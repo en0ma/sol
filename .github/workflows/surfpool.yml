@@ -129,6 +129,10 @@ jobs:
           name: whirlpool-verification-report
           path: ${{ runner.temp }}/whirlpool-report.json
           if-no-files-found: ignore
+      - name: Require verified pool fixture for swap-stage readiness
+        env:
+          POOL_VERIFICATION_REPORT: ${{ runner.temp }}/whirlpool-report.json
+        run: python3 -m arb.pool_readiness
       - name: Test on-chain account discovery against Surfpool
         run: python3 -m unittest discover -s tests -p test_onchain_discovery.py -v
       - name: Upload fork logs on failure
