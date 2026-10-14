@@ -13,6 +13,7 @@ from arb.orca_whirlpool import PROGRAM, fetch_pool
 from arb.whirlpool_swap import build_swap, inspect_swap_requirements
 
 def oracle_address(pool_address):
+    from solders.pubkey import Pubkey
     key=Pubkey.from_string(pool_address)
     program=Pubkey.from_string(PROGRAM)
     return str(Pubkey.find_program_address([b"oracle",bytes(key)],program)[0])
