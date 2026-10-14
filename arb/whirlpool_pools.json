@@ -1,4 +1,11 @@
 {
-  "note": "Pin independently verified Whirlpool pool public keys here; do not invent addresses.",
-  "pools": []
+  "note": "Candidate mainnet Whirlpool addresses from public references; must pass on-chain owner/mint/liquidity verification in Surfpool CI.",
+  "pools": [
+    {
+      "address": "7qbRF6Yq2ZjND7d46CxXQQpNh6GtB4MR8rxGzeWfSJ7L"
+    },
+    {
+      "address": "Czfq3x4X4QaGb5SQQrRQCrEY8Y2aE6R1pjcBsscFGufA"
+    }
+  ]
 }
