@@ -32,7 +32,7 @@ def main():
         raise RuntimeError("Local Surfpool airdrop not reflected")
     hash_value = call(rpc, "getLatestBlockhash")["value"]["blockhash"]
     ix = transfer(TransferParams(from_pubkey=payer.pubkey(),
-                                 to_pubkey=receiver, lamports=1000))
+                                 to_pubkey=receiver, lamports=1_000_000))
     tx = Transaction.new_signed_with_payer([ix], payer.pubkey(), [payer], Hash.from_string(hash_value))
     import base64
     wire = base64.b64encode(bytes(tx)).decode("ascii")
