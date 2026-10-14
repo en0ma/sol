@@ -76,6 +76,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_clmm_local_alt.py -v
       - name: Test versioned transaction lookup-table safety
         run: python3 -m unittest discover -s tests -p test_clmm_v0.py -v
+      - name: Test fail-closed RAY-to-WSOL third-leg readiness
+        run: python3 -m unittest discover -s tests -p test_third_leg_readiness.py -v
       - name: Test CLMM simulation post-balance assertions
         run: python3 -m unittest discover -s tests -p test_raydium_clmm_execution.py -v
       - name: Test CLMM candidate fixture safety gates
@@ -306,6 +308,17 @@ jobs:
         with:
           name: onchain-dex-venue-registry
           path: ${{ runner.temp }}/dex-venues.json
+          if-no-files-found: ignore
+      - name: Verify prospective RAY-to-WSOL third leg via Solana RPC
+        env:
+          THIRD_LEG_REPORT: ${{ runner.temp }}/third-leg-readiness.json
+        run: python3 -m arb.third_leg_readiness
+      - name: Upload third-leg pool verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ray-wsol-third-leg-readiness
+          path: ${{ runner.temp }}/third-leg-readiness.json
           if-no-files-found: ignore
       - name: Attempt simulation-only CPMM to CLMM route with local funding
         env:
