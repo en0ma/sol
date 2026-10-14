@@ -10,6 +10,7 @@ from arb.rpc import call
 from arb.orca_whirlpool import PROGRAM as ORCA,SIZE as ORCA_SIZE,decode as decode_orca,SOL,USDC
 from arb.raydium_cpmm import PROGRAM as RAY, SIZE as RAY_SIZE,decode as decode_ray
 from arb.raydium_clmm import PROGRAM as CLMM,SIZE as CLMM_SIZE,decode as decode_clmm,verify as verify_clmm
+from arb.meteora_dlmm import PROGRAM as DLMM,SIZE as DLMM_SIZE,decode as decode_dlmm,verify as verify_dlmm
 from arb.whirlpool_snapshot import snapshot
 from arb.token_vaults import TOKEN_PROGRAM,decode_token_account
 
@@ -18,7 +19,8 @@ JUP="JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN"
 MINTS={"WSOL":SOL,"USDC":USDC,"USDT":USDT,"JUP":JUP}
 VENUES={"orca":(ORCA,ORCA_SIZE,101,181,decode_orca),
         "raydium_cpmm":(RAY,RAY_SIZE,168,200,decode_ray),
-        "raydium_clmm":(CLMM,CLMM_SIZE,73,105,decode_clmm)}
+        "raydium_clmm":(CLMM,CLMM_SIZE,73,105,decode_clmm),
+        "meteora_dlmm":(DLMM,DLMM_SIZE,88,120,decode_dlmm)}
 
 def search_pair(rpc,venue,mint_a,mint_b,limit=8):
     if venue not in VENUES or mint_a==mint_b:raise ValueError("invalid search")
@@ -39,14 +41,17 @@ def search_pair(rpc,venue,mint_a,mint_b,limit=8):
                 raise ValueError("wrong program owner")
             raw=base64.b64decode(entry["account"]["data"][0],validate=True)
             decoded=decode(raw)
-            pair=(decoded["token_mint_a"],decoded["token_mint_b"]) if venue=="orca" else (
+            pair=(decoded["token_x_mint"],decoded["token_y_mint"]) if venue=="meteora_dlmm" else (
+                (decoded["token_mint_a"],decoded["token_mint_b"]) if venue=="orca" else (
                 decoded["token_mint_0"],decoded["token_mint_1"]) if venue=="raydium_clmm" else (
-                decoded["token_0_mint"],decoded["token_1_mint"])
+                decoded["token_0_mint"],decoded["token_1_mint"])))
             if pair!=(a,b):raise ValueError("mint filter mismatch")
             found[entry["pubkey"]]=decoded
     return found
 
 def verify(rpc,venue,address,state):
+    if venue=="meteora_dlmm":
+        return verify_dlmm(rpc,address,state)
     if venue=="raydium_clmm":
         return verify_clmm(rpc,address,state)
     if venue=="orca":

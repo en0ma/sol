@@ -13,5 +13,6 @@ class VenueRegistryTests(unittest.TestCase):
         self.assertTrue(output["raydium_clmm"]["pool_decoder_available"])
         self.assertFalse(output["raydium_clmm"]["swap_simulator_available"])
         self.assertFalse(output["meteora_dlmm"]["swap_simulator_available"])
+        self.assertTrue(output["meteora_dlmm"]["pool_decoder_available"])
         self.assertFalse(output["orca"]["pool_verified"])
         self.assertEqual(account.call_count,len(PROGRAMS))

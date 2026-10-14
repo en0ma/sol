@@ -15,7 +15,7 @@ PROGRAM_VENUES={
   "Meteora DAMM v2":"meteora_damm_v2",
   "Orca Whirlpools":"orca",
 }
-POOL_DECODERS={"orca","raydium_cpmm","raydium_clmm"}
+POOL_DECODERS={"orca","raydium_cpmm","raydium_clmm","meteora_dlmm"}
 EXECUTABLE={"orca","raydium_cpmm"}
 
 def probe(rpc):
