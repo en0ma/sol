@@ -58,6 +58,8 @@ jobs:
 
       - name: Test conservative residual-token valuation
         run: python3 -m unittest discover -s tests -p test_whirlpool_accounting.py -v
+      - name: Test Raydium CPMM on-chain decoder and restricted search
+        run: python3 -m unittest discover -s tests -p test_raydium_cpmm.py -v
       - name: Test exact-output atomic swap instruction semantics
         run: python3 -m unittest discover -s tests -p test_whirlpool_exact_output.py -v
       - name: Test atomic Whirlpool round-trip accounting
@@ -210,6 +212,9 @@ jobs:
         run: python3 -m arb.whirlpool_simulation
       - name: Simulate atomic WSOL USDC WSOL round trip
         run: python3 -m arb.whirlpool_roundtrip
+      - name: Report independently verified Raydium CPMM fixtures
+        run: |
+          python3 -m arb.raydium_cpmm || test "$?" -eq 2
       - name: Require verified pool fixture for swap-stage readiness
         env:
           POOL_VERIFICATION_REPORT: ${{ runner.temp }}/whirlpool-report.json
