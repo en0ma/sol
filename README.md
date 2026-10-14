@@ -38,3 +38,11 @@ The probe verifies that the configured Meteora DLMM, Orca Whirlpool, Raydium CLM
 The pool probe fails on missing accounts or unexpected owners. No pool addresses are committed yet, so passing the program-account probe is **not** validation of any pool price or swap route.
 
 GitHub push/PR CI separately runs Surfpool offline RPC tests and local PnL/RPC unit tests, without fetching mainnet state. Do not treat any of these as successful live-trade simulations. Future work: ingest verified pool listings, decode fee/liquidity state, build atomic swap instructions, simulate transactions on the fork, and reconcile failure/priority costs.
+
+## Live pool discovery (Raydium)
+After starting Surfpool in fork mode, run:
+```bash
+python3 -m arb.discover_raydium --output /tmp/discovered-pools.json
+POOL_MANIFEST=/tmp/discovered-pools.json python3 -m arb.fork_probe
+```
+Pool metadata comes from Raydium API v3; the script requires a local Surfpool account read to confirm actual owners. It currently discovers only Raydium CLMM/CPMM SOL-USDC pools. The manual GitHub Actions fork job performs these steps with the `SOLANA_MAINNET_RPC_URL` secret. No credentials are embedded in source. Pool discovery may fail when public API fields change, forked state is unavailable, RPC quotas are exhausted, or no matching pools exist. A passing result is **not** an executable swap or proof of profit.
