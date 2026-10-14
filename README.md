@@ -23,3 +23,6 @@ python3 -m arb.fork_probe
 
 ## Current boundary
 Passing tests prove RPC connectivity, deployed program accounts and a local System Program transaction simulation. They do **not** prove executable AMM swaps, prices, triangular routes, or profitable arbitrage. Next implement protocol-specific account decoders, restricted pool queries, quote math, and full atomic swap simulation before considering any execution.
+
+## Required on-chain pool readiness gate
+The CI fork job now runs `arb.pool_readiness` after writing the Whirlpool verification report. It **intentionally fails** when the report is `NOT_CONFIGURED` or `FAIL`. A passing program loader check and System Program transfer are not sufficient evidence of a testable DEX swap. Pin a real Whirlpool public key in `arb/whirlpool_pools.json` only after its on-chain owner, Whirlpool discriminator, token mints, vaults, and liquidity have been verified. The RPC secret is never printed or stored in artifacts.
