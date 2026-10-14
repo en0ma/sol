@@ -7,7 +7,7 @@ import argparse
 import json
 import os
 from arb.orca_whirlpool import fetch_pool, SOL, USDC
-from arb.token_vaults import verify_whirlpool_vaults
+from arb.whirlpool_snapshot import snapshot
 
 def verify(rpc, pools):
     if not pools:
@@ -15,14 +15,15 @@ def verify(rpc, pools):
     output = []
     for pool in pools:
         address = pool["address"]
-        state = fetch_pool(rpc, address)
+        same_slot = snapshot(rpc, address) if pool.get("verify_vaults", True) else None
+        state = same_slot["pool"] if same_slot is not None else fetch_pool(rpc, address)
         expected = set(pool.get("mints", [SOL, USDC]))
         if len(expected) != 2 or {state["token_mint_a"], state["token_mint_b"]} != expected:
             raise ValueError("Unexpected token mints for " + address)
         if int(state["liquidity"]) <= 0:
             raise ValueError("Zero Whirlpool liquidity for " + address)
         if pool.get('verify_vaults', True):
-            state['vault_validation'] = verify_whirlpool_vaults(rpc, state)
+            state['vault_validation'] = {'slot': same_slot['slot'], 'vault_a': same_slot['vault_a'], 'vault_b': same_slot['vault_b']}
         output.append(state)
     return output
 
