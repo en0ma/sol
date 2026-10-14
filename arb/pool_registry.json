@@ -1,0 +1,13 @@
+{
+  "note": "Persistent verified identity hints; every CI run revalidates pool state and vaults before use.",
+  "pools": [
+    {
+      "venue": "orca",
+      "address": "7qbRF6YsyGuLUVs6Y1q64bdVrfe4ZcUUz1JRdoVNUJnm"
+    },
+    {
+      "venue": "raydium_cpmm",
+      "address": "7JuwJuNU88gurFnyWeiyGKbFmExMWcmRZntn9imEzdny"
+    }
+  ]
+}
