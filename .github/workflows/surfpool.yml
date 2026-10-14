@@ -56,6 +56,8 @@ jobs:
           cat "$RUNNER_TEMP/surfpool.log" >&2
           exit 1
 
+      - name: Test atomic Whirlpool simulation guardrails
+        run: python3 -m unittest discover -s tests -p test_whirlpool_simulation.py -v
       - name: Test swap preflight safety gates
         run: python3 -m unittest discover -s tests -p test_whirlpool_preflight.py -v
       - name: Test Orca swap instruction payload
@@ -196,6 +198,8 @@ jobs:
           PY
       - name: Simulate Orca swap preflight on Surfpool
         run: python3 -m arb.whirlpool_preflight
+      - name: Simulate atomic WSOL to USDC Whirlpool swap
+        run: python3 -m arb.whirlpool_simulation
       - name: Require verified pool fixture for swap-stage readiness
         env:
           POOL_VERIFICATION_REPORT: ${{ runner.temp }}/whirlpool-report.json
