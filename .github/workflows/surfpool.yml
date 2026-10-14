@@ -57,6 +57,8 @@ jobs:
           exit 1
 
       - name: Run arbitrage arithmetic tests
+        env:
+          RUN_SURFPOOL_INTEGRATION: '1'
         run: python3 -m unittest discover -s tests -v
 
       # Future: run atomic swap integration tests with forked program accounts.
@@ -67,4 +69,54 @@ jobs:
         with:
           name: surfpool-log
           path: ${{ runner.temp }}/surfpool.log
+          if-no-files-found: ignore
+
+  mainnet-fork-probe:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SOLANA_RPC_URL: http://127.0.0.1:8899
+      SURFPOOL_DATASOURCE_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check datasource is configured
+        run: |
+          if [ -z "$SURFPOOL_DATASOURCE_RPC_URL" ]; then
+            echo "Configure repository secret SOLANA_MAINNET_RPC_URL to enable fork verification." >&2
+            exit 1
+          fi
+      - name: Install Surfpool
+        run: |
+          set -euo pipefail
+          curl --fail --show-error --silent --location https://run.surfpool.run/ -o /tmp/install-surfpool.sh
+          bash /tmp/install-surfpool.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - name: Start Surfpool mainnet fork
+        run: |
+          nohup surfpool start --ci --rpc-url "$SURFPOOL_DATASOURCE_RPC_URL" --no-deploy > "$RUNNER_TEMP/fork.log" 2>&1 < /dev/null &
+          echo $! > "$RUNNER_TEMP/fork.pid"
+      - name: Wait for RPC
+        run: |
+          python3 - <<'PY'
+          import time
+          from arb.rpc import call
+          for i in range(60):
+              try:
+                  assert call("http://127.0.0.1:8899", "getLatestBlockhash")["value"]["blockhash"]
+                  break
+              except Exception:
+                  time.sleep(2)
+          else:
+              raise SystemExit("Surfpool fork RPC unavailable")
+          PY
+      - name: Probe DEX program and pool accounts
+        run: python3 -m arb.fork_probe
+      - name: Upload fork logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surfpool-mainnet-fork-log
+          path: ${{ runner.temp }}/fork.log
           if-no-files-found: ignore
