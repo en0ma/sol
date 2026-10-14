@@ -56,6 +56,8 @@ jobs:
           cat "$RUNNER_TEMP/surfpool.log" >&2
           exit 1
 
+      - name: Test Orca swap instruction payload
+        run: python3 -m unittest discover -s tests -p test_whirlpool_swap.py -v
       - name: Run Whirlpool tick-array math tests
         run: python3 -m unittest discover -s tests -p test_whirlpool_ticks.py -v
       - name: Run serialized transaction replay contract tests
@@ -181,6 +183,15 @@ jobs:
           if-no-files-found: ignore
       - name: Inspect nearby on-chain tick arrays
         run: python3 -m arb.whirlpool_ticks
+      - name: Check on-chain swap account readiness
+        run: |
+          python3 - <<'PY'
+          import json,os
+          from arb.whirlpool_swap import inspect_swap_requirements
+          with open("arb/whirlpool_pools.json") as f: pools=json.load(f)["pools"]
+          for p in pools:
+              print(json.dumps(inspect_swap_requirements(os.environ["SOLANA_RPC_URL"],p["address"]),indent=2))
+          PY
       - name: Require verified pool fixture for swap-stage readiness
         env:
           POOL_VERIFICATION_REPORT: ${{ runner.temp }}/whirlpool-report.json
