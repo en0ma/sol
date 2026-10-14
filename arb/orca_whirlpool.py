@@ -22,7 +22,7 @@ def b58(data):
     while value:
         value, digit = divmod(value, 58)
         output = ALPHABET[digit] + output
-    return "1" * (len(data) - len(data.lstrip(b"\\x00"))) + output
+    return "1" * (len(data) - len(data.lstrip(bytes([0])))) + output
 
 def decode(raw):
     if len(raw) != SIZE or raw[:8] != DISCRIMINATOR:
