@@ -58,6 +58,8 @@ jobs:
 
       - name: Test conservative residual-token valuation
         run: python3 -m unittest discover -s tests -p test_whirlpool_accounting.py -v
+      - name: Test Raydium published-pool diagnostic
+        run: python3 -m unittest discover -s tests -p test_raydium_candidate.py -v
       - name: Test Raydium CPMM on-chain decoder and restricted search
         run: python3 -m unittest discover -s tests -p test_raydium_cpmm.py -v
       - name: Test exact-output atomic swap instruction semantics
@@ -212,6 +214,17 @@ jobs:
         run: python3 -m arb.whirlpool_simulation
       - name: Simulate atomic WSOL USDC WSOL round trip
         run: python3 -m arb.whirlpool_roundtrip
+      - name: Check published Raydium CPMM pool against on-chain mints
+        env:
+          RAYDIUM_CANDIDATE_REPORT: ${{ runner.temp }}/raydium-candidate.json
+        run: python3 -m arb.raydium_candidate
+      - name: Upload Raydium candidate report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: raydium-candidate
+          path: ${{ runner.temp }}/raydium-candidate.json
+          if-no-files-found: ignore
       - name: Report independently verified Raydium CPMM fixtures
         run: |
           python3 -m arb.raydium_cpmm || test "$?" -eq 2
