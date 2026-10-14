@@ -15,6 +15,7 @@ PROGRAM_VENUES={
   "Meteora DAMM v2":"meteora_damm_v2",
   "Orca Whirlpools":"orca",
 }
+POOL_DECODERS={"orca","raydium_cpmm","raydium_clmm"}
 EXECUTABLE={"orca","raydium_cpmm"}
 
 def probe(rpc):
@@ -25,10 +26,10 @@ def probe(rpc):
                    and account.get("owner_matches") is True)
         venue=PROGRAM_VENUES[name]
         results[venue]={"program":address,"program_verified":available,
-             "pool_decoder_available":venue in EXECUTABLE,
+             "pool_decoder_available":venue in POOL_DECODERS,
              "swap_simulator_available":venue in EXECUTABLE,
              "pool_verified":False,
-             "status":("READY_FOR_POOL_VALIDATION" if available and venue in EXECUTABLE
+             "status":("READY_FOR_POOL_VALIDATION" if available and venue in POOL_DECODERS
                 else "PROGRAM_ONLY" if available else "PROGRAM_UNAVAILABLE")}
     return {"venues":results,"rpc_only":True,"new_swap_execution_demonstrated":False}
 
