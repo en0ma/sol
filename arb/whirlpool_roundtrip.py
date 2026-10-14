@@ -15,6 +15,7 @@ from arb.whirlpool_preflight import verify_oracle
 from arb.whirlpool_swap import build_swap, inspect_swap_requirements
 from arb.whirlpool_simulation import prepare_token_accounts, TOKEN_SPACE
 from arb.token_vaults import decode_token_account, TOKEN_PROGRAM
+from arb.whirlpool_accounting import assess
 
 def measure_roundtrip(value, state, input_amount, second_leg_input):
     if value.get("err") is not None:
@@ -116,6 +117,7 @@ def run(rpc,pool_address,input_amount=1000000,second_leg_input=10000):
         stats["estimated_network_fee_lamports"]=None
         stats["wsol_delta_after_network_fee_lamports"]=None
     output.update(stats)
+    output["valuation"]=assess(stats,state)
     output["status"]="PASS"
     output["roundtrip_success"]=True
     output["profit_claim"]=False # residual USDC / fees require full accounting
