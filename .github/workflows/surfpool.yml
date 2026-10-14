@@ -72,6 +72,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_meteora_damm_v2.py -v
       - name: Test Meteora DLMM pool layout and mint filters
         run: python3 -m unittest discover -s tests -p test_meteora_dlmm.py -v
+      - name: Test CLMM candidate fixture safety gates
+        run: python3 -m unittest discover -s tests -p test_raydium_clmm_candidates.py -v
       - name: Test CLMM fork readiness reporting
         run: python3 -m unittest discover -s tests -p test_clmm_pool_readiness.py -v
       - name: Test CLMM tick-array PDA start and packed account layout
@@ -298,6 +300,17 @@ jobs:
         with:
           name: onchain-dex-venue-registry
           path: ${{ runner.temp }}/dex-venues.json
+          if-no-files-found: ignore
+      - name: Check published CLMM pool candidate against live fork
+        env:
+          CLMM_CANDIDATE_REPORT: ${{ runner.temp }}/clmm-candidates.json
+        run: python3 -m arb.raydium_clmm_candidates
+      - name: Upload Raydium CLMM candidate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: raydium-clmm-candidate
+          path: ${{ runner.temp }}/clmm-candidates.json
           if-no-files-found: ignore
       - name: Report pinned CLMM tick-array readiness
         env:
