@@ -112,6 +112,10 @@ jobs:
           else:
               raise SystemExit("Surfpool fork RPC unavailable")
           PY
+      - name: Install transaction serialization dependency
+        run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Simulate a signed local transaction
+        run: python3 -m arb.simulate_transfer
       - name: Probe deployed AMM programs and configured pools
         run: python3 -m arb.fork_probe
       - name: Discover Raydium pools (non-blocking external API)
