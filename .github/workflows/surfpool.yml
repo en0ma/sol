@@ -56,6 +56,8 @@ jobs:
           cat "$RUNNER_TEMP/surfpool.log" >&2
           exit 1
 
+      - name: Test actual simulated token balance assertions
+        run: python3 -m unittest discover -s tests -p test_simulated_balances.py -v
       - name: Test atomic Whirlpool simulation guardrails
         run: python3 -m unittest discover -s tests -p test_whirlpool_simulation.py -v
       - name: Test swap preflight safety gates

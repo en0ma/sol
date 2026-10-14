@@ -12,7 +12,7 @@ from arb.rpc import call
 from arb.orca_whirlpool import SOL, USDC, fetch_pool
 from arb.whirlpool_preflight import verify_oracle
 from arb.whirlpool_swap import build_swap, inspect_swap_requirements
-from arb.token_vaults import TOKEN_PROGRAM
+from arb.token_vaults import TOKEN_PROGRAM, decode_token_account
 
 TOKEN_SPACE = 165
 
@@ -52,6 +52,32 @@ def prepare_token_accounts(payer, account_a, account_b, mint_a, mint_b,
                                    [AccountMeta(acct.pubkey(),False,True)]))
     return out
 
+def extract_balances(value, address_a, address_b, state, input_amount, input_is_a):
+    """Validate post-simulation account states; an invoke log alone is insufficient."""
+    accounts = value.get("accounts")
+    if not isinstance(accounts, list) or len(accounts) != 2:
+        raise ValueError("simulateTransaction omitted requested post-simulation token accounts")
+    results = []
+    for item, mint in zip(accounts, (state["token_mint_a"], state["token_mint_b"])):
+        if not isinstance(item, dict) or item.get("owner") != TOKEN_PROGRAM:
+            raise ValueError("simulated token account absent or wrong owner")
+        data = item.get("data")
+        if not isinstance(data, list) or len(data) != 2 or data[1] != "base64":
+            raise ValueError("invalid simulated token encoding")
+        decoded = decode_token_account(base64.b64decode(data[0], validate=True))
+        if decoded["mint"] != mint:
+            raise ValueError("simulated token mint mismatch")
+        results.append(decoded["amount_base_units"])
+    remaining = results[0 if input_is_a else 1]
+    received = results[1 if input_is_a else 0]
+    spent = input_amount - remaining
+    if spent <= 0 or spent > input_amount or received <= 0:
+        raise ValueError("swap did not debit input and credit output")
+    return {"input_mint":state["token_mint_a"] if input_is_a else state["token_mint_b"],
+            "output_mint":state["token_mint_b"] if input_is_a else state["token_mint_a"],
+            "input_amount_base_units":input_amount,"spent_base_units":spent,
+            "received_base_units":received,"remaining_input_base_units":remaining}
+
 def run(rpc, pool_address, input_amount=1000000):
     state=fetch_pool(rpc,pool_address)
     a_to_b=state["token_mint_a"]==SOL
@@ -90,16 +116,23 @@ def run(rpc, pool_address, input_amount=1000000):
         raise ValueError("swap transaction exceeds Solana packet size")
     response=call(rpc,"simulateTransaction",[
         base64.b64encode(wire).decode(),{"encoding":"base64",
-                                       "sigVerify":True,"commitment":"processed"}])
+                                       "sigVerify":True,"commitment":"processed",
+                                       "accounts":{"encoding":"base64","addresses":[str(acct_a.pubkey()),str(acct_b.pubkey())]}}])
     v=response.get("value",{})
     logs=v.get("logs") or []
     from arb.orca_whirlpool import PROGRAM
     invoked=any("Program "+PROGRAM+" invoke" in item for item in logs)
     succeeded=v.get("err") is None and invoked
+    balances = None
+    if succeeded:
+        balances = extract_balances(v,str(acct_a.pubkey()),str(acct_b.pubkey()),
+                                    state,input_amount,a_to_b)
+    succeeded = succeeded and balances is not None
     return {"status":"PASS" if succeeded else "SIMULATION_FAILED",
             "swap_success":succeeded,"program_invoked":invoked,"error":v.get("err"),
             "compute_units":v.get("unitsConsumed"),"transaction_bytes":len(wire),
             "pool":pool_address,"direction":direction,"local_only":True,
+            "token_balance_changes":balances,
             "log_tail":logs[-12:]}
 
 def main():
