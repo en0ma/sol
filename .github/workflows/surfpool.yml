@@ -56,6 +56,8 @@ jobs:
           cat "$RUNNER_TEMP/surfpool.log" >&2
           exit 1
 
+      - name: Run serialized transaction replay contract tests
+        run: python3 -m unittest arb.transaction_replay.ReplayTests -v
       - name: Run Whirlpool spot mathematics and market gate tests
         run: python3 -m unittest arb.whirlpool_market.MarketTests -v
       - name: Run arbitrage arithmetic tests
@@ -151,6 +153,29 @@ jobs:
         with:
           name: whirlpool-market-state
           path: ${{ runner.temp }}/whirlpool-market.json
+          if-no-files-found: ignore
+      - name: Simulate captured AMM transactions when fixtures exist
+        env:
+          REPLAY_REPORT: ${{ runner.temp }}/replay-report.json
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess
+          with open("arb/replay_cases.json") as f:
+              manifest=json.load(f)
+          if manifest.get("cases"):
+              subprocess.run(["python3","-m","arb.transaction_replay","--output",
+                              os.environ["REPLAY_REPORT"]],check=True)
+          else:
+              with open(os.environ["REPLAY_REPORT"],"w") as f:
+                  json.dump({"status":"NOT_CONFIGURED","passed":False,"results":[]},f)
+              print("NOT_CONFIGURED: captured AMM simulation fixtures unavailable")
+          PY
+      - name: Upload transaction replay report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surfpool-transaction-replay
+          path: ${{ runner.temp }}/replay-report.json
           if-no-files-found: ignore
       - name: Require verified pool fixture for swap-stage readiness
         env:
