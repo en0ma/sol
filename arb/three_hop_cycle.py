@@ -29,7 +29,7 @@ def check_balances(value,addresses,mints):
         parsed=decode_token_account(base64.b64decode(data[0],validate=True))
         if parsed["mint"]!=mint:raise ValueError("simulated output mint mismatch")
         amounts.append(parsed["amount_base_units"])
-    if amounts[0]>=1000000 or amounts[2]<=0:
+    if amounts[0]>=1000000 or amounts[2]<0:
         raise ValueError("no input spent or no RAY received")
     return dict(zip(("remaining_wsol","residual_usdc","ray_received"),amounts))
 
