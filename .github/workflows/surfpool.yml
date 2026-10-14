@@ -56,6 +56,8 @@ jobs:
           cat "$RUNNER_TEMP/surfpool.log" >&2
           exit 1
 
+      - name: Test atomic Whirlpool round-trip accounting
+        run: python3 -m unittest discover -s tests -p test_whirlpool_roundtrip.py -v
       - name: Test actual simulated token balance assertions
         run: python3 -m unittest discover -s tests -p test_simulated_balances.py -v
       - name: Test atomic Whirlpool simulation guardrails
@@ -202,6 +204,8 @@ jobs:
         run: python3 -m arb.whirlpool_preflight
       - name: Simulate atomic WSOL to USDC Whirlpool swap
         run: python3 -m arb.whirlpool_simulation
+      - name: Simulate atomic WSOL USDC WSOL round trip
+        run: python3 -m arb.whirlpool_roundtrip
       - name: Require verified pool fixture for swap-stage readiness
         env:
           POOL_VERIFICATION_REPORT: ${{ runner.temp }}/whirlpool-report.json
