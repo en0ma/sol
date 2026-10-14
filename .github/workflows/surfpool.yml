@@ -60,6 +60,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_whirlpool_accounting.py -v
       - name: Test Raydium to Orca reverse route wiring
         run: python3 -m unittest discover -s tests -p test_reverse_sweep.py -v
+      - name: Test multi-token on-chain discovery filters
+        run: python3 -m unittest discover -s tests -p test_onchain_pool_discovery.py -v
       - name: Test bounded route sweep and profit filter
         run: python3 -m unittest discover -s tests -p test_cross_venue_sweep.py -v
       - name: Test cross-venue safety gates
@@ -259,6 +261,18 @@ jobs:
         with:
           name: cross-venue-size-sweep
           path: ${{ runner.temp }}/cross-venue-sweep.json
+          if-no-files-found: ignore
+      - name: Discover additional on-chain SOL token pools
+        env:
+          DEX_DISCOVERY_REPORT: ${{ runner.temp }}/dex-discovery.json
+        run: |
+          python3 -m arb.onchain_pool_discovery --pairs WSOL/USDT --limit 8 || test "$?" -eq 2
+      - name: Upload multi-token pool discovery results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: onchain-multi-token-discovery
+          path: ${{ runner.temp }}/dex-discovery.json
           if-no-files-found: ignore
       - name: Report independently verified Raydium CPMM fixtures
         run: |
