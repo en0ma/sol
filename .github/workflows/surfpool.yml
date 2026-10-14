@@ -56,6 +56,8 @@ jobs:
           cat "$RUNNER_TEMP/surfpool.log" >&2
           exit 1
 
+      - name: Run Whirlpool spot mathematics and market gate tests
+        run: python3 -m arb.whirlpool_market --self-test
       - name: Run arbitrage arithmetic tests
         env:
           RUN_SURFPOOL_INTEGRATION: '1'
@@ -128,6 +130,27 @@ jobs:
         with:
           name: whirlpool-verification-report
           path: ${{ runner.temp }}/whirlpool-report.json
+          if-no-files-found: ignore
+      - name: Analyze pinned Whirlpool spot state on fork
+        env:
+          WHIRLPOOL_MARKET_REPORT: ${{ runner.temp }}/whirlpool-market.json
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess
+          with open("arb/whirlpool_pools.json") as f:
+              pools=json.load(f)["pools"]
+          if not pools:
+              print("NOT_CONFIGURED: no verified pool; market-state scan unavailable")
+          else:
+              subprocess.run(["python3","-m","arb.whirlpool_market","--output",
+                              os.environ["WHIRLPOOL_MARKET_REPORT"]],check=True)
+          PY
+      - name: Upload market-state report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: whirlpool-market-state
+          path: ${{ runner.temp }}/whirlpool-market.json
           if-no-files-found: ignore
       - name: Require verified pool fixture for swap-stage readiness
         env:
