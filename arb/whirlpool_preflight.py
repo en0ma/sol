@@ -34,18 +34,21 @@ def verify_oracle(rpc,pool_address):
     return pubkey
 
 def preflight(rpc,pool_address,amount=1000,a_to_b=True):
-    from solders.keypair import Keypair
-    from solders.pubkey import Pubkey
-    from solders.hash import Hash
-    from solders.transaction import Transaction
     # Pool and oracle must be checked via forked on-chain accounts.
     state=fetch_pool(rpc,pool_address)
-    oracle=verify_oracle(rpc,pool_address)
+    try:
+        oracle=verify_oracle(rpc,pool_address)
+    except ValueError as exc:
+        return {"status":"BLOCKED_ORACLE","swap_success":False,
+                "pool":pool_address,"reason":str(exc)}
     requirements=inspect_swap_requirements(rpc,pool_address)
     direction="a_to_b" if a_to_b else "b_to_a"
     if not requirements["directions"][direction]["available"]:
         return {"status":"BLOCKED_TICK_ARRAYS","swap_success":False,
                 "pool":pool_address,"direction":direction,"oracle":oracle}
+    from solders.keypair import Keypair
+    from solders.hash import Hash
+    from solders.transaction import Transaction
     signer=Keypair()
     # Deliberately nonexistent user token accounts. This is an instruction
     # execution preflight, not a successful asset transfer simulation.
