@@ -8,7 +8,7 @@ class WhirlpoolSwapEncodingTests(unittest.TestCase):
         self.assertEqual(data[:8],DISC)
         self.assertEqual(int.from_bytes(data[8:16],"little"),123)
         self.assertEqual(int.from_bytes(data[16:24],"little"),100)
-        self.assertEqual(data[-2:],b"\\x01\\x01")
+        self.assertEqual(data[-2:],bytes([1,1]))
 
     def test_bad_amount(self):
         with self.assertRaises(ValueError): encode_swap(0,0,MIN_SQRT)
