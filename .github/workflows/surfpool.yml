@@ -72,6 +72,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_meteora_damm_v2.py -v
       - name: Test Meteora DLMM pool layout and mint filters
         run: python3 -m unittest discover -s tests -p test_meteora_dlmm.py -v
+      - name: Test Raydium CLMM swap v2 instruction serialization
+        run: python3 -m unittest discover -s tests -p test_raydium_clmm_swap.py -v
       - name: Test Raydium CLMM packed pool decoder
         run: python3 -m unittest discover -s tests -p test_raydium_clmm.py -v
       - name: Test Raydium CLMM discovery filters
