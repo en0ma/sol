@@ -75,14 +75,22 @@ def run(rpc,cp_pool,cl_pool):
     legacy_size=len(bytes(tx))
     if legacy_size>1232:
         table=os.environ.get("SURFPOOL_CLMM_ALT_ADDRESS")
-        if not table:
-            return {"status":"ALT_REQUIRED","swap_success":False,
-                    "legacy_transaction_bytes":legacy_size,
-                    "transaction_limit_bytes":1232,"swap_executed":False,
-                    "broadcast":False}
         from arb.clmm_v0 import load_table,build_v0
+        from arb.clmm_local_alt import provision,require_local
         try:
-            tx=build_v0(ixs,payer,[payer,wsol,usdc,ray],bh,[load_table(rpc,table)])
+            if table:lookup=load_table(rpc,table)
+            else:
+                require_local(rpc)
+                keys=[]
+                for ix in ixs:
+                    for meta in ix.accounts:
+                        key=str(meta.pubkey)
+                        if not meta.is_signer and key not in keys:keys.append(key)
+                    key=str(ix.program_id)
+                    if key not in keys:keys.append(key)
+                lookup=provision(rpc,payer,keys[:24])
+            bh=call(rpc,"getLatestBlockhash")["value"]["blockhash"]
+            tx=build_v0(ixs,payer,[payer,wsol,usdc,ray],bh,[lookup])
         except ValueError as exc:
             return {"status":"ALT_UNAVAILABLE","swap_success":False,
                     "legacy_transaction_bytes":legacy_size,"reason":str(exc),

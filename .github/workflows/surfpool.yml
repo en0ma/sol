@@ -72,6 +72,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_meteora_damm_v2.py -v
       - name: Test Meteora DLMM pool layout and mint filters
         run: python3 -m unittest discover -s tests -p test_meteora_dlmm.py -v
+      - name: Test local-only lookup table guard
+        run: python3 -m unittest discover -s tests -p test_clmm_local_alt.py -v
       - name: Test versioned transaction lookup-table safety
         run: python3 -m unittest discover -s tests -p test_clmm_v0.py -v
       - name: Test CLMM simulation post-balance assertions
