@@ -310,7 +310,7 @@ jobs:
       - name: Attempt simulation-only CPMM to CLMM route with local funding
         env:
           CLMM_SWAP_REPORT: ${{ runner.temp }}/clmm-swap-attempt.json
-        run: python3 -m arb.raydium_clmm_execution || test "$?" -eq 2
+        run: python3 -m arb.raydium_clmm_execution
       - name: Upload CLMM swap attempt evidence
         if: always()
         uses: actions/upload-artifact@v4
