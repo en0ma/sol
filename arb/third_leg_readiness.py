@@ -7,7 +7,7 @@ No off-chain quote APIs, no transaction broadcast, and no profit claim.
 import base64,json,os
 from arb.rpc import call
 from arb.orca_whirlpool import PROGRAM as ORCA,SOL
-from arb.raydium_clmm import PROGRAM as CLMM
+from arb.onchain_pool_discovery import VENUES
 from arb.pool_registry import refresh
 from arb.whirlpool_swap import inspect_swap_requirements
 RAY="4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R"
@@ -19,18 +19,24 @@ def probe(rpc,address):
         account=call(rpc,"getAccountInfo",[address,{"encoding":"base64","commitment":"confirmed"}]).get("value")
         if not account:raise ValueError("pool account missing")
         owner=account.get("owner")
-        if owner!=ORCA:raise ValueError("candidate not an Orca Whirlpool")
-        checked=refresh(rpc,[{"venue":"orca","address":address,"mints":[RAY,SOL]}])
+        result["program_owner"]=owner
+        venue=next((name for name,(program,*_) in VENUES.items() if program==owner),None)
+        result["detected_venue"]=venue
+        if venue is None:raise ValueError("unsupported pool program owner")
+        checked=refresh(rpc,[{"venue":venue,"address":address,"mints":[RAY,SOL]}])
         if checked["verified_count"]!=1:raise ValueError("pool/vault validation failed: "+str(checked["rejected"])[:180])
         pool=checked["verified_pools"][0]
         if set(pool["mints"])!={RAY,SOL}:raise ValueError("not RAY/WSOL")
-        readiness=inspect_swap_requirements(rpc,address)
-        direction=("a_to_b" if pool["mints"][0]==RAY else "b_to_a")
-        result.update(status="POOL_VERIFIED",mints=pool["mints"],
-                      verified_slot=pool["slot"],
-                      direction=direction,
-                      tick_arrays_available=readiness["directions"][direction]["available"])
-        if result["tick_arrays_available"]:result["status"]="THIRD_LEG_READY_FOR_SIMULATION"
+        result.update(status="POOL_VERIFIED",mints=pool["mints"],verified_slot=pool["slot"])
+        if venue=="orca":
+            readiness=inspect_swap_requirements(rpc,address)
+            direction=("a_to_b" if pool["mints"][0]==RAY else "b_to_a")
+            result.update(direction=direction,tick_arrays_available=readiness["directions"][direction]["available"])
+            if result["tick_arrays_available"]:result["status"]="THIRD_LEG_READY_FOR_SIMULATION"
+        elif venue=="raydium_cpmm":
+            result["status"]="THIRD_LEG_READY_FOR_SIMULATION"
+        else:
+            result["status"]="POOL_VERIFIED_SWAP_NOT_IMPLEMENTED"
     except Exception as exc:
         result["error"]=type(exc).__name__+": "+str(exc)[:200]
     return result
