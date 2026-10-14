@@ -102,7 +102,7 @@ def run(rpc,cp_pool,cl_pool,orca_pool):
                         if not meta.is_signer and key not in keys:keys.append(key)
                     key=str(ix.program_id)
                     if key not in keys:keys.append(key)
-                lookup=provision(rpc,payer,keys[-24:])
+                lookup=provision(rpc,payer,keys[:48])
             bh=call(rpc,"getLatestBlockhash")["value"]["blockhash"]
             tx=build_v0(ixs,payer,[payer,wsol,usdc,ray],bh,[lookup])
         except ValueError as exc:

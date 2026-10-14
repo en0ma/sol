@@ -15,8 +15,8 @@ def provision(rpc,payer,addresses):
     from solders.instruction import Instruction,AccountMeta
     from solders.hash import Hash
     from solders.transaction import Transaction
-    if not 8<=len(addresses)<=24 or len(set(addresses))!=len(addresses):
-        raise ValueError("ALT requires 8-24 distinct addresses")
+    if not 8<=len(addresses)<=48 or len(set(addresses))!=len(addresses):
+        raise ValueError("ALT requires 8-48 distinct addresses")
     program=Pubkey.from_string(ALT_PROGRAM)
     slot=call(rpc,"getSlot",[{"commitment":"processed"}])
     if type(slot)is not int:raise ValueError("invalid local slot")
@@ -25,9 +25,13 @@ def provision(rpc,payer,addresses):
           AccountMeta(payer.pubkey(),True,True),
           AccountMeta(Pubkey.from_string("11111111111111111111111111111111"),False,False)]
     create=(0).to_bytes(4,"little")+slot.to_bytes(8,"little")+bytes([bump])
-    extend=(2).to_bytes(4,"little")+len(addresses).to_bytes(8,"little")
-    extend+=b"".join(bytes(Pubkey.from_string(k)) for k in addresses)
-    for payload in (create,extend):
+    extensions=[]
+    for offset in range(0,len(addresses),20):
+        chunk=addresses[offset:offset+20]
+        extension=(2).to_bytes(4,"little")+len(chunk).to_bytes(8,"little")
+        extension+=b"".join(bytes(Pubkey.from_string(k)) for k in chunk)
+        extensions.append(extension)
+    for payload in (create,*extensions):
         bh=call(rpc,"getLatestBlockhash")["value"]["blockhash"]
         tx=Transaction.new_signed_with_payer([Instruction(program,payload,keys)],payer.pubkey(),[payer],Hash.from_string(bh))
         if len(bytes(tx))>1232:raise ValueError("ALT setup packet too large")
