@@ -39,7 +39,7 @@ def select_tick_arrays(pool_address, current_tick, spacing, a_to_b):
 
 def build_swap(pool_address, state, user_authority, user_account_a,
                user_account_b, oracle, amount, min_output, a_to_b=True,
-               sqrt_price_limit=None):
+               sqrt_price_limit=None, amount_specified_is_input=True):
     """Return solders Instruction; caller must prepare user token accounts."""
     from solders.instruction import AccountMeta, Instruction
     from solders.pubkey import Pubkey
@@ -60,7 +60,7 @@ def build_swap(pool_address, state, user_authority, user_account_a,
             meta(state["token_vault_b"],writable=True),
             *(meta(k,writable=True) for k in tick_arrays),
             meta(oracle)]
-    payload = encode_swap(amount,min_output,sqrt_price_limit,True,a_to_b)
+    payload = encode_swap(amount,min_output,sqrt_price_limit,amount_specified_is_input,a_to_b)
     return Instruction(Pubkey.from_string(PROGRAM),payload,keys)
 
 def inspect_swap_requirements(rpc,pool_address):

@@ -58,6 +58,8 @@ jobs:
 
       - name: Test conservative residual-token valuation
         run: python3 -m unittest discover -s tests -p test_whirlpool_accounting.py -v
+      - name: Test exact-output atomic swap instruction semantics
+        run: python3 -m unittest discover -s tests -p test_whirlpool_exact_output.py -v
       - name: Test atomic Whirlpool round-trip accounting
         run: python3 -m unittest discover -s tests -p test_whirlpool_roundtrip.py -v
       - name: Test actual simulated token balance assertions

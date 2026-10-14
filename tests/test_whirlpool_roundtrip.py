@@ -22,13 +22,18 @@ class RoundtripTests(unittest.TestCase):
 
     def test_both_legs_and_balances(self):
         out=measure_roundtrip({"err":None,"logs":self.logs,
-             "accounts":[account(SOL,900),account(USDC,3)]},self.state,1000,1)
+             "accounts":[account(SOL,900),account(USDC,0)]},self.state,1000,1)
         self.assertEqual(out["whirlpool_invocations"],2)
         self.assertEqual(out["wsol_delta_before_network_fees"],-100)
 
     def test_one_swap_not_counted_as_roundtrip(self):
         with self.assertRaises(ValueError):
             measure_roundtrip({"err":None,"logs":self.logs[:2],
+                "accounts":[account(SOL,900),account(USDC,3)]},self.state,1000,1)
+
+    def test_residual_usdc_rejected(self):
+        with self.assertRaisesRegex(ValueError,"not closed"):
+            measure_roundtrip({"err":None,"logs":self.logs,
                 "accounts":[account(SOL,900),account(USDC,3)]},self.state,1000,1)
 
     def test_error_rejected(self):

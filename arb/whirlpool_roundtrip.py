@@ -1,6 +1,6 @@
 """Atomic two-leg Whirlpool round-trip: simulation only, never broadcast.
 
-Uses first swap's conservative minimum guaranteed output for second exact-input
+Uses first swap's exact specified USDC output for second exact-input
 swap. This is deliberately conservative, not dynamic use of first-leg proceeds.
 Reports observed WSOL loss/profit after transaction fees, no PnL inference
 from spot price.
@@ -42,10 +42,10 @@ def measure_roundtrip(value, state, input_amount, second_leg_input):
     remaining_usdc=amounts[1-native_index]
     if final_wsol < 0 or remaining_usdc < 0:
         raise ValueError("invalid output amounts")
-    # The second swap must actually spend its declared input amount. First
-    # swap output >= second_leg_input, so leftover USDC is allowed.
-    if second_leg_input <= 0:
-        raise ValueError("second leg amount invalid")
+    # First leg buys exactly second_leg_input USDC (subject to max WSOL),
+    # and second leg spends precisely that amount; no stranded USDC.
+    if second_leg_input <= 0 or remaining_usdc != 0:
+        raise ValueError("route is not closed: residual USDC remains")
     return {"start_wsol_lamports":input_amount,"end_wsol_lamports":final_wsol,
             "wsol_delta_before_network_fees":final_wsol-input_amount,
             "residual_usdc_base_units":remaining_usdc,
@@ -78,7 +78,8 @@ def run(rpc,pool_address,input_amount=1000000,second_leg_input=10000):
           state["token_mint_a"],state["token_mint_b"],forward,rent,input_amount)
     args=(pool_address,state,str(payer.pubkey()),
           str(acct_a.pubkey()),str(acct_b.pubkey()),oracle)
-    instructions.append(build_swap(*args,input_amount,second_leg_input,forward))
+    instructions.append(build_swap(*args,second_leg_input,input_amount,forward,
+                                   amount_specified_is_input=False))
     instructions.append(build_swap(*args,second_leg_input,1,not forward))
     blockhash=call(rpc,"getLatestBlockhash")["value"]["blockhash"]
     tx=Transaction.new_signed_with_payer(instructions,payer.pubkey(),
@@ -118,9 +119,14 @@ def run(rpc,pool_address,input_amount=1000000,second_leg_input=10000):
         stats["wsol_delta_after_network_fee_lamports"]=None
     output.update(stats)
     output["valuation"]=assess(stats,state)
+    output["closed_route"]=stats["residual_usdc_base_units"] == 0
+    output["net_wsol_pnl_lamports"]=stats["wsol_delta_after_network_fee_lamports"]
+    output["meets_minimum_profit"]= (output["closed_route"] and
+        output["net_wsol_pnl_lamports"] is not None and
+        output["net_wsol_pnl_lamports"] >= 10000)
     output["status"]="PASS"
     output["roundtrip_success"]=True
-    output["profit_claim"]=False # residual USDC / fees require full accounting
+    output["profit_claim"]=False  # simulated route, not a live opportunity
     return output
 
 def main():
