@@ -26,3 +26,15 @@ The scanner requests **sequential** offchain quotes from Jupiter Metis and repor
 - Reproduce the same route in one atomic transaction via Surfpool using forked state.
 - Account for compute units, token account rents, fees, tips and failure rate.
 - Add risk limits before any live trading.
+
+## Fork verification (manual GitHub Actions job)
+
+The `mainnet-fork-probe` job runs only through **Actions → Surfpool CI → Run workflow**. Before running, add a repository Actions secret named `SOLANA_MAINNET_RPC_URL` with a private mainnet RPC HTTPS URL. Surfpool uses this datasource to lazily fetch real mainnet program/account state.
+
+The probe verifies that the configured Meteora DLMM, Orca Whirlpool, Raydium CLMM, Raydium CPMM, and Meteora DAMM v2 program accounts are executable. To inspect **real pools**, add verified entries to `arb/pools.json` using:
+```json
+{"name":"Verified pool label","venue":"Orca Whirlpools","address":"REAL_BASE58_POOL_ADDRESS"}
+```
+The pool probe fails on missing accounts or unexpected owners. No pool addresses are committed yet, so passing the program-account probe is **not** validation of any pool price or swap route.
+
+GitHub push/PR CI separately runs Surfpool offline RPC tests and local PnL/RPC unit tests, without fetching mainnet state. Do not treat any of these as successful live-trade simulations. Future work: ingest verified pool listings, decode fee/liquidity state, build atomic swap instructions, simulate transactions on the fork, and reconcile failure/priority costs.
