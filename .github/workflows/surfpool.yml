@@ -56,8 +56,10 @@ jobs:
           cat "$RUNNER_TEMP/surfpool.log" >&2
           exit 1
 
-      # Add your Anchor / Rust / TypeScript integration tests here once code is present.
-      # Point test clients at SOLANA_RPC_URL.
+      - name: Run arbitrage arithmetic tests
+        run: python3 -m unittest discover -s tests -v
+
+      # Future: run atomic swap integration tests with forked program accounts.
 
       - name: Upload Surfpool log on failure
         if: failure()
