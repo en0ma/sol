@@ -118,25 +118,8 @@ jobs:
         run: python3 -m arb.simulate_transfer
       - name: Probe deployed AMM programs and configured pools
         run: python3 -m arb.fork_probe
-      - name: Discover Raydium pools (non-blocking external API)
-        continue-on-error: true
-        run: python3 -m arb.discover_raydium --output "$RUNNER_TEMP/discovered-pools.json"
-      - name: Validate discovered Raydium pools when available
-        env:
-          POOL_MANIFEST: ${{ runner.temp }}/discovered-pools.json
-        run: |
-          if [ -s "$POOL_MANIFEST" ]; then
-            python3 -m arb.fork_probe
-          else
-            echo "No discovered pool manifest; deployed program checks still ran."
-          fi
-      - name: Upload discovered pool manifest
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: verified-raydium-pools
-          path: ${{ runner.temp }}/discovered-pools.json
-          if-no-files-found: ignore
+      - name: Test on-chain account discovery against Surfpool
+        run: python3 -m unittest tests.test_onchain_discovery -v
       - name: Upload fork logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
