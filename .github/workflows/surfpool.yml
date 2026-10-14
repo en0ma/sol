@@ -58,6 +58,8 @@ jobs:
 
       - name: Test conservative residual-token valuation
         run: python3 -m unittest discover -s tests -p test_whirlpool_accounting.py -v
+      - name: Test bounded route sweep and profit filter
+        run: python3 -m unittest discover -s tests -p test_cross_venue_sweep.py -v
       - name: Test cross-venue safety gates
         run: python3 -m unittest discover -s tests -p test_cross_venue.py -v
       - name: Test Raydium CPMM swap instruction encoding
@@ -233,6 +235,17 @@ jobs:
         run: python3 -m arb.raydium_swap
       - name: Simulate atomic Orca to Raydium two-venue route
         run: python3 -m arb.cross_venue
+      - name: Sweep actual atomic cross-venue trade sizes
+        env:
+          CROSS_VENUE_SWEEP_REPORT: ${{ runner.temp }}/cross-venue-sweep.json
+        run: python3 -m arb.cross_venue_sweep
+      - name: Upload cross-venue sweep evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cross-venue-size-sweep
+          path: ${{ runner.temp }}/cross-venue-sweep.json
+          if-no-files-found: ignore
       - name: Report independently verified Raydium CPMM fixtures
         run: |
           python3 -m arb.raydium_cpmm || test "$?" -eq 2
