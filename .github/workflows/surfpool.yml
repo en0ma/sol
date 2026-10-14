@@ -58,6 +58,8 @@ jobs:
 
       - name: Test conservative residual-token valuation
         run: python3 -m unittest discover -s tests -p test_whirlpool_accounting.py -v
+      - name: Test Raydium to Orca reverse route wiring
+        run: python3 -m unittest discover -s tests -p test_reverse_sweep.py -v
       - name: Test bounded route sweep and profit filter
         run: python3 -m unittest discover -s tests -p test_cross_venue_sweep.py -v
       - name: Test cross-venue safety gates
@@ -239,6 +241,18 @@ jobs:
         env:
           CROSS_VENUE_SWEEP_REPORT: ${{ runner.temp }}/cross-venue-sweep.json
         run: python3 -m arb.cross_venue_sweep
+      - name: Sweep reverse Raydium to Orca routes
+        env:
+          CROSS_VENUE_REVERSE: '1'
+          CROSS_VENUE_SWEEP_REPORT: ${{ runner.temp }}/reverse-sweep.json
+        run: python3 -m arb.cross_venue_sweep
+      - name: Upload reverse sweep evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reverse-cross-venue-sweep
+          path: ${{ runner.temp }}/reverse-sweep.json
+          if-no-files-found: ignore
       - name: Upload cross-venue sweep evidence
         if: always()
         uses: actions/upload-artifact@v4

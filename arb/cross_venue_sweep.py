@@ -19,17 +19,18 @@ def evaluate(result,min_profit=MIN_PROFIT_LAMPORTS):
             "reason":("SIMULATED_NET_PROFIT" if eligible else
                       "MISSING_NET_FEE_OR_LOSS_OR_INCOMPLETE_ROUTE")}
 
-def sweep(rpc,orca,raydium,sizes=SIZES,max_wsol=1000000):
+def sweep(rpc,orca,raydium,sizes=SIZES,max_wsol=1000000,reverse=False):
     if (not sizes or len(sizes)>8 or any(type(x)is not int or x<=0 or x>100000
                                          for x in sizes) or len(set(sizes))!=len(sizes)):
         raise ValueError("invalid bounded sizes")
     reports=[]
     for size in sizes:
-        simulated=run(rpc,orca,raydium,max_wsol,size)
+        simulated=run(rpc,orca,raydium,max_wsol,size,reverse=reverse)
         reports.append({"usdc_amount_base_units":size,
                         "simulation":{k:v for k,v in simulated.items() if k!="log_tail"},
                         "decision":evaluate(simulated)})
-    return {"status":"PASS" if len(reports)==len(sizes) else "INCOMPLETE",
+    return {"direction":"raydium_to_orca" if reverse else "orca_to_raydium",
+            "status":"PASS" if len(reports)==len(sizes) else "INCOMPLETE",
             "evaluated":len(reports),"profitable_candidates":sum(
                 r["decision"]["simulated_profitable"] for r in reports),
             "live_execution_approved":False,"results":reports}
@@ -37,7 +38,8 @@ def sweep(rpc,orca,raydium,sizes=SIZES,max_wsol=1000000):
 def main():
     with open("arb/whirlpool_pools.json") as f:orca=json.load(f)["pools"][0]["address"]
     with open("arb/raydium_cpmm_pools.json") as f:raydium=json.load(f)["pools"][0]["address"]
-    result=sweep(os.environ.get("SOLANA_RPC_URL","http://127.0.0.1:8899"),orca,raydium)
+    result=sweep(os.environ.get("SOLANA_RPC_URL","http://127.0.0.1:8899"),orca,raydium,
+                 reverse=os.environ.get("CROSS_VENUE_REVERSE")=="1")
     print(json.dumps(result,indent=2))
     if os.environ.get("CROSS_VENUE_SWEEP_REPORT"):
         with open(os.environ["CROSS_VENUE_SWEEP_REPORT"],"w") as f:json.dump(result,f,indent=2)

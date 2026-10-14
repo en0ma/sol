@@ -38,7 +38,7 @@ def measure(value, max_input):
             "gross_wsol_change_lamports":amounts[0]-max_input,
             "venues_executed":2}
 
-def run(rpc,orca_pool,raydium_pool,maximum_wsol_input=1000000,usdc_amount=10000):
+def run(rpc,orca_pool,raydium_pool,maximum_wsol_input=1000000,usdc_amount=10000,reverse=False):
     state=fetch_pool(rpc,orca_pool)
     if (state["token_mint_a"],state["token_mint_b"])!=(SOL,USDC):
         raise ValueError("requires Orca SOL token A, USDC token B")
@@ -47,7 +47,7 @@ def run(rpc,orca_pool,raydium_pool,maximum_wsol_input=1000000,usdc_amount=10000)
     oracle=verify_oracle(rpc,orca_pool,
         adaptive_fee=state["tick_spacing"]!=state["fee_tier_index_seed"])
     readiness=inspect_swap_requirements(rpc,orca_pool)
-    if not readiness["directions"]["a_to_b"]["available"]:
+    if not readiness["directions"]["b_to_a" if reverse else "a_to_b"]["available"]:
         return {"status":"BLOCKED_ORCA_TICKS","cross_venue_success":False}
     info=call(rpc,"getAccountInfo",[raydium_pool,{"encoding":"base64"}])["value"]
     if not info or info["owner"]!=RAYDIUM:raise ValueError("bad Raydium pool")
@@ -67,11 +67,20 @@ def run(rpc,orca_pool,raydium_pool,maximum_wsol_input=1000000,usdc_amount=10000)
     else:raise ValueError("local payer funding missing")
     rent=call(rpc,"getMinimumBalanceForRentExemption",[TOKEN_SPACE])
     ixs=prepare_token_accounts(payer,a,b,SOL,USDC,True,rent,maximum_wsol_input)
-    ixs.append(build_swap(orca_pool,state,str(payer.pubkey()),str(a.pubkey()),
-        str(b.pubkey()),oracle,usdc_amount,maximum_wsol_input,True,
-        amount_specified_is_input=False))
-    ixs.append(raydium_instruction(raydium_pool,cp,str(payer.pubkey()),
-        str(b.pubkey()),str(a.pubkey()),usdc_amount,1,input_is_token_0=False))
+    if reverse:
+        # Raydium buys USDC first; Orca spends exact USDC for WSOL second.
+        # A conservative fixed input must yield at least usdc_amount or the
+        # entire atomic transaction fails, avoiding residual intermediate funds.
+        ixs.append(raydium_instruction(raydium_pool,cp,str(payer.pubkey()),
+            str(a.pubkey()),str(b.pubkey()),maximum_wsol_input,usdc_amount,True))
+        ixs.append(build_swap(orca_pool,state,str(payer.pubkey()),str(a.pubkey()),
+            str(b.pubkey()),oracle,usdc_amount,1,False))
+    else:
+        ixs.append(build_swap(orca_pool,state,str(payer.pubkey()),str(a.pubkey()),
+            str(b.pubkey()),oracle,usdc_amount,maximum_wsol_input,True,
+            amount_specified_is_input=False))
+        ixs.append(raydium_instruction(raydium_pool,cp,str(payer.pubkey()),
+            str(b.pubkey()),str(a.pubkey()),usdc_amount,1,input_is_token_0=False))
     blockhash=call(rpc,"getLatestBlockhash")["value"]["blockhash"]
     tx=Transaction.new_signed_with_payer(ixs,payer.pubkey(),[payer,a,b],Hash.from_string(blockhash))
     wire=bytes(tx)
@@ -80,7 +89,8 @@ def run(rpc,orca_pool,raydium_pool,maximum_wsol_input=1000000,usdc_amount=10000)
     value=call(rpc,"simulateTransaction",[base64.b64encode(wire).decode(),{
         "encoding":"base64","sigVerify":True,"commitment":"processed",
         "accounts":{"encoding":"base64","addresses":[str(a.pubkey()),str(b.pubkey())]}}])["value"]
-    output={"status":"SIMULATION_FAILED","cross_venue_success":False,
+    output={"direction":"raydium_to_orca" if reverse else "orca_to_raydium",
+        "status":"SIMULATION_FAILED","cross_venue_success":False,
         "error":value.get("err"),"compute_units":value.get("unitsConsumed"),
         "transaction_bytes":len(wire),"local_only":True,
         "log_tail":(value.get("logs") or [])[-18:]}
