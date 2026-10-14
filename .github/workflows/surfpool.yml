@@ -322,6 +322,17 @@ jobs:
           name: ray-wsol-third-leg-readiness
           path: ${{ runner.temp }}/third-leg-readiness.json
           if-no-files-found: ignore
+      - name: Attempt closed three-venue cycle without broadcast
+        env:
+          THREE_HOP_REPORT: ${{ runner.temp }}/three-hop-cycle.json
+        run: python3 -m arb.three_hop_cycle || test "$?" -eq 2
+      - name: Upload closed-cycle simulation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: three-hop-cycle
+          path: ${{ runner.temp }}/three-hop-cycle.json
+          if-no-files-found: ignore
       - name: Attempt simulation-only CPMM to CLMM route with local funding
         env:
           CLMM_SWAP_REPORT: ${{ runner.temp }}/clmm-swap-attempt.json
