@@ -30,6 +30,7 @@ def decode(raw):
     le = lambda start, length, signed=False: int.from_bytes(raw[start:start+length], "little", signed=signed)
     result = {
         "tick_spacing": le(41, 2),
+        "fee_tier_index_seed": le(43, 2),
         "fee_rate_hundredths_bps": le(45, 2),
         "protocol_fee_rate": le(47, 2),
         "liquidity": str(le(49, 16)),

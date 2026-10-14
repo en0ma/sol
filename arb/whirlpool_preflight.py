@@ -13,17 +13,22 @@ from arb.orca_whirlpool import PROGRAM, fetch_pool
 from arb.whirlpool_swap import build_swap, inspect_swap_requirements
 
 def oracle_address(pool_address):
-    from solders.pubkey import Pubkey
     key=Pubkey.from_string(pool_address)
     program=Pubkey.from_string(PROGRAM)
     return str(Pubkey.find_program_address([b"oracle",bytes(key)],program)[0])
 
-def verify_oracle(rpc,pool_address):
+def verify_oracle(rpc,pool_address, adaptive_fee=False):
     pubkey=oracle_address(pool_address)
     response=call(rpc,"getAccountInfo",[pubkey,{"encoding":"base64","commitment":"confirmed"}])
     info=response.get("value")
-    if not info or info.get("owner")!=PROGRAM or info.get("executable"):
-        raise ValueError("Orca oracle missing or wrong owner")
+    if not info:
+        if adaptive_fee:
+            raise ValueError("Adaptive-fee Whirlpool oracle missing")
+        # Anchor UncheckedAccount permits an uninitialized PDA.
+        # Orca's legacy swap does not read its Oracle on non-adaptive pools.
+        return pubkey
+    if info.get("owner")!=PROGRAM or info.get("executable"):
+        raise ValueError("Orca oracle exists with unexpected owner")
     data=info.get("data")
     if not isinstance(data,list) or len(data)!=2 or data[1]!="base64":
         raise ValueError("malformed oracle data")
@@ -37,7 +42,8 @@ def preflight(rpc,pool_address,amount=1000,a_to_b=True):
     # Pool and oracle must be checked via forked on-chain accounts.
     state=fetch_pool(rpc,pool_address)
     try:
-        oracle=verify_oracle(rpc,pool_address)
+        oracle=verify_oracle(rpc,pool_address,
+            adaptive_fee=state["tick_spacing"] != state["fee_tier_index_seed"])
     except ValueError as exc:
         return {"status":"BLOCKED_ORACLE","swap_success":False,
                 "pool":pool_address,"reason":str(exc)}
