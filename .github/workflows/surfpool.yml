@@ -72,7 +72,8 @@ jobs:
           if-no-files-found: ignore
 
   mainnet-fork-probe:
-    if: ${{ github.event_name == 'workflow_dispatch' }}
+    # Secrets are unavailable to untrusted fork PRs; verify forks on trusted branches/PRs.
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -117,6 +118,13 @@ jobs:
         env:
           POOL_MANIFEST: ${{ runner.temp }}/discovered-pools.json
         run: python3 -m arb.fork_probe
+      - name: Upload discovered pool manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verified-raydium-pools
+          path: ${{ runner.temp }}/discovered-pools.json
+          if-no-files-found: ignore
       - name: Upload fork logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
