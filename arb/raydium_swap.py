@@ -12,20 +12,26 @@ def encode(amount_in,min_output):
         raise ValueError("invalid CPMM amount")
     return DISCRIMINATOR+amount_in.to_bytes(8,"little")+min_output.to_bytes(8,"little")
 
-def instruction(pool,state,authority,user_a,user_b,amount_in,min_output):
+def instruction(pool,state,authority,user_a,user_b,amount_in,min_output,input_is_token_0=True):
     from solders.pubkey import Pubkey
     from solders.instruction import Instruction,AccountMeta
     program=Pubkey.from_string(PROGRAM)
     auth,bump=Pubkey.find_program_address([AUTH_SEED],program)
     if bump!=state["auth_bump"]: raise ValueError("Raydium pool authority bump mismatch")
     if {state["token_0_mint"],state["token_1_mint"]}!={SOL,USDC}:raise ValueError("unexpected token pair")
-    if state["token_0_mint"]!=SOL:raise ValueError("this leg only supports WSOL token0")
+    if (state["token_0_mint"],state["token_1_mint"])!=(SOL,USDC):raise ValueError("requires WSOL token0 and USDC token1")
     if state["token_0_program"]!=state["token_1_program"]:raise ValueError("unsupported mixed SPL token programs")
+    input_vault=state["token_0_vault"] if input_is_token_0 else state["token_1_vault"]
+    output_vault=state["token_1_vault"] if input_is_token_0 else state["token_0_vault"]
+    input_mint=state["token_0_mint"] if input_is_token_0 else state["token_1_mint"]
+    output_mint=state["token_1_mint"] if input_is_token_0 else state["token_0_mint"]
+    input_program=state["token_0_program"] if input_is_token_0 else state["token_1_program"]
+    output_program=state["token_1_program"] if input_is_token_0 else state["token_0_program"]
     keys=[(authority,True,True),(str(auth),False,False),(state["amm_config"],False,False),
           (pool,False,True),(user_a,False,True),(user_b,False,True),
-          (state["token_0_vault"],False,True),(state["token_1_vault"],False,True),
-          (state["token_0_program"],False,False),(state["token_1_program"],False,False),
-          (state["token_0_mint"],False,False),(state["token_1_mint"],False,False),
+          (input_vault,False,True),(output_vault,False,True),
+          (input_program,False,False),(output_program,False,False),
+          (input_mint,False,False),(output_mint,False,False),
           (state["observation"],False,True)]
     return Instruction(program,encode(amount_in,min_output),[AccountMeta(Pubkey.from_string(k),s,w) for k,s,w in keys])
 
