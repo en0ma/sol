@@ -65,9 +65,9 @@ def run(rpc,cp_pool,cl_pool):
                     [AccountMeta(ray.pubkey(),False,True),
                      AccountMeta(Pubkey.from_string(cl["token_mint_0"]),False,False)])])
     ixs.append(cp_swap(cp_pool,cp,str(payer.pubkey()),str(wsol.pubkey()),
-                       str(usdc.pubkey()),1000000,1))
+                       str(usdc.pubkey()),1000000,10000,exact_output=True))
     ixs.append(build(cl_pool,cl,str(payer.pubkey()),str(usdc.pubkey()),
-                     str(ray.pubkey()),1,1,[a["address"] for a in
+                     str(ray.pubkey()),10000,1,[a["address"] for a in
                      readiness["tick_arrays"]],input_is_token_0=False))
     bh=call(rpc,"getLatestBlockhash")["value"]["blockhash"]
     tx=Transaction.new_signed_with_payer(ixs,payer.pubkey(),
