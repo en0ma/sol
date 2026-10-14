@@ -118,18 +118,17 @@ jobs:
         run: python3 -m arb.simulate_transfer
       - name: Probe deployed AMM programs and configured pools
         run: python3 -m arb.fork_probe
-      - name: Verify pinned Whirlpool pool state when configured
-        run: |
-          python3 - <<'PY'
-          import json
-          with open("arb/whirlpool_pools.json") as f:
-              pools = json.load(f)["pools"]
-          if pools:
-              import subprocess
-              subprocess.run(["python3", "-m", "arb.verify_whirlpool"], check=True)
-          else:
-              print("SKIPPED: no pinned Whirlpool pool addresses in manifest")
-          PY
+      - name: Report direct on-chain Whirlpool verification
+        env:
+          POOL_VERIFICATION_REPORT: ${{ runner.temp }}/whirlpool-report.json
+        run: python3 -m arb.pool_report
+      - name: Upload pool validation status
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: whirlpool-verification-report
+          path: ${{ runner.temp }}/whirlpool-report.json
+          if-no-files-found: ignore
       - name: Test on-chain account discovery against Surfpool
         run: python3 -m unittest discover -s tests -p test_onchain_discovery.py -v
       - name: Upload fork logs on failure
