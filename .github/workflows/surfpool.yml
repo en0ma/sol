@@ -1,0 +1,68 @@
+name: Surfpool CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  surfpool-smoke-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SOLANA_RPC_URL: http://127.0.0.1:8899
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Surfpool
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --show-error --silent --location https://run.surfpool.run/ -o /tmp/install-surfpool.sh
+          bash /tmp/install-surfpool.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: Start local Surfpool validator
+        shell: bash
+        run: |
+          set -euo pipefail
+          NO_DNA=1 surfpool --version
+          nohup surfpool start --ci --offline > "$RUNNER_TEMP/surfpool.log" 2>&1 < /dev/null &
+          echo $! > "$RUNNER_TEMP/surfpool.pid"
+
+      - name: Wait for RPC and verify blockhash
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent --show-error \
+              -H 'Content-Type: application/json' \
+              --data '{"jsonrpc":"2.0","id":1,"method":"getLatestBlockhash"}' \
+              "$SOLANA_RPC_URL" > "$RUNNER_TEMP/rpc-response.json"; then
+              if python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d["result"]["value"]["blockhash"]' "$RUNNER_TEMP/rpc-response.json"; then
+                echo "Surfpool RPC ready at $SOLANA_RPC_URL"
+                cat "$RUNNER_TEMP/rpc-response.json"
+                exit 0
+              fi
+            fi
+            sleep 2
+          done
+          echo "Surfpool did not become ready" >&2
+          cat "$RUNNER_TEMP/surfpool.log" >&2
+          exit 1
+
+      # Add your Anchor / Rust / TypeScript integration tests here once code is present.
+      # Point test clients at SOLANA_RPC_URL.
+
+      - name: Upload Surfpool log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surfpool-log
+          path: ${{ runner.temp }}/surfpool.log
+          if-no-files-found: ignore
