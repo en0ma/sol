@@ -5,6 +5,7 @@ from arb.orca_whirlpool import SOL,USDC
 from arb.rpc import call
 from arb.whirlpool_simulation import TOKEN_SPACE,prepare_token_accounts,extract_balances
 DISCRIMINATOR=hashlib.sha256(b"global:swap_base_input").digest()[:8]
+OUTPUT_DISCRIMINATOR=hashlib.sha256(b"global:swap_base_output").digest()[:8]
 AUTH_SEED=b"vault_and_lp_mint_auth_seed"
 
 def encode(amount_in,min_output):
@@ -12,7 +13,12 @@ def encode(amount_in,min_output):
         raise ValueError("invalid CPMM amount")
     return DISCRIMINATOR+amount_in.to_bytes(8,"little")+min_output.to_bytes(8,"little")
 
-def instruction(pool,state,authority,user_a,user_b,amount_in,min_output,input_is_token_0=True):
+def encode_exact_output(max_input,amount_out):
+    if any(type(x) is not int or not 0 <= x < (1<<64) for x in (max_input,amount_out)) or amount_out==0 or max_input==0:
+        raise ValueError("invalid CPMM exact-output amount")
+    return OUTPUT_DISCRIMINATOR+max_input.to_bytes(8,"little")+amount_out.to_bytes(8,"little")
+
+def instruction(pool,state,authority,user_a,user_b,amount_in,min_output,input_is_token_0=True,exact_output=False):
     from solders.pubkey import Pubkey
     from solders.instruction import Instruction,AccountMeta
     program=Pubkey.from_string(PROGRAM)
@@ -33,7 +39,7 @@ def instruction(pool,state,authority,user_a,user_b,amount_in,min_output,input_is
           (input_program,False,False),(output_program,False,False),
           (input_mint,False,False),(output_mint,False,False),
           (state["observation"],False,True)]
-    return Instruction(program,encode(amount_in,min_output),[AccountMeta(Pubkey.from_string(k),s,w) for k,s,w in keys])
+    return Instruction(program,(encode_exact_output(amount_in,min_output) if exact_output else encode(amount_in,min_output)),[AccountMeta(Pubkey.from_string(k),s,w) for k,s,w in keys])
 
 def run(rpc,pool,amount_in=1000000):
     from solders.keypair import Keypair

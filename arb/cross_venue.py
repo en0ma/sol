@@ -72,7 +72,7 @@ def run(rpc,orca_pool,raydium_pool,maximum_wsol_input=1000000,usdc_amount=10000,
         # A conservative fixed input must yield at least usdc_amount or the
         # entire atomic transaction fails, avoiding residual intermediate funds.
         ixs.append(raydium_instruction(raydium_pool,cp,str(payer.pubkey()),
-            str(a.pubkey()),str(b.pubkey()),maximum_wsol_input,usdc_amount,True))
+            str(a.pubkey()),str(b.pubkey()),maximum_wsol_input,usdc_amount,True,exact_output=True))
         ixs.append(build_swap(orca_pool,state,str(payer.pubkey()),str(a.pubkey()),
             str(b.pubkey()),oracle,usdc_amount,1,False))
     else:
