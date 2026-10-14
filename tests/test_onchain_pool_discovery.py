@@ -25,4 +25,4 @@ class DiscoveryTests(unittest.TestCase):
     def test_partial_discovery_visible(self,search):
         r=discover("rpc",[(MINTS["WSOL"],MINTS["USDT"])])
         self.assertEqual(r["status"],"PARTIAL")
-        self.assertEqual(len(r["errors"]),2)
+        self.assertEqual(len(r["errors"]),len(VENUES))
