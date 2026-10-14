@@ -111,7 +111,11 @@ jobs:
           else:
               raise SystemExit("Surfpool fork RPC unavailable")
           PY
+      - name: Discover and validate Raydium SOL/USDC pools
+        run: python3 -m arb.discover_raydium --output "$RUNNER_TEMP/discovered-pools.json"
       - name: Probe DEX program and pool accounts
+        env:
+          POOL_MANIFEST: \${{ runner.temp }}/discovered-pools.json
         run: python3 -m arb.fork_probe
       - name: Upload fork logs on failure
         if: failure()
