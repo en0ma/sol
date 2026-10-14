@@ -44,7 +44,7 @@ def search_pair(rpc,venue,mint_a,mint_b,limit=8):
             pair=(decoded["token_x_mint"],decoded["token_y_mint"]) if venue=="meteora_dlmm" else (
                 (decoded["token_mint_a"],decoded["token_mint_b"]) if venue=="orca" else (
                 decoded["token_mint_0"],decoded["token_mint_1"]) if venue=="raydium_clmm" else (
-                decoded["token_0_mint"],decoded["token_1_mint"])))
+                decoded["token_0_mint"],decoded["token_1_mint"]))
             if pair!=(a,b):raise ValueError("mint filter mismatch")
             found[entry["pubkey"]]=decoded
     return found
