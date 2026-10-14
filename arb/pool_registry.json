@@ -8,6 +8,14 @@
     {
       "venue": "raydium_cpmm",
       "address": "7JuwJuNU88gurFnyWeiyGKbFmExMWcmRZntn9imEzdny"
+    },
+    {
+      "venue": "raydium_clmm",
+      "address": "61R1ndXxvsWXXkWSyNkCxnzwd3zUNB8Q2ibmkiLPC8ht",
+      "mints": [
+        "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ]
     }
   ]
 }
