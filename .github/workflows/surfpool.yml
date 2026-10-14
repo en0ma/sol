@@ -118,6 +118,8 @@ jobs:
         run: python3 -m arb.simulate_transfer
       - name: Probe deployed AMM programs and configured pools
         run: python3 -m arb.fork_probe
+      - name: Query and decode live Orca SOL/USDC Whirlpool accounts
+        run: python3 -m arb.orca_whirlpool
       - name: Test on-chain account discovery against Surfpool
         run: python3 -m unittest discover -s tests -p test_onchain_discovery.py -v
       - name: Upload fork logs on failure
