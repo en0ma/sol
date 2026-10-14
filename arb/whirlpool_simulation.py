@@ -53,9 +53,6 @@ def prepare_token_accounts(payer, account_a, account_b, mint_a, mint_b,
     return out
 
 def run(rpc, pool_address, input_amount=1000000):
-    from solders.keypair import Keypair
-    from solders.hash import Hash
-    from solders.transaction import Transaction
     state=fetch_pool(rpc,pool_address)
     a_to_b=state["token_mint_a"]==SOL
     if {state["token_mint_a"],state["token_mint_b"]}!={SOL,USDC}:
@@ -66,6 +63,9 @@ def run(rpc, pool_address, input_amount=1000000):
     direction="a_to_b" if a_to_b else "b_to_a"
     if not readiness["directions"][direction]["available"]:
         return {"status":"BLOCKED_TICK_ARRAYS","swap_success":False}
+    from solders.keypair import Keypair
+    from solders.hash import Hash
+    from solders.transaction import Transaction
     payer, acct_a, acct_b=Keypair(),Keypair(),Keypair()
     if not isinstance(input_amount,int) or input_amount<=0 or input_amount>100000000:
         raise ValueError("unsafe input amount")
