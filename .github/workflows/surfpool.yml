@@ -57,7 +57,7 @@ jobs:
           exit 1
 
       - name: Run Whirlpool spot mathematics and market gate tests
-        run: python3 -m arb.whirlpool_market --self-test
+        run: python3 -m unittest arb.whirlpool_market.MarketTests -v
       - name: Run arbitrage arithmetic tests
         env:
           RUN_SURFPOOL_INTEGRATION: '1'
