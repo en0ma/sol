@@ -56,6 +56,8 @@ jobs:
           cat "$RUNNER_TEMP/surfpool.log" >&2
           exit 1
 
+      - name: Test swap preflight safety gates
+        run: python3 -m unittest discover -s tests -p test_whirlpool_preflight.py -v
       - name: Test Orca swap instruction payload
         run: python3 -m unittest discover -s tests -p test_whirlpool_swap.py -v
       - name: Run Whirlpool tick-array math tests
@@ -192,6 +194,8 @@ jobs:
           for p in pools:
               print(json.dumps(inspect_swap_requirements(os.environ["SOLANA_RPC_URL"],p["address"]),indent=2))
           PY
+      - name: Simulate Orca swap preflight on Surfpool
+        run: python3 -m arb.whirlpool_preflight
       - name: Require verified pool fixture for swap-stage readiness
         env:
           POOL_VERIFICATION_REPORT: ${{ runner.temp }}/whirlpool-report.json
