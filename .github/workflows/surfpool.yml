@@ -118,9 +118,18 @@ jobs:
         run: python3 -m arb.simulate_transfer
       - name: Probe deployed AMM programs and configured pools
         run: python3 -m arb.fork_probe
-      - name: Query and decode live Orca SOL/USDC Whirlpool accounts
-        continue-on-error: true # upstream RPC 429 is reported but does not mask required program checks
-        run: python3 -m arb.orca_whirlpool
+      - name: Verify pinned Whirlpool pool state when configured
+        run: |
+          python3 - <<'PY'
+          import json
+          with open("arb/whirlpool_pools.json") as f:
+              pools = json.load(f)["pools"]
+          if pools:
+              import subprocess
+              subprocess.run(["python3", "-m", "arb.verify_whirlpool"], check=True)
+          else:
+              print("SKIPPED: no pinned Whirlpool pool addresses in manifest")
+          PY
       - name: Test on-chain account discovery against Surfpool
         run: python3 -m unittest discover -s tests -p test_onchain_discovery.py -v
       - name: Upload fork logs on failure
