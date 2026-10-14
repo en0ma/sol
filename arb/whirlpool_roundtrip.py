@@ -50,14 +50,14 @@ def measure_roundtrip(value, state, input_amount, second_leg_input):
             "residual_usdc_base_units":remaining_usdc,
             "whirlpool_invocations":invocations}
 
-def run(rpc,pool_address,input_amount=1000000,second_leg_input=1):
+def run(rpc,pool_address,input_amount=1000000,second_leg_input=10000):
     from solders.keypair import Keypair
     from solders.hash import Hash
     from solders.transaction import Transaction
     state=fetch_pool(rpc,pool_address)
     if {state["token_mint_a"],state["token_mint_b"]}!={SOL,USDC}:
         raise ValueError("requires classic WSOL/USDC Whirlpool")
-    if not 0<second_leg_input<=10000 or not 0<input_amount<=100000000:
+    if not 0<second_leg_input<=100000 or not 0<input_amount<=100000000:
         raise ValueError("invalid input limits")
     oracle=verify_oracle(rpc,pool_address,
         adaptive_fee=state["tick_spacing"]!=state["fee_tier_index_seed"])
