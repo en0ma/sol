@@ -7,7 +7,7 @@ No network submission, quote API, or automatic executable-route admission.
 import hashlib
 from arb.raydium_clmm import PROGRAM
 from arb.token_vaults import TOKEN_PROGRAM
-TOKEN_2022="TokenzQdBNbLqP5VEhdkAS6EPF9oM85k2gT8KzWfT5"
+TOKEN_2022="TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
 MEMO="MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr"
 DISC=hashlib.sha256(b"global:swap_v2").digest()[:8]
 

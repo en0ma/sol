@@ -12,6 +12,11 @@ class ClmmSwapV2Tests(unittest.TestCase):
         data=encode(12000,150000,123456789,False)
         self.assertEqual(data[-1],0)
         self.assertEqual(int.from_bytes(data[24:40],"little"),123456789)
+    def test_program_ids_are_valid_pubkeys(self):
+        from solders.pubkey import Pubkey
+        from arb.raydium_clmm_swap import TOKEN_2022,MEMO
+        self.assertEqual(len(bytes(Pubkey.from_string(TOKEN_2022))),32)
+        self.assertEqual(len(bytes(Pubkey.from_string(MEMO))),32)
     def test_invalid_amounts(self):
         for x in (-1,0,1<<64,True):
             with self.assertRaises(ValueError):encode(x,1)
