@@ -1,0 +1,25 @@
+{
+  "note": "Discovery targets, not verified executable pool addresses or guaranteed API route labels.",
+  "clmm": [
+    "Orca Whirlpools",
+    "Raydium CLMM",
+    "Meteora DLMM"
+  ],
+  "amm": [
+    "Raydium CPMM",
+    "Pump.fun AMM"
+  ],
+  "propamm": [
+    "HumidiFi",
+    "SolFi V2",
+    "Tessera",
+    "BisonFi",
+    "Obric V2",
+    "ZeroFi",
+    "GoonFi"
+  ],
+  "future": [
+    "Meteora DAMM v2",
+    "Lifinity"
+  ]
+}
