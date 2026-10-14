@@ -4,7 +4,6 @@ from arb.rpc import call
 from arb.orca_whirlpool import b58
 
 TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
-TOKEN_2022 = "TokenzQdBNbLqP5VEhdkAS6EPFzPFh2N9pv6JKj"  # not enabled until verified
 SPL_TOKEN_ACCOUNT_LEN = 165
 
 def decode_token_account(raw):
