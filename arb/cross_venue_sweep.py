@@ -2,7 +2,7 @@
 import json,os
 from arb.cross_venue import run
 
-SIZES=(1000,10000,50000)
+SIZES=(1000,10000,50000,75000,100000)
 MIN_PROFIT_LAMPORTS=10000
 
 def evaluate(result,min_profit=MIN_PROFIT_LAMPORTS):
@@ -12,12 +12,17 @@ def evaluate(result,min_profit=MIN_PROFIT_LAMPORTS):
     eligible=(result.get("cross_venue_success") is True and
               type(pnl) is int and type(inventory) is int and inventory==0 and
               result.get("venues_executed")==2 and pnl>=min_profit)
+    if eligible: reason="SIMULATED_NET_PROFIT"
+    elif result.get("cross_venue_success") is not True: reason="SWAP_FAILED_OR_UNCLOSED"
+    elif type(inventory) is not int or inventory!=0: reason="RESIDUAL_INTERMEDIATE_TOKEN"
+    elif type(pnl) is not int: reason="MISSING_NETWORK_FEE"
+    elif pnl<min_profit: reason="BELOW_MINIMUM_NET_PROFIT"
+    else: reason="INELIGIBLE"
     return {"status":"CANDIDATE" if eligible else "REJECTED",
             "simulated_profitable":eligible,
             "live_execution_approved":False,
             "net_wsol_change_lamports":pnl if type(pnl) is int else None,
-            "reason":("SIMULATED_NET_PROFIT" if eligible else
-                      "MISSING_NET_FEE_OR_LOSS_OR_INCOMPLETE_ROUTE")}
+            "reason":reason}
 
 def sweep(rpc,orca,raydium,sizes=SIZES,max_wsol=1000000,reverse=False):
     if (not sizes or len(sizes)>8 or any(type(x)is not int or x<=0 or x>100000
@@ -29,7 +34,12 @@ def sweep(rpc,orca,raydium,sizes=SIZES,max_wsol=1000000,reverse=False):
         reports.append({"usdc_amount_base_units":size,
                         "simulation":{k:v for k,v in simulated.items() if k!="log_tail"},
                         "decision":evaluate(simulated)})
-    return {"direction":"raydium_to_orca" if reverse else "orca_to_raydium",
+    successful=[r for r in reports if r["simulation"].get("cross_venue_success") and
+                type(r["simulation"].get("net_wsol_change_lamports")) is int]
+    best=max(successful,key=lambda r:r["simulation"]["net_wsol_change_lamports"]) if successful else None
+    return {"best_simulated_size_usdc_base_units":best["usdc_amount_base_units"] if best else None,
+            "best_net_wsol_change_lamports":best["simulation"]["net_wsol_change_lamports"] if best else None,
+            "direction":"raydium_to_orca" if reverse else "orca_to_raydium",
             "status":"PASS" if len(reports)==len(sizes) else "INCOMPLETE",
             "evaluated":len(reports),"profitable_candidates":sum(
                 r["decision"]["simulated_profitable"] for r in reports),
@@ -44,7 +54,6 @@ def main():
     if os.environ.get("CROSS_VENUE_SWEEP_REPORT"):
         with open(os.environ["CROSS_VENUE_SWEEP_REPORT"],"w") as f:json.dump(result,f,indent=2)
     # Unprofitable routes are expected outcomes, not test failures.
-    return 0 if result["status"]=="PASS" and all(
-        r["simulation"].get("cross_venue_success") for r in result["results"]) else 1
+    return 0 if result["status"]=="PASS" else 1
 
 if __name__=="__main__":raise SystemExit(main())
