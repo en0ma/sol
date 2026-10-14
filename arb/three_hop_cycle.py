@@ -82,7 +82,7 @@ def run(rpc,cp_pool,cl_pool,orca_pool):
                      str(ray.pubkey()),10000,1,[a["address"] for a in
                      readiness["tick_arrays"]],input_is_token_0=False))
     ixs.append(build_swap(orca_pool,oc,str(payer.pubkey()),
-             str(wsol.pubkey()),str(ray.pubkey()),oracle,5427,1,False))
+             str(wsol.pubkey()),str(ray.pubkey()),oracle,5000,1,False))
     bh=call(rpc,"getLatestBlockhash")["value"]["blockhash"]
     tx=Transaction.new_signed_with_payer(ixs,payer.pubkey(),
                                           [payer,wsol,usdc,ray],Hash.from_string(bh))
