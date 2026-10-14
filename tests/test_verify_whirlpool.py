@@ -17,10 +17,10 @@ class PinnedPoolTests(unittest.TestCase):
     def test_wrong_mints_rejected(self, fetch):
         fetch.return_value = {"token_mint_a":SOL,"token_mint_b":"other","liquidity":"123"}
         with self.assertRaises(ValueError):
-            verify("http://localhost:8899",[{"address":"example"}])
+            verify("http://localhost:8899",[{"address":"example","verify_vaults":False}])
 
     @patch("arb.verify_whirlpool.fetch_pool")
     def test_zero_liquidity_rejected(self, fetch):
         fetch.return_value = {"token_mint_a":SOL,"token_mint_b":USDC,"liquidity":"0"}
         with self.assertRaises(ValueError):
-            verify("http://localhost:8899",[{"address":"example"}])
+            verify("http://localhost:8899",[{"address":"example","verify_vaults":False}])
