@@ -8,8 +8,6 @@ from arb.rpc import call
 ALT_PROGRAM="AddressLookupTab1e1111111111111111111111111"
 
 def load_table(rpc,address):
-    from solders.pubkey import Pubkey
-    from solders.address_lookup_table_account import AddressLookupTableAccount
     info=call(rpc,"getAccountInfo",[address,{"encoding":"base64","commitment":"confirmed"}]).get("value")
     if not info or info.get("owner")!=ALT_PROGRAM:
         raise ValueError("missing address lookup table or wrong owner")
@@ -19,6 +17,8 @@ def load_table(rpc,address):
     # ALT deactivation_slot == u64::MAX means active.
     if int.from_bytes(raw[4:12],"little")!=(1<<64)-1:
         raise ValueError("deactivated lookup table unsupported")
+    from solders.pubkey import Pubkey
+    from solders.address_lookup_table_account import AddressLookupTableAccount
     keys=[Pubkey.from_bytes(raw[i:i+32]) for i in range(56,len(raw),32)]
     if len(keys)>256 or len(set(keys))!=len(keys):
         raise ValueError("invalid lookup table address count")
