@@ -16,5 +16,10 @@ class IngestTests(unittest.TestCase):
         self.assertEqual(result["registry"]["pools"],[])
         self.assertEqual(result["rejected_count"],1)
         refresh.assert_called_once()
+    def test_history_report_candidate_merge(self):
+        merged,new=merge_identities([],{"pools":[
+            {"venue":"raydium_cpmm","address":"5"*32,"verified":True,"slot":99}]})
+        self.assertEqual(new,1)
+        self.assertEqual(merged[0]["address"],"5"*32)
     def test_unbounded_rejected(self):
         with self.assertRaises(ValueError):merge_identities([],{"pools":[{}]*201})

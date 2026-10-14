@@ -52,11 +52,12 @@ def ingest(rpc,existing,discovery):
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument("--registry",default="arb/pool_registry.json")
-    parser.add_argument("--discovery",required=True)
+    parser.add_argument("--discovery",required=True,action="append",help="repeat for multiple on-chain discovery reports")
     parser.add_argument("--output",required=True)
     args=parser.parse_args()
     current=json.loads(Path(args.registry).read_text())["pools"]
-    discovered=json.loads(Path(args.discovery).read_text())
+    reports=[json.loads(Path(path).read_text()) for path in args.discovery]
+    discovered={"pools":[p for report in reports for p in report.get("pools",[])]}
     result=ingest(os.environ.get("SOLANA_RPC_URL","http://127.0.0.1:8899"),
                   current,discovered)
     # Only publish a new registry snapshot if all retained identities passed

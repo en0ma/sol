@@ -305,11 +305,13 @@ jobs:
           path: ${{ runner.temp }}/pool-registry-refresh.json
           if-no-files-found: ignore
       - name: Discover additional on-chain SOL token pools
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         env:
           DEX_DISCOVERY_REPORT: ${{ runner.temp }}/dex-discovery.json
         run: |
           python3 -m arb.onchain_pool_discovery --pairs WSOL/USDT --limit 8 || test "$?" -eq 2
       - name: Discover pool identities from bounded on-chain transaction history
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         env:
           DEX_HISTORY_REPORT: ${{ runner.temp }}/dex-history.json
         run: python3 -m arb.onchain_history_discovery --venues orca,raydium_cpmm --signatures 3 || test "$?" -eq 2
@@ -324,9 +326,13 @@ jobs:
         if: always()
         env:
           CANDIDATE_DISCOVERY: ${{ runner.temp }}/dex-discovery.json
+          HISTORY_DISCOVERY: ${{ runner.temp }}/dex-history.json
         run: |
-          if [ -s "$CANDIDATE_DISCOVERY" ]; then
-            python3 -m arb.pool_registry_ingest --discovery "$CANDIDATE_DISCOVERY" --output "$RUNNER_TEMP/next-pool-registry.json" || test "$?" -eq 2
+          inputs=()
+          if [ -s "$CANDIDATE_DISCOVERY" ]; then inputs+=(--discovery "$CANDIDATE_DISCOVERY"); fi
+          if [ -s "$HISTORY_DISCOVERY" ]; then inputs+=(--discovery "$HISTORY_DISCOVERY"); fi
+          if [ "${#inputs[@]}" -gt 0 ]; then
+            python3 -m arb.pool_registry_ingest "${inputs[@]}" --output "$RUNNER_TEMP/next-pool-registry.json" || test "$?" -eq 2
           fi
       - name: Upload incremental registry snapshot
         if: always()
