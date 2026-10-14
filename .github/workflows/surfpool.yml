@@ -58,6 +58,8 @@ jobs:
 
       - name: Test conservative residual-token valuation
         run: python3 -m unittest discover -s tests -p test_whirlpool_accounting.py -v
+      - name: Test Raydium CPMM swap instruction encoding
+        run: python3 -m unittest discover -s tests -p test_raydium_swap.py -v
       - name: Test Raydium published-pool diagnostic
         run: python3 -m unittest discover -s tests -p test_raydium_candidate.py -v
       - name: Test Raydium CPMM on-chain decoder and restricted search
@@ -225,6 +227,8 @@ jobs:
           name: raydium-candidate
           path: ${{ runner.temp }}/raydium-candidate.json
           if-no-files-found: ignore
+      - name: Simulate real Raydium CPMM SOL to USDC swap
+        run: python3 -m arb.raydium_swap
       - name: Report independently verified Raydium CPMM fixtures
         run: |
           python3 -m arb.raydium_cpmm || test "$?" -eq 2
