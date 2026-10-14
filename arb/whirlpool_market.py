@@ -103,8 +103,8 @@ class MarketTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             price_from_sqrt(Q64, 6, 6, 1_000_000)
 
-    @patch("arb.whirlpool_market.mint_decimals")
-    @patch("arb.whirlpool_market.snapshot")
+    @patch(f"{__name__}.mint_decimals")
+    @patch(f"{__name__}.snapshot")
     def test_analyze(self, snap, mint):
         snap.return_value={"slot": 50,
             "pool":{"token_mint_a":SOL,"token_mint_b":USDC,
