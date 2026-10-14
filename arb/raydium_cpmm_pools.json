@@ -1,4 +1,12 @@
 {
-  "note": "No Raydium CPMM pool verified yet. Populate ONLY after direct RPC checks, never from an HTTP quote API.",
-  "pools": []
+  "note": "Verified from direct Surfpool mainnet-fork RPC in CI #146: owner CPMM, SOL/USDC mints, nonempty SPL vaults and swap enabled. No Raydium swap simulation yet.",
+  "pools": [
+    {
+      "address": "7JuwJuNU88gurFnyWeiyGKbFmExMWcmRZntn9imEzdny",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ]
+    }
+  ]
 }
