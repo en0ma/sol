@@ -60,6 +60,10 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_whirlpool_accounting.py -v
       - name: Test Raydium to Orca reverse route wiring
         run: python3 -m unittest discover -s tests -p test_reverse_sweep.py -v
+      - name: Test jittered RPC rate-limit retries
+        run: python3 -m unittest discover -s tests -p test_rpc_retries.py -v
+      - name: Test expanded DEX venue registry
+        run: python3 -m unittest discover -s tests -p test_dex_registry.py -v
       - name: Test zero-prefixed pubkey decoding
         run: python3 -m unittest discover -s tests -p test_base58_pubkeys.py -v
       - name: Test multi-token on-chain discovery filters
@@ -263,6 +267,17 @@ jobs:
         with:
           name: cross-venue-size-sweep
           path: ${{ runner.temp }}/cross-venue-sweep.json
+          if-no-files-found: ignore
+      - name: Probe five on-chain DEX venue capability levels
+        env:
+          DEX_VENUE_REPORT: ${{ runner.temp }}/dex-venues.json
+        run: python3 -m arb.dex_registry
+      - name: Upload DEX venue capability report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: onchain-dex-venue-registry
+          path: ${{ runner.temp }}/dex-venues.json
           if-no-files-found: ignore
       - name: Discover additional on-chain SOL token pools
         env:
