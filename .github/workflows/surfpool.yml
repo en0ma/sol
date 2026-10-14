@@ -56,6 +56,8 @@ jobs:
           cat "$RUNNER_TEMP/surfpool.log" >&2
           exit 1
 
+      - name: Run Whirlpool tick-array math tests
+        run: python3 -m unittest discover -s tests -p test_whirlpool_ticks.py -v
       - name: Run serialized transaction replay contract tests
         run: python3 -m unittest arb.transaction_replay.ReplayTests -v
       - name: Run Whirlpool spot mathematics and market gate tests
@@ -177,6 +179,8 @@ jobs:
           name: surfpool-transaction-replay
           path: ${{ runner.temp }}/replay-report.json
           if-no-files-found: ignore
+      - name: Inspect nearby on-chain tick arrays
+        run: python3 -m arb.whirlpool_ticks
       - name: Require verified pool fixture for swap-stage readiness
         env:
           POOL_VERIFICATION_REPORT: ${{ runner.temp }}/whirlpool-report.json
