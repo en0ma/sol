@@ -9,7 +9,9 @@ class VenueRegistryTests(unittest.TestCase):
         output=probe("rpc")["venues"]
         self.assertEqual(set(output),{"orca","raydium_cpmm","raydium_clmm",
                                     "meteora_dlmm","meteora_damm_v2"})
-        self.assertEqual(output["raydium_clmm"]["status"],"PROGRAM_ONLY")
+        self.assertEqual(output["raydium_clmm"]["status"],"READY_FOR_POOL_VALIDATION")
+        self.assertTrue(output["raydium_clmm"]["pool_decoder_available"])
+        self.assertFalse(output["raydium_clmm"]["swap_simulator_available"])
         self.assertFalse(output["meteora_dlmm"]["swap_simulator_available"])
         self.assertFalse(output["orca"]["pool_verified"])
         self.assertEqual(account.call_count,len(PROGRAMS))
