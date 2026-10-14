@@ -72,9 +72,21 @@ def run(rpc,cp_pool,cl_pool):
     bh=call(rpc,"getLatestBlockhash")["value"]["blockhash"]
     tx=Transaction.new_signed_with_payer(ixs,payer.pubkey(),
                                           [payer,wsol,usdc,ray],Hash.from_string(bh))
-    if len(bytes(tx))>1232:
-        return {"status":"TX_TOO_LARGE","swap_success":False,
-                "transaction_bytes":len(bytes(tx)),"swap_executed":False}
+    legacy_size=len(bytes(tx))
+    if legacy_size>1232:
+        table=os.environ.get("SURFPOOL_CLMM_ALT_ADDRESS")
+        if not table:
+            return {"status":"ALT_REQUIRED","swap_success":False,
+                    "legacy_transaction_bytes":legacy_size,
+                    "transaction_limit_bytes":1232,"swap_executed":False,
+                    "broadcast":False}
+        from arb.clmm_v0 import load_table,build_v0
+        try:
+            tx=build_v0(ixs,payer,[payer,wsol,usdc,ray],bh,[load_table(rpc,table)])
+        except ValueError as exc:
+            return {"status":"ALT_UNAVAILABLE","swap_success":False,
+                    "legacy_transaction_bytes":legacy_size,"reason":str(exc),
+                    "broadcast":False}
     value=call(rpc,"simulateTransaction",[base64.b64encode(bytes(tx)).decode(),{
         "encoding":"base64","sigVerify":True,"commitment":"processed",
         "accounts":{"encoding":"base64","addresses":[str(wsol.pubkey()),
