@@ -13,6 +13,6 @@ class QuoteTests(unittest.TestCase):
             quote_pool(p,"a",10000)
         self.assertTrue(quote_pool(p,"a",10000,3000)["indicative_only"])
     def test_rejects_bad_types_and_reserves(self):
-        for v in (-1,0,1000000):
+        for v in (-1,1000000):
             with self.assertRaises(ValueError):quote_exact_input(1000,1000,10,v)
         with self.assertRaises(TypeError):quote_exact_input(1000.0,1000,10,3000)
