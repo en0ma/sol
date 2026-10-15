@@ -58,6 +58,8 @@ jobs:
 
       - name: Enforce arbitrage mission and development priorities
         run: python3 -m arb.arbitrage_mission
+      - name: Test honest venue-coverage capability accounting
+        run: python3 -m unittest discover -s tests -p test_venue_coverage.py -v
       - name: Test conservative residual-token valuation
         run: python3 -m unittest discover -s tests -p test_whirlpool_accounting.py -v
       - name: Test Raydium to Orca reverse route wiring
@@ -399,6 +401,17 @@ jobs:
         with:
           name: onchain-arbitrage-route-graph
           path: ${{ runner.temp }}/arbitrage-graph.json
+          if-no-files-found: ignore
+      - name: Report validated pool and executable venue coverage
+        env:
+          VENUE_COVERAGE_REPORT: ${{ runner.temp }}/venue-coverage.json
+        run: python3 -m arb.venue_coverage
+      - name: Upload arbitrage venue coverage scorecard
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arbitrage-venue-coverage
+          path: ${{ runner.temp }}/venue-coverage.json
           if-no-files-found: ignore
       - name: Refresh pinned multi-venue pool registry via targeted RPC
         env:
