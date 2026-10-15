@@ -143,17 +143,45 @@ def run(rpc,cp_pool,cl_pool,orca_pool,orca_output_lamports=90000):
         except ValueError as exc:result["balance_error"]=str(exc)
     return result
 
+def sweep(rpc,cp_pool,cl_pool,orca_pool,outputs=(90000,92000,94000,96000,98000,100000)):
+    """Independent signed simulations; preserve explicit residual and fee uncertainty."""
+    trials=[]
+    for amount in outputs:
+        try:
+            out=run(rpc,cp_pool,cl_pool,orca_pool,amount)
+        except Exception as exc:
+            out={"status":"BLOCKED","cycle_closed":False,"error":str(exc)[:200]}
+        trials.append({"orca_output_lamports":amount,
+                       "status":out.get("status"),
+                       "residual_ray_base_units":out.get("ray_received"),
+                       "residual_usdc_base_units":out.get("residual_usdc"),
+                       "gross_wsol_change_lamports":out.get("gross_wsol_change_lamports"),
+                       "net_wsol_change_lamports":out.get("net_wsol_change_lamports"),
+                       "fee_known":out.get("estimated_network_fee_lamports") is not None,
+                       "transaction_bytes":out.get("transaction_bytes"),
+                       "cycle_closed":bool(out.get("cycle_closed")),
+                       "error":out.get("error")})
+    successes=[x for x in trials if x["cycle_closed"]]
+    residuals=[x for x in trials if x["status"]=="RESIDUAL_INTERMEDIATE" and
+               type(x["residual_ray_base_units"]) is int]
+    closest=min(residuals,key=lambda x:x["residual_ray_base_units"]) if residuals else None
+    return {"status":"CLOSED" if successes else "NO_CLOSED_CYCLE",
+            "trials":trials,"closest_residual_trial":closest,
+            "closed_cycle_simulated":bool(successes),
+            "profitable":any(x["cycle_closed"] and x["net_wsol_change_lamports"] is not None
+                             and x["net_wsol_change_lamports"]>0 for x in successes)}
+
 def main():
     cp=json.load(open("arb/pool_registry.json"))["pools"]
     cpa=next(x["address"] for x in cp if x["venue"]=="raydium_cpmm")
     cla=next(x["address"] for x in cp if x["venue"]=="raydium_clmm")
     oca=next(x["address"] for x in cp if x["venue"]=="orca" and "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R" in x.get("mints",[]))
-    try:out=run(os.environ.get("SOLANA_RPC_URL","http://127.0.0.1:8899"),cpa,cla,oca)
+    try:out=sweep(os.environ.get("SOLANA_RPC_URL","http://127.0.0.1:8899"),cpa,cla,oca)
     except Exception as exc:out={"status":"BLOCKED","swap_success":False,
                                  "error":str(exc)[:200]}
     print(json.dumps(out,indent=2))
     if os.environ.get("THREE_HOP_REPORT"):
         with open(os.environ["THREE_HOP_REPORT"],"w") as f:json.dump(out,f,indent=2)
-    return 0 if out.get("cycle_closed") else 2
+    return 0 if out.get("closed_cycle_simulated") else 2
 
 if __name__=="__main__":raise SystemExit(main())

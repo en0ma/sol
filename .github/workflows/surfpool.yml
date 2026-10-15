@@ -80,6 +80,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_third_leg_owner.py -v
       - name: Test fail-closed RAY-to-WSOL third-leg readiness
         run: python3 -m unittest discover -s tests -p test_third_leg_readiness.py -v
+      - name: Test bounded three-hop output sweep and unknown-fee safety
+        run: python3 -m unittest discover -s tests -p test_three_hop_sweep.py -v
       - name: Test Orca exact-output return leg serialization
         run: python3 -m unittest discover -s tests -p test_orca_exact_output_return.py -v
       - name: Test CLMM simulation post-balance assertions
