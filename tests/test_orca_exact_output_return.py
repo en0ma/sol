@@ -6,4 +6,4 @@ class OrcaExactOutputTests(unittest.TestCase):
         self.assertEqual(data[:8],DISC)
         self.assertEqual(int.from_bytes(data[8:16],"little"),90000)
         self.assertEqual(int.from_bytes(data[16:24],"little"),5314)
-        self.assertEqual(data[-2:],b"\\x00\\x00")
+        self.assertEqual(data[-2:],bytes([0,0]))
