@@ -60,6 +60,8 @@ jobs:
         run: python3 -m arb.arbitrage_mission
       - name: Test honest venue-coverage capability accounting
         run: python3 -m unittest discover -s tests -p test_venue_coverage.py -v
+      - name: Test integer CPMM amount-aware quote safety
+        run: python3 -m unittest discover -s tests -p test_cpmm_quote.py -v
       - name: Test conservative residual-token valuation
         run: python3 -m unittest discover -s tests -p test_whirlpool_accounting.py -v
       - name: Test Raydium to Orca reverse route wiring
