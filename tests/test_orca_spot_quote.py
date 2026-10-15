@@ -21,7 +21,7 @@ class WhirlpoolSpotQuoteTests(unittest.TestCase):
         state=self.state()
         for mint in ("a","b"):
             q=quote_verified_single_tick(state,mint,1000000,
-                lower_sqrt_x64=Q-100000000,upper_sqrt_x64=Q+100000000)
+                lower_sqrt_x64=Q-100000000000000,upper_sqrt_x64=Q+100000000000000)
             self.assertTrue(q["tick_boundary_verified"])
             self.assertFalse(q["executable_quote"])
             self.assertFalse(q["actionable"])
