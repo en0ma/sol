@@ -17,7 +17,8 @@ from arb.token_vaults import TOKEN_PROGRAM,decode_token_account
 
 USDT="Es9vMFrzaCER9UtuaxKVHAn4i98TpxHcv2DgsLg8n4v"
 JUP="JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN"
-MINTS={"WSOL":SOL,"USDC":USDC,"USDT":USDT,"JUP":JUP}
+RAY="4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R"
+MINTS={"WSOL":SOL,"USDC":USDC,"USDT":USDT,"JUP":JUP,"RAY":RAY}
 VENUES={"orca":(ORCA,ORCA_SIZE,101,181,decode_orca),
         "raydium_cpmm":(RAY,RAY_SIZE,168,200,decode_ray),
         "raydium_clmm":(CLMM,CLMM_SIZE,73,105,decode_clmm),

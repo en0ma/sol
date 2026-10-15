@@ -89,7 +89,7 @@ def scan(rpc,registry,extra_pairs=(),anchors=None,max_cycles=MAX_CYCLES):
 def main():
     p=argparse.ArgumentParser()
     p.add_argument("--registry",default="arb/pool_registry.json")
-    p.add_argument("--extra-pairs",default="")
+    p.add_argument("--extra-pairs",default="WSOL/RAY,USDC/RAY")
     p.add_argument("--anchors",default="WSOL,USDC,RAY")
     p.add_argument("--output",default=os.environ.get("ARB_GRAPH_REPORT",""))
     p.add_argument("--max-cycles",type=int,default=2000)

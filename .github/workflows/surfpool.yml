@@ -374,6 +374,17 @@ jobs:
           name: raydium-clmm-readiness
           path: ${{ runner.temp }}/clmm-readiness.json
           if-no-files-found: ignore
+      - name: Scan additional RAY and stablecoin pools on five DEX programs
+        env:
+          DEX_DISCOVERY_REPORT: ${{ runner.temp }}/expanded-pool-discovery.json
+        run: python3 -m arb.onchain_pool_discovery --pairs WSOL/RAY,USDC/RAY,WSOL/USDT,USDC/USDT --limit 8 || test "$?" -eq 2
+      - name: Upload expanded five-venue pool discovery
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: expanded-five-venue-pool-discovery
+          path: ${{ runner.temp }}/expanded-pool-discovery.json
+          if-no-files-found: ignore
       - name: Discover cyclic arbitrage routes from verified pool graph
         env:
           ARB_GRAPH_REPORT: ${{ runner.temp }}/arbitrage-graph.json
@@ -401,7 +412,7 @@ jobs:
         env:
           DEX_DISCOVERY_REPORT: ${{ runner.temp }}/dex-discovery.json
         run: |
-          python3 -m arb.onchain_pool_discovery --pairs WSOL/USDT --limit 8 || test "$?" -eq 2
+          python3 -m arb.onchain_pool_discovery --pairs WSOL/RAY,USDC/RAY,WSOL/USDT,USDC/USDT --limit 8 || test "$?" -eq 2
       - name: Discover pool identities from bounded on-chain transaction history
         if: ${{ github.event_name == 'workflow_dispatch' }}
         env:
