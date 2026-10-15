@@ -14,6 +14,40 @@ ARRAY_TICKS = 88
 FIXED_LEN = 9988
 DISC = hashlib.sha256(b"account:TickArray").digest()[:8]
 
+
+TICK_SIZE = 113  # initialized(1), net liquidity(16), gross(16), fee/reward growth(80)
+TICK_HEADER = 12
+MAX_TICK = 443636
+
+def decode_fixed_ticks(raw, pool_address, expected_start, spacing):
+    """Validate the full fixed-array layout and identify initialized ticks.
+
+    This is structural evidence, not a quote or swap-readiness assertion.
+    """
+    if type(spacing) is not int or spacing<=0 or type(expected_start) is not int:
+        raise ValueError("invalid tick-array parameters")
+    if len(raw)!=FIXED_LEN or raw[:8]!=DISC:
+        raise ValueError("unsupported tick array layout")
+    start=int.from_bytes(raw[8:12],"little",signed=True)
+    if start!=expected_start or b58(raw[-32:])!=pool_address:
+        raise ValueError("tick array pool or start mismatch")
+    ticks=[]
+    for i in range(ARRAY_TICKS):
+        offset=TICK_HEADER+i*TICK_SIZE
+        initialized=raw[offset]
+        if initialized not in (0,1):
+            raise ValueError("invalid tick initialization flag")
+        if not initialized:
+            continue
+        net=int.from_bytes(raw[offset+1:offset+17],"little",signed=True)
+        gross=int.from_bytes(raw[offset+17:offset+33],"little")
+        index=start+i*spacing
+        if abs(index)>MAX_TICK or gross<=0 or abs(net)>gross:
+            raise ValueError("invalid initialized tick liquidity or index")
+        ticks.append({"tick_index":index,"liquidity_net":str(net),
+                      "liquidity_gross":str(gross)})
+    return ticks
+
 def start_tick(index, spacing):
     if spacing <= 0: raise ValueError("invalid spacing")
     span = ARRAY_TICKS * spacing
@@ -51,10 +85,13 @@ def inspect(rpc, pool_address):
                 raise ValueError("invalid tick array encoding")
             raw=base64.b64decode(data[0],validate=True)
             if len(raw)==FIXED_LEN and raw[:8]==DISC:
-                found=int.from_bytes(raw[8:12],"little",signed=True)
-                if found!=idx or b58(raw[-32:])!=pool_address:
-                    raise ValueError("wrong tick array start or Whirlpool")
+                ticks=decode_fixed_ticks(raw,pool_address,idx,spacing)
                 entry["status"]="FIXED_VALID"
+                entry["initialized_ticks"]=len(ticks)
+                entry["nearest_initialized_below"]=max(
+                    (t["tick_index"] for t in ticks if t["tick_index"]<=state["tick_current_index"]),default=None)
+                entry["nearest_initialized_above"]=min(
+                    (t["tick_index"] for t in ticks if t["tick_index"]>state["tick_current_index"]),default=None)
             else:
                 entry["status"]="UNSUPPORTED_LAYOUT"
         out.append(entry)
