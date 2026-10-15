@@ -135,15 +135,17 @@ def run(rpc,cp_pool,cl_pool,orca_pool,orca_output_lamports=90000):
                           swaps_executed=3,cycle_closed=closed,swap_success=closed,
                           gross_wsol_change_lamports=amount_wsol-1000000)
             try:
-                fee=call(rpc,"getFeeForMessage",[base64.b64encode(bytes(tx.message)).decode()]).get("value")
+                fee=call(rpc,"getFeeForMessage",[base64.b64encode(bytes(tx.message)).decode(),{"commitment":"processed"}]).get("value")
             except Exception:fee=None
             result["estimated_network_fee_lamports"]=fee if type(fee)is int and fee>=0 else None
+            result["fee_source"]="getFeeForMessage" if type(fee)is int and fee>=0 else "unavailable"
+            result["minimum_signature_fee_lamports"]=5000*len(tx.signatures)
             result["net_wsol_change_lamports"]=(amount_wsol-1000000-fee if type(fee)is int and fee>=0 else None)
             result["profitable"]=closed and result["net_wsol_change_lamports"] is not None and result["net_wsol_change_lamports"]>0
         except ValueError as exc:result["balance_error"]=str(exc)
     return result
 
-def sweep(rpc,cp_pool,cl_pool,orca_pool,outputs=(90000,92000,94000,96000,98000,100000)):
+def sweep(rpc,cp_pool,cl_pool,orca_pool,outputs=(92000,92500,93000,93250,93500,93750,94000)):
     """Independent signed simulations; preserve explicit residual and fee uncertainty."""
     trials=[]
     for amount in outputs:
@@ -157,7 +159,7 @@ def sweep(rpc,cp_pool,cl_pool,orca_pool,outputs=(90000,92000,94000,96000,98000,1
                        "residual_usdc_base_units":out.get("residual_usdc"),
                        "gross_wsol_change_lamports":out.get("gross_wsol_change_lamports"),
                        "net_wsol_change_lamports":out.get("net_wsol_change_lamports"),
-                       "fee_known":out.get("estimated_network_fee_lamports") is not None,
+                       "fee_known":out.get("estimated_network_fee_lamports") is not None,\n                       "minimum_signature_fee_lamports":out.get("minimum_signature_fee_lamports"),
                        "transaction_bytes":out.get("transaction_bytes"),
                        "cycle_closed":bool(out.get("cycle_closed")),
                        "error":out.get("error")})
