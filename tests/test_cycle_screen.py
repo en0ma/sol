@@ -25,3 +25,34 @@ class CycleScreenTests(unittest.TestCase):
         route={"start_mint":"SOL","legs":[{"input":"SOL","output":"USDC",
             "venue":"raydium_cpmm","pool":"x"}]}
         self.assertEqual(score_cycle(route,{}, {},1000)["status"],"UNQUOTABLE")
+
+    def test_disconnect_and_fake_start_rejected_before_quotes(self):
+        indexed={("raydium_cpmm",p["address"]):p for p in (self.pool("a",[1000000,2000000]),self.pool("b",[2000000,1000000]))}
+        cfg={k:{"fee_verified_onchain":True,"trade_fee_rate_ppm":2500,"creator_fee_rate_ppm":500} for k in indexed}
+        good=[{"input":"SOL","output":"USDC","venue":"raydium_cpmm","pool":"a"},
+              {"input":"USDC","output":"SOL","venue":"raydium_cpmm","pool":"b"}]
+        for bad in (
+            {"start_mint":"FAKE","legs":good},
+            {"start_mint":"SOL","legs":[good[0],{**good[1],"input":"SOL"}]},
+            {"start_mint":"SOL","legs":[good[0],{**good[1],"output":"USDC"}]},
+            {"start_mint":"SOL","legs":[good[0],{**good[1],"pool":"a"}]},
+            {"start_mint":"SOL","legs":[good[0]]},
+        ):
+            with self.subTest(bad=bad):
+                result=score_cycle(bad,indexed,cfg,10000)
+                self.assertEqual(result["status"],"UNQUOTABLE")
+                self.assertFalse(result["actionable"])
+
+    def test_bad_fee_config_fails_closed_without_crash(self):
+        pools=[self.pool("a",[1000000,2000000]),self.pool("b",[2000000,1000000])]
+        indexed={("raydium_cpmm",p["address"]):p for p in pools}
+        legs=[{"input":"SOL","output":"USDC","venue":"raydium_cpmm","pool":"a"},
+              {"input":"USDC","output":"SOL","venue":"raydium_cpmm","pool":"b"}]
+        for bad in ({"fee_verified_onchain":True,"trade_fee_rate_ppm":2500},
+                    {"fee_verified_onchain":True,"trade_fee_rate_ppm":"2500","creator_fee_rate_ppm":500},
+                    {"fee_verified_onchain":True,"trade_fee_rate_ppm":999999,"creator_fee_rate_ppm":500}):
+            cfg={k:bad for k in indexed}
+            with self.subTest(bad=bad):
+                result=score_cycle({"start_mint":"SOL","legs":legs},indexed,cfg,1000)
+                self.assertEqual(result["status"],"UNQUOTABLE")
+                self.assertFalse(result["actionable"])
