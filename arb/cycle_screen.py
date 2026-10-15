@@ -14,6 +14,23 @@ def score_cycle(route,pool_index,fee_index,input_amount,network_fee=None):
     if type(input_amount)is not int or input_amount<=0:raise ValueError("invalid input size")
     if network_fee is not None and (type(network_fee)is not int or network_fee<0):
         raise ValueError("invalid network fee")
+    # Never price malformed walks as arbitrage, even if their individual pools quote.
+    path=route.get("legs")
+    start=route.get("start_mint")
+    if not isinstance(path,list) or not 2<=len(path)<=4 or not isinstance(start,str) or not start:
+        return {"status":"UNQUOTABLE","reason":"invalid cycle topology","legs_quoted":0,"actionable":False}
+    current=start
+    seen=set()
+    for leg in path:
+        if not isinstance(leg,dict) or leg.get("input")!=current or not isinstance(leg.get("output"),str) or not leg["output"]:
+            return {"status":"UNQUOTABLE","reason":"disconnected cycle topology","legs_quoted":0,"actionable":False}
+        key=(leg.get("venue"),leg.get("pool"))
+        if any(not isinstance(v,str) or not v for v in key) or key in seen:
+            return {"status":"UNQUOTABLE","reason":"invalid or reused cycle pool","legs_quoted":0,"actionable":False}
+        seen.add(key)
+        current=leg["output"]
+    if current!=start:
+        return {"status":"UNQUOTABLE","reason":"cycle does not return to start","legs_quoted":0,"actionable":False}
     amount=input_amount
     legs=[]
     for leg in route["legs"]:
@@ -28,9 +45,14 @@ def score_cycle(route,pool_index,fee_index,input_amount,network_fee=None):
             return {"status":"UNQUOTABLE","reason":"missing verified fee configuration","missing_quote_venue":leg["venue"],"legs_quoted":len(legs),"actionable":False}
         if not cfg.get("fee_verified_onchain"):
             return {"status":"UNQUOTABLE","reason":"fee not verified on chain","legs_quoted":len(legs),"actionable":False}
-        fee=cfg["trade_fee_rate_ppm"]+cfg["creator_fee_rate_ppm"]
-        try:q=quote_pool(pool,leg["input"],amount,fee)
-        except (ValueError,TypeError) as exc:
+        try:
+            trade_fee=cfg["trade_fee_rate_ppm"]
+            creator_fee=cfg["creator_fee_rate_ppm"]
+            if type(trade_fee) is not int or type(creator_fee) is not int:
+                raise ValueError("invalid fee type")
+            fee=trade_fee+creator_fee
+            q=quote_pool(pool,leg["input"],amount,fee)
+        except (ValueError,TypeError,KeyError) as exc:
             return {"status":"UNQUOTABLE","reason":str(exc)[:180],"legs_quoted":len(legs),"actionable":False}
         if q["mint_out"]!=leg["output"]:
             return {"status":"UNQUOTABLE","reason":"route output mint mismatch","legs_quoted":len(legs),"actionable":False}
