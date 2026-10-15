@@ -60,6 +60,8 @@ jobs:
         run: python3 -m arb.arbitrage_mission
       - name: Test honest venue-coverage capability accounting
         run: python3 -m unittest discover -s tests -p test_venue_coverage.py -v
+      - name: Test fee-aware CPMM candidate screening
+        run: python3 -m unittest discover -s tests -p test_cpmm_screen.py -v
       - name: Test verified on-chain CPMM fee config decoding
         run: python3 -m unittest discover -s tests -p test_cpmm_config.py -v
       - name: Test integer CPMM amount-aware quote safety
@@ -405,6 +407,17 @@ jobs:
         with:
           name: onchain-arbitrage-route-graph
           path: ${{ runner.temp }}/arbitrage-graph.json
+          if-no-files-found: ignore
+      - name: Screen Raydium CPMM liquidity across trade sizes
+        env:
+          CPMM_QUOTE_REPORT: ${{ runner.temp }}/cpmm-quote-screen.json
+        run: python3 -m arb.cpmm_screen
+      - name: Upload fee-aware CPMM size screening
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpmm-size-screening
+          path: ${{ runner.temp }}/cpmm-quote-screen.json
           if-no-files-found: ignore
       - name: Verify Raydium CPMM fee configuration on Surfpool
         env:
