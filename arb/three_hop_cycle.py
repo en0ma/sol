@@ -34,7 +34,9 @@ def check_balances(value,addresses,mints):
     return dict(zip(("remaining_wsol","residual_usdc","ray_received"),amounts))
 
 def run(rpc,cp_pool,cl_pool,orca_pool,orca_output_lamports=90000):
-    if type(orca_output_lamports) is not int or not 1<=orca_output_lamports<=1000000:\n        raise ValueError("invalid exact-output probe")\n    from solders.keypair import Keypair
+    if type(orca_output_lamports) is not int or not 1<=orca_output_lamports<=1000000:
+        raise ValueError("invalid exact-output probe")
+    from solders.keypair import Keypair
     from solders.hash import Hash
     from solders.transaction import Transaction
     from solders.pubkey import Pubkey
