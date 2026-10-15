@@ -1,5 +1,5 @@
 import unittest
-from arb.orca_spot_quote import quote_single_tick,Q
+from arb.orca_spot_quote import quote_single_tick,quote_verified_single_tick,Q
 class WhirlpoolSpotQuoteTests(unittest.TestCase):
     def state(self):
         return {"token_mint_a":"a","token_mint_b":"b",
@@ -16,3 +16,23 @@ class WhirlpoolSpotQuoteTests(unittest.TestCase):
         with self.assertRaises(ValueError):quote_single_tick(self.state(),"a",0)
         s=self.state();s["fee_rate_hundredths_bps"]=1000000
         with self.assertRaises(ValueError):quote_single_tick(s,"a",1000)
+
+    def test_verified_tick_bounds_are_directional_and_fail_closed(self):
+        state=self.state()
+        for mint in ("a","b"):
+            q=quote_verified_single_tick(state,mint,1000000,
+                lower_sqrt_x64=Q-100000000,upper_sqrt_x64=Q+100000000)
+            self.assertTrue(q["tick_boundary_verified"])
+            self.assertFalse(q["executable_quote"])
+            self.assertFalse(q["actionable"])
+        for mint in ("a","b"):
+            with self.subTest(mint=mint):
+                with self.assertRaises(ValueError):
+                    quote_verified_single_tick(state,mint,1000000,
+                        lower_sqrt_x64=Q-1,upper_sqrt_x64=Q+1)
+        with self.assertRaises(ValueError):
+            quote_verified_single_tick(state,"a",1000000,
+                lower_sqrt_x64=Q,upper_sqrt_x64=Q)
+        with self.assertRaises(ValueError):
+            quote_verified_single_tick(state,"a",1000000,
+                lower_sqrt_x64="1",upper_sqrt_x64=Q+100000000)
