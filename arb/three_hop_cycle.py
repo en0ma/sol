@@ -33,8 +33,8 @@ def check_balances(value,addresses,mints):
         raise ValueError("no input spent or no RAY received")
     return dict(zip(("remaining_wsol","residual_usdc","ray_received"),amounts))
 
-def run(rpc,cp_pool,cl_pool,orca_pool):
-    from solders.keypair import Keypair
+def run(rpc,cp_pool,cl_pool,orca_pool,orca_output_lamports=90000):
+    if type(orca_output_lamports) is not int or not 1<=orca_output_lamports<=1000000:\n        raise ValueError("invalid exact-output probe")\n    from solders.keypair import Keypair
     from solders.hash import Hash
     from solders.transaction import Transaction
     from solders.pubkey import Pubkey
@@ -82,7 +82,7 @@ def run(rpc,cp_pool,cl_pool,orca_pool):
                      str(ray.pubkey()),10000,1,[a["address"] for a in
                      readiness["tick_arrays"]],input_is_token_0=False))
     ixs.append(build_swap(orca_pool,oc,str(payer.pubkey()),
-             str(wsol.pubkey()),str(ray.pubkey()),oracle,5000,1,False))
+             str(wsol.pubkey()),str(ray.pubkey()),oracle,orca_output_lamports,5314,False,amount_specified_is_input=False))
     bh=call(rpc,"getLatestBlockhash")["value"]["blockhash"]
     tx=Transaction.new_signed_with_payer(ixs,payer.pubkey(),
                                           [payer,wsol,usdc,ray],Hash.from_string(bh))
@@ -129,7 +129,7 @@ def run(rpc,cp_pool,cl_pool,orca_pool):
             amount_wsol=results["remaining_wsol"]
             residual_ray=results["ray_received"]
             closed=(results["residual_usdc"]==0 and residual_ray==0)
-            result.update(results,status="PASS" if closed else "RESIDUAL_INTERMEDIATE",
+            result.update(results,orca_exact_output_lamports=orca_output_lamports,status="PASS" if closed else "RESIDUAL_INTERMEDIATE",
                           swaps_executed=3,cycle_closed=closed,swap_success=closed,
                           gross_wsol_change_lamports=amount_wsol-1000000)
             try:
