@@ -379,7 +379,7 @@ jobs:
       - name: Scan additional RAY and stablecoin pools on five DEX programs
         env:
           DEX_DISCOVERY_REPORT: ${{ runner.temp }}/expanded-pool-discovery.json
-        run: python3 -m arb.onchain_pool_discovery --pairs WSOL/RAY,USDC/RAY,WSOL/USDT,USDC/USDT --limit 8 || test "$?" -eq 2
+        run: python3 -m arb.onchain_pool_discovery --pairs WSOL/RAY,USDC/RAY --limit 8 || test "$?" -eq 2
       - name: Upload expanded five-venue pool discovery
         if: always()
         uses: actions/upload-artifact@v4
@@ -390,7 +390,7 @@ jobs:
       - name: Discover cyclic arbitrage routes from verified pool graph
         env:
           ARB_GRAPH_REPORT: ${{ runner.temp }}/arbitrage-graph.json
-        run: python3 -m arb.opportunity_graph
+        run: python3 -m arb.opportunity_graph --extra-pairs ""
       - name: Upload candidate arbitrage route graph
         if: always()
         uses: actions/upload-artifact@v4
@@ -430,7 +430,7 @@ jobs:
       - name: Revalidate discovery candidates into registry snapshot
         if: always()
         env:
-          CANDIDATE_DISCOVERY: ${{ runner.temp }}/dex-discovery.json
+          CANDIDATE_DISCOVERY: ${{ runner.temp }}/expanded-pool-discovery.json
           HISTORY_DISCOVERY: ${{ runner.temp }}/dex-history.json
         run: |
           inputs=()
