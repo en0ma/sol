@@ -8,7 +8,7 @@ import argparse,base64,json,os
 from itertools import combinations
 from arb.rpc import call
 from arb.orca_whirlpool import PROGRAM as ORCA,SIZE as ORCA_SIZE,decode as decode_orca,SOL,USDC
-from arb.raydium_cpmm import PROGRAM as RAY, SIZE as RAY_SIZE,decode as decode_ray
+from arb.raydium_cpmm import PROGRAM as RAY_PROGRAM, SIZE as RAY_SIZE,decode as decode_ray
 from arb.raydium_clmm import PROGRAM as CLMM,SIZE as CLMM_SIZE,decode as decode_clmm,verify as verify_clmm
 from arb.meteora_dlmm import PROGRAM as DLMM,SIZE as DLMM_SIZE,decode as decode_dlmm,verify as verify_dlmm
 from arb.meteora_damm_v2 import PROGRAM as DAMM,SIZE as DAMM_SIZE,decode as decode_damm,verify as verify_damm
@@ -20,7 +20,7 @@ JUP="JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN"
 RAY="4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R"
 MINTS={"WSOL":SOL,"USDC":USDC,"USDT":USDT,"JUP":JUP,"RAY":RAY}
 VENUES={"orca":(ORCA,ORCA_SIZE,101,181,decode_orca),
-        "raydium_cpmm":(RAY,RAY_SIZE,168,200,decode_ray),
+        "raydium_cpmm":(RAY_PROGRAM,RAY_SIZE,168,200,decode_ray),
         "raydium_clmm":(CLMM,CLMM_SIZE,73,105,decode_clmm),
         "meteora_dlmm":(DLMM,DLMM_SIZE,88,120,decode_dlmm),
         "meteora_damm_v2":(DAMM,DAMM_SIZE,168,200,decode_damm)}
@@ -75,7 +75,7 @@ def verify(rpc,venue,address,state):
         values=resp.get("value")
         if not isinstance(values,list) or len(values)!=3:raise ValueError("missing Raydium accounts")
         pool=values[0]
-        if not pool or pool.get("owner")!=RAY or decode_ray(base64.b64decode(pool["data"][0],validate=True))!=state:
+        if not pool or pool.get("owner")!=RAY_PROGRAM or decode_ray(base64.b64decode(pool["data"][0],validate=True))!=state:
             raise ValueError("Raydium state mutated")
         amounts=[]
         for i in (0,1):
