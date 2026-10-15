@@ -37,10 +37,10 @@ def quote_pool_state(state,mint_in,amount_in):
     return quote_single_tick(state,mint_in,amount_in)
 
 
-def quote_verified_single_tick(state, mint_in, amount_in, *, lower_sqrt_x64, upper_sqrt_x64):
-    """Bound an indicative swap inside independently verified current tick edges.
+def quote_bounded_single_tick(state, mint_in, amount_in, *, lower_sqrt_x64, upper_sqrt_x64):
+    """Bound an indicative swap using caller-supplied current tick edges.
 
-    The caller must verify both boundary prices and their association with the
+    The caller must independently verify both prices and their association with the
     current initialized tick. This does NOT traverse tick arrays or assert that
     execution matches this arithmetic.
     """
@@ -53,6 +53,6 @@ def quote_verified_single_tick(state, mint_in, amount_in, *, lower_sqrt_x64, upp
     next_p=int(q["post_sqrt_price_x64"])
     if not lower_sqrt_x64<next_p<upper_sqrt_x64:
         raise ValueError("quote would reach or cross a tick boundary")
-    return {**q, "tick_boundary_verified":True,
-            "status":"INDICATIVE_WITHIN_VERIFIED_TICK",
+    return {**q, "supplied_tick_boundary_checked":True,
+            "status":"INDICATIVE_WITHIN_SUPPLIED_TICK",
             "actionable":False,"executable_quote":False}
