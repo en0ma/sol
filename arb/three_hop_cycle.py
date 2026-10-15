@@ -159,7 +159,8 @@ def sweep(rpc,cp_pool,cl_pool,orca_pool,outputs=(92000,92500,93000,93250,93500,9
                        "residual_usdc_base_units":out.get("residual_usdc"),
                        "gross_wsol_change_lamports":out.get("gross_wsol_change_lamports"),
                        "net_wsol_change_lamports":out.get("net_wsol_change_lamports"),
-                       "fee_known":out.get("estimated_network_fee_lamports") is not None,\n                       "minimum_signature_fee_lamports":out.get("minimum_signature_fee_lamports"),
+                       "fee_known":out.get("estimated_network_fee_lamports") is not None,
+                       "minimum_signature_fee_lamports":out.get("minimum_signature_fee_lamports"),
                        "transaction_bytes":out.get("transaction_bytes"),
                        "cycle_closed":bool(out.get("cycle_closed")),
                        "error":out.get("error")})
