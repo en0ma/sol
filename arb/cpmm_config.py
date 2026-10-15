@@ -46,3 +46,26 @@ def read_pool_config(rpc,pool):
         raise ValueError("CPMM config PDA mismatch")
     return {**cfg,"pool":pool_address,"config_address":config_address,
             "fee_verified_onchain":True,"creator_fee_placement_verified":False}
+
+def main():
+    import json,os
+    from arb.pool_registry import refresh
+    entries=json.load(open("arb/pool_registry.json"))["pools"]
+    entries=[e for e in entries if e["venue"]=="raydium_cpmm"]
+    rpc=os.environ.get("SOLANA_RPC_URL","http://127.0.0.1:8899")
+    result=refresh(rpc,entries)
+    rows=[];errors=[]
+    for pool in result["verified_pools"]:
+        try:rows.append(read_pool_config(rpc,pool))
+        except Exception as exc:errors.append({"pool":pool["address"],"reason":str(exc)[:200]})
+    report={"status":"COMPLETE" if rows and not errors and not result["rejected"] else "PARTIAL",
+            "verified_configs":rows,"errors":errors+result["rejected"],
+            "executable_native_quote":False,
+            "note":"On-chain fee configuration verified; creator-fee placement and exact swap quote remain unvalidated."}
+    print(json.dumps(report,indent=2))
+    dest=os.environ.get("CPMM_CONFIG_REPORT")
+    if dest:
+        with open(dest,"w") as f:json.dump(report,f,indent=2)
+    return 0 if report["status"]=="COMPLETE" else 2
+
+if __name__=="__main__":raise SystemExit(main())

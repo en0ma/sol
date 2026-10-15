@@ -406,6 +406,17 @@ jobs:
           name: onchain-arbitrage-route-graph
           path: ${{ runner.temp }}/arbitrage-graph.json
           if-no-files-found: ignore
+      - name: Verify Raydium CPMM fee configuration on Surfpool
+        env:
+          CPMM_CONFIG_REPORT: ${{ runner.temp }}/cpmm-config.json
+        run: python3 -m arb.cpmm_config
+      - name: Upload CPMM on-chain fee evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: onchain-cpmm-fee-config
+          path: ${{ runner.temp }}/cpmm-config.json
+          if-no-files-found: ignore
       - name: Report validated pool and executable venue coverage
         env:
           VENUE_COVERAGE_REPORT: ${{ runner.temp }}/venue-coverage.json
