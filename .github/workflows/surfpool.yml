@@ -60,6 +60,8 @@ jobs:
         run: python3 -m arb.arbitrage_mission
       - name: Test honest venue-coverage capability accounting
         run: python3 -m unittest discover -s tests -p test_venue_coverage.py -v
+      - name: Test missing-quote venue prioritization across discovered routes
+        run: python3 -m unittest discover -s tests -p test_quote_gap_priorities.py -v
       - name: Test fail-closed multi-pool route quote screening
         run: python3 -m unittest discover -s tests -p test_cycle_screen.py -v
       - name: Test fee-aware CPMM candidate screening

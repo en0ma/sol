@@ -20,10 +20,12 @@ def score_cycle(route,pool_index,fee_index,input_amount,network_fee=None):
         key=(leg["venue"],leg["pool"])
         pool=pool_index.get(key)
         cfg=fee_index.get(key)
-        if pool is None or not pool.get("verified") or cfg is None:
-            return {"status":"UNQUOTABLE","reason":"missing verified pool or fee","legs_quoted":len(legs),"actionable":False}
+        if pool is None or not pool.get("verified"):
+            return {"status":"UNQUOTABLE","reason":"missing verified pool","missing_quote_venue":leg["venue"],"legs_quoted":len(legs),"actionable":False}
         if leg["venue"]!="raydium_cpmm":
-            return {"status":"UNQUOTABLE","reason":"unsupported native quote venue","legs_quoted":len(legs),"actionable":False}
+            return {"status":"UNQUOTABLE","reason":"unsupported native quote venue","missing_quote_venue":leg["venue"],"legs_quoted":len(legs),"actionable":False}
+        if cfg is None:
+            return {"status":"UNQUOTABLE","reason":"missing verified fee configuration","missing_quote_venue":leg["venue"],"legs_quoted":len(legs),"actionable":False}
         if not cfg.get("fee_verified_onchain"):
             return {"status":"UNQUOTABLE","reason":"fee not verified on chain","legs_quoted":len(legs),"actionable":False}
         fee=cfg["trade_fee_rate_ppm"]+cfg["creator_fee_rate_ppm"]
@@ -57,6 +59,21 @@ def scan(rpc,entries,amounts=(100000,1000000)):
         if p["venue"]=="raydium_cpmm":
             try:fees[(p["venue"],p["address"])]=read_pool_config(rpc,p)
             except Exception as exc:fee_errors.append({"pool":p["address"],"error":str(exc)[:180]})
+    # Count every missing leg, not merely the first blocked leg of each cycle.
+    # This identifies where implementing one quote adapter unlocks most routes.
+    missing_by_venue={}
+    for route in graph:
+        for leg in route["legs"]:
+            key=(leg["venue"],leg["pool"])
+            if leg["venue"]!="raydium_cpmm" or key not in fees:
+                entry=missing_by_venue.setdefault(leg["venue"],{"blocked_route_legs":0,"unique_pools":set()})
+                entry["blocked_route_legs"]+=1
+                entry["unique_pools"].add(leg["pool"])
+    quote_gap_priorities=sorted((
+        {"venue":venue,"blocked_route_legs":x["blocked_route_legs"],
+         "unique_pools":len(x["unique_pools"])}
+        for venue,x in missing_by_venue.items()),
+        key=lambda x:(-x["blocked_route_legs"],-x["unique_pools"],x["venue"]))
     rankings=[]
     for route in graph:
         for amount in amounts:
@@ -70,7 +87,7 @@ def scan(rpc,entries,amounts=(100000,1000000)):
         "screened_size_routes":len(rankings),
         "indicative_routes":sum(x["status"]=="INDICATIVE_ONLY" for x in rankings),
         "unquotable_routes":sum(x["status"]=="UNQUOTABLE" for x in rankings),
-        "candidate_rankings":rankings[:100],"fee_errors":fee_errors,
+        "candidate_rankings":rankings[:100],"quote_gap_priorities":quote_gap_priorities,"fee_errors":fee_errors,
         "actionable_opportunities":0,"confirmed_profitable":0,
         "note":"No actionable ranking until all legs have native verified quotes, execution simulation and net fees."}
 
