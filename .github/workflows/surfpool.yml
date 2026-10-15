@@ -56,6 +56,8 @@ jobs:
           cat "$RUNNER_TEMP/surfpool.log" >&2
           exit 1
 
+      - name: Enforce arbitrage mission and development priorities
+        run: python3 -m arb.arbitrage_mission
       - name: Test conservative residual-token valuation
         run: python3 -m unittest discover -s tests -p test_whirlpool_accounting.py -v
       - name: Test Raydium to Orca reverse route wiring
