@@ -18,7 +18,13 @@ def score_cycle(route,pool_index,fee_index,input_amount,network_fee=None):
     path=route.get("legs")
     start=route.get("start_mint")
     if not isinstance(path,list) or not 2<=len(path)<=4 or not isinstance(start,str) or not start:
-        return {"status":"UNQUOTABLE","reason":"invalid cycle topology","legs_quoted":0,"actionable":False}
+        # Diagnostic callers may probe a single unsupported leg. Preserve its
+        # venue attribution without ever treating it as a priced cycle.
+        venue=(path[0].get("venue") if isinstance(path,list) and path and isinstance(path[0],dict) else None)
+        result={"status":"UNQUOTABLE","reason":"invalid cycle topology","legs_quoted":0,"actionable":False}
+        if isinstance(venue,str) and venue:
+            result["missing_quote_venue"]=venue
+        return result
     current=start
     seen=set()
     for leg in path:
