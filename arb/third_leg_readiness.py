@@ -8,6 +8,7 @@ import base64,json,os
 from arb.rpc import call
 from arb.orca_whirlpool import PROGRAM as ORCA,SOL
 from arb.onchain_pool_discovery import VENUES
+from arb.venue_watchlist import RECOGNIZED_UNSUPPORTED
 from arb.pool_registry import refresh
 from arb.whirlpool_swap import inspect_swap_requirements
 RAY="4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R"
@@ -21,8 +22,9 @@ def probe(rpc,address):
         owner=account.get("owner")
         result["program_owner"]=owner
         venue=next((name for name,(program,*_) in VENUES.items() if program==owner),None)
-        result["detected_venue"]=venue
-        if venue is None:raise ValueError("unsupported pool program owner")
+        result["detected_venue"]=venue or RECOGNIZED_UNSUPPORTED.get(owner)
+        result["decoder_supported"]=venue is not None
+        if venue is None:raise ValueError("recognized or unknown pool owner; no verified decoder/swap builder")
         checked=refresh(rpc,[{"venue":venue,"address":address,"mints":[RAY,SOL]}])
         if checked["verified_count"]!=1:raise ValueError("pool/vault validation failed: "+str(checked["rejected"])[:180])
         pool=checked["verified_pools"][0]
