@@ -4,7 +4,7 @@ Searches exact curated mint pairs via getProgramAccounts with size/offset
 memcmp filters, verifies returned owners and account data, then reads vault
 balances before admitting pools to the candidate graph. Read-only.
 """
-import argparse,base64,json,os
+import argparse,base64,json,os,time
 from itertools import combinations
 from arb.rpc import call
 from arb.orca_whirlpool import PROGRAM as ORCA,SIZE as ORCA_SIZE,decode as decode_orca,SOL,USDC
@@ -27,9 +27,11 @@ VENUES={"orca":(ORCA,ORCA_SIZE,101,181,decode_orca),
         "meteora_damm_v2":(DAMM,DAMM_SIZE,168,200,decode_damm),
         "pumpswap":(PUMP_PROGRAM,None,43,75,decode_pump)}
 
-def search_pair(rpc,venue,mint_a,mint_b,limit=8):
+def search_pair(rpc,venue,mint_a,mint_b,limit=8,pace_seconds=0):
     if venue not in VENUES or mint_a==mint_b:raise ValueError("invalid search")
     if type(limit)is not int or not 1<=limit<=32:raise ValueError("invalid search limit")
+    if type(pace_seconds) not in (int,float) or not 0<=pace_seconds<=5:
+        raise ValueError("invalid discovery pacing")
     program,size,offset_a,offset_b,decode=VENUES[venue]
     found={}
     for a,b in ((mint_a,mint_b),(mint_b,mint_a)):
@@ -37,6 +39,7 @@ def search_pair(rpc,venue,mint_a,mint_b,limit=8):
                  {"memcmp":{"offset":offset_b,"bytes":b}}]
         if size is not None:filters.insert(0,{"dataSize":size})
         config={"encoding":"base64","commitment":"confirmed","filters":filters}
+        if pace_seconds:time.sleep(pace_seconds)
         response=call(rpc,"getProgramAccounts",[program,config],timeout=45)
         if not isinstance(response,list):
             raise ValueError("unexpected getProgramAccounts result")
@@ -101,12 +104,12 @@ def verify(rpc,venue,address,state):
     return {"venue":venue,"address":address,"mints":list(pair),"slot":slot,
             "vault_base_units":amounts,"swap_simulated":False}
 
-def discover(rpc,pairs,limit=8):
+def discover(rpc,pairs,limit=8,pace_seconds=0):
     results=[];errors=[]
     for a,b in pairs:
         for venue in VENUES:
             try:
-                found=search_pair(rpc,venue,a,b,limit)
+                found=search_pair(rpc,venue,a,b,limit,pace_seconds=pace_seconds)
                 for address,state in found.items():
                     try:results.append(verify(rpc,venue,address,state))
                     except ValueError as exc:errors.append({"venue":venue,"address":address,"error":str(exc)})
@@ -127,6 +130,7 @@ def main():
     p.add_argument("--pairs",default="WSOL/USDT,WSOL/JUP,USDC/USDT")
     p.add_argument("--output",default=os.environ.get("DEX_DISCOVERY_REPORT",""))
     p.add_argument("--limit",type=int,default=8)
+    p.add_argument("--pace-seconds",type=float,default=0)
     args=p.parse_args()
     pairs=[]
     for item in args.pairs.split(","):
@@ -134,7 +138,7 @@ def main():
         if a not in MINTS or b not in MINTS:raise ValueError("mint not on curated allowlist")
         pairs.append((MINTS[a],MINTS[b]))
     if len(pairs)>6:raise ValueError("pair budget exceeded")
-    report=discover(os.environ.get("SOLANA_RPC_URL","http://127.0.0.1:8899"),pairs,args.limit)
+    report=discover(os.environ.get("SOLANA_RPC_URL","http://127.0.0.1:8899"),pairs,args.limit,pace_seconds=args.pace_seconds)
     print(json.dumps(report,indent=2))
     if args.output:
         with open(args.output,"w") as f:json.dump(report,f,indent=2)
