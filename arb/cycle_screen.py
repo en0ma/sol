@@ -89,11 +89,22 @@ def score_cycle(route,pool_index,fee_index,input_amount,network_fee=None,max_slo
             "actionable":False,"confirmed_profitable":False,
             "reason":"creator fee placement and atomic execution are unverified"}
 
-def scan(rpc,entries,amounts=(100000,1000000),max_slot_spread=8):
+def scan(rpc,entries,amounts=(100000,1000000),max_slot_spread=8,extra_entries=()):
     if len(amounts)>8 or any(type(n)is not int or n<=0 for n in amounts):raise ValueError("invalid size budget")
     if type(max_slot_spread) is not int or not 0<=max_slot_spread<=1000:
         raise ValueError("invalid scan slot spread budget")
-    validation=refresh(rpc,entries)
+    # Additional addresses are hints, never trusted snapshots. Revalidate all
+    # pool state, ownership and reserves before constructing cycle edges.
+    identities=set()
+    merged=[]
+    for item in list(entries)+list(extra_entries):
+        if not isinstance(item,dict):raise ValueError("invalid pool identity hint")
+        key=(item.get("venue"),item.get("address"))
+        if key not in identities:
+            identities.add(key)
+            merged.append(item)
+    if len(merged)>200:raise ValueError("pool registry budget exceeded")
+    validation=refresh(rpc,merged)
     if validation["rejected"]:raise ValueError("pool registry validation incomplete")
     pools=validation["verified_pools"]
     graph=cycles(pools,anchors={mint for p in pools for mint in p["mints"]})
@@ -163,7 +174,17 @@ def main():
     from arb.arbitrage_mission import check
     check()
     entries=json.load(open("arb/pool_registry.json"))["pools"]
-    report=scan(os.environ.get("SOLANA_RPC_URL","http://127.0.0.1:8899"),entries)
+    extra=[]
+    discovery=os.environ.get("DEX_DISCOVERY_INPUT")
+    if discovery and os.path.isfile(discovery):
+        report_data=json.load(open(discovery))
+        hints=report_data.get("candidate_graph_pool_identities",[])
+        if not isinstance(hints,list) or len(hints)>200:
+            raise ValueError("invalid discovery candidate list")
+        extra=[{"venue":h["venue"],"address":h["address"],"mints":h["mints"]}
+               for h in hints]
+    report=scan(os.environ.get("SOLANA_RPC_URL","http://127.0.0.1:8899"),entries,
+                extra_entries=extra)
     print(json.dumps(report,indent=2))
     if os.environ.get("CYCLE_SCREEN_REPORT"):
         with open(os.environ["CYCLE_SCREEN_REPORT"],"w") as f:json.dump(report,f,indent=2)
