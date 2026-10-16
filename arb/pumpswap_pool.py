@@ -112,6 +112,8 @@ def verify(rpc, address, state):
         "virtual_quote_reserves":state["virtual_quote_reserves"]})
     return {"venue": "pumpswap", "address": address, "verified": True,
             "base_mint": state["base_mint"], "quote_mint": state["quote_mint"],
+            "base_vault":state["base_vault"],"quote_vault":state["quote_vault"],
+            "coin_creator":state["coin_creator"],
             "base_reserve": balances[0], "quote_vault_balance": balances[1],
             "base_mint_supply": base_supply,
             "virtual_quote_reserves": state["virtual_quote_reserves"],
