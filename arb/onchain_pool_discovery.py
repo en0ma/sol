@@ -128,14 +128,25 @@ def discover(rpc,pairs,limit=8,pace_seconds=0,registry_entries=None):
         # Independently validate identity and vaults; do not call these newly found.
         from arb.pool_registry import refresh
         fallback = refresh(rpc,registry_entries)
+    # Candidate graph can use revalidated identities without conflating them
+    # with newly discovered pools. Duplicate identities are counted once.
+    combined={(p["venue"],p["address"]):p for p in results}
+    if fallback:
+        for p in fallback["verified_pools"]:
+            combined.setdefault((p["venue"],p["address"]),p)
     by_pair={}
-    for pool in results:
+    for pool in combined.values():
         key=tuple(sorted(pool["mints"]))
         by_pair.setdefault(key,set()).add(pool["venue"])
     shared=[{"mints":list(k),"venues":sorted(v)} for k,v in by_pair.items() if len(v)>1]
     return {"status":("UPSTREAM_RATE_LIMITED" if upstream_rate_limited else
                       "COMPLETE" if not errors else "PARTIAL"),
-            "pools_verified":len(results),"shared_pairs":shared,
+            "pools_verified":len(results),
+            "candidate_graph_verified_count":len(combined),
+            "candidate_graph_pool_identities":[{"venue":p["venue"],"address":p["address"],
+                "mints":p["mints"],"slot":p["slot"],"swap_simulated":False}
+                for p in combined.values()],
+            "shared_pairs":shared,
             "pools":results,"errors":errors,
             "direct_registry_fallback":fallback,
             "route_simulated":False,"profitable_opportunities_confirmed":0}
