@@ -104,7 +104,7 @@ def verify(rpc,venue,address,state):
     return {"venue":venue,"address":address,"mints":list(pair),"slot":slot,
             "vault_base_units":amounts,"swap_simulated":False}
 
-def discover(rpc,pairs,limit=8,pace_seconds=0):
+def discover(rpc,pairs,limit=8,pace_seconds=0,registry_entries=None):
     results=[];errors=[]
     upstream_rate_limited=False
     for a,b in pairs:
@@ -122,6 +122,12 @@ def discover(rpc,pairs,limit=8,pace_seconds=0):
                 # Stop the scan instead of hammering it with another 20+ requests.
                 if "429" in message or "too many requests" in message.lower():
                     upstream_rate_limited=True
+    fallback = None
+    if upstream_rate_limited and registry_entries is not None:
+        # Direct address reads avoid globally rate-limited getProgramAccounts.
+        # Independently validate identity and vaults; do not call these newly found.
+        from arb.pool_registry import refresh
+        fallback = refresh(rpc,registry_entries)
     by_pair={}
     for pool in results:
         key=tuple(sorted(pool["mints"]))
@@ -131,6 +137,7 @@ def discover(rpc,pairs,limit=8,pace_seconds=0):
                       "COMPLETE" if not errors else "PARTIAL"),
             "pools_verified":len(results),"shared_pairs":shared,
             "pools":results,"errors":errors,
+            "direct_registry_fallback":fallback,
             "route_simulated":False,"profitable_opportunities_confirmed":0}
 
 def main():
@@ -139,6 +146,7 @@ def main():
     p.add_argument("--output",default=os.environ.get("DEX_DISCOVERY_REPORT",""))
     p.add_argument("--limit",type=int,default=8)
     p.add_argument("--pace-seconds",type=float,default=0)
+    p.add_argument("--registry-fallback",default="")
     args=p.parse_args()
     pairs=[]
     for item in args.pairs.split(","):
@@ -146,7 +154,10 @@ def main():
         if a not in MINTS or b not in MINTS:raise ValueError("mint not on curated allowlist")
         pairs.append((MINTS[a],MINTS[b]))
     if len(pairs)>6:raise ValueError("pair budget exceeded")
-    report=discover(os.environ.get("SOLANA_RPC_URL","http://127.0.0.1:8899"),pairs,args.limit,pace_seconds=args.pace_seconds)
+    entries=(json.load(open(args.registry_fallback))["pools"]
+             if args.registry_fallback else None)
+    report=discover(os.environ.get("SOLANA_RPC_URL","http://127.0.0.1:8899"),pairs,args.limit,
+                    pace_seconds=args.pace_seconds,registry_entries=entries)
     print(json.dumps(report,indent=2))
     if args.output:
         with open(args.output,"w") as f:json.dump(report,f,indent=2)
