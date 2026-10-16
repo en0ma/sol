@@ -35,8 +35,10 @@ class OrcaQuoteProbeTests(unittest.TestCase):
         import json
         report=json.loads(output.getvalue())
         self.assertEqual(report["attempted_pools"],1)
-        self.assertEqual(report["attempted_pool_sizes"],3)
+        self.assertEqual(report["attempted_pool_sizes"],5)
         self.assertEqual(report["status"],"NO_COMPARABLE_QUOTE")
         self.assertEqual(report["exact_matches"],0)
+        self.assertEqual(report["matched_tick_crossing_quotes"],0)
+        self.assertEqual(report["unavailable_quotes"],5)
         self.assertEqual([call.args[2] if len(call.args)>2 else call.kwargs.get("amount")
-                          for call in probe_mock.call_args_list], [100000,1000000,5000000])
+                          for call in probe_mock.call_args_list], [100000,1000000,5000000,20000000,50000000])
