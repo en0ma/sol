@@ -18,8 +18,12 @@ BASE_LEN = 245
 def decode(raw):
     if not isinstance(raw, bytes) or len(raw) < BASE_LEN or raw[:8] != DISC:
         raise ValueError("unsupported PumpSwap Pool account")
-    if 245 < len(raw) < 261:
-        raise ValueError("partial virtual quote reserves extension")
+    for start, end, label in ((245,261,"virtual quote reserves"),
+                               (261,269,"creator fee bps"),
+                               (269,270,"creator fee editing"),
+                               (270,271,"holder reward flag")):
+        if start < len(raw) < end:
+            raise ValueError("partial PumpSwap "+label+" extension")
     key = lambda offset: b58(raw[offset:offset+32])
     fields = {"creator": key(11), "base_mint": key(43),
               "quote_mint": key(75), "lp_mint": key(107),
@@ -29,11 +33,18 @@ def decode(raw):
               "is_mayhem_mode": raw[243],
               "is_cashback_coin": raw[244],
               "virtual_quote_reserves": (int.from_bytes(raw[245:261], "little", signed=True)
-                                         if len(raw) >= 261 else 0)}
+                                         if len(raw) >= 261 else 0),
+              "creator_fee_bps": (int.from_bytes(raw[261:269], "little")
+                                  if len(raw) >= 269 else 0),
+              "can_edit_creator_fee": raw[269] if len(raw) >= 270 else 0,
+              "is_holder_reward": raw[270] if len(raw) >= 271 else 0}
     if (len(set(fields[k] for k in ("base_mint", "quote_mint",
                                    "base_vault", "quote_vault"))) != 4
             or fields["is_mayhem_mode"] not in (0, 1)
-            or fields["is_cashback_coin"] not in (0, 1)):
+            or fields["is_cashback_coin"] not in (0, 1)
+            or fields["can_edit_creator_fee"] not in (0, 1)
+            or fields["is_holder_reward"] not in (0, 1)
+            or fields["creator_fee_bps"] > 10000):
         raise ValueError("invalid PumpSwap Pool fields")
     return fields
 
@@ -65,5 +76,7 @@ def verify(rpc, address, state):
             "base_mint": state["base_mint"], "quote_mint": state["quote_mint"],
             "base_reserve": balances[0], "quote_vault_balance": balances[1],
             "virtual_quote_reserves": state["virtual_quote_reserves"],
-            "slot": slot, "fee_verified_onchain": False,
+            "slot": slot, "creator_fee_bps": state["creator_fee_bps"],
+            "protocol_fees_accrued": None, "creator_fees_accrued": None,
+            "fee_verified_onchain": False,
             "actionable": False, "executable_quote": False}
