@@ -10,7 +10,7 @@ from arb.opportunity_graph import cycles
 from arb.cpmm_quote import quote_pool
 from arb.cpmm_config import read_pool_config
 
-def score_cycle(route,pool_index,fee_index,input_amount,network_fee=None,max_slot_spread=None,orca_evidence=None):
+def score_cycle(route,pool_index,fee_index,input_amount,network_fee=None,max_slot_spread=None,orca_evidence=None,clmm_quote=None):
     if type(input_amount)is not int or input_amount<=0:raise ValueError("invalid input size")
     if network_fee is not None and (type(network_fee)is not int or network_fee<0):
         raise ValueError("invalid network fee")
@@ -77,6 +77,27 @@ def score_cycle(route,pool_index,fee_index,input_amount,network_fee=None,max_slo
             except (KeyError,ValueError,TypeError) as exc:
                 return {"status":"UNQUOTABLE","reason":str(exc)[:180],
                         "missing_quote_venue":"orca","legs_quoted":len(legs),"actionable":False}
+        if leg["venue"]=="raydium_clmm":
+            if clmm_quote is None:
+                return {"status":"UNQUOTABLE","reason":"missing authenticated CLMM quote adapter",
+                        "missing_quote_venue":"raydium_clmm","legs_quoted":len(legs),"actionable":False}
+            try:
+                q=clmm_quote(leg["pool"],leg["input"],amount)
+                if (q.get("status")!="INDICATIVE_WITHIN_TICK_ONLY" or
+                    q.get("mint_out")!=leg["output"] or
+                    q.get("actionable") is not False or
+                    q.get("executable_quote") is not False or
+                    type(q.get("estimated_output_base_units")) is not int or
+                    q["estimated_output_base_units"]<=0):
+                    raise ValueError("invalid indicative CLMM quote provenance")
+                amount=q["estimated_output_base_units"]
+                legs.append({"venue":"raydium_clmm","pool":leg["pool"],
+                             "input":q["amount_in"],"estimated_output":amount,
+                             "crossed_ticks":0})
+                continue
+            except (KeyError,ValueError,TypeError) as exc:
+                return {"status":"UNQUOTABLE","reason":str(exc)[:180],
+                        "missing_quote_venue":"raydium_clmm","legs_quoted":len(legs),"actionable":False}
         if leg["venue"]!="raydium_cpmm":
             return {"status":"UNQUOTABLE","reason":"unsupported native quote venue","missing_quote_venue":leg["venue"],"legs_quoted":len(legs),"actionable":False}
         if cfg is None:
@@ -175,11 +196,14 @@ def scan(rpc,entries,amounts=(100000,1000000),max_slot_spread=8,extra_entries=()
         for venue,x in missing_by_venue.items()),
         key=lambda x:(-x["routes_unlocked_by_single_adapter"],
                       -x["blocked_route_legs"],-x["unique_pools"],x["venue"]))
+    from arb.raydium_clmm_live_quote import quote_live
+    def clmm_quote(address,mint,amount):
+        return quote_live(rpc,address,mint,amount)
     rankings=[]
     for route in graph:
         for amount in amounts:
             q=score_cycle(route,pool_index,fees,amount,max_slot_spread=max_slot_spread,
-                          orca_evidence=orca_evidence)
+                          orca_evidence=orca_evidence,clmm_quote=clmm_quote)
             rankings.append({"start_mint":route["start_mint"],"hops":route["hops"],
                 "route_legs":[dict(leg) for leg in route["legs"]],
                 "venues":route["venues"],"input_base_units":amount,**q})
