@@ -10,10 +10,12 @@ from arb.opportunity_graph import cycles
 from arb.cpmm_quote import quote_pool
 from arb.cpmm_config import read_pool_config
 
-def score_cycle(route,pool_index,fee_index,input_amount,network_fee=None):
+def score_cycle(route,pool_index,fee_index,input_amount,network_fee=None,max_slot_spread=None):
     if type(input_amount)is not int or input_amount<=0:raise ValueError("invalid input size")
     if network_fee is not None and (type(network_fee)is not int or network_fee<0):
         raise ValueError("invalid network fee")
+    if max_slot_spread is not None and (type(max_slot_spread) is not int or max_slot_spread<0):
+        raise ValueError("invalid slot spread budget")
     # Never price malformed walks as arbitrage, even if their individual pools quote.
     path=route.get("legs")
     start=route.get("start_mint")
@@ -37,6 +39,19 @@ def score_cycle(route,pool_index,fee_index,input_amount,network_fee=None):
         current=leg["output"]
     if current!=start:
         return {"status":"UNQUOTABLE","reason":"cycle does not return to start","legs_quoted":0,"actionable":False}
+    if max_slot_spread is not None:
+        slots=[]
+        for leg in path:
+            pool=pool_index.get((leg["venue"],leg["pool"]))
+            slot=pool.get("slot") if isinstance(pool,dict) else None
+            if type(slot) is not int or slot<0:
+                return {"status":"UNQUOTABLE","reason":"missing verified pool slot",
+                        "legs_quoted":0,"actionable":False}
+            slots.append(slot)
+        if max(slots)-min(slots)>max_slot_spread:
+            return {"status":"UNQUOTABLE","reason":"stale cross-pool slot spread",
+                    "slot_spread":max(slots)-min(slots),
+                    "legs_quoted":0,"actionable":False}
     amount=input_amount
     legs=[]
     for leg in route["legs"]:
@@ -74,8 +89,10 @@ def score_cycle(route,pool_index,fee_index,input_amount,network_fee=None):
             "actionable":False,"confirmed_profitable":False,
             "reason":"creator fee placement and atomic execution are unverified"}
 
-def scan(rpc,entries,amounts=(100000,1000000)):
+def scan(rpc,entries,amounts=(100000,1000000),max_slot_spread=8):
     if len(amounts)>8 or any(type(n)is not int or n<=0 for n in amounts):raise ValueError("invalid size budget")
+    if type(max_slot_spread) is not int or not 0<=max_slot_spread<=1000:
+        raise ValueError("invalid scan slot spread budget")
     validation=refresh(rpc,entries)
     if validation["rejected"]:raise ValueError("pool registry validation incomplete")
     pools=validation["verified_pools"]
@@ -105,7 +122,7 @@ def scan(rpc,entries,amounts=(100000,1000000)):
     rankings=[]
     for route in graph:
         for amount in amounts:
-            q=score_cycle(route,pool_index,fees,amount)
+            q=score_cycle(route,pool_index,fees,amount,max_slot_spread=max_slot_spread)
             rankings.append({"start_mint":route["start_mint"],"hops":route["hops"],
                 "venues":route["venues"],"input_base_units":amount,**q})
     rankings.sort(key=lambda q:(q["status"]!="INDICATIVE_ONLY",
@@ -114,6 +131,9 @@ def scan(rpc,entries,amounts=(100000,1000000)):
         "validated_pools":len(pools),"cycles_discovered":len(graph),
         "screened_size_routes":len(rankings),
         "indicative_routes":sum(x["status"]=="INDICATIVE_ONLY" for x in rankings),
+        "stale_slot_routes":sum(x.get("reason")=="stale cross-pool slot spread" for x in rankings),
+        "missing_slot_routes":sum(x.get("reason")=="missing verified pool slot" for x in rankings),
+        "max_pool_slot_spread":max_slot_spread,
         "unquotable_routes":sum(x["status"]=="UNQUOTABLE" for x in rankings),
         "candidate_rankings":rankings[:100],"quote_gap_priorities":quote_gap_priorities,"fee_errors":fee_errors,
         "actionable_opportunities":0,"confirmed_profitable":0,
