@@ -217,3 +217,9 @@ class CycleScreenTests(unittest.TestCase):
         report=scan("http://127.0.0.1:8899",[])
         self.assertEqual(report["orca_array_gap_evidence"],[])
         self.assertEqual(report["validated_pools"],0)
+
+    @patch("arb.cycle_screen.refresh",return_value={"rejected":0,"verified_pools":[]})
+    def test_empty_scan_has_no_positive_candidate_evidence(self,_refresh):
+        report=scan("http://127.0.0.1:8899",[])
+        self.assertEqual(report["positive_gross_candidates"],[])
+        self.assertEqual(report["indicative_positive_gross_count"],0)
