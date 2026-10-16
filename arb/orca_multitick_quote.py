@@ -111,3 +111,72 @@ def quote_multitick(state, mint_in, amount_in, ticks, *, max_crossings=12):
             'post_sqrt_price_x64': str(p), 'post_liquidity': str(liquidity),
             'steps': steps, 'actionable': False, 'executable_quote': False,
             'simulation_verified': False}
+
+
+def quote_from_decoded_arrays(state, mint_in, amount_in, arrays, sqrt_price_at_tick,
+                              *, max_crossings=12):
+    """Bridge validated tick observations to the indicative multi-tick model.
+
+    The price converter is an injected, independently verified tick-math
+    implementation. Missing or unsupported arrays, unaligned tick indexes,
+    and gaps in the array traversal fail closed. No on-chain validation is
+    implied by providing a callback, and the result is never executable.
+    """
+    from arb.whirlpool_ticks import ARRAY_TICKS, start_tick
+    if not callable(sqrt_price_at_tick):
+        raise ValueError("missing tick price converter")
+    if not isinstance(arrays, list) or not 1 <= len(arrays) <= 5:
+        raise ValueError("invalid array coverage")
+    spacing = state.get("tick_spacing")
+    current = state.get("tick_current_index")
+    if type(spacing) is not int or spacing <= 0 or type(current) is not int:
+        raise ValueError("invalid Whirlpool tick metadata")
+    if mint_in not in (state["token_mint_a"], state["token_mint_b"]):
+        raise ValueError("mint not in pool")
+    down = mint_in == state["token_mint_a"]
+    span = ARRAY_TICKS * spacing
+    indexed = {}
+    for entry in arrays:
+        if not isinstance(entry, dict) or type(entry.get("start_tick")) is not int:
+            raise ValueError("invalid decoded tick array")
+        start = entry["start_tick"]
+        if start % span or start in indexed:
+            raise ValueError("duplicate or unaligned tick array")
+        indexed[start] = entry
+    start = start_tick(current, spacing)
+    step = -span if down else span
+    ticks = []
+    covered = 0
+    while covered < len(indexed):
+        entry = indexed.get(start)
+        if entry is None or entry.get("status") != "FIXED_VALID":
+            raise ValueError("missing or unsupported tick array")
+        records = entry.get("ticks")
+        if not isinstance(records, list):
+            raise ValueError("missing decoded ticks")
+        local = []
+        seen = set()
+        for record in records:
+            if not isinstance(record, dict):
+                raise ValueError("invalid tick record")
+            ix, net = record.get("tick_index"), record.get("liquidity_net")
+            if (type(ix) is not int or ix in seen or not start <= ix < start + span
+                    or (ix-start) % spacing):
+                raise ValueError("invalid initialized tick index")
+            seen.add(ix)
+            if type(net) is not str or not net.lstrip("-").isdigit():
+                raise ValueError("invalid tick liquidity")
+            if (ix <= current if down else ix > current):
+                price = sqrt_price_at_tick(ix)
+                if type(price) is not int:
+                    raise ValueError("invalid converted tick price")
+                local.append({"tick_index": ix, "sqrt_price_x64": price,
+                              "liquidity_net": int(net)})
+        ticks.extend(sorted(local, key=lambda t: t["tick_index"], reverse=down))
+        covered += 1
+        start += step
+    result = quote_multitick(state, mint_in, amount_in, ticks,
+                             max_crossings=max_crossings)
+    return {**result, "tick_arrays_examined": covered,
+            "source": "CALLER_VERIFIED_ARRAYS_AND_TICK_MATH",
+            "actionable": False, "executable_quote": False}
