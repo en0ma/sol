@@ -13,6 +13,7 @@ from arb.orca_multitick_quote import quote_from_decoded_arrays
 from arb.orca_quote_reconcile import compare_quote_and_simulation
 from arb.orca_crossing_budget import first_crossing_budget
 from arb.whirlpool_simulation import run
+from arb.orca_whirlpool import SOL
 
 
 def probe(rpc, pool, amount=1000000):
@@ -20,7 +21,7 @@ def probe(rpc, pool, amount=1000000):
     if (url.scheme != 'http' or url.hostname not in ('127.0.0.1', 'localhost')
             or url.port != 8899 or url.username or url.password):
         raise ValueError('only loopback Surfpool RPC port 8899 is allowed')
-    if type(amount) is not int or not 0 < amount <= 100000000:
+    if type(amount) is not int or not 0 < amount <= 600000000:
         raise ValueError('invalid local swap size')
     state = fetch_pool(rpc, pool)
     sim = run(rpc, pool, input_amount=amount)
@@ -46,6 +47,26 @@ def probe(rpc, pool, amount=1000000):
             'actionable': False, 'confirmed_profitable': False}
 
 
+def crossing_target(rpc, pool, *, max_amount=600000000):
+    """Pick one evidence-based crossing trade, bounded by local funding."""
+    if type(max_amount) is not int or not 0 < max_amount <= 600000000:
+        raise ValueError("invalid local crossing budget")
+    state = fetch_pool(rpc, pool)
+    evidence = inspect(rpc, pool)
+    if evidence.get('pool_state') != state:
+        return None
+    mint_in = SOL if SOL in (state['token_mint_a'], state['token_mint_b']) else None
+    if mint_in is None:
+        return None
+    budget = first_crossing_budget(state, mint_in, evidence['arrays'],
+                                   simulation_cap=max_amount)
+    threshold = budget.get('candidate_input_base_units')
+    if budget.get('status') != 'CROSSING_BUDGET_ESTIMATE' or type(threshold) is not int:
+        return None
+    amount = threshold + max(1000, threshold // 1000)
+    return amount if amount <= max_amount else None
+
+
 def main():
     rpc = os.environ.get('SOLANA_RPC_URL', 'http://127.0.0.1:8899')
     with open('arb/whirlpool_pools.json') as file:
@@ -53,7 +74,16 @@ def main():
     sizes = (100000, 1000000, 5000000, 20000000, 50000000)
     results = []
     for pool in pools:
-        for amount in sizes:
+        amounts = list(sizes)
+        try:
+            target = crossing_target(rpc, pool['address'])
+        except (ValueError, KeyError, TypeError) as exc:
+            target = None
+            results.append({'pool': pool['address'], 'status': 'CROSSING_TARGET_UNAVAILABLE',
+                            'reason': str(exc)[:180], 'actionable': False})
+        if target is not None and target not in amounts:
+            amounts.append(target)
+        for amount in amounts:
             result = probe(rpc, pool['address'], amount=amount)
             results.append({'pool': pool['address'], 'input_base_units': amount, **result})
     report = {'status': 'COMPARED' if any(r.get('status') == 'COMPARED' for r in results) else 'NO_COMPARABLE_QUOTE',
