@@ -97,5 +97,6 @@ def verify(rpc, address, state):
             "protocol_fees_accrued": state["protocol_fees"],
             "creator_fees_accrued": state["creator_fees"],
             "global_config": config, "fee_config": fee_config,
+            "canonical_pool_verified": False, "fee_mode_verified": False,
             "effective_fee_verified": False, "fee_verified_onchain": False,
             "actionable": False, "executable_quote": False}
