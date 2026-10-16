@@ -8,6 +8,8 @@ from arb.raydium_clmm_within_tick_quote import quote_within_tick
 
 
 def quote_live(rpc,pool,mint_in,amount_in):
+    from arb.pumpswap_local_simulation import local_rpc_only
+    local_rpc_only(rpc)
     fee=read(rpc,pool)
     state=fee["state"]
     if mint_in not in (state["token_mint_0"],state["token_mint_1"]):
