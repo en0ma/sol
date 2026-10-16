@@ -104,3 +104,17 @@ class CycleScreenTests(unittest.TestCase):
         self.assertEqual(result["candidate_rankings"][0]["route_legs"],legs)
         self.assertFalse(result["candidate_rankings"][0]["actionable"])
         self.assertEqual(result["max_pool_slot_spread"],8)
+
+    @patch("arb.cycle_screen.read_pool_config")
+    @patch("arb.cycle_screen.refresh")
+    def test_extra_discovered_hints_reverified_and_deduplicated(self,refresh,fees):
+        refresh.return_value={"verified_pools":[],"rejected":[]}
+        entries=[{"venue":"orca","address":"known"}]
+        extra=[{"venue":"orca","address":"known"},
+               {"venue":"raydium_cpmm","address":"candidate"}]
+        result=scan("rpc",entries,extra_entries=extra)
+        self.assertEqual(result["validated_pools"],0)
+        self.assertEqual(refresh.call_args.args[1],[
+            {"venue":"orca","address":"known"},
+            {"venue":"raydium_cpmm","address":"candidate"}])
+        self.assertEqual(result["actionable_opportunities"],0)
