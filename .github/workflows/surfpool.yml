@@ -287,7 +287,16 @@ jobs:
       - name: Simulate atomic WSOL to USDC Whirlpool swap
         run: python3 -m arb.whirlpool_simulation
       - name: Compare Orca exact-input quote model with signed Surfpool balances
+        env:
+          ORCA_QUOTE_COMPARISON_REPORT: ${{ runner.temp }}/orca-quote-comparison.json
         run: python3 -m arb.orca_quote_probe
+      - name: Upload Orca quote comparison evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orca-quote-comparison
+          path: ${{ runner.temp }}/orca-quote-comparison.json
+          if-no-files-found: ignore
       - name: Simulate atomic WSOL USDC WSOL round trip
         run: python3 -m arb.whirlpool_roundtrip
       - name: Check published Raydium CPMM pool against on-chain mints
