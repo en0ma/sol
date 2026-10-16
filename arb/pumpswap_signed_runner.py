@@ -24,6 +24,9 @@ def sign_and_simulate(rpc, pool, payer, direction, addresses, amount_in, min_out
         raise ValueError("unsupported PumpSwap direction")
     if addresses.get(in_key)!=input_address or addresses.get(out_key)!=output_address:
         raise ValueError("token account direction mismatch")
+    from arb.pumpswap_user_preflight import verify_user_accounts
+    verify_user_accounts(rpc,str(payer.pubkey()),input_address,output_address,
+                         mint_in,mint_out,initial_input,initial_output)
     ix=build_instruction(direction,addresses,amount_in,min_out,track_volume=track_volume)
     from solders.transaction import Transaction
     from solders.hash import Hash
