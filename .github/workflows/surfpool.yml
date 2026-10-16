@@ -214,6 +214,17 @@ jobs:
         run: python3 -m pip install --disable-pip-version-check solders==0.26.0
       - name: Simulate a signed local transaction
         run: python3 -m arb.simulate_transfer
+      - name: Authenticate real PumpSwap fee/config accounts on Surfpool fork
+        env:
+          PUMPSWAP_PREFLIGHT_REPORT: ${{ runner.temp }}/pumpswap-preflight.json
+        run: python3 -m arb.pumpswap_fork_preflight
+      - name: Upload PumpSwap authenticated config evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pumpswap-fork-preflight
+          path: ${{ runner.temp }}/pumpswap-preflight.json
+          if-no-files-found: ignore
       - name: Probe deployed AMM programs and configured pools
         run: python3 -m arb.fork_probe
       - name: Report direct on-chain Whirlpool verification
