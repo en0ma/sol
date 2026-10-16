@@ -58,7 +58,7 @@ def nearest_observed_ticks(decoded_arrays, current_tick, spacing):
     """
     if type(current_tick) is not int or type(spacing) is not int or spacing<=0:
         raise ValueError("invalid tick metadata")
-    if not isinstance(decoded_arrays,list) or len(decoded_arrays)>5:
+    if not isinstance(decoded_arrays,list) or len(decoded_arrays)>9:
         raise ValueError("invalid tick array budget")
     seen=set()
     ticks=[]
@@ -142,7 +142,7 @@ def start_tick(index, spacing):
 def candidate_starts(index, spacing):
     center = start_tick(index, spacing)
     span = spacing * ARRAY_TICKS
-    return [center + i * span for i in (0, 1, 2, -1, -2)
+    return [center + i * span for i in (0, 1, 2, 3, 4, -1, -2, -3, -4)
             if -443636-span <= center+i*span <= 443636]
 
 def addresses(pool_address, starts):
