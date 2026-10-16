@@ -85,6 +85,55 @@ def nearest_observed_ticks(decoded_arrays, current_tick, spacing):
             "initialized_ticks_observed":len(ticks),
             "complete_liquidity_path":False,"executable_quote":False}
 
+
+def directional_tick_observation(decoded_arrays, current_tick, spacing, direction):
+    """Report the first observed initialized tick only across contiguous valid arrays.
+
+    An initialized tick is a liquidity event, not necessarily the current tick
+    boundary. Never infer an executable quote from this observation.
+    """
+    if direction not in ("a_to_b","b_to_a"):
+        raise ValueError("invalid swap direction")
+    if type(current_tick) is not int or type(spacing) is not int or spacing<=0:
+        raise ValueError("invalid tick state")
+    if not isinstance(decoded_arrays,list) or len(decoded_arrays)>5:
+        raise ValueError("invalid tick array budget")
+    span=ARRAY_TICKS*spacing
+    by_start={}
+    for entry in decoded_arrays:
+        if not isinstance(entry,dict) or type(entry.get("start_tick")) is not int:
+            raise ValueError("invalid array entry")
+        start=entry["start_tick"]
+        if start%span or start in by_start:
+            raise ValueError("unaligned or duplicate array")
+        by_start[start]=entry
+    step=-span if direction=="a_to_b" else span
+    start=start_tick(current_tick,spacing)
+    examined=0
+    while examined<len(by_start):
+        entry=by_start.get(start)
+        if entry is None or entry.get("status")!="FIXED_VALID":
+            return {"status":"UNKNOWN_ARRAY_GAP","first_tick":None,
+                    "arrays_traversed":examined,"actionable":False}
+        ticks=entry.get("ticks")
+        if not isinstance(ticks,list):
+            raise ValueError("missing decoded initialized ticks")
+        observed=[]
+        for tick in ticks:
+            ix=tick.get("tick_index") if isinstance(tick,dict) else None
+            if type(ix) is not int or not start<=ix<start+span or (ix-start)%spacing:
+                raise ValueError("invalid decoded tick index")
+            if (ix<=current_tick if step<0 else ix>current_tick):
+                observed.append(ix)
+        examined+=1
+        if observed:
+            return {"status":"OBSERVED_INITIALIZED_TICK",
+                    "first_tick":max(observed) if step<0 else min(observed),
+                    "arrays_traversed":examined,"actionable":False}
+        start+=step
+    return {"status":"INCOMPLETE_ARRAY_COVERAGE","first_tick":None,
+            "arrays_traversed":examined,"actionable":False}
+
 def start_tick(index, spacing):
     if spacing <= 0: raise ValueError("invalid spacing")
     span = ARRAY_TICKS * spacing
@@ -134,8 +183,10 @@ def inspect(rpc, pool_address):
                 entry["status"]="UNSUPPORTED_LAYOUT"
         out.append(entry)
     observed=nearest_observed_ticks(out,state["tick_current_index"],spacing)
+    directions={d:directional_tick_observation(out,state["tick_current_index"],spacing,d)
+                for d in ("a_to_b","b_to_a")}
     return {"pool":pool_address,"pool_tick":state["tick_current_index"],
-            "observed_tick_coverage":observed,
+            "observed_tick_coverage":observed,"directional_observations":directions,
             "slot":resp.get("context",{}).get("slot"),"arrays":out,
             "swap_ready":False}
 
