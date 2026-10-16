@@ -76,6 +76,8 @@ def verify(rpc, address, state):
         raise ValueError("PumpSwap GlobalConfig missing from same-slot snapshot")
     config = decode_config(base64.b64decode(config_account["data"][0],validate=True))
     fee_config = decode_authenticated(accounts[4], address=fee_address)
+    from arb.pumpswap_canonical import classify_pool
+    canonical = classify_pool(state)
     balances = []
     for account, mint in zip(accounts[1:], (state["base_mint"], state["quote_mint"])):
         if not account or account.get("owner") != TOKEN_PROGRAM or account.get("executable"):
@@ -97,6 +99,8 @@ def verify(rpc, address, state):
             "protocol_fees_accrued": state["protocol_fees"],
             "creator_fees_accrued": state["creator_fees"],
             "global_config": config, "fee_config": fee_config,
-            "canonical_pool_verified": False, "fee_mode_verified": False,
+            "canonical": canonical["canonical"],
+            "canonical_pool_verified": canonical["canonical_pool_verified"],
+            "fee_mode_verified": False,
             "effective_fee_verified": False, "fee_verified_onchain": False,
             "actionable": False, "executable_quote": False}
