@@ -24,6 +24,15 @@ def probe(rpc,pool,amount=100000):
     wallet=Keypair()
     state=read(rpc,pool)["state"]
     owner=wallet.pubkey()
+    # Fund only the ephemeral fee payer on the local fork.
+    call(rpc,"requestAirdrop",[str(owner),100000000])
+    import time
+    for _ in range(30):
+        if call(rpc,"getBalance",[str(owner)])["value"]>=100000000:
+            break
+        time.sleep(0.25)
+    else:
+        raise ValueError("local fee payer airdrop not reflected")
     token_program=Pubkey.from_string(TOKEN_PROGRAM)
     ata_program=Pubkey.from_string(ATA_PROGRAM)
     def ata(mint):
@@ -51,6 +60,7 @@ def probe(rpc,pool,amount=100000):
             "pool":pool,"amount_in":amount,"simulation_error":error,
             "logs_tail":logs[-8:] if isinstance(logs,list) else [],
             "signed":True,"local_only":True,"broadcast":False,
+            "fee_payer_funded_on_fork":True,
             "token_account_funding_verified":False,
             "post_swap_balances_verified":False,
             "executable_route_verified":False,"profitable_arbitrage_verified":False}
