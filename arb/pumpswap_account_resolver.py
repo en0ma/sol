@@ -15,13 +15,13 @@ ATA="ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
 
 def resolve(pool, user, user_base, user_quote, protocol_fee_recipient, *,
             quote_token_program=TOKEN_PROGRAM):
-    from solders.pubkey import Pubkey
     if not isinstance(pool,dict) or pool.get("verified") is not True:
         raise ValueError("verified pool snapshot required")
     if pool.get("canonical_pool_verified") is not True:
         raise ValueError("verified pool creator required")
     if quote_token_program!=TOKEN_PROGRAM:
         raise ValueError("only classic SPL quote tokens supported")
+    from solders.pubkey import Pubkey
     def pk(value):
         if not isinstance(value,str):raise ValueError("invalid account address")
         return Pubkey.from_string(value)
