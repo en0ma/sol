@@ -10,8 +10,12 @@ class PumpSwapFeeAccountTests(unittest.TestCase):
         raw[40:48]=(20).to_bytes(8,"little")
         raw[48:56]=(5).to_bytes(8,"little")
         raw[56]=16
+        raw[57:89]=bytes([3])*32
         raw[313:321]=(5).to_bytes(8,"little")
         data=decode(bytes(raw))
+        from arb.orca_whirlpool import b58
+        self.assertEqual(data["protocol_fee_recipients"][0],b58(bytes([3])*32))
+        self.assertEqual(len(data["protocol_fee_recipients"]),8)
         self.assertEqual(data["lp_fee_bps"],20)
         self.assertTrue(data["buy_enabled"])
         self.assertFalse(data["sell_enabled"])
