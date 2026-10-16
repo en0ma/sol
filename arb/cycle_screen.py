@@ -178,6 +178,27 @@ def scan(rpc,entries,amounts=(100000,1000000),max_slot_spread=8,extra_entries=()
         if p["venue"]=="raydium_cpmm":
             try:fees[(p["venue"],p["address"])]=read_pool_config(rpc,p)
             except Exception as exc:fee_errors.append({"pool":p["address"],"error":str(exc)[:180]})
+    # Expose exact authenticated Orca array coverage by pool. A missing PDA is
+    # not equivalent to a wrong-owner or unsupported-layout account; operators
+    # need the concrete gap addresses before extending pool discovery.
+    orca_array_gaps=[]
+    for p in pools:
+        if p["venue"]!="orca":
+            continue
+        proof=orca_evidence.get(("orca",p["address"]))
+        if proof is None:
+            orca_array_gaps.append({"pool":p["address"],
+                "status":"SNAPSHOT_UNAVAILABLE","missing":[],
+                "unsupported":[],"valid_arrays":0})
+            continue
+        arrays=proof["arrays"]
+        orca_array_gaps.append({"pool":p["address"],"status":"OBSERVED",
+            "valid_arrays":sum(x.get("status")=="FIXED_VALID" for x in arrays),
+            "missing":[{"start_tick":x["start_tick"],"address":x["address"]}
+                       for x in arrays if x.get("status")=="MISSING"],
+            "unsupported":[{"start_tick":x["start_tick"],"address":x["address"],
+                             "status":x.get("status")}
+                           for x in arrays if x.get("status") not in ("FIXED_VALID","MISSING")]})
     # Count every missing leg, not merely the first blocked leg of each cycle.
     # This identifies where implementing one quote adapter unlocks most routes.
     missing_by_venue={}
@@ -258,6 +279,7 @@ def scan(rpc,entries,amounts=(100000,1000000),max_slot_spread=8,extra_entries=()
         "candidate_rankings":rankings[:100],
         "indicative_positive_gross_count":sum(x["status"]=="INDICATIVE_ONLY" and x.get("estimated_gross_base_units",0)>0 for x in rankings),
         "orca_tick_snapshots":len(orca_evidence),
+        "orca_array_gap_evidence":orca_array_gaps,
         "wsol_positive_gross_routes":len(wsol_gross_positive),
         "reference_signature_fee_lamports":signature_fee_reference_lamports,
         "wsol_positive_gross_not_exceeding_reference_fee":wsol_below_signature_fee,
