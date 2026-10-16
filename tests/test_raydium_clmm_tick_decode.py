@@ -13,8 +13,8 @@ class ClmmTickDecodeTests(unittest.TestCase):
             raw[pos:pos+4]=(i*10).to_bytes(4,"little",signed=True)
         for i in (3,7):
             pos=44+i*168
-            raw[pos+4:pos+20]=(100).to_bytes(16,"little")
-            raw[pos+20:pos+36]=(-20 if i==3 else 20).to_bytes(16,"little",signed=True)
+            raw[pos+4:pos+20]=(-20 if i==3 else 20).to_bytes(16,"little",signed=True)
+            raw[pos+20:pos+36]=(100).to_bytes(16,"little")
         return raw
 
     def test_decodes_and_selects_directional_boundaries(self):
