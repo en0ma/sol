@@ -96,7 +96,7 @@ def directional_tick_observation(decoded_arrays, current_tick, spacing, directio
         raise ValueError("invalid swap direction")
     if type(current_tick) is not int or type(spacing) is not int or spacing<=0:
         raise ValueError("invalid tick state")
-    if not isinstance(decoded_arrays,list) or len(decoded_arrays)>5:
+    if not isinstance(decoded_arrays,list) or len(decoded_arrays)>9:
         raise ValueError("invalid tick array budget")
     span=ARRAY_TICKS*spacing
     by_start={}
