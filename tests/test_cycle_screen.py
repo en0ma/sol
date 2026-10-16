@@ -163,3 +163,37 @@ class CycleScreenTests(unittest.TestCase):
         self.assertEqual(report["unquotable_routes"],report["screened_size_routes"])
         self.assertGreater(report["actual_quote_blockers"]["orca"]["unquotable_size_routes"],0)
         self.assertFalse(report["actionable_opportunities"])
+
+    def test_clmm_and_cpmm_route_amounts_still_not_actionable(self):
+        route={"start_mint":"SOL","legs":[
+            {"venue":"raydium_clmm","pool":"clmm","input":"SOL","output":"USDC"},
+            {"venue":"raydium_cpmm","pool":"cpmm","input":"USDC","output":"SOL"}]}
+        indexed={("raydium_clmm","clmm"):{"verified":True,"slot":10},
+                 ("raydium_cpmm","cpmm"):{
+                     **self.pool("cpmm",[1000000,2000000]),"slot":10}}
+        cfg={("raydium_cpmm","cpmm"):{"fee_verified_onchain":True,
+             "trade_fee_rate_ppm":2500,"creator_fee_rate_ppm":500}}
+        def quote(pool,mint,amount):
+            self.assertEqual((pool,mint,amount),("clmm","SOL",1000))
+            return {"status":"INDICATIVE_WITHIN_TICK_ONLY",
+                    "mint_out":"USDC","amount_in":amount,
+                    "estimated_output_base_units":2000,
+                    "actionable":False,"executable_quote":False}
+        result=score_cycle(route,indexed,cfg,1000,max_slot_spread=0,clmm_quote=quote)
+        self.assertEqual(result["status"],"INDICATIVE_ONLY")
+        self.assertEqual(result["legs_quoted"],2)
+        self.assertFalse(result["actionable"])
+        self.assertFalse(result["confirmed_profitable"])
+
+    def test_clmm_provenance_rejects_executable_claim(self):
+        route={"start_mint":"SOL","legs":[
+            {"venue":"raydium_clmm","pool":"clmm","input":"SOL","output":"USDC"},
+            {"venue":"raydium_cpmm","pool":"cpmm","input":"USDC","output":"SOL"}]}
+        indexed={("raydium_clmm","clmm"):{"verified":True,"slot":10},
+                 ("raydium_cpmm","cpmm"):{"verified":True,"slot":10}}
+        result=score_cycle(route,indexed,{},1000,
+            clmm_quote=lambda *args:{"status":"INDICATIVE_WITHIN_TICK_ONLY",
+                "mint_out":"USDC","amount_in":1000,
+                "estimated_output_base_units":2000,"actionable":True,
+                "executable_quote":True})
+        self.assertEqual(result["status"],"UNQUOTABLE")
