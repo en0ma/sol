@@ -45,9 +45,15 @@ def main():
     rpc = os.environ.get('SOLANA_RPC_URL', 'http://127.0.0.1:8899')
     with open('arb/whirlpool_pools.json') as file:
         pools = json.load(file)['pools']
-    results = [probe(rpc, pool['address']) for pool in pools]
+    sizes = (100000, 1000000, 5000000)
+    results = []
+    for pool in pools:
+        for amount in sizes:
+            result = probe(rpc, pool['address'], amount=amount)
+            results.append({'pool': pool['address'], 'input_base_units': amount, **result})
     report = {'status': 'COMPARED' if any(r.get('status') == 'COMPARED' for r in results) else 'NO_COMPARABLE_QUOTE',
-              'attempted_pools': len(results),
+              'attempted_pools': len(pools), 'attempted_pool_sizes': len(results),
+              'tested_input_base_units': list(sizes),
               'exact_matches': sum(r.get('comparison', {}).get('status') == 'MATCH' for r in results),
               'mismatches': sum(r.get('comparison', {}).get('status') == 'MISMATCH' for r in results),
               'results': results, 'executable_quotes_verified': 0,
