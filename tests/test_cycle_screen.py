@@ -56,3 +56,30 @@ class CycleScreenTests(unittest.TestCase):
                 result=score_cycle({"start_mint":"SOL","legs":legs},indexed,cfg,1000)
                 self.assertEqual(result["status"],"UNQUOTABLE")
                 self.assertFalse(result["actionable"])
+
+    def test_cross_pool_slot_freshness_gate(self):
+        p1=self.pool("a",[1000000,2000000])
+        p2=self.pool("b",[2000000,1000000])
+        p1["slot"]=100
+        p2["slot"]=109
+        indexed={("raydium_cpmm",p["address"]):p for p in (p1,p2)}
+        cfg={k:{"fee_verified_onchain":True,"trade_fee_rate_ppm":2500,
+                "creator_fee_rate_ppm":500} for k in indexed}
+        route={"start_mint":"SOL","legs":[
+            {"input":"SOL","output":"USDC","venue":"raydium_cpmm","pool":"a"},
+            {"input":"USDC","output":"SOL","venue":"raydium_cpmm","pool":"b"}]}
+        stale=score_cycle(route,indexed,cfg,10000,max_slot_spread=8)
+        self.assertEqual(stale["status"],"UNQUOTABLE")
+        self.assertEqual(stale["slot_spread"],9)
+        self.assertEqual(stale["legs_quoted"],0)
+        p2["slot"]=108
+        acceptable=score_cycle(route,indexed,cfg,10000,max_slot_spread=8)
+        self.assertEqual(acceptable["status"],"INDICATIVE_ONLY")
+        del p2["slot"]
+        missing=score_cycle(route,indexed,cfg,10000,max_slot_spread=8)
+        self.assertEqual(missing["reason"],"missing verified pool slot")
+        self.assertFalse(missing["actionable"])
+
+    def test_invalid_slot_budget_rejected(self):
+        with self.assertRaises(ValueError):
+            score_cycle({}, {}, {}, 100, max_slot_spread=True)
