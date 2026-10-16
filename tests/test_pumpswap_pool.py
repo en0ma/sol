@@ -28,8 +28,9 @@ class PumpSwapPoolTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     decode(raw)
 
+    @patch("arb.pumpswap_fee_account.authenticated_address", return_value=("fee-pda",4))
     @patch("arb.pumpswap_pool.call")
-    def test_missing_rpc_snapshot_fails_closed(self, call):
+    def test_missing_rpc_snapshot_fails_closed(self, call, authenticated):
         state=decode(raw_pool())
         call.return_value={"context":{"slot":100},"value":[None,None,None,None,None]}
         with self.assertRaisesRegex(ValueError,"owner or state"):
@@ -55,8 +56,9 @@ class PumpSwapPoolTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"invalid PumpSwap Pool fields"):
             decode(bytes(raw))
 
+    @patch("arb.pumpswap_fee_account.authenticated_address", return_value=("fee-pda",4))
     @patch("arb.pumpswap_pool.call")
-    def test_same_snapshot_includes_global_fee_account(self, call):
+    def test_same_snapshot_includes_global_fee_account(self, call, authenticated):
         state=decode(raw_pool())
         call.return_value={"context":{"slot":123},"value":[None,None,None,None]}
         with self.assertRaisesRegex(ValueError,"owner or state"):
