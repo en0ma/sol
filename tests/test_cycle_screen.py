@@ -1,5 +1,6 @@
 import unittest
-from arb.cycle_screen import score_cycle
+from unittest.mock import patch
+from arb.cycle_screen import score_cycle,scan
 class CycleScreenTests(unittest.TestCase):
     def pool(self,name,reserves):
         return {"venue":"raydium_cpmm","address":name,"verified":True,
@@ -83,3 +84,23 @@ class CycleScreenTests(unittest.TestCase):
     def test_invalid_slot_budget_rejected(self):
         with self.assertRaises(ValueError):
             score_cycle({}, {}, {}, 100, max_slot_spread=True)
+
+    @patch("arb.cycle_screen.read_pool_config")
+    @patch("arb.cycle_screen.cycles")
+    @patch("arb.cycle_screen.refresh")
+    def test_scan_keeps_route_identity_and_same_mint_rankings(self,refresh,cycles,fees):
+        p1=self.pool("a",[1000000,2000000])
+        p2=self.pool("b",[2000000,1000000])
+        p1["slot"]=p2["slot"]=500
+        refresh.return_value={"rejected":[],"verified_pools":[p1,p2]}
+        legs=[{"input":"SOL","output":"USDC","venue":"raydium_cpmm","pool":"a"},
+              {"input":"USDC","output":"SOL","venue":"raydium_cpmm","pool":"b"}]
+        cycles.return_value=[{"start_mint":"SOL","hops":2,"venues":["raydium_cpmm"],"legs":legs}]
+        fees.return_value={"fee_verified_onchain":True,"trade_fee_rate_ppm":2500,
+                           "creator_fee_rate_ppm":500}
+        result=scan("localhost",[],amounts=(10000,20000))
+        self.assertEqual(result["screened_size_routes"],2)
+        self.assertEqual(result["indicative_routes"],2)
+        self.assertEqual(result["candidate_rankings"][0]["route_legs"],legs)
+        self.assertFalse(result["candidate_rankings"][0]["actionable"])
+        self.assertEqual(result["max_pool_slot_spread"],8)
