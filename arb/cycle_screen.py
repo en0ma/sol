@@ -10,7 +10,7 @@ from arb.opportunity_graph import cycles
 from arb.cpmm_quote import quote_pool
 from arb.cpmm_config import read_pool_config
 
-def score_cycle(route,pool_index,fee_index,input_amount,network_fee=None,max_slot_spread=None):
+def score_cycle(route,pool_index,fee_index,input_amount,network_fee=None,max_slot_spread=None,orca_evidence=None):
     if type(input_amount)is not int or input_amount<=0:raise ValueError("invalid input size")
     if network_fee is not None and (type(network_fee)is not int or network_fee<0):
         raise ValueError("invalid network fee")
@@ -60,6 +60,23 @@ def score_cycle(route,pool_index,fee_index,input_amount,network_fee=None,max_slo
         cfg=fee_index.get(key)
         if pool is None or not pool.get("verified"):
             return {"status":"UNQUOTABLE","reason":"missing verified pool","missing_quote_venue":leg["venue"],"legs_quoted":len(legs),"actionable":False}
+        if leg["venue"]=="orca":
+            proof=(orca_evidence or {}).get(key)
+            if not isinstance(proof,dict) or proof.get("verified") is not True:
+                return {"status":"UNQUOTABLE","reason":"missing validated Orca tick arrays",
+                        "missing_quote_venue":"orca","legs_quoted":len(legs),"actionable":False}
+            try:
+                from arb.orca_multitick_quote import quote_from_decoded_arrays
+                q=quote_from_decoded_arrays(proof["state"],leg["input"],amount,proof["arrays"])
+                if q["mint_out"]!=leg["output"]:
+                    raise ValueError("Orca output mint mismatch")
+                amount=q["estimated_output_base_units"]
+                legs.append({"venue":"orca","pool":leg["pool"],"input":q["amount_in"],
+                             "estimated_output":amount,"ticks_crossed":q["ticks_crossed"]})
+                continue
+            except (KeyError,ValueError,TypeError) as exc:
+                return {"status":"UNQUOTABLE","reason":str(exc)[:180],
+                        "missing_quote_venue":"orca","legs_quoted":len(legs),"actionable":False}
         if leg["venue"]!="raydium_cpmm":
             return {"status":"UNQUOTABLE","reason":"unsupported native quote venue","missing_quote_venue":leg["venue"],"legs_quoted":len(legs),"actionable":False}
         if cfg is None:
@@ -112,6 +129,21 @@ def scan(rpc,entries,amounts=(100000,1000000),max_slot_spread=8,extra_entries=()
     pool_index={(p["venue"],p["address"]):p for p in pools}
     fees={}
     fee_errors=[]
+    orca_evidence={}
+    from arb.whirlpool_ticks import inspect as inspect_orca
+    for p in pools:
+        if p["venue"]!="orca":continue
+        try:
+            observation=inspect_orca(rpc,p["address"])
+            state=observation["pool_state"]
+            if (observation.get("slot")!=p.get("slot") or
+                    sorted((state["token_mint_a"],state["token_mint_b"]))!=sorted(p["mints"])):
+                raise ValueError("Orca tick snapshot not aligned with verified pool slot")
+            orca_evidence[(p["venue"],p["address"])]={"verified":True,
+                "state":state,"arrays":observation["arrays"]}
+        except Exception as exc:
+            fee_errors.append({"pool":p["address"],"venue":"orca",
+                               "error":str(exc)[:180]})
     for p in pools:
         if p["venue"]=="raydium_cpmm":
             try:fees[(p["venue"],p["address"])]=read_pool_config(rpc,p)
@@ -146,7 +178,8 @@ def scan(rpc,entries,amounts=(100000,1000000),max_slot_spread=8,extra_entries=()
     rankings=[]
     for route in graph:
         for amount in amounts:
-            q=score_cycle(route,pool_index,fees,amount,max_slot_spread=max_slot_spread)
+            q=score_cycle(route,pool_index,fees,amount,max_slot_spread=max_slot_spread,
+                          orca_evidence=orca_evidence)
             rankings.append({"start_mint":route["start_mint"],"hops":route["hops"],
                 "route_legs":[dict(leg) for leg in route["legs"]],
                 "venues":route["venues"],"input_base_units":amount,**q})
@@ -167,6 +200,7 @@ def scan(rpc,entries,amounts=(100000,1000000),max_slot_spread=8,extra_entries=()
         "unquotable_routes":sum(x["status"]=="UNQUOTABLE" for x in rankings),
         "candidate_rankings":rankings[:100],
         "indicative_positive_gross_count":sum(x["status"]=="INDICATIVE_ONLY" and x.get("estimated_gross_base_units",0)>0 for x in rankings),
+        "orca_tick_snapshots":len(orca_evidence),
         "quote_gap_priorities":quote_gap_priorities,"fee_errors":fee_errors,
         "actionable_opportunities":0,"confirmed_profitable":0,
         "note":"No actionable ranking until all legs have native verified quotes, execution simulation and net fees."}
