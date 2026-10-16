@@ -57,13 +57,13 @@ def verify(rpc, address, state):
     from arb.pumpswap_global_config import ADDRESS as CONFIG_ADDRESS, decode as decode_config
     from arb.pumpswap_fee_account import authenticated_address, decode_authenticated
     fee_address,_ = authenticated_address()
-    keys = [address, state["base_vault"], state["quote_vault"], CONFIG_ADDRESS, fee_address]
+    keys = [address, state["base_vault"], state["quote_vault"], CONFIG_ADDRESS, fee_address, state["base_mint"]]
     resp = call(rpc, "getMultipleAccounts", [keys, {
         "encoding": "base64", "commitment": "confirmed"}])
     accounts = resp.get("value")
     slot = resp.get("context", {}).get("slot")
     if (type(slot) is not int or slot < 0 or not isinstance(accounts, list)
-            or len(accounts) != 5):
+            or len(accounts) != 6):
         raise ValueError("incomplete PumpSwap account snapshot")
     pool = accounts[0]
     if (not pool or pool.get("owner") != PROGRAM or pool.get("executable")
@@ -78,6 +78,18 @@ def verify(rpc, address, state):
     fee_config = decode_authenticated(accounts[4], address=fee_address)
     from arb.pumpswap_canonical import classify_pool
     canonical = classify_pool(state)
+    from arb.token_vaults import TOKEN_PROGRAM
+    mint_account = accounts[5]
+    if (not mint_account or mint_account.get("owner") != TOKEN_PROGRAM
+            or mint_account.get("executable") is not False
+            or mint_account.get("data", [None,None])[1] != "base64"):
+        raise ValueError("missing classic SPL base mint in snapshot")
+    mint_data = base64.b64decode(mint_account["data"][0], validate=True)
+    if len(mint_data) != 82 or mint_data[45] != 1:
+        raise ValueError("unsupported or uninitialized PumpSwap base mint")
+    base_supply = int.from_bytes(mint_data[36:44], "little")
+    if base_supply <= 0:
+        raise ValueError("invalid PumpSwap base mint supply")
     balances = []
     for account, mint in zip(accounts[1:], (state["base_mint"], state["quote_mint"])):
         if not account or account.get("owner") != TOKEN_PROGRAM or account.get("executable"):
@@ -94,6 +106,7 @@ def verify(rpc, address, state):
     return {"venue": "pumpswap", "address": address, "verified": True,
             "base_mint": state["base_mint"], "quote_mint": state["quote_mint"],
             "base_reserve": balances[0], "quote_vault_balance": balances[1],
+            "base_mint_supply": base_supply,
             "virtual_quote_reserves": state["virtual_quote_reserves"],
             "slot": slot, "creator_fee_bps": state["creator_fee_bps"],
             "protocol_fees_accrued": state["protocol_fees"],
