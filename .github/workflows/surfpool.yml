@@ -439,6 +439,7 @@ jobs:
       - name: Screen full discovered arbitrage cycles across trade sizes
         env:
           CYCLE_SCREEN_REPORT: ${{ runner.temp }}/cycle-screen.json
+          DEX_DISCOVERY_INPUT: ${{ runner.temp }}/expanded-pool-discovery.json
         run: python3 -m arb.cycle_screen
       - name: Upload quote coverage and cycle screening
         if: always()
