@@ -1,6 +1,6 @@
 """Decode initialized Raydium CLMM TickArrayState entries without inventing gaps.
 
-Raydium TickState is 168 bytes; TickArrayState stores 60 contiguous ticks
+Raydium TickState is 168 bytes, with signed liquidity_net BEFORE unsigned\nliquidity_gross; TickArrayState stores 60 contiguous ticks
 starting at offset 44. Results only describe this authenticated array.
 """
 from arb.raydium_clmm_ticks import SIZE,DISC
@@ -23,8 +23,8 @@ def initialized_ticks(raw,start,spacing):
         # must never be interpreted as usable liquidity.
         if index!=expected:
             raise ValueError("unexpected CLMM tick-array index layout")
-        gross=int.from_bytes(raw[pos+4:pos+20],"little")
-        net=int.from_bytes(raw[pos+20:pos+36],"little",signed=True)
+        net=int.from_bytes(raw[pos+4:pos+20],"little",signed=True)
+        gross=int.from_bytes(raw[pos+20:pos+36],"little")
         if gross:
             if abs(net)>gross:
                 raise ValueError("invalid CLMM initialized tick liquidity")
