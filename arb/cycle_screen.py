@@ -163,7 +163,10 @@ def scan(rpc,entries,amounts=(100000,1000000),max_slot_spread=8,extra_entries=()
         try:
             observation=inspect_orca(rpc,p["address"])
             state=observation["pool_state"]
-            if (observation.get("slot")!=p.get("slot") or
+            tick_slot=observation.get("slot")
+            pool_slot=p.get("slot")
+            if (type(tick_slot) is not int or type(pool_slot) is not int or
+                    abs(tick_slot-pool_slot)>max_slot_spread or
                     sorted((state["token_mint_a"],state["token_mint_b"]))!=sorted(p["mints"])):
                 raise ValueError("Orca tick snapshot not aligned with verified pool slot")
             orca_evidence[(p["venue"],p["address"])]={"verified":True,
