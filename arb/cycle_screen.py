@@ -197,7 +197,9 @@ def scan(rpc,entries,amounts=(100000,1000000),max_slot_spread=8,extra_entries=()
             "missing":[{"start_tick":x["start_tick"],"address":x["address"]}
                        for x in arrays if x.get("status")=="MISSING"],
             "unsupported":[{"start_tick":x["start_tick"],"address":x["address"],
-                             "status":x.get("status")}
+                             "status":x.get("status"),
+                             "data_length":x.get("data_length"),
+                             "discriminator_hex":x.get("discriminator_hex")}
                            for x in arrays if x.get("status") not in ("FIXED_VALID","MISSING")]})
     # Count every missing leg, not merely the first blocked leg of each cycle.
     # This identifies where implementing one quote adapter unlocks most routes.
