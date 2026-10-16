@@ -12,6 +12,7 @@ from arb.raydium_cpmm import PROGRAM as RAY_PROGRAM, SIZE as RAY_SIZE,decode as 
 from arb.raydium_clmm import PROGRAM as CLMM,SIZE as CLMM_SIZE,decode as decode_clmm,verify as verify_clmm
 from arb.meteora_dlmm import PROGRAM as DLMM,SIZE as DLMM_SIZE,decode as decode_dlmm,verify as verify_dlmm
 from arb.meteora_damm_v2 import PROGRAM as DAMM,SIZE as DAMM_SIZE,decode as decode_damm,verify as verify_damm
+from arb.pumpswap_pool import PROGRAM as PUMP_PROGRAM, decode as decode_pump, verify as verify_pump
 from arb.whirlpool_snapshot import snapshot
 from arb.token_vaults import TOKEN_PROGRAM,decode_token_account
 
@@ -23,7 +24,8 @@ VENUES={"orca":(ORCA,ORCA_SIZE,101,181,decode_orca),
         "raydium_cpmm":(RAY_PROGRAM,RAY_SIZE,168,200,decode_ray),
         "raydium_clmm":(CLMM,CLMM_SIZE,73,105,decode_clmm),
         "meteora_dlmm":(DLMM,DLMM_SIZE,88,120,decode_dlmm),
-        "meteora_damm_v2":(DAMM,DAMM_SIZE,168,200,decode_damm)}
+        "meteora_damm_v2":(DAMM,DAMM_SIZE,168,200,decode_damm),
+        "pumpswap":(PUMP_PROGRAM,None,43,75,decode_pump)}
 
 def search_pair(rpc,venue,mint_a,mint_b,limit=8):
     if venue not in VENUES or mint_a==mint_b:raise ValueError("invalid search")
@@ -31,9 +33,10 @@ def search_pair(rpc,venue,mint_a,mint_b,limit=8):
     program,size,offset_a,offset_b,decode=VENUES[venue]
     found={}
     for a,b in ((mint_a,mint_b),(mint_b,mint_a)):
-        config={"encoding":"base64","commitment":"confirmed",
-           "filters":[{"dataSize":size},{"memcmp":{"offset":offset_a,"bytes":a}},
-                      {"memcmp":{"offset":offset_b,"bytes":b}}]}
+        filters=[{"memcmp":{"offset":offset_a,"bytes":a}},
+                 {"memcmp":{"offset":offset_b,"bytes":b}}]
+        if size is not None:filters.insert(0,{"dataSize":size})
+        config={"encoding":"base64","commitment":"confirmed","filters":filters}
         response=call(rpc,"getProgramAccounts",[program,config],timeout=45)
         if not isinstance(response,list):
             raise ValueError("unexpected getProgramAccounts result")
@@ -44,7 +47,8 @@ def search_pair(rpc,venue,mint_a,mint_b,limit=8):
                 raise ValueError("wrong program owner")
             raw=base64.b64decode(entry["account"]["data"][0],validate=True)
             decoded=decode(raw)
-            pair=(decoded["token_a_mint"],decoded["token_b_mint"]) if venue=="meteora_damm_v2" else (
+            pair=(decoded["base_mint"],decoded["quote_mint"]) if venue=="pumpswap" else (
+                (decoded["token_a_mint"],decoded["token_b_mint"]) if venue=="meteora_damm_v2" else (
                 (decoded["token_x_mint"],decoded["token_y_mint"]) if venue=="meteora_dlmm" else (
                 (decoded["token_mint_a"],decoded["token_mint_b"]) if venue=="orca" else (
                 decoded["token_mint_0"],decoded["token_mint_1"]) if venue=="raydium_clmm" else (
@@ -54,6 +58,11 @@ def search_pair(rpc,venue,mint_a,mint_b,limit=8):
     return found
 
 def verify(rpc,venue,address,state):
+    if venue=="pumpswap":
+        p=verify_pump(rpc,address,state)
+        return {**p,"mints":[p["base_mint"],p["quote_mint"]],
+                "vault_base_units":[p["base_reserve"],p["quote_vault_balance"]],
+                "swap_simulated":False}
     if venue=="meteora_damm_v2":
         return verify_damm(rpc,address,state)
     if venue=="meteora_dlmm":
