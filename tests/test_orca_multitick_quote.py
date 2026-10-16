@@ -114,7 +114,9 @@ class MultitickIndicativeTests(unittest.TestCase):
             quote_from_decoded_arrays(state, "b", 10000000000, arrays)
 
     def test_empty_verified_array_quotes_only_within_current_array(self):
-        state={**self.state(),"tick_spacing":1}
+        from arb.orca_tick_math import sqrt_price_from_tick_index
+        state={**self.state(),"tick_spacing":1,
+               "sqrt_price_x64":str(sqrt_price_from_tick_index(15))}
         arrays=[{"start_tick":0,"status":"FIXED_VALID","ticks":[]}]
         for mint in ("a","b"):
             with self.subTest(mint=mint):
