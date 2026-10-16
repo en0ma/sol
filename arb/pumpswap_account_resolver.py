@@ -19,6 +19,10 @@ def resolve(pool, user, user_base, user_quote, protocol_fee_recipient, *,
         raise ValueError("verified pool snapshot required")
     if pool.get("canonical_pool_verified") is not True:
         raise ValueError("verified pool creator required")
+    config=pool.get("global_config")
+    if (not isinstance(config,dict) or not isinstance(config.get("protocol_fee_recipients"),list)
+            or protocol_fee_recipient not in config["protocol_fee_recipients"]):
+        raise ValueError("protocol fee recipient not present in verified GlobalConfig")
     if quote_token_program!=TOKEN_PROGRAM:
         raise ValueError("only classic SPL quote tokens supported")
     from solders.pubkey import Pubkey
