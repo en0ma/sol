@@ -24,8 +24,9 @@ class DiscoveryTests(unittest.TestCase):
     @patch("arb.onchain_pool_discovery.search_pair",side_effect=RuntimeError("429"))
     def test_partial_discovery_visible(self,search):
         r=discover("rpc",[(MINTS["WSOL"],MINTS["USDT"])])
-        self.assertEqual(r["status"],"PARTIAL")
-        self.assertEqual(len(r["errors"]),len(VENUES))
+        self.assertEqual(r["status"],"UPSTREAM_RATE_LIMITED")
+        self.assertEqual(len(r["errors"]),1)
+        search.assert_called_once()
     @patch("arb.onchain_pool_discovery.time.sleep")
     @patch("arb.onchain_pool_discovery.call",return_value=[])
     def test_paced_requests_preserve_two_order_filters(self,call,sleep):
