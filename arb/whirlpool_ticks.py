@@ -49,6 +49,51 @@ def decode_fixed_ticks(raw, pool_address, expected_start, spacing):
     return ticks
 
 
+DYNAMIC_DISC=hashlib.sha256(b"account:DynamicTickArray").digest()[:8]
+DYNAMIC_MIN_LEN=148
+DYNAMIC_MAX_LEN=10004
+
+def decode_dynamic_ticks(raw,pool_address,expected_start,spacing):
+    """Decode Orca's Borsh DynamicTickArray and cross-check all bitmap flags.
+
+    Layout: discriminator(8), start(i32), whirlpool(32), bitmap(u128),
+    then 88 Borsh enum tags (0 or 1); tag 1 carries 112-byte TickData.
+    """
+    if (type(spacing) is not int or spacing<=0 or
+            type(expected_start) is not int or not isinstance(raw,bytes) or
+            not DYNAMIC_MIN_LEN<=len(raw)<=DYNAMIC_MAX_LEN or
+            raw[:8]!=DYNAMIC_DISC):
+        raise ValueError("unsupported dynamic Orca tick array")
+    start=int.from_bytes(raw[8:12],"little",signed=True)
+    if start!=expected_start or b58(raw[12:44])!=pool_address:
+        raise ValueError("dynamic array identity mismatch")
+    bitmap=int.from_bytes(raw[44:60],"little")
+    if bitmap>>ARRAY_TICKS:
+        raise ValueError("dynamic bitmap exceeds 88 ticks")
+    result=[]
+    cursor=60
+    for i in range(ARRAY_TICKS):
+        if cursor>=len(raw):
+            raise ValueError("truncated dynamic tick tags")
+        tag=raw[cursor]
+        cursor+=1
+        if tag not in (0,1) or tag!=((bitmap>>i)&1):
+            raise ValueError("dynamic bitmap and tick tags disagree")
+        if tag:
+            if cursor+112>len(raw):
+                raise ValueError("truncated dynamic initialized tick")
+            net=int.from_bytes(raw[cursor:cursor+16],"little",signed=True)
+            gross=int.from_bytes(raw[cursor+16:cursor+32],"little")
+            ix=start+i*spacing
+            if abs(ix)>MAX_TICK or gross<=0 or abs(net)>gross:
+                raise ValueError("invalid dynamic tick liquidity")
+            result.append({"tick_index":ix,"liquidity_net":str(net),
+                           "liquidity_gross":str(gross)})
+            cursor+=112
+    if cursor!=len(raw):
+        raise ValueError("unexpected dynamic tick array trailing bytes")
+    return result
+
 def nearest_observed_ticks(decoded_arrays, current_tick, spacing):
     """Find observed initialized boundaries; missing arrays remain explicit gaps.
 
@@ -179,6 +224,12 @@ def inspect(rpc, pool_address):
                     (t["tick_index"] for t in ticks if t["tick_index"]<=state["tick_current_index"]),default=None)
                 entry["nearest_initialized_above"]=min(
                     (t["tick_index"] for t in ticks if t["tick_index"]>state["tick_current_index"]),default=None)
+            elif raw[:8]==DYNAMIC_DISC:
+                ticks=decode_dynamic_ticks(raw,pool_address,idx,spacing)
+                entry["status"]="FIXED_VALID"
+                entry["layout"]="DYNAMIC_VERIFIED"
+                entry["initialized_ticks"]=len(ticks)
+                entry["ticks"]=ticks
             else:
                 entry["status"]="UNSUPPORTED_LAYOUT"
                 entry["data_length"]=len(raw)
