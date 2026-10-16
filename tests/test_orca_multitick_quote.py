@@ -84,3 +84,31 @@ class MultitickIndicativeTests(unittest.TestCase):
             {"tick_index": 10, "liquidity_net": "not-a-number"}]}]
         with self.assertRaisesRegex(ValueError, "invalid tick liquidity"):
             quote_from_decoded_arrays(state, "a", 1000, observed, lambda _: Q-1)
+
+    def test_unused_missing_next_array_is_not_a_quote_blocker(self):
+        from arb.orca_tick_math import sqrt_price_from_tick_index
+        state = self.state()
+        state["tick_spacing"] = 1
+        state["tick_current_index"] = 1
+        state["sqrt_price_x64"] = str(sqrt_price_from_tick_index(1))
+        arrays = [
+            {"start_tick": 0, "status": "FIXED_VALID",
+             "ticks": [{"tick_index": 10, "liquidity_net": "0"}]},
+            {"start_tick": 88, "status": "MISSING"}]
+        result = quote_from_decoded_arrays(state, "b", 1000, arrays)
+        self.assertEqual(result["ticks_crossed"], 0)
+        self.assertEqual(result["first_unavailable_array_start"], 88)
+        self.assertFalse(result["actionable"])
+
+    def test_missing_next_array_blocks_trade_requiring_further_liquidity(self):
+        from arb.orca_tick_math import sqrt_price_from_tick_index
+        state = self.state()
+        state["tick_spacing"] = 1
+        state["tick_current_index"] = 1
+        state["sqrt_price_x64"] = str(sqrt_price_from_tick_index(1))
+        arrays = [
+            {"start_tick": 0, "status": "FIXED_VALID",
+             "ticks": [{"tick_index": 10, "liquidity_net": "0"}]},
+            {"start_tick": 88, "status": "MISSING"}]
+        with self.assertRaisesRegex(ValueError, "missing tick coverage"):
+            quote_from_decoded_arrays(state, "b", 100000000, arrays)
