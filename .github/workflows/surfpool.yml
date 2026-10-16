@@ -417,7 +417,7 @@ jobs:
       - name: Scan additional RAY and stablecoin pools on five DEX programs
         env:
           DEX_DISCOVERY_REPORT: ${{ runner.temp }}/expanded-pool-discovery.json
-        run: python3 -m arb.onchain_pool_discovery --pairs WSOL/RAY,USDC/RAY --limit 8 || test "$?" -eq 2
+        run: python3 -m arb.onchain_pool_discovery --pairs WSOL/RAY,USDC/RAY --limit 8 --pace-seconds 2 || test "$?" -eq 2
       - name: Upload expanded five-venue pool discovery
         if: always()
         uses: actions/upload-artifact@v4
