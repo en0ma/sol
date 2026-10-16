@@ -140,3 +140,14 @@ class MultitickIndicativeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"missing or unsupported"):
             quote_from_decoded_arrays(state,"a",100000,
                 [{"start_tick":0,"status":"MISSING"}])
+
+    def test_more_than_64_authenticated_ticks_uses_nearest_only(self):
+        from arb.orca_tick_math import sqrt_price_from_tick_index
+        state={**self.state(),"tick_spacing":1,"tick_current_index":1,
+               "sqrt_price_x64":str(sqrt_price_from_tick_index(1))}
+        arrays=[{"start_tick":0,"status":"FIXED_VALID",
+                 "ticks":[{"tick_index":i,"liquidity_net":"0"} for i in range(2,88)]}]
+        result=quote_from_decoded_arrays(state,"b",100,arrays)
+        self.assertEqual(result["ticks_crossed"],0)
+        self.assertGreater(result["estimated_output_base_units"],0)
+        self.assertFalse(result["actionable"])
