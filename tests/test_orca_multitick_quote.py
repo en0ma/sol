@@ -1,5 +1,5 @@
 import unittest
-from arb.orca_multitick_quote import Q, quote_multitick
+from arb.orca_multitick_quote import Q, quote_multitick, quote_from_decoded_arrays
 
 
 class MultitickIndicativeTests(unittest.TestCase):
@@ -54,3 +54,33 @@ class MultitickIndicativeTests(unittest.TestCase):
                                    'liquidity_net': 0}], max_crossings=0)
         self.assertEqual(result['ticks_crossed'], 0)
         self.assertEqual(result['steps'][0]['kind'], 'partial')
+
+    def test_decoded_array_bridge_crosses_tick(self):
+        state = self.state()
+        state["tick_spacing"] = 1
+        observed = [
+            {"start_tick": 0, "status": "FIXED_VALID", "ticks": [
+                {"tick_index": 10, "liquidity_net": "10000000000"},
+                {"tick_index": 0, "liquidity_net": "0"}]}]
+        def price(ix):
+            return {10: Q - 1000000000000, 0: Q - 101000000000000}[ix]
+        q = quote_from_decoded_arrays(state, "a", 1000000, observed, price)
+        self.assertEqual(q["ticks_crossed"], 1)
+        self.assertEqual(q["tick_arrays_examined"], 1)
+        self.assertFalse(q["executable_quote"])
+
+    def test_decoded_array_bridge_rejects_missing_current_array(self):
+        state = self.state()
+        state["tick_spacing"] = 1
+        observed = [{"start_tick": 88, "status": "FIXED_VALID", "ticks": [
+            {"tick_index": 90, "liquidity_net": "0"}]}]
+        with self.assertRaisesRegex(ValueError, "missing or unsupported"):
+            quote_from_decoded_arrays(state, "a", 1000, observed, lambda _: Q-1)
+
+    def test_decoded_array_bridge_rejects_bad_liquidity(self):
+        state = self.state()
+        state["tick_spacing"] = 1
+        observed = [{"start_tick": 0, "status": "FIXED_VALID", "ticks": [
+            {"tick_index": 10, "liquidity_net": "not-a-number"}]}]
+        with self.assertRaisesRegex(ValueError, "invalid tick liquidity"):
+            quote_from_decoded_arrays(state, "a", 1000, observed, lambda _: Q-1)
