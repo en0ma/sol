@@ -222,6 +222,21 @@ jobs:
         run: python3 -m pip install --disable-pip-version-check solders==0.26.0
       - name: Simulate a signed local transaction
         run: python3 -m arb.simulate_transfer
+      - name: Decode pinned CLMM current initialized ticks on real fork
+        run: |
+          python3 - <<'PY'
+          import json,os
+          from arb.raydium_clmm_quote_preflight import inspect_authenticated
+          with open("arb/pool_registry.json") as f:
+              pools=json.load(f)["pools"]
+          targets=[p["address"] for p in pools if p["venue"]=="raydium_clmm"]
+          if not targets:raise SystemExit("No pinned CLMM pool")
+          for zero_for_one in (True,False):
+              result=inspect_authenticated(os.environ["SOLANA_RPC_URL"],targets[0],zero_for_one)
+              print(json.dumps(result,indent=2))
+              assert result["simulation_verified"] is False
+              assert result["actionable"] is False
+          PY
       - name: Verify pinned Raydium CLMM trade fee on real fork
         run: |
           python3 - <<'PY'
