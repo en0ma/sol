@@ -182,6 +182,27 @@ def quote_from_decoded_arrays(state, mint_in, amount_in, arrays, sqrt_price_at_t
         ticks.extend(sorted(local, key=lambda t: t["tick_index"], reverse=down))
         covered += 1
         start += step
+    if not ticks:
+        # An authenticated current array with no initialized ticks in the
+        # direction still proves a finite no-crossing price interval. Use its
+        # edge only as a STOP boundary, never as a liquidity event. Larger
+        # trades must fail closed rather than crossing a fabricated tick.
+        current_array=indexed.get(start_tick(current,spacing))
+        if current_array is None or current_array.get("status")!="FIXED_VALID":
+            raise ValueError("missing authenticated current tick array")
+        edge=(start_tick(current,spacing) if down else
+              start_tick(current,spacing)+span-spacing)
+        if not (edge<current if down else edge>current):
+            raise ValueError("no within-array price interval")
+        ticks=[{"tick_index":edge,"sqrt_price_x64":sqrt_price_at_tick(edge),
+                "liquidity_net":0}]
+        result=quote_multitick(state,mint_in,amount_in,ticks,max_crossings=0)
+        if result["ticks_crossed"]!=0:
+            raise ValueError("synthetic boundary cannot be crossed")
+        return {**result,"tick_arrays_examined":1,
+                "first_unavailable_array_start":first_gap,
+                "source":"VERIFIED_CURRENT_ARRAY_NO_INITIALIZED_TICKS",
+                "actionable":False,"executable_quote":False}
     result = quote_multitick(state, mint_in, amount_in, ticks,
                              max_crossings=max_crossings)
     return {**result, "tick_arrays_examined": covered,
