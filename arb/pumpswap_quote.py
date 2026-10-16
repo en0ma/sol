@@ -14,6 +14,11 @@ def quote_exact_input(pool, mint_in, amount_in, *, verified_total_fee_ppm):
         raise ValueError("unsupported PumpSwap pool")
     if pool.get("verified") is not True or pool.get("fee_verified_onchain") is not True:
         raise ValueError("pool and fee configuration must be verified on-chain")
+    if pool.get("effective_fee_verified") is not True:
+        raise ValueError("effective PumpSwap dynamic fee tier not verified")
+    config = pool.get("global_config")
+    if not isinstance(config, dict) or config.get("effective_fee_verified") is not True:
+        raise ValueError("same-slot effective fee evidence missing")
     if type(amount_in) is not int or not 0 < amount_in < 1 << 64:
         raise ValueError("invalid exact input")
     if type(verified_total_fee_ppm) is not int or not 0 <= verified_total_fee_ppm < DENOM:
@@ -38,6 +43,8 @@ def quote_exact_input(pool, mint_in, amount_in, *, verified_total_fee_ppm):
     if mint_in not in (base_mint, quote_mint):
         raise ValueError("input mint not in pool")
     from_base = mint_in == base_mint
+    if not (config.get("sell_enabled") if from_base else config.get("buy_enabled")):
+        raise ValueError("PumpSwap direction disabled")
     reserve_in, reserve_out = (base, priced_quote) if from_base else (priced_quote, base)
     net = amount_in * (DENOM - verified_total_fee_ppm) // DENOM
     if net <= 0:
