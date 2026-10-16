@@ -124,9 +124,15 @@ def scan(rpc,entries,amounts=(100000,1000000),max_slot_spread=8):
         for amount in amounts:
             q=score_cycle(route,pool_index,fees,amount,max_slot_spread=max_slot_spread)
             rankings.append({"start_mint":route["start_mint"],"hops":route["hops"],
+                "route_legs":[dict(leg) for leg in route["legs"]],
                 "venues":route["venues"],"input_base_units":amount,**q})
+    # Preserve executable route identity for downstream simulation candidates.
+    # Sort only comparable base units: never rank one starting mint against
+    # another as if their raw integer denominations were interchangeable.
     rankings.sort(key=lambda q:(q["status"]!="INDICATIVE_ONLY",
-                         -(q.get("estimated_gross_base_units") or -10**30)))
+                         q["start_mint"],
+                         -q.get("estimated_gross_base_units", -(10**30)),
+                         q["input_base_units"]))
     return {"status":"PARTIAL" if fee_errors else "COMPLETE",
         "validated_pools":len(pools),"cycles_discovered":len(graph),
         "screened_size_routes":len(rankings),
@@ -135,7 +141,9 @@ def scan(rpc,entries,amounts=(100000,1000000),max_slot_spread=8):
         "missing_slot_routes":sum(x.get("reason")=="missing verified pool slot" for x in rankings),
         "max_pool_slot_spread":max_slot_spread,
         "unquotable_routes":sum(x["status"]=="UNQUOTABLE" for x in rankings),
-        "candidate_rankings":rankings[:100],"quote_gap_priorities":quote_gap_priorities,"fee_errors":fee_errors,
+        "candidate_rankings":rankings[:100],
+        "indicative_positive_gross_count":sum(x["status"]=="INDICATIVE_ONLY" and x.get("estimated_gross_base_units",0)>0 for x in rankings),
+        "quote_gap_priorities":quote_gap_priorities,"fee_errors":fee_errors,
         "actionable_opportunities":0,"confirmed_profitable":0,
         "note":"No actionable ranking until all legs have native verified quotes, execution simulation and net fees."}
 
