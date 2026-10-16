@@ -37,6 +37,8 @@ def probe(rpc, pool, amount=1000000):
         return {'status': 'QUOTE_UNAVAILABLE', 'reason': str(exc)[:180],
                 'quote_verified': False, 'actionable': False}
     return {'status': 'COMPARED', 'comparison': compared,
+            'ticks_crossed': quote['ticks_crossed'],
+            'tick_arrays_examined': quote['tick_arrays_examined'],
             'quote_verified': compared['status'] == 'MATCH',
             'actionable': False, 'confirmed_profitable': False}
 
@@ -45,7 +47,7 @@ def main():
     rpc = os.environ.get('SOLANA_RPC_URL', 'http://127.0.0.1:8899')
     with open('arb/whirlpool_pools.json') as file:
         pools = json.load(file)['pools']
-    sizes = (100000, 1000000, 5000000)
+    sizes = (100000, 1000000, 5000000, 20000000, 50000000)
     results = []
     for pool in pools:
         for amount in sizes:
@@ -56,6 +58,9 @@ def main():
               'tested_input_base_units': list(sizes),
               'exact_matches': sum(r.get('comparison', {}).get('status') == 'MATCH' for r in results),
               'mismatches': sum(r.get('comparison', {}).get('status') == 'MISMATCH' for r in results),
+              'matched_tick_crossing_quotes': sum(r.get('comparison', {}).get('status') == 'MATCH' and r.get('ticks_crossed', 0) > 0 for r in results),
+              'unavailable_quotes': sum(r.get('status') == 'QUOTE_UNAVAILABLE' for r in results),
+              'unavailable_simulations': sum(r.get('status') == 'SIMULATION_UNAVAILABLE' for r in results),
               'results': results, 'executable_quotes_verified': 0,
               'confirmed_profitable': 0}
     print(json.dumps(report, indent=2))
