@@ -21,6 +21,7 @@ def probe(rpc,pool,amount=100000):
     from solders.keypair import Keypair
     from solders.hash import Hash
     from solders.transaction import Transaction
+    from solders.instruction import Instruction,AccountMeta
     wallet=Keypair()
     state=read(rpc,pool)["state"]
     owner=wallet.pubkey()
@@ -45,10 +46,20 @@ def probe(rpc,pool,amount=100000):
     start=start_tick(state["tick_current"],state["tick_spacing"])
     arrays=[tick_array_pda(pool,start),tick_array_pda(pool,start-step)]
     blockhash=call(rpc,"getLatestBlockhash")["value"]["blockhash"]
+    def create_ata(address,mint):
+        # Idempotent ATA creation, included in the signed simulation only.
+        keys=[(owner,True,True),(Pubkey.from_string(address),False,True),
+              (owner,False,False),(Pubkey.from_string(mint),False,False),
+              (Pubkey.from_string("11111111111111111111111111111111"),False,False),
+              (token_program,False,False)]
+        return Instruction(ata_program,bytes([1]),
+            [AccountMeta(key,signer,writable) for key,signer,writable in keys])
+    setup=[create_ata(input_ata,state["token_mint_0"]),
+           create_ata(output_ata,state["token_mint_1"])]
     instruction=build(pool,state,str(owner),input_ata,output_ata,
                       amount,1,arrays,input_is_token_0=True)
     wire=bytes(Transaction.new_signed_with_payer(
-        [instruction],owner,[wallet],Hash.from_string(blockhash)))
+        [*setup,instruction],owner,[wallet],Hash.from_string(blockhash)))
     import base64
     result=call(rpc,"simulateTransaction",[
         base64.b64encode(wire).decode("ascii"),
@@ -61,6 +72,7 @@ def probe(rpc,pool,amount=100000):
             "logs_tail":logs[-8:] if isinstance(logs,list) else [],
             "signed":True,"local_only":True,"broadcast":False,
             "fee_payer_funded_on_fork":True,
+            "ata_creation_in_simulated_transaction":True,
             "token_account_funding_verified":False,
             "post_swap_balances_verified":False,
             "executable_route_verified":False,"profitable_arbitrage_verified":False}
