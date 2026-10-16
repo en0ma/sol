@@ -55,13 +55,15 @@ def decode(raw):
 
 def verify(rpc, address, state):
     from arb.pumpswap_global_config import ADDRESS as CONFIG_ADDRESS, decode as decode_config
-    keys = [address, state["base_vault"], state["quote_vault"], CONFIG_ADDRESS]
+    from arb.pumpswap_fee_account import authenticated_address, decode_authenticated
+    fee_address,_ = authenticated_address()
+    keys = [address, state["base_vault"], state["quote_vault"], CONFIG_ADDRESS, fee_address]
     resp = call(rpc, "getMultipleAccounts", [keys, {
         "encoding": "base64", "commitment": "confirmed"}])
     accounts = resp.get("value")
     slot = resp.get("context", {}).get("slot")
     if (type(slot) is not int or slot < 0 or not isinstance(accounts, list)
-            or len(accounts) != 4):
+            or len(accounts) != 5):
         raise ValueError("incomplete PumpSwap account snapshot")
     pool = accounts[0]
     if (not pool or pool.get("owner") != PROGRAM or pool.get("executable")
@@ -73,6 +75,7 @@ def verify(rpc, address, state):
             or config_account.get("data", [None,None])[1] != "base64"):
         raise ValueError("PumpSwap GlobalConfig missing from same-slot snapshot")
     config = decode_config(base64.b64decode(config_account["data"][0],validate=True))
+    fee_config = decode_authenticated(accounts[4], address=fee_address)
     balances = []
     for account, mint in zip(accounts[1:], (state["base_mint"], state["quote_mint"])):
         if not account or account.get("owner") != TOKEN_PROGRAM or account.get("executable"):
@@ -93,6 +96,6 @@ def verify(rpc, address, state):
             "slot": slot, "creator_fee_bps": state["creator_fee_bps"],
             "protocol_fees_accrued": state["protocol_fees"],
             "creator_fees_accrued": state["creator_fees"],
-            "global_config": config,
+            "global_config": config, "fee_config": fee_config,
             "effective_fee_verified": False, "fee_verified_onchain": False,
             "actionable": False, "executable_quote": False}
