@@ -8,7 +8,8 @@ class PumpSwapResolverTests(unittest.TestCase):
         return {"verified":True,"canonical_pool_verified":True,
                 "address":"pool","base_mint":"base","quote_mint":"quote",
                 "base_vault":"base_vault","quote_vault":"quote_vault",
-                "coin_creator":"creator"}
+                "coin_creator":"creator",
+                "global_config":{"protocol_fee_recipients":["recipient"]}}
 
     def test_unverified_pool_fails_before_derivation(self):
         pool=self.pool()
@@ -25,3 +26,7 @@ class PumpSwapResolverTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"classic SPL"):
             resolve(self.pool(),"user","userbase","userquote","recipient",
                     quote_token_program="some-other-program")
+
+    def test_unlisted_fee_recipient_fails_before_derivation(self):
+        with self.assertRaisesRegex(ValueError,"recipient not present"):
+            resolve(self.pool(),"user","userbase","userquote","other-recipient")
