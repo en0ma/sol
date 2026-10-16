@@ -107,7 +107,8 @@ def scan(rpc,entries,amounts=(100000,1000000),max_slot_spread=8,extra_entries=()
     validation=refresh(rpc,merged)
     if validation["rejected"]:raise ValueError("pool registry validation incomplete")
     pools=validation["verified_pools"]
-    graph=cycles(pools,anchors={mint for p in pools for mint in p["mints"]})
+    graph=(cycles(pools,anchors={mint for p in pools for mint in p["mints"]})
+           if pools else [])
     pool_index={(p["venue"],p["address"]):p for p in pools}
     fees={}
     fee_errors=[]
