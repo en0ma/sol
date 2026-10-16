@@ -1,5 +1,5 @@
 import unittest
-from arb.orca_spot_quote import quote_single_tick,quote_bounded_single_tick,Q
+from arb.orca_spot_quote import quote_single_tick,quote_bounded_single_tick,maximum_bounded_input,Q
 class WhirlpoolSpotQuoteTests(unittest.TestCase):
     def state(self):
         return {"token_mint_a":"a","token_mint_b":"b",
@@ -37,3 +37,29 @@ class WhirlpoolSpotQuoteTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             quote_bounded_single_tick(state,"a",1000000,
                 lower_sqrt_x64="1",upper_sqrt_x64=Q+100000000)
+
+    def test_find_largest_bounded_trade_by_direction(self):
+        for mint in ("a","b"):
+            with self.subTest(mint=mint):
+                result=maximum_bounded_input(self.state(),mint,
+                    lower_sqrt_x64=Q-100000000000,
+                    upper_sqrt_x64=Q+100000000000,max_input=1000000)
+                self.assertEqual(result["status"],"INDICATIVE_SIZE_BOUND")
+                self.assertFalse(result["actionable"])
+                self.assertFalse(result["executable_quote"])
+                self.assertLess(result["max_tested_input_base_units"],1000000)
+                self.assertLessEqual(result["probes"],64)
+                self.assertTrue(result["search_converged"])
+
+    def test_whole_budget_can_be_bounded(self):
+        result=maximum_bounded_input(self.state(),"a",
+            lower_sqrt_x64=Q-100000000000000,
+            upper_sqrt_x64=Q+100000000000000,max_input=1000000)
+        self.assertEqual(result["max_tested_input_base_units"],1000000)
+
+    def test_invalid_budget_fails_closed(self):
+        for budget in (0,True,1<<64):
+            with self.assertRaises(ValueError):
+                maximum_bounded_input(self.state(),"a",
+                    lower_sqrt_x64=Q-100000000000000,
+                    upper_sqrt_x64=Q+100000000000000,max_input=budget)
