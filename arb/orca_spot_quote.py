@@ -56,3 +56,64 @@ def quote_bounded_single_tick(state, mint_in, amount_in, *, lower_sqrt_x64, uppe
     return {**q, "supplied_tick_boundary_checked":True,
             "status":"INDICATIVE_WITHIN_SUPPLIED_TICK",
             "actionable":False,"executable_quote":False}
+
+def maximum_bounded_input(state, mint_in, *, lower_sqrt_x64, upper_sqrt_x64,
+                          max_input, iterations=64):
+    """Search a bounded integer size range for a strictly in-tick indicative quote.
+
+    Feasible amounts must be monotone for the constant-liquidity model.
+    Exact boundary hits are rejected. Neither these bounds nor quote outputs
+    are independently verified by this search; no execution is authorized.
+    """
+    if type(max_input) is not int or not 0<max_input<1<<64:
+        raise ValueError("invalid maximum input budget")
+    if type(iterations) is not int or not 1<=iterations<=64:
+        raise ValueError("invalid search budget")
+    if type(lower_sqrt_x64) is not int or type(upper_sqrt_x64) is not int:
+        raise ValueError("invalid tick boundary types")
+    p=int(state["sqrt_price_x64"])
+    if not 0<lower_sqrt_x64<=p<upper_sqrt_x64:
+        raise ValueError("invalid current tick bounds")
+    # Validate mint, fee, and liquidity even if the smallest amount is dust.
+    if mint_in not in (state["token_mint_a"],state["token_mint_b"]):
+        raise ValueError("input mint missing from pool")
+    if int(state["liquidity"])<=0 or type(state["fee_rate_hundredths_bps"]) is not int or not 0<=state["fee_rate_hundredths_bps"]<FEE_DENOM:
+        raise ValueError("invalid pool liquidity or fee")
+
+    lo,hi=0,max_input
+    best=None
+    probes=0
+    while lo<hi and probes<iterations:
+        middle=(lo+hi+1)//2
+        probes+=1
+        try:
+            quote=quote_bounded_single_tick(
+                state,mint_in,middle,
+                lower_sqrt_x64=lower_sqrt_x64,
+                upper_sqrt_x64=upper_sqrt_x64)
+        except ValueError as exc:
+            # Only price/dust limitations imply a smaller trade may work.
+            if str(exc) not in ("quote would reach or cross a tick boundary",
+                                "dust quote","amount eaten by fees"):
+                raise
+            if str(exc) in ("dust quote","amount eaten by fees"):
+                # Dust means this amount is too small; it is not a safe upper bound.
+                lo=middle
+                continue
+            hi=middle-1
+        else:
+            lo=middle
+            best=quote
+    # Recheck the final tested amount rather than treating convergence as proof.
+    if lo>0:
+        try:
+            best=quote_bounded_single_tick(
+                state,mint_in,lo,lower_sqrt_x64=lower_sqrt_x64,
+                upper_sqrt_x64=upper_sqrt_x64)
+        except ValueError:
+            best=None
+    return {"status":"INDICATIVE_SIZE_BOUND" if best else "NO_BOUNDED_QUOTE",
+            "max_tested_input_base_units":lo if best else None,
+            "quote":best,"probes":probes,
+            "search_converged":lo==hi,
+            "actionable":False,"executable_quote":False}
