@@ -97,3 +97,37 @@ class DirectionalTickObservationTests(unittest.TestCase):
             directional_tick_observation([],0,8,"other")
         with self.assertRaises(ValueError):
             directional_tick_observation([{"start_tick":0},{"start_tick":0}],0,8,"a_to_b")
+
+
+class DynamicArrayDecodeTests(unittest.TestCase):
+    def fixture(self,initialized=(3,7)):
+        from arb.whirlpool_ticks import DYNAMIC_DISC
+        raw=bytearray(DYNAMIC_DISC)
+        raw+=(0).to_bytes(4,"little",signed=True)
+        raw+=bytes([2])*32
+        raw+=sum(1<<i for i in initialized).to_bytes(16,"little")
+        for i in range(88):
+            raw.append(1 if i in initialized else 0)
+            if i in initialized:
+                raw+=(10).to_bytes(16,"little",signed=True)
+                raw+=(100).to_bytes(16,"little")
+                raw+=bytes(80)
+        return bytes(raw)
+
+    @patch("arb.whirlpool_ticks.b58",return_value="expected-pool")
+    def test_bitmap_and_initialized_ticks(self,_):
+        from arb.whirlpool_ticks import decode_dynamic_ticks
+        ticks=decode_dynamic_ticks(self.fixture(),"expected-pool",0,4)
+        self.assertEqual([t["tick_index"] for t in ticks],[12,28])
+        self.assertEqual([t["liquidity_net"] for t in ticks],["10","10"])
+
+    @patch("arb.whirlpool_ticks.b58",return_value="expected-pool")
+    def test_empty_and_corrupt_dynamic_arrays(self,_):
+        from arb.whirlpool_ticks import decode_dynamic_ticks
+        self.assertEqual(decode_dynamic_ticks(self.fixture(()),"expected-pool",0,4),[])
+        original=self.fixture()
+        mutated=bytearray(original)
+        mutated[60+3]=0
+        for broken in (original[:-1],bytes(mutated),original+b"\\x00"):
+            with self.assertRaises(ValueError):
+                decode_dynamic_ticks(broken,"expected-pool",0,4)
