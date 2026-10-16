@@ -112,3 +112,27 @@ class MultitickIndicativeTests(unittest.TestCase):
             {"start_tick": 88, "status": "MISSING"}]
         with self.assertRaisesRegex(ValueError, "missing tick coverage"):
             quote_from_decoded_arrays(state, "b", 10000000000, arrays)
+
+    def test_empty_verified_array_quotes_only_within_current_array(self):
+        state={**self.state(),"tick_spacing":1}
+        arrays=[{"start_tick":0,"status":"FIXED_VALID","ticks":[]}]
+        for mint in ("a","b"):
+            with self.subTest(mint=mint):
+                q=quote_from_decoded_arrays(state,mint,100000,arrays)
+                self.assertEqual(q["ticks_crossed"],0)
+                self.assertEqual(q["source"],"VERIFIED_CURRENT_ARRAY_NO_INITIALIZED_TICKS")
+                self.assertGreater(q["estimated_output_base_units"],0)
+                self.assertFalse(q["actionable"])
+                self.assertFalse(q["executable_quote"])
+
+    def test_empty_array_cannot_quote_across_its_boundary(self):
+        state={**self.state(),"tick_spacing":1}
+        arrays=[{"start_tick":0,"status":"FIXED_VALID","ticks":[]}]
+        with self.assertRaisesRegex(ValueError,"crossing budget exceeded"):
+            quote_from_decoded_arrays(state,"a",100000000000,arrays)
+
+    def test_missing_empty_array_is_never_assumed(self):
+        state={**self.state(),"tick_spacing":1}
+        with self.assertRaisesRegex(ValueError,"missing or unsupported"):
+            quote_from_decoded_arrays(state,"a",100000,
+                [{"start_tick":0,"status":"MISSING"}])
