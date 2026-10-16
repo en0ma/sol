@@ -61,6 +61,6 @@ class PumpSwapPoolTests(unittest.TestCase):
         call.return_value={"context":{"slot":123},"value":[None,None,None,None]}
         with self.assertRaisesRegex(ValueError,"owner or state"):
             verify("rpc","pool",state)
-        self.assertEqual(len(call.call_args.args[2][1][0]),4)
+        self.assertEqual(len(call.call_args.args[2][0]),4)
         from arb.pumpswap_global_config import ADDRESS
         self.assertEqual(call.call_args.args[2][1][0][-1],ADDRESS)
