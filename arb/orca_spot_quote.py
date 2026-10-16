@@ -104,6 +104,13 @@ def maximum_bounded_input(state, mint_in, *, lower_sqrt_x64, upper_sqrt_x64,
         else:
             lo=middle
             best=quote
+    # Never describe a partial search as a maximum. With dust at the lower
+    # bound, the feasible interval is not a simple true-then-false predicate;
+    # the maximum is therefore unknown until feasibility is established.
+    if lo!=hi:
+        return {"status":"INCOMPLETE_SIZE_SEARCH","max_tested_input_base_units":None,
+                "quote":None,"probes":probes,"search_converged":False,
+                "actionable":False,"executable_quote":False}
     # Recheck the final tested amount rather than treating convergence as proof.
     if lo>0:
         try:
