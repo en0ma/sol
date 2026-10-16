@@ -106,21 +106,29 @@ def verify(rpc,venue,address,state):
 
 def discover(rpc,pairs,limit=8,pace_seconds=0):
     results=[];errors=[]
+    upstream_rate_limited=False
     for a,b in pairs:
         for venue in VENUES:
+            if upstream_rate_limited:break
             try:
                 found=search_pair(rpc,venue,a,b,limit,pace_seconds=pace_seconds)
                 for address,state in found.items():
                     try:results.append(verify(rpc,venue,address,state))
                     except ValueError as exc:errors.append({"venue":venue,"address":address,"error":str(exc)})
             except Exception as exc:
-                errors.append({"venue":venue,"pair":[a,b],"error":type(exc).__name__+": "+str(exc)[:250]})
+                message=type(exc).__name__+": "+str(exc)[:250]
+                errors.append({"venue":venue,"pair":[a,b],"error":message})
+                # Surfpool may proxy GPA reads to a globally rate-limited provider.
+                # Stop the scan instead of hammering it with another 20+ requests.
+                if "429" in message or "too many requests" in message.lower():
+                    upstream_rate_limited=True
     by_pair={}
     for pool in results:
         key=tuple(sorted(pool["mints"]))
         by_pair.setdefault(key,set()).add(pool["venue"])
     shared=[{"mints":list(k),"venues":sorted(v)} for k,v in by_pair.items() if len(v)>1]
-    return {"status":"COMPLETE" if not errors else "PARTIAL",
+    return {"status":("UPSTREAM_RATE_LIMITED" if upstream_rate_limited else
+                      "COMPLETE" if not errors else "PARTIAL"),
             "pools_verified":len(results),"shared_pairs":shared,
             "pools":results,"errors":errors,
             "route_simulated":False,"profitable_opportunities_confirmed":0}
