@@ -128,7 +128,9 @@ class MultitickIndicativeTests(unittest.TestCase):
                 self.assertFalse(q["executable_quote"])
 
     def test_empty_array_cannot_quote_across_its_boundary(self):
-        state={**self.state(),"tick_spacing":1}
+        from arb.orca_tick_math import sqrt_price_from_tick_index
+        state={**self.state(),"tick_spacing":1,
+               "sqrt_price_x64":str(sqrt_price_from_tick_index(15))}
         arrays=[{"start_tick":0,"status":"FIXED_VALID","ticks":[]}]
         with self.assertRaisesRegex(ValueError,"crossing budget exceeded"):
             quote_from_decoded_arrays(state,"a",100000000000,arrays)
