@@ -42,6 +42,21 @@ def probe(rpc,pool,amount=100000):
             ata_program)[0])
     input_ata=ata(state["token_mint_0"])
     output_ata=ata(state["token_mint_1"])
+    # Surfpool-only cheatcode creates and funds the owner's canonical ATA.
+    # The amount is synthetic local test liquidity, never a mainnet balance.
+    call(rpc,"surfnet_setTokenAccount",[
+        str(owner),state["token_mint_0"],
+        {"amount":amount*10,"state":"initialized"},TOKEN_PROGRAM])
+    from arb.token_vaults import decode_token_account
+    import base64
+    account=call(rpc,"getAccountInfo",[
+        input_ata,{"encoding":"base64","commitment":"processed"}])["value"]
+    if not account or account.get("owner")!=TOKEN_PROGRAM:
+        raise ValueError("Surfpool-funded input ATA unavailable")
+    token=decode_token_account(base64.b64decode(account["data"][0],validate=True))
+    if (token["mint"]!=state["token_mint_0"] or
+            token["authority"]!=str(owner) or token["amount_base_units"]<amount):
+        raise ValueError("Surfpool synthetic token funding failed verification")
     step=60*state["tick_spacing"]
     start=start_tick(state["tick_current"],state["tick_spacing"])
     arrays=[tick_array_pda(pool,start),tick_array_pda(pool,start-step)]
@@ -54,8 +69,7 @@ def probe(rpc,pool,amount=100000):
               (token_program,False,False)]
         return Instruction(ata_program,bytes([1]),
             [AccountMeta(key,signer,writable) for key,signer,writable in keys])
-    setup=[create_ata(input_ata,state["token_mint_0"]),
-           create_ata(output_ata,state["token_mint_1"])]
+    setup=[create_ata(output_ata,state["token_mint_1"])]
     instruction=build(pool,state,str(owner),input_ata,output_ata,
                       amount,1,arrays,input_is_token_0=True)
     wire=bytes(Transaction.new_signed_with_payer(
@@ -73,7 +87,8 @@ def probe(rpc,pool,amount=100000):
             "signed":True,"local_only":True,"broadcast":False,
             "fee_payer_funded_on_fork":True,
             "ata_creation_in_simulated_transaction":True,
-            "token_account_funding_verified":False,
+            "token_account_funding_verified":True,
+            "synthetic_local_input_tokens":True,
             "post_swap_balances_verified":False,
             "executable_route_verified":False,"profitable_arbitrage_verified":False}
 
