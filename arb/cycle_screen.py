@@ -282,6 +282,17 @@ def scan(rpc,entries,amounts=(100000,1000000),max_slot_spread=8,extra_entries=()
         "indicative_positive_gross_count":sum(x["status"]=="INDICATIVE_ONLY" and x.get("estimated_gross_base_units",0)>0 for x in rankings),
         "orca_tick_snapshots":len(orca_evidence),
         "orca_array_gap_evidence":orca_array_gaps,
+        "positive_gross_candidates":[
+            {"start_mint":x["start_mint"],"input_base_units":x["input_base_units"],
+             "hops":x["hops"],"gross_base_units":x["estimated_gross_base_units"],
+             "route_legs":x["route_legs"],
+             "signature_fee_reference_applicable":x["start_mint"]==WSOL,
+             "exceeds_signature_fee_reference":(
+                 x["estimated_gross_base_units"]>signature_fee_reference_lamports
+                 if x["start_mint"]==WSOL else None),
+             "simulation_verified":False,"actionable":False}
+            for x in rankings if x["status"]=="INDICATIVE_ONLY"
+                and x.get("estimated_gross_base_units",0)>0],
         "wsol_positive_gross_routes":len(wsol_gross_positive),
         "reference_signature_fee_lamports":signature_fee_reference_lamports,
         "wsol_positive_gross_not_exceeding_reference_fee":wsol_below_signature_fee,
