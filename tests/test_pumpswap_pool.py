@@ -54,3 +54,13 @@ class PumpSwapPoolTests(unittest.TestCase):
         raw.extend((10001).to_bytes(8,"little"))
         with self.assertRaisesRegex(ValueError,"invalid PumpSwap Pool fields"):
             decode(bytes(raw))
+
+    @patch("arb.pumpswap_pool.call")
+    def test_same_snapshot_includes_global_fee_account(self, call):
+        state=decode(raw_pool())
+        call.return_value={"context":{"slot":123},"value":[None,None,None,None]}
+        with self.assertRaisesRegex(ValueError,"owner or state"):
+            verify("rpc","pool",state)
+        self.assertEqual(len(call.call_args.args[2][1][0]),4)
+        from arb.pumpswap_global_config import ADDRESS
+        self.assertEqual(call.call_args.args[2][1][0][-1],ADDRESS)
