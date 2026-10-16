@@ -19,3 +19,24 @@ class OrcaQuoteProbeTests(unittest.TestCase):
     def test_nonlocal_rpc_is_rejected(self):
         with self.assertRaisesRegex(ValueError,"loopback"):
             probe("https://api.mainnet-beta.solana.com","pool")
+
+    @patch("arb.orca_quote_probe.probe")
+    @patch("arb.orca_quote_probe.json.load")
+    def test_report_separates_pool_and_amount_coverage(self, load, probe_mock):
+        from arb.orca_quote_probe import main
+        from unittest.mock import mock_open
+        import io
+        from contextlib import redirect_stdout
+        load.return_value={"pools":[{"address":"sample-pool"}]}
+        probe_mock.return_value={"status":"QUOTE_UNAVAILABLE","quote_verified":False}
+        output=io.StringIO()
+        with patch("builtins.open", mock_open()), redirect_stdout(output):
+            self.assertEqual(main(),0)
+        import json
+        report=json.loads(output.getvalue())
+        self.assertEqual(report["attempted_pools"],1)
+        self.assertEqual(report["attempted_pool_sizes"],3)
+        self.assertEqual(report["status"],"NO_COMPARABLE_QUOTE")
+        self.assertEqual(report["exact_matches"],0)
+        self.assertEqual([call.args[2] if len(call.args)>2 else call.kwargs.get("amount")
+                          for call in probe_mock.call_args_list], [100000,1000000,5000000])
