@@ -183,6 +183,19 @@ def scan(rpc,entries,amounts=(100000,1000000),max_slot_spread=8,extra_entries=()
             rankings.append({"start_mint":route["start_mint"],"hops":route["hops"],
                 "route_legs":[dict(leg) for leg in route["legs"]],
                 "venues":route["venues"],"input_base_units":amount,**q})
+    # Quote blockers reflect actual attempted sizes, not static venue labels.
+    # A verified Orca tick snapshot can quote a leg in one route direction and
+    # fail in another; raw unsupported-venue totals overstate the remaining gap.
+    actual_blockers={}
+    for result in rankings:
+        venue=result.get("missing_quote_venue")
+        if result.get("status")!="UNQUOTABLE" or not isinstance(venue,str):
+            continue
+        entry=actual_blockers.setdefault(venue,{"unquotable_size_routes":0,
+            "reasons":{}})
+        entry["unquotable_size_routes"]+=1
+        reason=result.get("reason","unknown")
+        entry["reasons"][reason]=entry["reasons"].get(reason,0)+1
     # Preserve executable route identity for downstream simulation candidates.
     # Sort only comparable base units: never rank one starting mint against
     # another as if their raw integer denominations were interchangeable.
@@ -201,6 +214,7 @@ def scan(rpc,entries,amounts=(100000,1000000),max_slot_spread=8,extra_entries=()
         "candidate_rankings":rankings[:100],
         "indicative_positive_gross_count":sum(x["status"]=="INDICATIVE_ONLY" and x.get("estimated_gross_base_units",0)>0 for x in rankings),
         "orca_tick_snapshots":len(orca_evidence),
+        "actual_quote_blockers":actual_blockers,
         "quote_gap_priorities":quote_gap_priorities,"fee_errors":fee_errors,
         "actionable_opportunities":0,"confirmed_profitable":0,
         "note":"No actionable ranking until all legs have native verified quotes, execution simulation and net fees."}
