@@ -103,6 +103,13 @@ def verify(rpc, address, state):
         raise ValueError("PumpSwap accrued fees exceed quote vault")
     if min(balances) <= 0 or balances[1] + state["virtual_quote_reserves"] <= 0:
         raise ValueError("empty or invalid effective PumpSwap liquidity")
+    from arb.pumpswap_fee_tiers import select_fee_tier
+    # The documented standard schedule alone cannot classify stable/exotic pools.
+    # Keep effective fee mode unverified even when a candidate tier is derived.
+    fee_candidate = select_fee_tier(fee_config,
+        canonical=canonical["canonical"], base_mint_supply=base_supply,
+        base_reserve=balances[0],
+        quote_reserve=balances[1] + state["virtual_quote_reserves"])
     return {"venue": "pumpswap", "address": address, "verified": True,
             "base_mint": state["base_mint"], "quote_mint": state["quote_mint"],
             "base_reserve": balances[0], "quote_vault_balance": balances[1],
@@ -112,6 +119,7 @@ def verify(rpc, address, state):
             "protocol_fees_accrued": state["protocol_fees"],
             "creator_fees_accrued": state["creator_fees"],
             "global_config": config, "fee_config": fee_config,
+            "fee_tier_candidate": fee_candidate,
             "canonical": canonical["canonical"],
             "canonical_pool_verified": canonical["canonical_pool_verified"],
             "fee_mode_verified": False,
