@@ -111,4 +111,4 @@ class MultitickIndicativeTests(unittest.TestCase):
              "ticks": [{"tick_index": 10, "liquidity_net": "0"}]},
             {"start_tick": 88, "status": "MISSING"}]
         with self.assertRaisesRegex(ValueError, "missing tick coverage"):
-            quote_from_decoded_arrays(state, "b", 100000000, arrays)
+            quote_from_decoded_arrays(state, "b", 10000000000, arrays)
