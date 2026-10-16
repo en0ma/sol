@@ -93,7 +93,7 @@ def run(rpc, pool_address, input_amount=1000000):
     from solders.hash import Hash
     from solders.transaction import Transaction
     payer, acct_a, acct_b=Keypair(),Keypair(),Keypair()
-    if not isinstance(input_amount,int) or input_amount<=0 or input_amount>100000000:
+    if type(input_amount) is not int or input_amount<=0 or input_amount>600000000:
         raise ValueError("unsafe input amount")
     funded=call(rpc,"requestAirdrop",[str(payer.pubkey()),1000000000])
     if not isinstance(funded,str): raise RuntimeError("Surfpool local airdrop not accepted")
