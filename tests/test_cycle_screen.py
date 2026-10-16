@@ -118,3 +118,34 @@ class CycleScreenTests(unittest.TestCase):
             {"venue":"orca","address":"known"},
             {"venue":"raydium_cpmm","address":"candidate"}])
         self.assertEqual(result["actionable_opportunities"],0)
+
+    @patch("arb.orca_multitick_quote.quote_from_decoded_arrays")
+    def test_orca_leg_uses_amount_aware_tick_quote_but_not_executable(self,quote):
+        route={"start_mint":"SOL","legs":[
+            {"venue":"orca","pool":"whirlpool","input":"SOL","output":"USDC"},
+            {"venue":"raydium_cpmm","pool":"cpmm","input":"USDC","output":"SOL"}]}
+        indexed={
+          ("orca","whirlpool"):{"verified":True,"slot":100},
+          ("raydium_cpmm","cpmm"):{
+              **self.pool("cpmm",[1000000,2000000]),"slot":100}}
+        cfg={("raydium_cpmm","cpmm"):{"fee_verified_onchain":True,
+                "trade_fee_rate_ppm":2500,"creator_fee_rate_ppm":500}}
+        quote.return_value={"mint_out":"USDC","amount_in":1000,
+                            "estimated_output_base_units":2000,"ticks_crossed":1}
+        q=score_cycle(route,indexed,cfg,1000,max_slot_spread=0,
+                      orca_evidence={("orca","whirlpool"):{"verified":True,
+                           "state":{"token_mint_a":"SOL","token_mint_b":"USDC"},
+                           "arrays":[{"status":"FIXED_VALID"}]}})
+        quote.assert_called_once()
+        self.assertEqual(q["status"],"INDICATIVE_ONLY")
+        self.assertEqual(q["legs_quoted"],2)
+        self.assertFalse(q["actionable"])
+        self.assertEqual(q["legs"][0]["ticks_crossed"],1)
+
+    def test_missing_orca_tick_coverage_remains_unquotable(self):
+        route={"start_mint":"SOL","legs":[
+            {"venue":"orca","pool":"whirlpool","input":"SOL","output":"USDC"},
+            {"venue":"raydium_cpmm","pool":"cpmm","input":"USDC","output":"SOL"}]}
+        r=score_cycle(route,{("orca","whirlpool"):{"verified":True}}, {},1000)
+        self.assertEqual(r["status"],"UNQUOTABLE")
+        self.assertEqual(r["missing_quote_venue"],"orca")
