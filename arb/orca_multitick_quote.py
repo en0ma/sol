@@ -113,7 +113,7 @@ def quote_multitick(state, mint_in, amount_in, ticks, *, max_crossings=12):
             'simulation_verified': False}
 
 
-def quote_from_decoded_arrays(state, mint_in, amount_in, arrays, sqrt_price_at_tick,
+def quote_from_decoded_arrays(state, mint_in, amount_in, arrays, sqrt_price_at_tick=None,
                               *, max_crossings=12):
     """Bridge validated tick observations to the indicative multi-tick model.
 
@@ -123,6 +123,9 @@ def quote_from_decoded_arrays(state, mint_in, amount_in, arrays, sqrt_price_at_t
     implied by providing a callback, and the result is never executable.
     """
     from arb.whirlpool_ticks import ARRAY_TICKS, start_tick
+    if sqrt_price_at_tick is None:
+        from arb.orca_tick_math import sqrt_price_from_tick_index
+        sqrt_price_at_tick = sqrt_price_from_tick_index
     if not callable(sqrt_price_at_tick):
         raise ValueError("missing tick price converter")
     if not isinstance(arrays, list) or not 1 <= len(arrays) <= 5:
@@ -178,5 +181,5 @@ def quote_from_decoded_arrays(state, mint_in, amount_in, arrays, sqrt_price_at_t
     result = quote_multitick(state, mint_in, amount_in, ticks,
                              max_crossings=max_crossings)
     return {**result, "tick_arrays_examined": covered,
-            "source": "CALLER_VERIFIED_ARRAYS_AND_TICK_MATH",
+            "source": "SUPPLIED_ARRAYS_AND_REFERENCE_TICK_MATH",
             "actionable": False, "executable_quote": False}
