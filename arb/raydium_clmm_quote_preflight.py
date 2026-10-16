@@ -58,5 +58,6 @@ def inspect_authenticated(rpc,pool,zero_for_one):
         "direction":"zero_for_one" if zero_for_one else "one_for_zero",
         "current_array":keys[0],"initialized_ticks":len(ticks),
         "boundary_tick":boundary_tick,"boundary_sqrt_x64":boundary_sqrt,
-        "quote_available":boundary_sqrt is not None,
+        "boundary_observed":boundary_sqrt is not None,
+        "quote_available":False,
         "simulation_verified":False,"actionable":False}
