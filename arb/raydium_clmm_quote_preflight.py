@@ -45,8 +45,18 @@ def inspect_authenticated(rpc,pool,zero_for_one):
             b58(raw_tick[8:40])!=pool or
             int.from_bytes(raw_tick[40:44],"little",signed=True)!=start):
         raise ValueError("unauthenticated current CLMM tick array")
+    from arb.raydium_clmm_tick_decode import initialized_ticks,next_boundary
+    from arb.orca_tick_math import sqrt_price_from_tick_index
+    ticks=initialized_ticks(raw_tick,start,state["tick_spacing"])
+    try:
+        boundary_tick=next_boundary(ticks,state["tick_current"],zero_for_one)
+        boundary_sqrt=sqrt_price_from_tick_index(boundary_tick)
+    except ValueError:
+        boundary_tick=boundary_sqrt=None
     return {"status":"FEE_AND_CURRENT_ARRAY_AUTHENTICATED",
         "pool":pool,"slot":slot,"fee_rate_ppm":fee["trade_fee_rate_ppm"],
         "direction":"zero_for_one" if zero_for_one else "one_for_zero",
-        "current_array":keys[0],"quote_available":False,
+        "current_array":keys[0],"initialized_ticks":len(ticks),
+        "boundary_tick":boundary_tick,"boundary_sqrt_x64":boundary_sqrt,
+        "quote_available":boundary_sqrt is not None,
         "simulation_verified":False,"actionable":False}
