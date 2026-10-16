@@ -45,7 +45,18 @@ def main():
     rpc = os.environ.get('SOLANA_RPC_URL', 'http://127.0.0.1:8899')
     with open('arb/whirlpool_pools.json') as file:
         pools = json.load(file)['pools']
-    print(json.dumps([probe(rpc, pool['address']) for pool in pools], indent=2))
+    results = [probe(rpc, pool['address']) for pool in pools]
+    report = {'status': 'COMPARED' if any(r.get('status') == 'COMPARED' for r in results) else 'NO_COMPARABLE_QUOTE',
+              'attempted_pools': len(results),
+              'exact_matches': sum(r.get('comparison', {}).get('status') == 'MATCH' for r in results),
+              'mismatches': sum(r.get('comparison', {}).get('status') == 'MISMATCH' for r in results),
+              'results': results, 'executable_quotes_verified': 0,
+              'confirmed_profitable': 0}
+    print(json.dumps(report, indent=2))
+    destination = os.environ.get('ORCA_QUOTE_COMPARISON_REPORT')
+    if destination:
+        with open(destination, 'w') as file:
+            json.dump(report, file, indent=2)
     return 0
 
 
