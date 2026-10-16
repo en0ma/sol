@@ -185,7 +185,7 @@ def inspect(rpc, pool_address):
     observed=nearest_observed_ticks(out,state["tick_current_index"],spacing)
     directions={d:directional_tick_observation(out,state["tick_current_index"],spacing,d)
                 for d in ("a_to_b","b_to_a")}
-    return {"pool":pool_address,"pool_tick":state["tick_current_index"],
+    return {"pool":pool_address,"pool_state":state,"pool_tick":state["tick_current_index"],
             "observed_tick_coverage":observed,"directional_observations":directions,
             "slot":resp.get("context",{}).get("slot"),"arrays":out,
             "swap_ready":False}
