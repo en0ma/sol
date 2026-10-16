@@ -181,6 +181,9 @@ def inspect(rpc, pool_address):
                     (t["tick_index"] for t in ticks if t["tick_index"]>state["tick_current_index"]),default=None)
             else:
                 entry["status"]="UNSUPPORTED_LAYOUT"
+                entry["data_length"]=len(raw)
+                entry["discriminator_hex"]=raw[:8].hex()
+                entry["matches_fixed_discriminator"]=raw[:8]==DISC
         out.append(entry)
     observed=nearest_observed_ticks(out,state["tick_current_index"],spacing)
     directions={d:directional_tick_observation(out,state["tick_current_index"],spacing,d)
