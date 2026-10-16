@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import patch
-from arb.whirlpool_ticks import start_tick, candidate_starts, decode_fixed_ticks, nearest_observed_ticks, DISC, FIXED_LEN, TICK_HEADER, TICK_SIZE
+from arb.whirlpool_ticks import start_tick, candidate_starts, decode_fixed_ticks, nearest_observed_ticks, directional_tick_observation, DISC, FIXED_LEN, TICK_HEADER, TICK_SIZE
 class TickMathTests(unittest.TestCase):
     def test_negative_floor(self):
         self.assertEqual(start_tick(-1,8),-704)
@@ -69,3 +69,30 @@ class ObservedTickCoverageTests(unittest.TestCase):
             with self.subTest(entries=entries):
                 with self.assertRaises(ValueError):
                     nearest_observed_ticks(entries,10,8)
+
+class DirectionalTickObservationTests(unittest.TestCase):
+    def test_direction_and_contiguous_arrays(self):
+        arrays=[
+            {"start_tick":0,"status":"FIXED_VALID","ticks":[{"tick_index":8}]},
+            {"start_tick":704,"status":"FIXED_VALID","ticks":[{"tick_index":712}]}]
+        upper=directional_tick_observation(arrays,700,8,"b_to_a")
+        self.assertEqual(upper["first_tick"],712)
+        self.assertEqual(upper["arrays_traversed"],2)
+        lower=directional_tick_observation(arrays,700,8,"a_to_b")
+        self.assertEqual(lower["first_tick"],8)
+        self.assertFalse(upper["actionable"])
+
+    def test_missing_intervening_array_never_skipped(self):
+        arrays=[
+            {"start_tick":0,"status":"FIXED_VALID","ticks":[]},
+            {"start_tick":704,"status":"MISSING"},
+            {"start_tick":1408,"status":"FIXED_VALID","ticks":[{"tick_index":1416}]}]
+        out=directional_tick_observation(arrays,5,8,"b_to_a")
+        self.assertEqual(out["status"],"UNKNOWN_ARRAY_GAP")
+        self.assertIsNone(out["first_tick"])
+
+    def test_invalid_direction_and_duplicate_fail_closed(self):
+        with self.assertRaises(ValueError):
+            directional_tick_observation([],0,8,"other")
+        with self.assertRaises(ValueError):
+            directional_tick_observation([{"start_tick":0},{"start_tick":0}],0,8,"a_to_b")
