@@ -241,6 +241,17 @@ jobs:
               assert result["simulation_verified"] is False
               assert result["actionable"] is False
           PY
+      - name: Attempt signed Raydium CLMM swap on local fork
+        env:
+          CLMM_SIGNED_PROBE_REPORT: ${{ runner.temp }}/clmm-signed-probe.json
+        run: python3 -m arb.raydium_clmm_signed_probe
+      - name: Upload signed CLMM swap attempt evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clmm-signed-swap-attempt
+          path: ${{ runner.temp }}/clmm-signed-probe.json
+          if-no-files-found: ignore
       - name: Probe authenticated Raydium CLMM exact-input quotes on fork
         env:
           CLMM_LIVE_QUOTE_REPORT: ${{ runner.temp }}/clmm-live-quotes.json
