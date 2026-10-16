@@ -114,6 +114,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_raydium_clmm_ticks.py -v
       - name: Test Raydium CLMM swap v2 instruction serialization
         run: python3 -m unittest discover -s tests -p test_raydium_clmm_swap.py -v
+      - name: Test Raydium CLMM initialized tick boundaries
+        run: python3 -m unittest discover -s tests -p test_raydium_clmm_tick_decode.py -v
       - name: Test authenticated Raydium CLMM quote preflight
         run: python3 -m unittest discover -s tests -p test_raydium_clmm_quote_preflight.py -v
       - name: Test synchronized Raydium CLMM fee configuration snapshot
