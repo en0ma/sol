@@ -150,10 +150,14 @@ def quote_from_decoded_arrays(state, mint_in, amount_in, arrays, sqrt_price_at_t
     step = -span if down else span
     ticks = []
     covered = 0
+    first_gap = None
     while covered < len(indexed):
         entry = indexed.get(start)
         if entry is None or entry.get("status") != "FIXED_VALID":
-            raise ValueError("missing or unsupported tick array")
+            if covered == 0:
+                raise ValueError("missing or unsupported tick array")
+            first_gap = start
+            break
         records = entry.get("ticks")
         if not isinstance(records, list):
             raise ValueError("missing decoded ticks")
@@ -181,5 +185,6 @@ def quote_from_decoded_arrays(state, mint_in, amount_in, arrays, sqrt_price_at_t
     result = quote_multitick(state, mint_in, amount_in, ticks,
                              max_crossings=max_crossings)
     return {**result, "tick_arrays_examined": covered,
+            "first_unavailable_array_start": first_gap,
             "source": "SUPPLIED_ARRAYS_AND_REFERENCE_TICK_MATH",
             "actionable": False, "executable_quote": False}
