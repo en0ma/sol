@@ -36,11 +36,18 @@ def quote_multitick(state, mint_in, amount_in, ticks, *, max_crossings=12):
     if type(fee) is not int or not 0 <= fee < FEE_DENOM:
         raise ValueError('invalid fee')
     previous = p
+    previous_index = state.get("tick_current_index")
+    if type(previous_index) is not int:
+        raise ValueError("missing current tick index")
     prepared = []
     for t in ticks:
         if not isinstance(t, dict) or type(t.get('sqrt_price_x64')) is not int or type(t.get('liquidity_net')) is not int or type(t.get('tick_index')) is not int:
             raise ValueError('incomplete tick metadata')
         target, net = t['sqrt_price_x64'], t['liquidity_net']
+        index = t["tick_index"]
+        if not (index <= previous_index if down else index > previous_index):
+            raise ValueError("unordered or wrong-direction tick index")
+        previous_index = index
         if not 0 < target < (1 << 128) or not (-1 << 127) <= net < (1 << 127):
             raise ValueError('invalid tick price or liquidity net')
         if not (target < previous if down else target > previous):
@@ -51,8 +58,6 @@ def quote_multitick(state, mint_in, amount_in, ticks, *, max_crossings=12):
         raise ValueError('missing initialized tick coverage')
     remaining, output, crosses, steps = amount_in, 0, 0, []
     for target, net, tick_index in prepared:
-        if crosses >= max_crossings:
-            raise ValueError('crossing budget exceeded')
         required_net = (_ceil(liquidity * Q * (p - target), p * target)
                         if down else _ceil(liquidity * (target - p), Q))
         if required_net <= 0:
@@ -78,6 +83,8 @@ def quote_multitick(state, mint_in, amount_in, ticks, *, max_crossings=12):
             remaining = 0
             p = next_p
             break
+        if crosses >= max_crossings:
+            raise ValueError("crossing budget exceeded")
         if down:
             step_out = liquidity * (p - target) // Q
         else:
