@@ -48,6 +48,43 @@ def decode_fixed_ticks(raw, pool_address, expected_start, spacing):
                       "liquidity_gross":str(gross)})
     return ticks
 
+
+def nearest_observed_ticks(decoded_arrays, current_tick, spacing):
+    """Find observed initialized boundaries; missing arrays remain explicit gaps.
+
+    Inputs are decoded fixed-array results from verified pool accounts. These
+    tick indexes are *not* executable price quotes or proof of coverage beyond
+    the fetched arrays.
+    """
+    if type(current_tick) is not int or type(spacing) is not int or spacing<=0:
+        raise ValueError("invalid tick metadata")
+    if not isinstance(decoded_arrays,list) or len(decoded_arrays)>5:
+        raise ValueError("invalid tick array budget")
+    seen=set()
+    ticks=[]
+    for entry in decoded_arrays:
+        if not isinstance(entry,dict) or type(entry.get("start_tick")) is not int:
+            raise ValueError("invalid decoded array")
+        start=entry["start_tick"]
+        if start in seen or start%(spacing*ARRAY_TICKS):
+            raise ValueError("duplicate or unaligned array")
+        seen.add(start)
+        if entry.get("status")!="FIXED_VALID":
+            continue
+        for tick in entry.get("ticks",[]):
+            ix=tick.get("tick_index") if isinstance(tick,dict) else None
+            if type(ix) is not int or ix<start or ix>=start+spacing*ARRAY_TICKS or (ix-start)%spacing:
+                raise ValueError("invalid initialized tick index")
+            ticks.append(ix)
+    below=[n for n in ticks if n<=current_tick]
+    above=[n for n in ticks if n>current_tick]
+    return {"nearest_initialized_below":max(below,default=None),
+            "nearest_initialized_above":min(above,default=None),
+            "arrays_examined":len(decoded_arrays),
+            "arrays_valid":sum(a.get("status")=="FIXED_VALID" for a in decoded_arrays),
+            "initialized_ticks_observed":len(ticks),
+            "complete_liquidity_path":False,"executable_quote":False}
+
 def start_tick(index, spacing):
     if spacing <= 0: raise ValueError("invalid spacing")
     span = ARRAY_TICKS * spacing
@@ -88,6 +125,7 @@ def inspect(rpc, pool_address):
                 ticks=decode_fixed_ticks(raw,pool_address,idx,spacing)
                 entry["status"]="FIXED_VALID"
                 entry["initialized_ticks"]=len(ticks)
+                entry["ticks"]=ticks
                 entry["nearest_initialized_below"]=max(
                     (t["tick_index"] for t in ticks if t["tick_index"]<=state["tick_current_index"]),default=None)
                 entry["nearest_initialized_above"]=min(
@@ -95,7 +133,9 @@ def inspect(rpc, pool_address):
             else:
                 entry["status"]="UNSUPPORTED_LAYOUT"
         out.append(entry)
+    observed=nearest_observed_ticks(out,state["tick_current_index"],spacing)
     return {"pool":pool_address,"pool_tick":state["tick_current_index"],
+            "observed_tick_coverage":observed,
             "slot":resp.get("context",{}).get("slot"),"arrays":out,
             "swap_ready":False}
 
