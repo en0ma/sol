@@ -175,7 +175,7 @@ class CycleScreenTests(unittest.TestCase):
              "trade_fee_rate_ppm":2500,"creator_fee_rate_ppm":500}}
         def quote(pool,mint,amount):
             self.assertEqual((pool,mint,amount),("clmm","SOL",1000))
-            return {"status":"INDICATIVE_WITHIN_TICK_ONLY",
+            return {"status":"INDICATIVE_WITHIN_TICK_ONLY","pool":"clmm","slot":10,
                     "mint_out":"USDC","amount_in":amount,
                     "estimated_output_base_units":2000,
                     "actionable":False,"executable_quote":False}
@@ -197,3 +197,17 @@ class CycleScreenTests(unittest.TestCase):
                 "estimated_output_base_units":2000,"actionable":True,
                 "executable_quote":True})
         self.assertEqual(result["status"],"UNQUOTABLE")
+
+    def test_clmm_quote_from_wrong_slot_fails_closed(self):
+        route={"start_mint":"SOL","legs":[
+            {"venue":"raydium_clmm","pool":"clmm","input":"SOL","output":"USDC"},
+            {"venue":"raydium_cpmm","pool":"cpmm","input":"USDC","output":"SOL"}]}
+        pools={("raydium_clmm","clmm"):{"verified":True,"slot":10},
+               ("raydium_cpmm","cpmm"):{"verified":True,"slot":10}}
+        result=score_cycle(route,pools,{},1000,clmm_quote=lambda *args:{
+            "status":"INDICATIVE_WITHIN_TICK_ONLY","mint_out":"USDC",
+            "amount_in":1000,"estimated_output_base_units":2000,
+            "actionable":False,"executable_quote":False,
+            "pool":"clmm","slot":19})
+        self.assertEqual(result["status"],"UNQUOTABLE")
+        self.assertEqual(result["missing_quote_venue"],"raydium_clmm")
