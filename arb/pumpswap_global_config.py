@@ -7,6 +7,7 @@ import base64
 import hashlib
 from arb.rpc import call
 from arb.pumpswap_pool import PROGRAM
+from arb.orca_whirlpool import b58
 
 ADDRESS = "ADyA8hdefvWN2dbGGWFotbzWxrAvLW83WG6QCVXvJKqw"
 DISC = hashlib.sha256(b"account:GlobalConfig").digest()[:8]
@@ -24,8 +25,10 @@ def decode(raw):
     if any(x > 10000 for x in (lp, protocol, creator)):
         raise ValueError("invalid PumpSwap fee basis points")
     flags = raw[56]
+    recipients = [b58(raw[57+32*i:57+32*(i+1)]) for i in range(8)]
     return {"lp_fee_bps": lp, "protocol_fee_bps": protocol,
             "coin_creator_fee_bps": creator, "disable_flags": flags,
+            "protocol_fee_recipients": recipients,
             "buy_enabled": not bool(flags & 8),
             "sell_enabled": not bool(flags & 16),
             "effective_fee_verified": False,
