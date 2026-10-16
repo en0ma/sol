@@ -26,3 +26,14 @@ class DiscoveryTests(unittest.TestCase):
         r=discover("rpc",[(MINTS["WSOL"],MINTS["USDT"])])
         self.assertEqual(r["status"],"PARTIAL")
         self.assertEqual(len(r["errors"]),len(VENUES))
+    @patch("arb.onchain_pool_discovery.time.sleep")
+    @patch("arb.onchain_pool_discovery.call",return_value=[])
+    def test_paced_requests_preserve_two_order_filters(self,call,sleep):
+        self.assertEqual(search_pair("rpc","pumpswap",MINTS["WSOL"],MINTS["USDC"],
+                                     pace_seconds=2),{})
+        self.assertEqual(sleep.call_count,2)
+        sleep.assert_any_call(2)
+        self.assertEqual(call.call_count,2)
+    def test_invalid_pacing_rejected(self):
+        with self.assertRaisesRegex(ValueError,"pacing"):
+            search_pair("rpc","pumpswap",MINTS["WSOL"],MINTS["USDC"],pace_seconds=6)
