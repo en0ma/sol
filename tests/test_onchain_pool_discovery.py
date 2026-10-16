@@ -38,3 +38,15 @@ class DiscoveryTests(unittest.TestCase):
     def test_invalid_pacing_rejected(self):
         with self.assertRaisesRegex(ValueError,"pacing"):
             search_pair("rpc","pumpswap",MINTS["WSOL"],MINTS["USDC"],pace_seconds=6)
+    @patch("arb.pool_registry.refresh")
+    @patch("arb.onchain_pool_discovery.search_pair",side_effect=RuntimeError("429"))
+    def test_rate_limit_registry_fallback_is_distinct(self,search,refresh):
+        refresh.return_value={"status":"COMPLETE","verified_count":1,
+                              "verified_pools":[{"venue":"orca","address":"known"}]}
+        r=discover("rpc",[(MINTS["WSOL"],MINTS["USDT"])],
+                   registry_entries=[{"venue":"orca","address":"known"}])
+        self.assertEqual(r["status"],"UPSTREAM_RATE_LIMITED")
+        self.assertEqual(r["pools_verified"],0)
+        self.assertEqual(r["direct_registry_fallback"]["verified_count"],1)
+        search.assert_called_once()
+        refresh.assert_called_once()
