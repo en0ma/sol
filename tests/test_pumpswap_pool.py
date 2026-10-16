@@ -37,3 +37,20 @@ class PumpSwapPoolTests(unittest.TestCase):
         call.return_value={"context":{},"value":[None,None,None]}
         with self.assertRaisesRegex(ValueError,"incomplete"):
             verify("rpc","pool",state)
+
+    def test_appended_creator_fee_fields(self):
+        raw=bytearray(raw_pool())
+        raw.extend((175).to_bytes(8,"little"))
+        raw.extend(bytes((0,1)))
+        state=decode(bytes(raw))
+        self.assertEqual(state["creator_fee_bps"],175)
+        self.assertEqual(state["is_holder_reward"],1)
+        self.assertEqual(state["can_edit_creator_fee"],0)
+        with self.assertRaisesRegex(ValueError,"partial"):
+            decode(bytes(raw[:265]))
+
+    def test_invalid_creator_fee_rate_rejected(self):
+        raw=bytearray(raw_pool())
+        raw.extend((10001).to_bytes(8,"little"))
+        with self.assertRaisesRegex(ValueError,"invalid PumpSwap Pool fields"):
+            decode(bytes(raw))
