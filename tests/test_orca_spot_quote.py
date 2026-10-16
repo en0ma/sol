@@ -63,3 +63,14 @@ class WhirlpoolSpotQuoteTests(unittest.TestCase):
                 maximum_bounded_input(self.state(),"a",
                     lower_sqrt_x64=Q-100000000000000,
                     upper_sqrt_x64=Q+100000000000000,max_input=budget)
+
+    def test_exhausted_search_does_not_misreport_maximum(self):
+        result=maximum_bounded_input(self.state(),"a",
+            lower_sqrt_x64=Q-100000000000,
+            upper_sqrt_x64=Q+100000000000,
+            max_input=1000000,iterations=1)
+        self.assertEqual(result["status"],"INCOMPLETE_SIZE_SEARCH")
+        self.assertIsNone(result["max_tested_input_base_units"])
+        self.assertIsNone(result["quote"])
+        self.assertFalse(result["search_converged"])
+        self.assertFalse(result["actionable"])
