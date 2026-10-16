@@ -182,7 +182,10 @@ def quote_from_decoded_arrays(state, mint_in, amount_in, arrays, sqrt_price_at_t
         ticks.extend(sorted(local, key=lambda t: t["tick_index"], reverse=down))
         covered += 1
         start += step
-    # Keep the closest 64 initialized liquidity events in directional order.\n    # The pure quote engine has a fixed 64-tick budget and fails closed if\n    # trade input would require traversal beyond the retained observations.\n    ticks=ticks[:64]\n    if not ticks:
+    # Bound the nearest observed initialized ticks, preserving trade order.
+    # Missing farther liquidity is never silently synthesized.
+    ticks=ticks[:64]
+    if not ticks:
         # An authenticated current array with no initialized ticks in the
         # direction still proves a finite no-crossing price interval. Use its
         # edge only as a STOP boundary, never as a liquidity event. Larger
