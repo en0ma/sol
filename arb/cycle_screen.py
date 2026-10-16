@@ -236,6 +236,17 @@ def scan(rpc,entries,amounts=(100000,1000000),max_slot_spread=8,extra_entries=()
                          q["start_mint"],
                          -q.get("estimated_gross_base_units", -(10**30)),
                          q["input_base_units"]))
+    # WSOL base units are lamports. This illustrative one-signature
+    # transaction fee floor is NOT a priority fee, rent, ATA or compute quote.
+    # Other starting mints have incomparable units and must remain unclassified.
+    WSOL="So11111111111111111111111111111111111111112"
+    signature_fee_reference_lamports=5000
+    wsol_gross_positive=[x for x in rankings
+        if x["status"]=="INDICATIVE_ONLY" and x["start_mint"]==WSOL
+        and x.get("estimated_gross_base_units",0)>0]
+    wsol_below_signature_fee=sum(
+        x["estimated_gross_base_units"]<=signature_fee_reference_lamports
+        for x in wsol_gross_positive)
     return {"status":"PARTIAL" if fee_errors else "COMPLETE",
         "validated_pools":len(pools),"cycles_discovered":len(graph),
         "screened_size_routes":len(rankings),
@@ -247,6 +258,9 @@ def scan(rpc,entries,amounts=(100000,1000000),max_slot_spread=8,extra_entries=()
         "candidate_rankings":rankings[:100],
         "indicative_positive_gross_count":sum(x["status"]=="INDICATIVE_ONLY" and x.get("estimated_gross_base_units",0)>0 for x in rankings),
         "orca_tick_snapshots":len(orca_evidence),
+        "wsol_positive_gross_routes":len(wsol_gross_positive),
+        "reference_signature_fee_lamports":signature_fee_reference_lamports,
+        "wsol_positive_gross_not_exceeding_reference_fee":wsol_below_signature_fee,
         "actual_quote_blockers":actual_blockers,
         "quote_gap_priorities":quote_gap_priorities,"fee_errors":fee_errors,
         "actionable_opportunities":0,"confirmed_profitable":0,
