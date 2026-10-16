@@ -21,7 +21,9 @@ def decode(raw):
     for start, end, label in ((245,261,"virtual quote reserves"),
                                (261,269,"creator fee bps"),
                                (269,270,"creator fee editing"),
-                               (270,271,"holder reward flag")):
+                               (270,271,"holder reward flag"),
+                               (271,279,"protocol fees"),
+                               (279,287,"creator fees")):
         if start < len(raw) < end:
             raise ValueError("partial PumpSwap "+label+" extension")
     key = lambda offset: b58(raw[offset:offset+32])
@@ -37,7 +39,9 @@ def decode(raw):
               "creator_fee_bps": (int.from_bytes(raw[261:269], "little")
                                   if len(raw) >= 269 else 0),
               "can_edit_creator_fee": raw[269] if len(raw) >= 270 else 0,
-              "is_holder_reward": raw[270] if len(raw) >= 271 else 0}
+              "is_holder_reward": raw[270] if len(raw) >= 271 else 0,
+              "protocol_fees": (int.from_bytes(raw[271:279],"little") if len(raw)>=279 else None),
+              "creator_fees": (int.from_bytes(raw[279:287],"little") if len(raw)>=287 else None)}
     if (len(set(fields[k] for k in ("base_mint", "quote_mint",
                                    "base_vault", "quote_vault"))) != 4
             or fields["is_mayhem_mode"] not in (0, 1)
@@ -70,6 +74,9 @@ def verify(rpc, address, state):
         if token["mint"] != mint or token["authority"] != address:
             raise ValueError("PumpSwap vault mint or authority mismatch")
         balances.append(token["amount_base_units"])
+    if (state["protocol_fees"] is not None and state["creator_fees"] is not None
+            and state["protocol_fees"] + state["creator_fees"] > balances[1]):
+        raise ValueError("PumpSwap accrued fees exceed quote vault")
     if min(balances) <= 0 or balances[1] + state["virtual_quote_reserves"] <= 0:
         raise ValueError("empty or invalid effective PumpSwap liquidity")
     return {"venue": "pumpswap", "address": address, "verified": True,
@@ -77,6 +84,7 @@ def verify(rpc, address, state):
             "base_reserve": balances[0], "quote_vault_balance": balances[1],
             "virtual_quote_reserves": state["virtual_quote_reserves"],
             "slot": slot, "creator_fee_bps": state["creator_fee_bps"],
-            "protocol_fees_accrued": None, "creator_fees_accrued": None,
+            "protocol_fees_accrued": state["protocol_fees"],
+            "creator_fees_accrued": state["creator_fees"],
             "fee_verified_onchain": False,
             "actionable": False, "executable_quote": False}
