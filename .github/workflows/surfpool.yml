@@ -218,6 +218,20 @@ jobs:
         run: python3 -m pip install --disable-pip-version-check solders==0.26.0
       - name: Simulate a signed local transaction
         run: python3 -m arb.simulate_transfer
+      - name: Verify pinned Raydium CLMM trade fee on real fork
+        run: |
+          python3 - <<'PY'
+          import json,os
+          from arb.raydium_clmm_fee_snapshot import read
+          with open("arb/pool_registry.json") as f:
+              pools=json.load(f)["pools"]
+          candidates=[p["address"] for p in pools if p["venue"]=="raydium_clmm"]
+          if not candidates:
+              raise SystemExit("No configured CLMM pool for fork fee validation")
+          result=read(os.environ["SOLANA_RPC_URL"],candidates[0])
+          print(json.dumps({k:v for k,v in result.items() if k!="state"},indent=2))
+          assert result["fee_verified_onchain"]
+          PY
       - name: Authenticate real PumpSwap fee/config accounts on Surfpool fork
         env:
           PUMPSWAP_PREFLIGHT_REPORT: ${{ runner.temp }}/pumpswap-preflight.json
