@@ -60,7 +60,7 @@ class PumpSwapPoolTests(unittest.TestCase):
     @patch("arb.pumpswap_pool.call")
     def test_same_snapshot_includes_global_fee_account(self, call, authenticated):
         state=decode(raw_pool())
-        call.return_value={"context":{"slot":123},"value":[None,None,None,None]}
+        call.return_value={"context":{"slot":123},"value":[None,None,None,None,None]}
         with self.assertRaisesRegex(ValueError,"owner or state"):
             verify("rpc","pool",state)
         self.assertEqual(len(call.call_args.args[2][0]),5)
