@@ -5,6 +5,9 @@ from arb.pumpswap_quote import quote_exact_input
 class PumpSwapQuoteTests(unittest.TestCase):
     def pool(self):
         return {"venue":"pumpswap","verified":True,"fee_verified_onchain":True,
+                "effective_fee_verified":True,
+                "global_config":{"effective_fee_verified":True,
+                                 "buy_enabled":True,"sell_enabled":True},
                 "base_mint":"BASE","quote_mint":"QUOTE",
                 "base_reserve":1000000,"quote_vault_balance":2000000,
                 "virtual_quote_reserves":-250000,
@@ -53,3 +56,23 @@ class PumpSwapQuoteTests(unittest.TestCase):
                     creator_fees_accrued=0)
         with self.assertRaisesRegex(ValueError,"spendable"):
             quote_exact_input(pool,"BASE",100000,verified_total_fee_ppm=10000)
+
+    def test_missing_dynamic_fee_evidence_blocks_quote(self):
+        pool=self.pool()
+        pool["effective_fee_verified"]=False
+        with self.assertRaisesRegex(ValueError,"dynamic fee"):
+            quote_exact_input(pool,"BASE",10000,verified_total_fee_ppm=10000)
+        pool=self.pool()
+        pool["global_config"]["effective_fee_verified"]=False
+        with self.assertRaisesRegex(ValueError,"evidence missing"):
+            quote_exact_input(pool,"BASE",10000,verified_total_fee_ppm=10000)
+
+    def test_disabled_swap_direction_blocks_quote(self):
+        pool=self.pool()
+        pool["global_config"]["sell_enabled"]=False
+        with self.assertRaisesRegex(ValueError,"direction disabled"):
+            quote_exact_input(pool,"BASE",10000,verified_total_fee_ppm=10000)
+        pool=self.pool()
+        pool["global_config"]["buy_enabled"]=False
+        with self.assertRaisesRegex(ValueError,"direction disabled"):
+            quote_exact_input(pool,"QUOTE",10000,verified_total_fee_ppm=10000)
