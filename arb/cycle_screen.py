@@ -90,6 +90,12 @@ def score_cycle(route,pool_index,fee_index,input_amount,network_fee=None,max_slo
                     type(q.get("estimated_output_base_units")) is not int or
                     q["estimated_output_base_units"]<=0):
                     raise ValueError("invalid indicative CLMM quote provenance")
+                # Validate the quote's actual snapshot against the registry
+                # snapshot used for every other leg. Refuse silently mixed slots.
+                if q.get("pool")!=leg["pool"] or type(q.get("slot")) is not int:
+                    raise ValueError("CLMM quote missing authenticated pool/slot provenance")
+                if abs(q["slot"]-pool["slot"])>8:
+                    raise ValueError("CLMM quote stale relative to verified route pool")
                 amount=q["estimated_output_base_units"]
                 legs.append({"venue":"raydium_clmm","pool":leg["pool"],
                              "input":q["amount_in"],"estimated_output":amount,
