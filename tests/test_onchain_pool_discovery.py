@@ -42,11 +42,15 @@ class DiscoveryTests(unittest.TestCase):
     @patch("arb.onchain_pool_discovery.search_pair",side_effect=RuntimeError("429"))
     def test_rate_limit_registry_fallback_is_distinct(self,search,refresh):
         refresh.return_value={"status":"COMPLETE","verified_count":1,
-                              "verified_pools":[{"venue":"orca","address":"known"}]}
+                              "verified_pools":[{"venue":"orca","address":"known",
+                                  "mints":[MINTS["WSOL"],MINTS["USDT"]],
+                                  "slot":12}]}
         r=discover("rpc",[(MINTS["WSOL"],MINTS["USDT"])],
                    registry_entries=[{"venue":"orca","address":"known"}])
         self.assertEqual(r["status"],"UPSTREAM_RATE_LIMITED")
         self.assertEqual(r["pools_verified"],0)
         self.assertEqual(r["direct_registry_fallback"]["verified_count"],1)
+        self.assertEqual(r["candidate_graph_verified_count"],1)
+        self.assertEqual(r["candidate_graph_pool_identities"][0]["address"],"known")
         search.assert_called_once()
         refresh.assert_called_once()
