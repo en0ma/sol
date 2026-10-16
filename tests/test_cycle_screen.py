@@ -104,6 +104,7 @@ class CycleScreenTests(unittest.TestCase):
         self.assertEqual(result["candidate_rankings"][0]["route_legs"],legs)
         self.assertFalse(result["candidate_rankings"][0]["actionable"])
         self.assertEqual(result["max_pool_slot_spread"],8)
+        self.assertEqual(result["actual_quote_blockers"],{})
 
     @patch("arb.cycle_screen.read_pool_config")
     @patch("arb.cycle_screen.refresh")
@@ -149,3 +150,16 @@ class CycleScreenTests(unittest.TestCase):
         r=score_cycle(route,{("orca","whirlpool"):{"verified":True}}, {},1000)
         self.assertEqual(r["status"],"UNQUOTABLE")
         self.assertEqual(r["missing_quote_venue"],"orca")
+
+    @patch("arb.cycle_screen.refresh")
+    def test_real_quote_blockers_count_attempted_sizes(self,refresh):
+        refresh.return_value={"verified_pools":[
+            {"verified":True,"venue":"orca","address":"a","mints":["SOL","USDC"],"slot":1},
+            {"verified":True,"venue":"raydium_clmm","address":"b","mints":["SOL","USDC"],"slot":1}],
+            "rejected":[]}
+        with patch("arb.whirlpool_ticks.inspect",side_effect=ValueError("missing ticks")):
+            report=scan("rpc",[],amounts=(100,200))
+        self.assertEqual(report["indicative_routes"],0)
+        self.assertEqual(report["unquotable_routes"],report["screened_size_routes"])
+        self.assertGreater(report["actual_quote_blockers"]["orca"]["unquotable_size_routes"],0)
+        self.assertFalse(report["actionable_opportunities"])
