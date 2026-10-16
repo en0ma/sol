@@ -20,22 +20,23 @@ def compare_fee_modes(pool):
     if any(type(v) is not int for v in (mint_supply,base,quote,virtual)):
         raise ValueError("incomplete synchronized reserves")
     options={}
+    unavailable={}
     canonical=pool.get("canonical")
     if type(canonical) is not bool:
         raise ValueError("unknown canonical status")
     options["standard"]=select_fee_tier(fee,canonical=canonical,
         base_mint_supply=mint_supply,base_reserve=base,quote_reserve=quote+virtual)
-    if canonical:
-        options["stable"]=select_fee_tier(
-            {**fee,"fee_tiers":fee.get("stable_fee_tiers")},canonical=True,
+    alternate = "stable" if canonical else "exotic"
+    alternate_config=({**fee,"fee_tiers":fee.get("stable_fee_tiers")} if canonical
+                      else {**fee,"flat_fees":fee.get("exotic_flat_fees")})
+    try:
+        options[alternate]=select_fee_tier(alternate_config,canonical=canonical,
             base_mint_supply=mint_supply,base_reserve=base,quote_reserve=quote+virtual)
-    else:
-        options["exotic"]=select_fee_tier(
-            {**fee,"flat_fees":fee.get("exotic_flat_fees")},canonical=False,
-            base_mint_supply=mint_supply,base_reserve=base,quote_reserve=quote+virtual)
+    except ValueError as exc:
+        unavailable[alternate]=str(exc)
     rates=[o["fee_rates"] for o in options.values()]
-    same=all(item==rates[0] for item in rates[1:])
+    same=not unavailable and all(item==rates[0] for item in rates[1:])
     return {"status":"MODE_RATES_EQUAL_UNVERIFIED" if same else "FEE_MODE_AMBIGUOUS",
-            "candidate_modes":options,
+            "candidate_modes":options,"unavailable_modes":unavailable,
             "rates_equal":same,"fee_mode_verified":False,
             "effective_fee_verified":False,"actionable":False}
