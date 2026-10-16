@@ -114,11 +114,23 @@ def scan(rpc,entries,amounts=(100000,1000000),max_slot_spread=8):
                 entry=missing_by_venue.setdefault(leg["venue"],{"blocked_route_legs":0,"unique_pools":set()})
                 entry["blocked_route_legs"]+=1
                 entry["unique_pools"].add(leg["pool"])
+    # Count distinct routes unlocked by one adapter, versus raw leg frequency.
+    # A route needing multiple missing venues is not unlocked by only one.
+    sole_missing_routes={}
+    for route in graph:
+        missing={leg["venue"] for leg in route["legs"]
+                 if leg["venue"]!="raydium_cpmm" or
+                    (leg["venue"],leg["pool"]) not in fees}
+        if len(missing)==1:
+            venue=next(iter(missing))
+            sole_missing_routes[venue]=sole_missing_routes.get(venue,0)+1
     quote_gap_priorities=sorted((
         {"venue":venue,"blocked_route_legs":x["blocked_route_legs"],
-         "unique_pools":len(x["unique_pools"])}
+         "unique_pools":len(x["unique_pools"]),
+         "routes_unlocked_by_single_adapter":sole_missing_routes.get(venue,0)}
         for venue,x in missing_by_venue.items()),
-        key=lambda x:(-x["blocked_route_legs"],-x["unique_pools"],x["venue"]))
+        key=lambda x:(-x["routes_unlocked_by_single_adapter"],
+                      -x["blocked_route_legs"],-x["unique_pools"],x["venue"]))
     rankings=[]
     for route in graph:
         for amount in amounts:
