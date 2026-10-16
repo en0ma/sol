@@ -47,12 +47,14 @@ def search_pair(rpc,venue,mint_a,mint_b,limit=8):
                 raise ValueError("wrong program owner")
             raw=base64.b64decode(entry["account"]["data"][0],validate=True)
             decoded=decode(raw)
-            pair=(decoded["base_mint"],decoded["quote_mint"]) if venue=="pumpswap" else (
-                (decoded["token_a_mint"],decoded["token_b_mint"]) if venue=="meteora_damm_v2" else (
-                (decoded["token_x_mint"],decoded["token_y_mint"]) if venue=="meteora_dlmm" else (
-                (decoded["token_mint_a"],decoded["token_mint_b"]) if venue=="orca" else (
-                decoded["token_mint_0"],decoded["token_mint_1"]) if venue=="raydium_clmm" else (
-                decoded["token_0_mint"],decoded["token_1_mint"])))
+            mint_fields={"pumpswap":("base_mint","quote_mint"),
+                         "meteora_damm_v2":("token_a_mint","token_b_mint"),
+                         "meteora_dlmm":("token_x_mint","token_y_mint"),
+                         "orca":("token_mint_a","token_mint_b"),
+                         "raydium_clmm":("token_mint_0","token_mint_1"),
+                         "raydium_cpmm":("token_0_mint","token_1_mint")}
+            left,right=mint_fields[venue]
+            pair=(decoded[left],decoded[right])
             if pair!=(a,b):raise ValueError("mint filter mismatch")
             found[entry["pubkey"]]=decoded
     return found
