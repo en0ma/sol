@@ -211,3 +211,9 @@ class CycleScreenTests(unittest.TestCase):
             "pool":"clmm","slot":19})
         self.assertEqual(result["status"],"UNQUOTABLE")
         self.assertEqual(result["missing_quote_venue"],"raydium_clmm")
+
+    @patch("arb.cycle_screen.refresh",return_value={"rejected":0,"verified_pools":[]})
+    def test_empty_scan_has_no_unverified_orca_gap_claims(self,_refresh):
+        report=scan("http://127.0.0.1:8899",[])
+        self.assertEqual(report["orca_array_gap_evidence"],[])
+        self.assertEqual(report["validated_pools"],0)
