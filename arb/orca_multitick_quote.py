@@ -128,7 +128,7 @@ def quote_from_decoded_arrays(state, mint_in, amount_in, arrays, sqrt_price_at_t
         sqrt_price_at_tick = sqrt_price_from_tick_index
     if not callable(sqrt_price_at_tick):
         raise ValueError("missing tick price converter")
-    if not isinstance(arrays, list) or not 1 <= len(arrays) <= 5:
+    if not isinstance(arrays, list) or not 1 <= len(arrays) <= 9:
         raise ValueError("invalid array coverage")
     spacing = state.get("tick_spacing")
     current = state.get("tick_current_index")
