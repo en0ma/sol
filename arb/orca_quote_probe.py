@@ -27,7 +27,7 @@ def probe(rpc, pool, amount=1000000):
         return {'status': 'SIMULATION_UNAVAILABLE', 'simulation_status': sim.get('status'),
                 'quote_verified': False, 'actionable': False}
     evidence = inspect(rpc, pool)
-    if evidence['pool_tick'] != state['tick_current_index']:
+    if evidence.get('pool_state') != state:
         return {'status': 'POOL_STATE_CHANGED', 'quote_verified': False, 'actionable': False}
     mint_in = state['token_mint_a'] if sim['direction'] == 'a_to_b' else state['token_mint_b']
     try:
