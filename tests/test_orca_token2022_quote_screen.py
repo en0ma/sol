@@ -43,6 +43,18 @@ class QuoteScreenTests(unittest.TestCase):
         quote.return_value={"estimated_output_base_units":100,"tick_arrays_examined":1,"ticks_crossed":0}
         self.assertEqual(screen("rpc",POOL,None,101)["input_mint"],A)
 
+    @patch("arb.orca_token2022_quote_screen.quote_from_decoded_arrays")
+    @patch("arb.orca_token2022_quote_screen.scheduled_epoch_snapshot")
+    def test_missing_tick_coverage_reports_array_statuses(self,snap,quote):
+        state=observed()
+        state["pool"]={**STATE,"tick_current_index":5,"tick_spacing":1}
+        state["tick_arrays"]=[{"start_tick":0,"status":"MISSING"}]
+        snap.return_value=state
+        quote.side_effect=ValueError("missing or unsupported tick array")
+        with self.assertRaisesRegex(ValueError,"current_start=0") as result:
+            screen("rpc",POOL,A,101)
+        self.assertIn("MISSING",str(result.exception))
+
 class QuoteFailureCategoryTests(unittest.TestCase):
     def test_epoch_and_tick_mismatches_stay_distinct(self):
         self.assertEqual(diagnostic_failure_category(
