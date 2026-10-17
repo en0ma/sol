@@ -8,7 +8,7 @@ import base64
 from arb.rpc import call
 from arb.orca_whirlpool import PROGRAM, decode, fetch_pool
 from arb.token_vaults import TOKEN_PROGRAM
-from arb.token2022_extensions import TOKEN_2022, account_observation, extension_types
+from arb.token2022_extensions import TOKEN_2022, account_observation, extension_types, transfer_fee_config
 
 def _raw(info,owner):
     if not isinstance(info,dict) or info.get("owner")!=owner or info.get("executable"):
@@ -34,7 +34,9 @@ def _mint(info):
         if len(raw)<166 or any(raw[82:165]):
             raise ValueError("invalid Token-2022 mint padding")
         extensions=extension_types(raw,1)
+    fee_config=transfer_fee_config(raw) if owner==TOKEN_2022 and 1 in extensions else None
     return {"owner":owner,"extension_types":extensions,
+            "transfer_fee_config":fee_config,
             "supply":int.from_bytes(raw[36:44],"little"),"decimals":raw[44]}
 
 # IDs from SPL Token-2022 ExtensionType; presence is NOT quote authorization.
