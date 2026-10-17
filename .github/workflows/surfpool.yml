@@ -681,6 +681,17 @@ jobs:
           name: arbitrage-venue-coverage
           path: ${{ runner.temp }}/venue-coverage.json
           if-no-files-found: ignore
+      - name: Probe Orca public API for new on-chain verified Whirlpools
+        continue-on-error: true
+        run: |
+          python3 -m arb.orca_api_discovery --pages 2 --size 30 --min-tvl 10000 --limit 50 --output "$RUNNER_TEMP/orca-public-api-discovery.json"
+      - name: Upload Orca public API validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orca-public-api-discovery
+          path: ${{ runner.temp }}/orca-public-api-discovery.json
+          if-no-files-found: ignore
       - name: Refresh pinned multi-venue pool registry via targeted RPC
         env:
           POOL_REGISTRY_REPORT: ${{ runner.temp }}/pool-registry-refresh.json
