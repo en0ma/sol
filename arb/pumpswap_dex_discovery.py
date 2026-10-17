@@ -33,8 +33,8 @@ def resolve_pumpswap_dex_id(payload):
     return matches[0]
 
 def scan(rpc,pages=3,limit=60,pace_seconds=7):
-    from arb.pool_registry import refresh
-    if type(pages)is not int or not 1<=pages<=10 or type(limit)is not int or not 1<=limit<=200:
+    from arb.pool_registry_batches import refresh_batched
+    if type(pages)is not int or not 1<=pages<=10 or type(limit)is not int or not 1<=limit<=2000:
         raise ValueError("invalid scan budget")
     if not isinstance(pace_seconds,(int,float)) or not 0<=pace_seconds<=60:
         raise ValueError("invalid pacing")
@@ -54,9 +54,10 @@ def scan(rpc,pages=3,limit=60,pace_seconds=7):
         for entry in page_rows:
             if entry["address"] not in seen:
                 seen.add(entry["address"]);results.append(entry)
-    report=refresh(rpc,results[:limit])
+    report=refresh_batched(rpc,results[:limit],batch_size=100)
     return {"source":"geckoterminal_pumpswap_dex","dex_id":dex_id,
             "candidate_count":len(results),"checked_count":min(len(results),limit),
+            "rpc_validation_batches":report["batch_count"],
             "verified_count":report["verified_count"],"rejected_count":report["rejected_count"],
             "verified_identities":[{"venue":x["venue"],"address":x["address"],"mints":x["mints"]}
                                    for x in report["verified_pools"]],
