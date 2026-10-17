@@ -98,7 +98,30 @@ def main():
     with open("arb/pool_registry.json") as file:
         pool=next(p["address"] for p in json.load(file)["pools"]
                   if p["venue"]=="raydium_clmm")
-    report=probe(os.environ.get("SOLANA_RPC_URL","http://127.0.0.1:8899"),pool)
+    rpc=os.environ.get("SOLANA_RPC_URL","http://127.0.0.1:8899")
+    outcomes=[]
+    for amount in (10000,100000,1000000):
+        try:
+            outcomes.append(probe(rpc,pool,amount))
+        except (ValueError,KeyError,TypeError) as exc:
+            outcomes.append({"input_base_units":amount,
+                             "status":"ROUND_TRIP_UNAVAILABLE",
+                             "failure_reason":str(exc)[:500],
+                             "atomic_cycle_simulated":False,
+                             "confirmed_profitable":False})
+    report={"pool":pool,"attempted_sizes":len(outcomes),
+            "atomic_cycles_simulated":sum(
+                x.get("atomic_cycle_simulated") is True for x in outcomes),
+            "negative_gross_cycles":sum(
+                x.get("atomic_cycle_simulated") is True and
+                x["balance_evidence"]["gross_start_token_base_units"]<0
+                for x in outcomes),
+            "zero_or_positive_gross_cycles":sum(
+                x.get("atomic_cycle_simulated") is True and
+                x["balance_evidence"]["gross_start_token_base_units"]>=0
+                for x in outcomes),
+            "results":outcomes,"confirmed_profitable":False,
+            "mainnet_broadcast":False}
     print(json.dumps(report,indent=2))
     if os.environ.get("ATOMIC_CLMM_PROBE_REPORT"):
         with open(os.environ["ATOMIC_CLMM_PROBE_REPORT"],"w") as file:
