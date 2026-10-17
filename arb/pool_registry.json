@@ -448,6 +448,62 @@
         "So11111111111111111111111111111111111111112",
         "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump"
       ]
+    },
+    {
+      "venue": "orca",
+      "address": "5WrgXzWiz93g4L5XBmr3ggMybW5gfL7drNAKoQMgpDHc",
+      "mints": [
+        "6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ]
+    },
+    {
+      "venue": "orca",
+      "address": "Hxw77h9fEx598afiiZunwHaX3vYu9UskDk9EpPNZp1mG",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE"
+      ]
+    },
+    {
+      "venue": "orca",
+      "address": "78QBVQz3EnpuzmY42LRcCkn7gSyuFEMmQn1m5bY1yHgw",
+      "mints": [
+        "METAewgxyPbgwsseH8T16a39CQ5VyVxZi9zXiDPY18m",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ]
+    },
+    {
+      "venue": "orca",
+      "address": "HsQGWEh3ib6w59rBh5n1jXmi8VXFBqKEjxozL6PGfcgb",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk"
+      ]
+    },
+    {
+      "venue": "orca",
+      "address": "C1MgLojNLWBKADvu9BHdtgzz1oZX4dZ5zGdGcgvvW8Wz",
+      "mints": [
+        "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+        "So11111111111111111111111111111111111111112"
+      ]
+    },
+    {
+      "venue": "orca",
+      "address": "5H7c1wUYrE3uaEGNfaXLoR4jnUcmyNCRrhfk6oaVxFWt",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "EicWvteVi2fWepEzS3FYWsnuPoP6caZfjnKqNvydLjCH"
+      ]
+    },
+    {
+      "venue": "orca",
+      "address": "AFdizLL2M716aPcV8gu4azEL3JxFpT7wWFgjVwNU3RNm",
+      "mints": [
+        "SATqS9DYpLQsM2z51P4QCoqJRHa5wboV4qjJerJRUSH",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ]
     }
   ]
 }
