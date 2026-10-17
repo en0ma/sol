@@ -33,8 +33,8 @@ def score_cycle(route,pool_index,fee_index,input_amount,network_fee=None,max_slo
         if not isinstance(leg,dict) or leg.get("input")!=current or not isinstance(leg.get("output"),str) or not leg["output"]:
             return {"status":"UNQUOTABLE","reason":"disconnected cycle topology","legs_quoted":0,"actionable":False}
         key=(leg.get("venue"),leg.get("pool"))
-        if any(not isinstance(v,str) or not v for v in key):
-            return {"status":"UNQUOTABLE","reason":"invalid cycle pool","legs_quoted":0,"actionable":False}
+        if any(not isinstance(v,str) or not v for v in key) or key in seen:
+            return {"status":"UNQUOTABLE","reason":"invalid or reused cycle pool","legs_quoted":0,"actionable":False}
         seen.add(key)
         current=leg["output"]
     if current!=start:
@@ -289,7 +289,6 @@ def scan(rpc,entries,amounts=(100000,1000000),max_slot_spread=8,extra_entries=()
         "candidate_rankings":rankings[:100],
         "cross_pool_simulation_queue":cross_pool_queue,
         "all_cycle_inventory":all_cycle_inventory,
-        "same_pool_size_routes":sum(x["topology"]=="SAME_POOL" for x in all_cycle_inventory),
         "same_venue_multipool_size_routes":sum(x["topology"]=="SAME_VENUE_MULTIPOOL" for x in all_cycle_inventory),
         "cross_venue_size_routes":sum(x["topology"]=="CROSS_VENUE" for x in all_cycle_inventory),
         "cross_pool_simulation_queue_count":len(cross_pool_queue),
