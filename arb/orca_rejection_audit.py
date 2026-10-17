@@ -9,10 +9,10 @@ from pathlib import Path
 
 from arb.orca_whirlpool import PROGRAM, decode, b58
 from arb.rpc import call
-from arb.token_vaults import TOKEN_PROGRAM, decode_token_account
+from arb.token_vaults import TOKEN_PROGRAM
+from arb.token2022_extensions import TOKEN_2022, account_observation
 import base64
 
-TOKEN_2022 = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
 
 # Structural observations only: unknown Token-2022 extensions remain unsupported.
 def observe_vault(account, expected_mint):
@@ -26,12 +26,10 @@ def observe_vault(account, expected_mint):
                  "authority":authority,"amount_base_units":amount,
                  "initialized":state==1,"account_length":len(raw),
                  "token_program":"token_2022" if owner==TOKEN_2022 else "classic"}
-    if owner==TOKEN_PROGRAM:
-        decode_token_account(raw)
-        observation["extension_state"]="NOT_APPLICABLE"
-    else:
-        observation["extension_state"]="NOT_YET_DECODED"
-        observation["eligible_for_executable_quote"]=False
+    decoded=account_observation(owner,raw)
+    observation["extension_types"]=decoded["extension_types"]
+    observation["extension_state"]="INVENTORIED_NOT_EXECUTION_AUTHENTICATED" if owner==TOKEN_2022 else "NOT_APPLICABLE"
+    observation["eligible_for_executable_quote"]=False if owner==TOKEN_2022 else True
     return observation
 
 def classify(rpc,address):
