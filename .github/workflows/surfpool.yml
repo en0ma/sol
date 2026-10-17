@@ -685,6 +685,16 @@ jobs:
           name: arbitrage-venue-coverage
           path: ${{ runner.temp }}/venue-coverage.json
           if-no-files-found: ignore
+      - name: Audit fixed Orca Token-2022 structural cohort
+        continue-on-error: true
+        run: python3 -m arb.orca_token2022_validation --limit 15 --output "$RUNNER_TEMP/orca-token2022-structural.json"
+      - name: Upload fixed Orca Token-2022 structural evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orca-token2022-structural-cohort
+          path: ${{ runner.temp }}/orca-token2022-structural.json
+          if-no-files-found: ignore
       - name: Probe Orca public API for new on-chain verified Whirlpools
         continue-on-error: true
         run: |
