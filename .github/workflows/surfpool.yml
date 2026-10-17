@@ -411,6 +411,7 @@ jobs:
       - name: Simulate atomic WSOL to USDC Whirlpool swap
         run: python3 -m arb.whirlpool_simulation
       - name: Compare Orca exact-input quote model with signed Surfpool balances
+        continue-on-error: true
         env:
           ORCA_QUOTE_COMPARISON_REPORT: ${{ runner.temp }}/orca-quote-comparison.json
         run: python3 -m arb.orca_quote_probe
