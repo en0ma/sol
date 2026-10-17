@@ -10,7 +10,7 @@ from pathlib import Path
 
 from arb.rpc import call
 from arb.pumpswap_pool import PROGRAM, decode
-from arb.token_vaults import TOKEN_PROGRAM
+from arb.token_vaults import TOKEN_PROGRAM, decode_token_account
 
 NATIVE_WS0L_MINT = "So11111111111111111111111111111111111111112"
 
@@ -64,6 +64,20 @@ def inspect(rpc, address):
                                            "POSITIVE_SUPPLY")
         out["vault_owners"] = [a.get("owner") if isinstance(a,dict) else None
                                for a in accounts[2:]]
+        vaults = []
+        for account, expected_mint in zip(accounts[2:], (state["base_mint"], state["quote_mint"])):
+            item = {"owner_is_classic_spl":isinstance(account,dict) and
+                    account.get("owner") == TOKEN_PROGRAM}
+            if item["owner_is_classic_spl"]:
+                try:
+                    token = decode_token_account(_bytes(account))
+                    item["mint_matches_pool"] = token["mint"] == expected_mint
+                    item["authority_matches_pool"] = token["authority"] == address
+                    item["amount_base_units"] = token["amount_base_units"]
+                except (ValueError, KeyError, TypeError, IndexError):
+                    item["layout_supported"] = False
+            vaults.append(item)
+        out["vault_observations"] = vaults
         return out
     except (ValueError, KeyError, TypeError, IndexError) as exc:
         return {"address":address, "status":"SNAPSHOT_UNSUPPORTED",
