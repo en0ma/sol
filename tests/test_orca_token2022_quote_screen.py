@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import patch
-from arb.orca_token2022_quote_screen import screen, diagnostic_failure_category
+from arb.orca_token2022_quote_screen import screen, diagnostic_failure_category, screen_with_rate_limit_retry
 
 A="So11111111111111111111111111111111111111112"
 B="EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
@@ -72,3 +72,32 @@ class QuoteFailureCategoryTests(unittest.TestCase):
             "array_statuses=[{'start_tick': 1144, 'status': 'MISSING'}]"),
             "CURRENT_OR_DIRECTIONAL_TICK_ARRAY_MISSING")
         self.assertEqual(diagnostic_failure_category("unknown failure"),"OTHER_UNQUOTABLE")
+
+class ThrottleRetryTests(unittest.TestCase):
+    @patch("arb.orca_token2022_quote_screen.screen")
+    def test_retry_is_new_complete_snapshot(self,mocked):
+        mocked.side_effect=[RuntimeError("429 Too Many Requests"),
+                            {"status":"INDICATIVE_TOKEN2022_QUOTE_ONLY"}]
+        delays=[]
+        result=screen_with_rate_limit_retry("rpc",POOL,None,100,sleeper=delays.append)
+        self.assertEqual(result["status"],"INDICATIVE_TOKEN2022_QUOTE_ONLY")
+        self.assertEqual(mocked.call_count,2)
+        self.assertEqual(delays,[1.5])
+
+    @patch("arb.orca_token2022_quote_screen.screen")
+    def test_missing_tick_array_is_never_retried(self,mocked):
+        mocked.side_effect=ValueError("missing tick coverage")
+        delays=[]
+        with self.assertRaisesRegex(ValueError,"missing tick coverage"):
+            screen_with_rate_limit_retry("rpc",POOL,None,100,sleeper=delays.append)
+        self.assertEqual(mocked.call_count,1)
+        self.assertEqual(delays,[])
+
+    @patch("arb.orca_token2022_quote_screen.screen")
+    def test_throttling_exhaustion_stays_unquotable(self,mocked):
+        mocked.side_effect=RuntimeError("HTTP 429 Too Many Requests")
+        delays=[]
+        with self.assertRaisesRegex(RuntimeError,"429"):
+            screen_with_rate_limit_retry("rpc",POOL,None,100,sleeper=delays.append)
+        self.assertEqual(mocked.call_count,3)
+        self.assertEqual(delays,[1.5,3.0])
