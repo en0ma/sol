@@ -127,6 +127,12 @@ def main():
             "verified_swaps":sum(x.get("post_swap_balances_verified") is True
                                  for x in observations),
             "observations":observations,
+            "same_fork_exact_quote_matches":sum(
+                x.get("indicative_quote_vs_simulation",{}).get("quote_matches_observed_exactly") is True
+                for x in observations),
+            "same_fork_quote_comparisons":sum(
+                x.get("indicative_quote_vs_simulation") is not None
+                for x in observations),
             "atomic_cycle_simulated":False,
             "profitable_arbitrage_verified":False}
     print(json.dumps(report,indent=2))
