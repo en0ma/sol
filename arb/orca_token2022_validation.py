@@ -37,6 +37,28 @@ def _mint(info):
     return {"owner":owner,"extension_types":extensions,
             "supply":int.from_bytes(raw[36:44],"little"),"decimals":raw[44]}
 
+# IDs from SPL Token-2022 ExtensionType; presence is NOT quote authorization.
+EXTENSION_NAMES={1:"TRANSFER_FEE_CONFIG",3:"MINT_CLOSE_AUTHORITY",
+    4:"CONFIDENTIAL_TRANSFER_MINT",6:"DEFAULT_ACCOUNT_STATE",
+    9:"NON_TRANSFERABLE",10:"INTEREST_BEARING_CONFIG",
+    12:"PERMANENT_DELEGATE",14:"TRANSFER_HOOK",
+    16:"CONFIDENTIAL_TRANSFER_FEE_CONFIG",18:"METADATA_POINTER",
+    19:"TOKEN_METADATA",25:"SCALED_UI_AMOUNT",26:"PAUSABLE"}
+QUOTE_BLOCKING_EXTENSIONS={1,4,6,9,10,12,14,16,25,26}
+
+def extension_risk(mint_accounts):
+    if not isinstance(mint_accounts,list) or len(mint_accounts)!=2:
+        raise ValueError("expected two mint observations")
+    observed=sorted({kind for mint in mint_accounts
+                     for kind in mint["extension_types"]})
+    blocking=sorted({kind for kind in observed
+                     if kind in QUOTE_BLOCKING_EXTENSIONS or kind not in EXTENSION_NAMES})
+    return {"mint_extension_ids":observed,
+            "mint_extension_names":[EXTENSION_NAMES.get(k,"UNKNOWN_"+str(k)) for k in observed],
+            "requires_specialized_quote_support":bool(blocking),
+            "blocking_extension_ids":blocking,
+            "fee_mode_verified":False,"executable_quote":False}
+
 def snapshot(rpc,address):
     seed=fetch_pool(rpc,address)
     addrs=[address,seed["token_vault_a"],seed["token_vault_b"],
@@ -62,9 +84,10 @@ def snapshot(rpc,address):
         vaults.append(obs)
     if vaults[0]["authority"]!=vaults[1]["authority"] or int(pool["liquidity"])<=0:
         raise ValueError("vault authorities differ or active liquidity zero")
+    risks=extension_risk(mints)
     return {"venue":"orca","address":address,"slot":slot,
             "mints":[addrs[3],addrs[4]],"mint_accounts":mints,
-            "vault_accounts":vaults,"structurally_verified":True,
+            "vault_accounts":vaults,"extension_risk":risks,"structurally_verified":True,
             "effective_fee_verified":False,"executable_quote":False,
             "actionable":False,"simulation_verified":False,"broadcast":False}
 
@@ -88,7 +111,7 @@ def main():
             item=snapshot(rpc,address)
             observations.append({"address":address,"structurally_verified":True,
                                  "slot":item["slot"],"mint_accounts":item["mint_accounts"],
-                                 "vault_accounts":item["vault_accounts"],
+                                 "vault_accounts":item["vault_accounts"],"extension_risk":item["extension_risk"],
                                  "actionable":False})
         except Exception as exc:
             observations.append({"address":address,"structurally_verified":False,
