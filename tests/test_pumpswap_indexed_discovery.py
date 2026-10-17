@@ -10,6 +10,10 @@ class PumpSwapIndexedDiscoveryTests(unittest.TestCase):
         self.assertEqual(len(result),1)
         self.assertFalse(result[0]["verified"])
         self.assertEqual(result[0]["venue"],"pumpswap")
+    def test_known_other_dex_is_filtered_before_rpc(self):
+        result=candidates({"data":[{"attributes":{"address":ADDR},
+                                    "relationships":{"dex":{"data":{"id":"raydium"}}}}]})
+        self.assertEqual(result,[])
     def test_invalid_structure_fails_closed(self):
         with self.assertRaises(ValueError):candidates({"data":{}})
     @patch("arb.pool_registry.refresh")
