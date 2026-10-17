@@ -543,6 +543,21 @@ jobs:
         env:
           DEX_DISCOVERY_REPORT: ${{ runner.temp }}/pumpswap-discovery.json
         run: python3 -m arb.onchain_pool_discovery --pairs WSOL/RAY --venues pumpswap --limit 8 --pace-seconds 2 || test "$?" -eq 2
+      - name: Discover and independently validate Meteora DLMM indexed pools
+        continue-on-error: true
+        run: python3 -m arb.indexed_pool_discovery --venue meteora_dlmm --page-size 8 --output "$RUNNER_TEMP/indexed-dlmm-validation.json"
+      - name: Discover and independently validate Meteora DAMM v2 indexed pools
+        continue-on-error: true
+        run: python3 -m arb.indexed_pool_discovery --venue meteora_damm_v2 --page-size 8 --output "$RUNNER_TEMP/indexed-damm-v2-validation.json"
+      - name: Upload indexed Meteora validation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: indexed-meteora-pool-validation
+          path: |
+            ${{ runner.temp }}/indexed-dlmm-validation.json
+            ${{ runner.temp }}/indexed-damm-v2-validation.json
+          if-no-files-found: ignore
       - name: Direct-address validation of externally sourced Meteora candidate
         env:
           POOL_REGISTRY_REPORT: ${{ runner.temp }}/unverified-candidate-validation.json
