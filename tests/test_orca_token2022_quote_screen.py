@@ -29,6 +29,9 @@ class QuoteScreenTests(unittest.TestCase):
         self.assertFalse(result["actionable"])
         self.assertIn("MINT_EXTENSION_1_UNSUPPORTED_FOR_EXECUTION",result["execution_blockers"])
         self.assertIn("SIGNED_ATOMIC_SIMULATION_NOT_VERIFIED",result["execution_blockers"])
+        self.assertEqual(len(result["mint_execution_evidence"]),2)
+        self.assertFalse(result["mint_execution_evidence"][0]["transfer_hook_extra_accounts_verified"])
+        self.assertFalse(result["mint_execution_evidence"][1]["swap_account_metas_verified"])
 
     @patch("arb.orca_token2022_quote_screen.scheduled_epoch_snapshot")
     def test_missing_synchronized_ticks_fails_closed(self,snap):
