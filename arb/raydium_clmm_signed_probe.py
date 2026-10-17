@@ -24,6 +24,8 @@ def probe(rpc,pool,amount=100000):
     from solders.instruction import Instruction,AccountMeta
     wallet=Keypair()
     state=read(rpc,pool)["state"]
+    from arb.raydium_clmm_live_quote import quote_live
+    indicative=quote_live(rpc,pool,state["token_mint_0"],amount)
     owner=wallet.pubkey()
     # Fund only the ephemeral fee payer on the local fork.
     call(rpc,"requestAirdrop",[str(owner),100000000])
@@ -83,6 +85,7 @@ def probe(rpc,pool,amount=100000):
     error=result.get("err")
     logs=result.get("logs")
     reconciliation=None
+    quote_comparison=None
     if error is None:
         from arb.raydium_clmm_signed_simulation import simulate_signed
         # The verifier issues its own signed simulation request and authenticates
@@ -91,6 +94,8 @@ def probe(rpc,pool,amount=100000):
             rpc,wire,input_ata,output_ata,
             state["token_mint_0"],state["token_mint_1"],
             token["amount_base_units"],0,amount,1)
+        from arb.raydium_clmm_quote_reconciliation import compare
+        quote_comparison=compare(indicative,reconciliation)
     return {"status":"SIGNED_SIMULATION_SUCCESS" if error is None else "SIGNED_SIMULATION_FAILED",
             "pool":pool,"amount_in":amount,"simulation_error":error,
             "logs_tail":logs[-8:] if isinstance(logs,list) else [],
@@ -101,6 +106,7 @@ def probe(rpc,pool,amount=100000):
             "synthetic_local_input_tokens":True,
             "post_swap_balances_verified":reconciliation is not None,
             "post_swap_balance_deltas":reconciliation,
+            "indicative_quote_vs_simulation":quote_comparison,
             "executable_route_verified":False,"profitable_arbitrage_verified":False}
 
 def main():
