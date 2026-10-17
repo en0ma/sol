@@ -56,6 +56,116 @@ jobs:
           cat "$RUNNER_TEMP/surfpool.log" >&2
           exit 1
 
+      - name: Enforce arbitrage mission and development priorities
+        run: python3 -m arb.arbitrage_mission
+      - name: Test honest venue-coverage capability accounting
+        run: python3 -m unittest discover -s tests -p test_venue_coverage.py -v
+      - name: Test missing-quote venue prioritization across discovered routes
+        run: python3 -m unittest discover -s tests -p test_quote_gap_priorities.py -v
+      - name: Test fail-closed multi-pool route quote screening
+        run: python3 -m unittest discover -s tests -p test_cycle_screen.py -v
+      - name: Test indicative Orca single-tick quote arithmetic
+        run: python3 -m unittest discover -s tests -p test_orca_spot_quote.py -v
+      - name: Test fee-aware CPMM candidate screening
+        run: python3 -m unittest discover -s tests -p test_cpmm_screen.py -v
+      - name: Test verified on-chain CPMM fee config decoding
+        run: python3 -m unittest discover -s tests -p test_cpmm_config.py -v
+      - name: Test integer CPMM amount-aware quote safety
+        run: python3 -m unittest discover -s tests -p test_cpmm_quote.py -v
+      - name: Test conservative residual-token valuation
+        run: python3 -m unittest discover -s tests -p test_whirlpool_accounting.py -v
+      - name: Test Raydium to Orca reverse route wiring
+        run: python3 -m unittest discover -s tests -p test_reverse_sweep.py -v
+      - name: Test jittered RPC rate-limit retries
+        run: python3 -m unittest discover -s tests -p test_rpc_retries.py -v
+      - name: Test on-chain transaction-history discovery
+        run: python3 -m unittest discover -s tests -p test_onchain_history_discovery.py -v
+      - name: Test incremental pool registry ingestion
+        run: python3 -m unittest discover -s tests -p test_pool_registry_ingest.py -v
+      - name: Test persistent pool registry safety checks
+        run: python3 -m unittest discover -s tests -p test_pool_registry.py -v
+      - name: Test Meteora DAMM v2 pool decoder and mint filters
+        run: python3 -m unittest discover -s tests -p test_meteora_damm_v2.py -v
+      - name: Test Meteora DLMM pool layout and mint filters
+        run: python3 -m unittest discover -s tests -p test_meteora_dlmm.py -v
+      - name: Test local-only lookup table guard
+        run: python3 -m unittest discover -s tests -p test_clmm_local_alt.py -v
+      - name: Test versioned transaction lookup-table safety
+        run: python3 -m unittest discover -s tests -p test_clmm_v0.py -v
+      - name: Test new recognized DEX program watchlist safety
+        run: python3 -m unittest discover -s tests -p test_venue_watchlist.py -v
+      - name: Test third-leg owner-aware discovery
+        run: python3 -m unittest discover -s tests -p test_third_leg_owner.py -v
+      - name: Test fail-closed RAY-to-WSOL third-leg readiness
+        run: python3 -m unittest discover -s tests -p test_third_leg_readiness.py -v
+      - name: Test fine-grained exact-output sweep
+        run: python3 -m unittest discover -s tests -p test_three_hop_fine_sweep.py -v
+      - name: Test bounded three-hop output sweep and unknown-fee safety
+        run: python3 -m unittest discover -s tests -p test_three_hop_sweep.py -v
+      - name: Test Orca exact-output return leg serialization
+        run: python3 -m unittest discover -s tests -p test_orca_exact_output_return.py -v
+      - name: Test CLMM simulation post-balance assertions
+        run: python3 -m unittest discover -s tests -p test_raydium_clmm_execution.py -v
+      - name: Test CLMM candidate fixture safety gates
+        run: python3 -m unittest discover -s tests -p test_raydium_clmm_candidates.py -v
+      - name: Test CLMM fork readiness reporting
+        run: python3 -m unittest discover -s tests -p test_clmm_pool_readiness.py -v
+      - name: Test CLMM tick-array PDA start and packed account layout
+        run: python3 -m unittest discover -s tests -p test_raydium_clmm_ticks.py -v
+      - name: Test Raydium CLMM swap v2 instruction serialization
+        run: python3 -m unittest discover -s tests -p test_raydium_clmm_swap.py -v
+      - name: Test signed CLMM swap simulation post-state verifier
+        run: python3 -m unittest discover -s tests -p test_raydium_clmm_signed_simulation.py -v
+      - name: Test fail-closed authenticated CLMM live quote
+        run: python3 -m unittest discover -s tests -p test_raydium_clmm_live_quote.py -v
+      - name: Test Raydium CLMM initialized tick boundaries
+        run: python3 -m unittest discover -s tests -p test_raydium_clmm_tick_decode.py -v
+      - name: Test authenticated Raydium CLMM quote preflight
+        run: python3 -m unittest discover -s tests -p test_raydium_clmm_quote_preflight.py -v
+      - name: Test synchronized Raydium CLMM fee configuration snapshot
+        run: python3 -m unittest discover -s tests -p test_raydium_clmm_fee_snapshot.py -v
+      - name: Test conservative Raydium CLMM within-tick amount quote
+        run: python3 -m unittest discover -s tests -p test_raydium_clmm_within_tick_quote.py -v
+      - name: Test Raydium CLMM packed pool decoder
+        run: python3 -m unittest discover -s tests -p test_raydium_clmm.py -v
+      - name: Test Raydium CLMM discovery filters
+        run: python3 -m unittest discover -s tests -p test_raydium_clmm_filters.py -v
+      - name: Test expanded DEX venue registry
+        run: python3 -m unittest discover -s tests -p test_dex_registry.py -v
+      - name: Test zero-prefixed pubkey decoding
+        run: python3 -m unittest discover -s tests -p test_base58_pubkeys.py -v
+      - name: Test multi-venue arbitrage graph and cycle discovery
+        run: python3 -m unittest discover -s tests -p test_opportunity_graph.py -v
+      - name: Test multi-token on-chain discovery filters
+        run: python3 -m unittest discover -s tests -p test_onchain_pool_discovery.py -v
+      - name: Test bounded route sweep and profit filter
+        run: python3 -m unittest discover -s tests -p test_cross_venue_sweep.py -v
+      - name: Test cross-venue safety gates
+        run: python3 -m unittest discover -s tests -p test_cross_venue.py -v
+      - name: Test Raydium CPMM swap instruction encoding
+        run: python3 -m unittest discover -s tests -p test_raydium_swap.py -v
+      - name: Test Raydium published-pool diagnostic
+        run: python3 -m unittest discover -s tests -p test_raydium_candidate.py -v
+      - name: Test Raydium CPMM on-chain decoder and restricted search
+        run: python3 -m unittest discover -s tests -p test_raydium_cpmm.py -v
+      - name: Test exact-output atomic swap instruction semantics
+        run: python3 -m unittest discover -s tests -p test_whirlpool_exact_output.py -v
+      - name: Test atomic Whirlpool round-trip accounting
+        run: python3 -m unittest discover -s tests -p test_whirlpool_roundtrip.py -v
+      - name: Test actual simulated token balance assertions
+        run: python3 -m unittest discover -s tests -p test_simulated_balances.py -v
+      - name: Test atomic Whirlpool simulation guardrails
+        run: python3 -m unittest discover -s tests -p test_whirlpool_simulation.py -v
+      - name: Test swap preflight safety gates
+        run: python3 -m unittest discover -s tests -p test_whirlpool_preflight.py -v
+      - name: Test Orca swap instruction payload
+        run: python3 -m unittest discover -s tests -p test_whirlpool_swap.py -v
+      - name: Run Whirlpool tick-array math tests
+        run: python3 -m unittest discover -s tests -p test_whirlpool_ticks.py -v
+      - name: Run serialized transaction replay contract tests
+        run: python3 -m unittest arb.transaction_replay.ReplayTests -v
+      - name: Run Whirlpool spot mathematics and market gate tests
+        run: python3 -m unittest arb.whirlpool_market.MarketTests -v
       - name: Run arbitrage arithmetic tests
         env:
           RUN_SURFPOOL_INTEGRATION: '1'
@@ -72,7 +182,8 @@ jobs:
           if-no-files-found: ignore
 
   mainnet-fork-probe:
-    if: ${{ github.event_name == 'workflow_dispatch' }}
+    # Secrets are unavailable to untrusted fork PRs; verify forks on trusted branches/PRs.
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -86,6 +197,17 @@ jobs:
             echo "Configure repository secret SOLANA_MAINNET_RPC_URL to enable fork verification." >&2
             exit 1
           fi
+      - name: Compare upstream RPC methods without retries
+        env:
+          UPSTREAM_RPC_DIAGNOSTIC_REPORT: ${{ runner.temp }}/upstream-rpc-method-diagnostic.json
+        run: python3 -m arb.upstream_rpc_method_diagnostic
+      - name: Upload upstream RPC method comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: upstream-rpc-method-comparison
+          path: ${{ runner.temp }}/upstream-rpc-method-diagnostic.json
+          if-no-files-found: ignore
       - name: Install Surfpool
         run: |
           set -euo pipefail
@@ -111,12 +233,568 @@ jobs:
           else:
               raise SystemExit("Surfpool fork RPC unavailable")
           PY
-      - name: Discover and validate Raydium SOL/USDC pools
-        run: python3 -m arb.discover_raydium --output "$RUNNER_TEMP/discovered-pools.json"
-      - name: Probe DEX program and pool accounts
+      - name: Install transaction serialization dependency
+        run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Screen bounded Orca Token-2022 indicative quotes
+        continue-on-error: true
+        run: python3 -m arb.orca_token2022_quote_screen --limit 15 --gross-input 100000 --output "$RUNNER_TEMP/orca-token2022-quote-screen.json"
+      - name: Upload Orca Token-2022 quote coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orca-token2022-indicative-quote-screen
+          path: ${{ runner.temp }}/orca-token2022-quote-screen.json
+          if-no-files-found: ignore
+      - name: Simulate a signed local transaction
+        run: python3 -m arb.simulate_transfer
+      - name: Decode pinned CLMM current initialized ticks on real fork
+        run: |
+          python3 - <<'PY'
+          import json,os
+          from arb.raydium_clmm_quote_preflight import inspect_authenticated
+          with open("arb/pool_registry.json") as f:
+              pools=json.load(f)["pools"]
+          targets=[p["address"] for p in pools if p["venue"]=="raydium_clmm"]
+          if not targets:raise SystemExit("No pinned CLMM pool")
+          for zero_for_one in (True,False):
+              result=inspect_authenticated(os.environ["SOLANA_RPC_URL"],targets[0],zero_for_one)
+              print(json.dumps(result,indent=2))
+              assert result["simulation_verified"] is False
+              assert result["actionable"] is False
+          PY
+      - name: Attempt signed Raydium CLMM swap on local fork
+        continue-on-error: true
         env:
-          POOL_MANIFEST: ${{ runner.temp }}/discovered-pools.json
+          CLMM_SIGNED_PROBE_REPORT: ${{ runner.temp }}/clmm-signed-probe.json
+        run: python3 -m arb.raydium_clmm_signed_probe
+      - name: Upload signed CLMM swap attempt evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clmm-signed-swap-attempt
+          path: ${{ runner.temp }}/clmm-signed-probe.json
+          if-no-files-found: ignore
+      - name: Attempt signed two-leg atomic CLMM round trip on local fork
+        continue-on-error: true
+        env:
+          ATOMIC_CLMM_PROBE_REPORT: ${{ runner.temp }}/atomic-clmm-roundtrip.json
+        run: python3 -m arb.atomic_clmm_roundtrip_probe
+      - name: Upload signed atomic CLMM round-trip evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clmm-atomic-roundtrip-attempt
+          path: ${{ runner.temp }}/atomic-clmm-roundtrip.json
+          if-no-files-found: ignore
+      - name: Probe authenticated Raydium CLMM exact-input quotes on fork
+        env:
+          CLMM_LIVE_QUOTE_REPORT: ${{ runner.temp }}/clmm-live-quotes.json
+        run: |
+          python3 - <<'PY'
+          import json,os
+          from arb.raydium_clmm_fee_snapshot import read
+          from arb.raydium_clmm_live_quote import quote_live
+          with open("arb/pool_registry.json") as f:
+              pools=json.load(f)["pools"]
+          target=next(p["address"] for p in pools if p["venue"]=="raydium_clmm")
+          rpc=os.environ["SOLANA_RPC_URL"]
+          state=read(rpc,target)["state"]
+          evidence=[]
+          for mint in (state["token_mint_0"],state["token_mint_1"]):
+              for amount in (100000,1000000):
+                  try:
+                      value=quote_live(rpc,target,mint,amount)
+                      evidence.append({"mint_in":mint,"amount":amount,
+                                       "status":"INDICATIVE_QUOTE","output":value["estimated_output_base_units"],
+                                       "actionable":False})
+                  except (ValueError,KeyError,TypeError) as error:
+                      evidence.append({"mint_in":mint,"amount":amount,
+                                       "status":"QUOTE_UNAVAILABLE","reason":str(error)[:180],
+                                       "actionable":False})
+          report={"pool":target,"attempted":len(evidence),
+                  "indicative_quotes":sum(x["status"]=="INDICATIVE_QUOTE" for x in evidence),
+                  "results":evidence,"simulation_verified":False}
+          print(json.dumps(report,indent=2))
+          with open(os.environ["CLMM_LIVE_QUOTE_REPORT"],"w") as f:json.dump(report,f,indent=2)
+          assert report["attempted"]==4
+          PY
+      - name: Upload CLMM indicative quote evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clmm-live-quote-evidence
+          path: ${{ runner.temp }}/clmm-live-quotes.json
+          if-no-files-found: ignore
+      - name: Verify pinned Raydium CLMM trade fee on real fork
+        run: |
+          python3 - <<'PY'
+          import json,os
+          from arb.raydium_clmm_fee_snapshot import read
+          with open("arb/pool_registry.json") as f:
+              pools=json.load(f)["pools"]
+          candidates=[p["address"] for p in pools if p["venue"]=="raydium_clmm"]
+          if not candidates:
+              raise SystemExit("No configured CLMM pool for fork fee validation")
+          result=read(os.environ["SOLANA_RPC_URL"],candidates[0])
+          print(json.dumps({k:v for k,v in result.items() if k!="state"},indent=2))
+          assert result["fee_verified_onchain"]
+          PY
+      - name: Authenticate real PumpSwap fee/config accounts on Surfpool fork
+        env:
+          PUMPSWAP_PREFLIGHT_REPORT: ${{ runner.temp }}/pumpswap-preflight.json
+        run: python3 -m arb.pumpswap_fork_preflight
+      - name: Upload PumpSwap authenticated config evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pumpswap-fork-preflight
+          path: ${{ runner.temp }}/pumpswap-preflight.json
+          if-no-files-found: ignore
+      - name: Probe deployed AMM programs and configured pools
         run: python3 -m arb.fork_probe
+      - name: Report direct on-chain Whirlpool verification
+        continue-on-error: true
+        env:
+          POOL_VERIFICATION_REPORT: ${{ runner.temp }}/whirlpool-report.json
+        run: python3 -m arb.pool_report
+      - name: Upload pool validation status
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: whirlpool-verification-report
+          path: ${{ runner.temp }}/whirlpool-report.json
+          if-no-files-found: ignore
+      - name: Analyze pinned Whirlpool spot state on fork
+        env:
+          WHIRLPOOL_MARKET_REPORT: ${{ runner.temp }}/whirlpool-market.json
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess
+          with open("arb/whirlpool_pools.json") as f:
+              pools=json.load(f)["pools"]
+          if not pools:
+              print("NOT_CONFIGURED: no verified pool; market-state scan unavailable")
+          else:
+              subprocess.run(["python3","-m","arb.whirlpool_market","--output",
+                              os.environ["WHIRLPOOL_MARKET_REPORT"]],check=True)
+          PY
+      - name: Upload market-state report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: whirlpool-market-state
+          path: ${{ runner.temp }}/whirlpool-market.json
+          if-no-files-found: ignore
+      - name: Simulate captured AMM transactions when fixtures exist
+        env:
+          REPLAY_REPORT: ${{ runner.temp }}/replay-report.json
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess
+          with open("arb/replay_cases.json") as f:
+              manifest=json.load(f)
+          if manifest.get("cases"):
+              subprocess.run(["python3","-m","arb.transaction_replay","--output",
+                              os.environ["REPLAY_REPORT"]],check=True)
+          else:
+              with open(os.environ["REPLAY_REPORT"],"w") as f:
+                  json.dump({"status":"NOT_CONFIGURED","passed":False,"results":[]},f)
+              print("NOT_CONFIGURED: captured AMM simulation fixtures unavailable")
+          PY
+      - name: Upload transaction replay report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surfpool-transaction-replay
+          path: ${{ runner.temp }}/replay-report.json
+          if-no-files-found: ignore
+      - name: Inspect nearby on-chain tick arrays
+        run: python3 -m arb.whirlpool_ticks
+      - name: Check on-chain swap account readiness
+        run: |
+          python3 - <<'PY'
+          import json,os
+          from arb.whirlpool_swap import inspect_swap_requirements
+          with open("arb/whirlpool_pools.json") as f: pools=json.load(f)["pools"]
+          for p in pools:
+              print(json.dumps(inspect_swap_requirements(os.environ["SOLANA_RPC_URL"],p["address"]),indent=2))
+          PY
+      - name: Simulate Orca swap preflight on Surfpool
+        continue-on-error: true
+        run: python3 -m arb.whirlpool_preflight
+      - name: Simulate atomic WSOL to USDC Whirlpool swap
+        run: python3 -m arb.whirlpool_simulation
+      - name: Compare Orca exact-input quote model with signed Surfpool balances
+        continue-on-error: true
+        env:
+          ORCA_QUOTE_COMPARISON_REPORT: ${{ runner.temp }}/orca-quote-comparison.json
+        run: python3 -m arb.orca_quote_probe
+      - name: Upload Orca quote comparison evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orca-quote-comparison
+          path: ${{ runner.temp }}/orca-quote-comparison.json
+          if-no-files-found: ignore
+      - name: Simulate atomic WSOL USDC WSOL round trip
+        run: python3 -m arb.whirlpool_roundtrip
+      - name: Check published Raydium CPMM pool against on-chain mints
+        env:
+          RAYDIUM_CANDIDATE_REPORT: ${{ runner.temp }}/raydium-candidate.json
+        run: python3 -m arb.raydium_candidate
+      - name: Upload Raydium candidate report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: raydium-candidate
+          path: ${{ runner.temp }}/raydium-candidate.json
+          if-no-files-found: ignore
+      - name: Simulate real Raydium CPMM SOL to USDC swap
+        run: python3 -m arb.raydium_swap
+      - name: Simulate atomic Orca to Raydium two-venue route
+        run: python3 -m arb.cross_venue
+      - name: Sweep actual atomic cross-venue trade sizes
+        env:
+          CROSS_VENUE_SWEEP_REPORT: ${{ runner.temp }}/cross-venue-sweep.json
+        run: python3 -m arb.cross_venue_sweep
+      - name: Sweep reverse Raydium to Orca routes
+        env:
+          CROSS_VENUE_REVERSE: '1'
+          CROSS_VENUE_SWEEP_REPORT: ${{ runner.temp }}/reverse-sweep.json
+        run: python3 -m arb.cross_venue_sweep
+      - name: Upload reverse sweep evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reverse-cross-venue-sweep
+          path: ${{ runner.temp }}/reverse-sweep.json
+          if-no-files-found: ignore
+      - name: Upload cross-venue sweep evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cross-venue-size-sweep
+          path: ${{ runner.temp }}/cross-venue-sweep.json
+          if-no-files-found: ignore
+      - name: Probe five on-chain DEX venue capability levels
+        env:
+          DEX_VENUE_REPORT: ${{ runner.temp }}/dex-venues.json
+        run: python3 -m arb.dex_registry
+      - name: Upload DEX venue capability report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: onchain-dex-venue-registry
+          path: ${{ runner.temp }}/dex-venues.json
+          if-no-files-found: ignore
+      - name: Verify prospective RAY-to-WSOL third leg via Solana RPC
+        env:
+          THIRD_LEG_REPORT: ${{ runner.temp }}/third-leg-readiness.json
+        run: python3 -m arb.third_leg_readiness
+      - name: Upload third-leg pool verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ray-wsol-third-leg-readiness
+          path: ${{ runner.temp }}/third-leg-readiness.json
+          if-no-files-found: ignore
+      - name: Attempt closed three-venue cycle without broadcast
+        env:
+          THREE_HOP_REPORT: ${{ runner.temp }}/three-hop-cycle.json
+        run: python3 -m arb.three_hop_cycle || test "$?" -eq 2
+      - name: Upload closed-cycle simulation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: three-hop-cycle
+          path: ${{ runner.temp }}/three-hop-cycle.json
+          if-no-files-found: ignore
+      - name: Attempt simulation-only CPMM to CLMM route with local funding
+        env:
+          CLMM_SWAP_REPORT: ${{ runner.temp }}/clmm-swap-attempt.json
+        run: python3 -m arb.raydium_clmm_execution
+      - name: Upload CLMM swap attempt evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: raydium-clmm-swap-attempt
+          path: ${{ runner.temp }}/clmm-swap-attempt.json
+          if-no-files-found: ignore
+      - name: Check published CLMM pool candidate against live fork
+        env:
+          CLMM_CANDIDATE_REPORT: ${{ runner.temp }}/clmm-candidates.json
+        run: python3 -m arb.raydium_clmm_candidates
+      - name: Upload Raydium CLMM candidate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: raydium-clmm-candidate
+          path: ${{ runner.temp }}/clmm-candidates.json
+          if-no-files-found: ignore
+      - name: Report pinned CLMM tick-array readiness
+        env:
+          CLMM_PREFLIGHT_REPORT: ${{ runner.temp }}/clmm-readiness.json
+        run: python3 -m arb.clmm_pool_readiness
+      - name: Upload CLMM readiness evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: raydium-clmm-readiness
+          path: ${{ runner.temp }}/clmm-readiness.json
+          if-no-files-found: ignore
+      - name: Scan additional RAY and stablecoin pools on five DEX programs
+        env:
+          DEX_DISCOVERY_REPORT: ${{ runner.temp }}/expanded-pool-discovery.json
+        run: python3 -m arb.onchain_pool_discovery --pairs WSOL/RAY,USDC/RAY --limit 8 --pace-seconds 2 --registry-fallback arb/pool_registry.json || test "$?" -eq 2
+      - name: Attempt independent Meteora DLMM discovery
+        env:
+          DEX_DISCOVERY_REPORT: ${{ runner.temp }}/meteora-dlmm-discovery.json
+        run: python3 -m arb.onchain_pool_discovery --pairs WSOL/RAY --venues meteora_dlmm --limit 8 --pace-seconds 2 || test "$?" -eq 2
+      - name: Attempt independent Meteora DAMM v2 discovery
+        env:
+          DEX_DISCOVERY_REPORT: ${{ runner.temp }}/meteora-damm-v2-discovery.json
+        run: python3 -m arb.onchain_pool_discovery --pairs WSOL/RAY --venues meteora_damm_v2 --limit 8 --pace-seconds 2 || test "$?" -eq 2
+      - name: Attempt independent PumpSwap discovery
+        env:
+          DEX_DISCOVERY_REPORT: ${{ runner.temp }}/pumpswap-discovery.json
+        run: python3 -m arb.onchain_pool_discovery --pairs WSOL/RAY --venues pumpswap --limit 8 --pace-seconds 2 || test "$?" -eq 2
+      - name: Discover and independently validate Meteora DLMM indexed pools
+        continue-on-error: true
+        run: python3 -m arb.indexed_pool_discovery --venue meteora_dlmm --page-size 8 --output "$RUNNER_TEMP/indexed-dlmm-validation.json"
+      - name: Discover and independently validate Meteora DAMM v2 indexed pools
+        continue-on-error: true
+        run: python3 -m arb.indexed_pool_discovery --venue meteora_damm_v2 --page-size 8 --output "$RUNNER_TEMP/indexed-damm-v2-validation.json"
+      - name: Upload indexed Meteora validation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: indexed-meteora-pool-validation
+          path: |
+            ${{ runner.temp }}/indexed-dlmm-validation.json
+            ${{ runner.temp }}/indexed-damm-v2-validation.json
+          if-no-files-found: ignore
+      - name: Discover PumpSwap candidates through GeckoTerminal and validate on-chain
+        continue-on-error: true
+        run: python3 -m arb.pumpswap_indexed_discovery --mints WSOL,USDC,RAY --pages 3 --limit 100 --pace-seconds 7 --output "$RUNNER_TEMP/pumpswap-indexed-validation.json"
+      - name: Upload indexed PumpSwap validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: indexed-pumpswap-pool-validation
+          path: ${{ runner.temp }}/pumpswap-indexed-validation.json
+          if-no-files-found: ignore
+      - name: Diagnose bounded PumpSwap rejected mint snapshots
+        if: always()
+        continue-on-error: true
+        run: |
+          if test -s "$RUNNER_TEMP/pumpswap-indexed-validation.json"; then
+            python3 -m arb.pumpswap_rejection_audit \
+              --rejections "$RUNNER_TEMP/pumpswap-indexed-validation.json" \
+              --limit 20 \
+              --output "$RUNNER_TEMP/pumpswap-rejection-audit.json"
+          else
+            echo "Indexed discovery report missing; mint audit not attempted"
+          fi
+      - name: Upload read-only PumpSwap rejection evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pumpswap-rejected-mint-snapshots
+          path: ${{ runner.temp }}/pumpswap-rejection-audit.json
+          if-no-files-found: ignore
+      - name: Discover PumpSwap-specific DEX pools and validate on-chain
+        continue-on-error: true
+        run: python3 -m arb.pumpswap_dex_discovery --pages 3 --limit 60 --pace-seconds 7 --output "$RUNNER_TEMP/pumpswap-dex-validation.json"
+      - name: Upload PumpSwap DEX-wide discovery evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dex-indexed-pumpswap-pool-validation
+          path: ${{ runner.temp }}/pumpswap-dex-validation.json
+          if-no-files-found: ignore
+      - name: Direct-address validation of externally sourced Meteora candidate
+        env:
+          POOL_REGISTRY_REPORT: ${{ runner.temp }}/unverified-candidate-validation.json
+        run: python3 -m arb.pool_registry --registry arb/unverified_pool_candidates.json || test "$?" -eq 1
+      - name: Upload direct-address pool validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: direct-address-pool-validation
+          path: ${{ runner.temp }}/unverified-candidate-validation.json
+          if-no-files-found: ignore
+      - name: Upload independent Meteora and PumpSwap discovery evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: independent-meteora-pumpswap-discovery
+          path: |
+            ${{ runner.temp }}/meteora-dlmm-discovery.json
+            ${{ runner.temp }}/meteora-damm-v2-discovery.json
+            ${{ runner.temp }}/pumpswap-discovery.json
+          if-no-files-found: ignore
+      - name: Upload expanded five-venue pool discovery
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: expanded-five-venue-pool-discovery
+          path: ${{ runner.temp }}/expanded-pool-discovery.json
+          if-no-files-found: ignore
+      - name: Discover cyclic arbitrage routes from verified pool graph
+        env:
+          ARB_GRAPH_REPORT: ${{ runner.temp }}/arbitrage-graph.json
+        run: python3 -m arb.opportunity_graph --extra-pairs ""
+      - name: Upload candidate arbitrage route graph
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: onchain-arbitrage-route-graph
+          path: ${{ runner.temp }}/arbitrage-graph.json
+          if-no-files-found: ignore
+      - name: Screen full discovered arbitrage cycles across trade sizes
+        continue-on-error: true
+        env:
+          CYCLE_SCREEN_REPORT: ${{ runner.temp }}/cycle-screen.json
+          DEX_DISCOVERY_INPUT: ${{ runner.temp }}/expanded-pool-discovery.json
+        run: python3 -m arb.cycle_screen
+      - name: Upload quote coverage and cycle screening
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arbitrage-cycle-screen
+          path: ${{ runner.temp }}/cycle-screen.json
+          if-no-files-found: ignore
+      - name: Screen Raydium CPMM liquidity across trade sizes
+        env:
+          CPMM_QUOTE_REPORT: ${{ runner.temp }}/cpmm-quote-screen.json
+        run: python3 -m arb.cpmm_screen
+      - name: Upload fee-aware CPMM size screening
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpmm-size-screening
+          path: ${{ runner.temp }}/cpmm-quote-screen.json
+          if-no-files-found: ignore
+      - name: Verify Raydium CPMM fee configuration on Surfpool
+        env:
+          CPMM_CONFIG_REPORT: ${{ runner.temp }}/cpmm-config.json
+        run: python3 -m arb.cpmm_config
+      - name: Upload CPMM on-chain fee evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: onchain-cpmm-fee-config
+          path: ${{ runner.temp }}/cpmm-config.json
+          if-no-files-found: ignore
+      - name: Report validated pool and executable venue coverage
+        env:
+          VENUE_COVERAGE_REPORT: ${{ runner.temp }}/venue-coverage.json
+        run: python3 -m arb.venue_coverage
+      - name: Upload arbitrage venue coverage scorecard
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arbitrage-venue-coverage
+          path: ${{ runner.temp }}/venue-coverage.json
+          if-no-files-found: ignore
+      - name: Audit fixed Orca Token-2022 structural cohort
+        continue-on-error: true
+        run: python3 -m arb.orca_token2022_validation --limit 15 --output "$RUNNER_TEMP/orca-token2022-structural.json"
+      - name: Upload fixed Orca Token-2022 structural evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orca-token2022-structural-cohort
+          path: ${{ runner.temp }}/orca-token2022-structural.json
+          if-no-files-found: ignore
+      - name: Probe Orca public API for new on-chain verified Whirlpools
+        continue-on-error: true
+        run: |
+          python3 -m arb.orca_api_discovery --pages 4 --size 50 --min-tvl 10000 --limit 150 --output "$RUNNER_TEMP/orca-public-api-discovery.json"
+      - name: Upload Orca public API validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orca-public-api-discovery
+          path: ${{ runner.temp }}/orca-public-api-discovery.json
+          if-no-files-found: ignore
+      - name: Diagnose rejected Orca public API candidates
+        if: always()
+        run: |
+          if [ -s "$RUNNER_TEMP/orca-public-api-discovery.json" ]; then
+            python3 -m arb.orca_rejection_audit --input "$RUNNER_TEMP/orca-public-api-discovery.json" --output "$RUNNER_TEMP/orca-rejections-diagnostic.json" --limit 50
+          fi
+      - name: Upload Orca rejection account diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orca-public-api-rejection-audit
+          path: ${{ runner.temp }}/orca-rejections-diagnostic.json
+          if-no-files-found: ignore
+      - name: Refresh pinned multi-venue pool registry via targeted RPC
+        env:
+          POOL_REGISTRY_REPORT: ${{ runner.temp }}/pool-registry-refresh.json
+        run: python3 -m arb.pool_registry
+      - name: Upload verified pool registry snapshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verified-pool-registry
+          path: ${{ runner.temp }}/pool-registry-refresh.json
+          if-no-files-found: ignore
+      - name: Discover additional on-chain SOL token pools
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          DEX_DISCOVERY_REPORT: ${{ runner.temp }}/dex-discovery.json
+        run: |
+          python3 -m arb.onchain_pool_discovery --pairs WSOL/RAY,USDC/RAY,WSOL/USDT,USDC/USDT --limit 8 || test "$?" -eq 2
+      - name: Discover pool identities from bounded on-chain transaction history
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          DEX_HISTORY_REPORT: ${{ runner.temp }}/dex-history.json
+        run: python3 -m arb.onchain_history_discovery --venues orca,raydium_cpmm --signatures 3 || test "$?" -eq 2
+      - name: Upload on-chain transaction-history discovery evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: onchain-history-pool-discovery
+          path: ${{ runner.temp }}/dex-history.json
+          if-no-files-found: ignore
+      - name: Revalidate discovery candidates into registry snapshot
+        if: always()
+        env:
+          CANDIDATE_DISCOVERY: ${{ runner.temp }}/expanded-pool-discovery.json
+          HISTORY_DISCOVERY: ${{ runner.temp }}/dex-history.json
+        run: |
+          inputs=()
+          if [ -s "$CANDIDATE_DISCOVERY" ]; then inputs+=(--discovery "$CANDIDATE_DISCOVERY"); fi
+          if [ -s "$HISTORY_DISCOVERY" ]; then inputs+=(--discovery "$HISTORY_DISCOVERY"); fi
+          if [ "${#inputs[@]}" -gt 0 ]; then
+            python3 -m arb.pool_registry_ingest "${inputs[@]}" --output "$RUNNER_TEMP/next-pool-registry.json" || test "$?" -eq 2
+          fi
+      - name: Upload incremental registry snapshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: proposed-pool-registry
+          path: ${{ runner.temp }}/next-pool-registry.json
+          if-no-files-found: ignore
+      - name: Upload multi-token pool discovery results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: onchain-multi-token-discovery
+          path: ${{ runner.temp }}/dex-discovery.json
+          if-no-files-found: ignore
+      - name: Report independently verified Raydium CPMM fixtures
+        run: |
+          python3 -m arb.raydium_cpmm || test "$?" -eq 2
+      - name: Require verified pool fixture for swap-stage readiness
+        env:
+          POOL_VERIFICATION_REPORT: ${{ runner.temp }}/whirlpool-report.json
+        run: python3 -m arb.pool_readiness
+      - name: Test on-chain account discovery against Surfpool
+        run: python3 -m unittest discover -s tests -p test_onchain_discovery.py -v
       - name: Upload fork logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
