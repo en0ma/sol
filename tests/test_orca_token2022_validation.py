@@ -48,7 +48,7 @@ class OrcaToken2022StructuralTests(unittest.TestCase):
         output=snapshot("rpc",POOL)
         self.assertTrue(output["structurally_verified"])
         self.assertEqual(output["slot"],55)
-        self.assertEqual(output["pool"],STATE)
+        self.assertEqual(output["pool"],{"address":POOL,**STATE})
         self.assertEqual(output["mints"],[MA,MB])
         self.assertFalse(output["actionable"])
         self.assertFalse(output["executable_quote"])
