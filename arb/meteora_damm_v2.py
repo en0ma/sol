@@ -33,13 +33,15 @@ def verify(rpc,address,state):
     addresses=[address,state["token_a_vault"],state["token_b_vault"]]
     reply=call(rpc,"getMultipleAccounts",[addresses,{"encoding":"base64","commitment":"confirmed"}])
     values=reply.get("value")
-    if not isinstance(values,list) or len(values)!=3:raise ValueError("missing DAMM v2 accounts")
+    slot=reply.get("context",{}).get("slot")
+    if type(slot)is not int or slot<0 or not isinstance(values,list) or len(values)!=3:
+        raise ValueError("incomplete DAMM v2 synchronized account snapshot")
     pool=values[0]
-    if not pool or pool.get("owner")!=PROGRAM or decode(base64.b64decode(
+    if not pool or pool.get("owner")!=PROGRAM or pool.get("executable") or decode(base64.b64decode(
         pool["data"][0],validate=True))!=state:raise ValueError("DAMM v2 pool changed")
     balances=[];auth=[]
     for key,entry in zip(("token_a_mint","token_b_mint"),values[1:]):
-        if not entry or entry.get("owner")!=TOKEN_PROGRAM:raise ValueError("unsupported SPL vault")
+        if not entry or entry.get("owner")!=TOKEN_PROGRAM or entry.get("executable"):raise ValueError("unsupported SPL vault")
         token=decode_token_account(base64.b64decode(entry["data"][0],validate=True))
         if token["mint"]!=state[key]:raise ValueError("DAMM v2 vault mint mismatch")
         balances.append(token["amount_base_units"]);auth.append(token["authority"])
@@ -48,4 +50,4 @@ def verify(rpc,address,state):
     return {"venue":"meteora_damm_v2","address":address,
             "mints":[state["token_a_mint"],state["token_b_mint"]],
             "vault_base_units":balances,
-            "slot":reply.get("context",{}).get("slot"),"swap_simulated":False}
+            "slot":slot,"swap_simulated":False}
