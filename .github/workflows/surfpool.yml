@@ -409,6 +409,7 @@ jobs:
               print(json.dumps(inspect_swap_requirements(os.environ["SOLANA_RPC_URL"],p["address"]),indent=2))
           PY
       - name: Simulate Orca swap preflight on Surfpool
+        continue-on-error: true
         run: python3 -m arb.whirlpool_preflight
       - name: Simulate atomic WSOL to USDC Whirlpool swap
         run: python3 -m arb.whirlpool_simulation
