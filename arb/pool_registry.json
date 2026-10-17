@@ -160,6 +160,70 @@
         "Ce2gx9KGXJ6C9Mp5b5x1sn9Mg87JwEbrQby4Zqo3pump",
         "So11111111111111111111111111111111111111112"
       ]
+    },
+    {
+      "venue": "pumpswap",
+      "address": "9DMCBmDYtHbiuL1ctf3M4txTV5ZmdqXipkTgQ1LdFYyv",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "CfRbEWpLB8pWUwrkEGMwMtVBFzAsgJhs4LRNpChUBBDi"
+      ]
+    },
+    {
+      "venue": "pumpswap",
+      "address": "Ds2fyB2fnz8F1KjZ8WycHMh2u6aRpjy81errtEtY5nEw",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "DneSmn3NenxC8CMm4vTJUpTYfigZZKWWbyymq8MjFkw3"
+      ]
+    },
+    {
+      "venue": "pumpswap",
+      "address": "7keTBuD7Q9HczsvxRhvQ7uXT5biVLsRgPDSfqEkDFjqm",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "3TbrqvTKoVDJNWQe5t4f3KAHVLE8iEsL9vdGJd5ximwh"
+      ]
+    },
+    {
+      "venue": "pumpswap",
+      "address": "2oaQZSyrPESA5Ud6WunKnm8qewhxRmoys6r9X9oR7bMf",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "BP172LqcuPuADw7WtYg961dVQ778xC6zc1pvm6NfZSR"
+      ]
+    },
+    {
+      "venue": "pumpswap",
+      "address": "8dvFN9YTbWW3Lo6zV9Uxs6Mzkgg6fyuA6vAYDN94twvN",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "EjPr9rQuavUaSMs2HHsbPdAi5KWfvwwF2r1AdW9kRkLR"
+      ]
+    },
+    {
+      "venue": "pumpswap",
+      "address": "9gxCdLJQbnXkZ3tiYTPqXtyTjoKXo6J7cY3y3r48Xu4e",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "BcczGav161jFJmdYTpKLco1TEEkhitsEjr7WqBnvbanW"
+      ]
+    },
+    {
+      "venue": "pumpswap",
+      "address": "B57zWTQreCGHkFcY8fd372tBLzhP7oQHnX9DmxmTcsBF",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "5cYCnK4mcawrY7tofiERjPr97MceNwiV5iNMY3Sj9hSQ"
+      ]
+    },
+    {
+      "venue": "pumpswap",
+      "address": "DNJTX1uZU87hBr9mbza9C5WJKP2zgu6gfaEVUT6ov7Gp",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "MFmKFZqoaQ7qN4VsSM8F7E2TnvxWaxoteK2jUmN1wjs"
+      ]
     }
   ]
 }
