@@ -560,7 +560,7 @@ jobs:
           if-no-files-found: ignore
       - name: Discover PumpSwap candidates through GeckoTerminal and validate on-chain
         continue-on-error: true
-        run: python3 -m arb.pumpswap_indexed_discovery --mints WSOL,USDC --limit 20 --output "$RUNNER_TEMP/pumpswap-indexed-validation.json"
+        run: python3 -m arb.pumpswap_indexed_discovery --mints WSOL,USDC,RAY --pages 3 --limit 100 --output "$RUNNER_TEMP/pumpswap-indexed-validation.json"
       - name: Upload indexed PumpSwap validation evidence
         if: always()
         uses: actions/upload-artifact@v4
