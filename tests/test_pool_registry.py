@@ -3,6 +3,25 @@ from unittest.mock import patch
 from arb.pool_registry import refresh
 from arb.orca_whirlpool import SOL,USDC
 class RegistryTests(unittest.TestCase):
+    def test_committed_registry_hints_are_unique_and_non_executable(self):
+        import json
+        from pathlib import Path
+        from arb.onchain_pool_discovery import VENUES
+        registry=Path(__file__).resolve().parents[1]/"arb"/"pool_registry.json"
+        entries=json.loads(registry.read_text())["pools"]
+        self.assertLessEqual(len(entries),200)
+        self.assertEqual(len(entries),
+                         len({(e["venue"],e["address"]) for e in entries}))
+        for entry in entries:
+            self.assertIn(entry["venue"],VENUES)
+            self.assertIsInstance(entry["address"],str)
+            self.assertTrue(32 <= len(entry["address"]) <= 44)
+            self.assertNotIn("actionable",entry)
+            self.assertNotIn("verified",entry)
+            if entry["venue"] == "pumpswap":
+                self.assertEqual(len(entry["mints"]),2)
+                self.assertEqual(len(set(entry["mints"])),2)
+
     def test_unbounded_rejected(self):
         with self.assertRaises(ValueError):refresh("rpc",[{}]*201)
     @patch("arb.pool_registry.verify")
