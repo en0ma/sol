@@ -33,8 +33,8 @@ def score_cycle(route,pool_index,fee_index,input_amount,network_fee=None,max_slo
         if not isinstance(leg,dict) or leg.get("input")!=current or not isinstance(leg.get("output"),str) or not leg["output"]:
             return {"status":"UNQUOTABLE","reason":"disconnected cycle topology","legs_quoted":0,"actionable":False}
         key=(leg.get("venue"),leg.get("pool"))
-        if any(not isinstance(v,str) or not v for v in key) or key in seen:
-            return {"status":"UNQUOTABLE","reason":"invalid or reused cycle pool","legs_quoted":0,"actionable":False}
+        if any(not isinstance(v,str) or not v for v in key):
+            return {"status":"UNQUOTABLE","reason":"invalid cycle pool","legs_quoted":0,"actionable":False}
         seen.add(key)
         current=leg["output"]
     if current!=start:
