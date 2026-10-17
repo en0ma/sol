@@ -558,6 +558,16 @@ jobs:
             ${{ runner.temp }}/indexed-dlmm-validation.json
             ${{ runner.temp }}/indexed-damm-v2-validation.json
           if-no-files-found: ignore
+      - name: Discover PumpSwap candidates through GeckoTerminal and validate on-chain
+        continue-on-error: true
+        run: python3 -m arb.pumpswap_indexed_discovery --mints WSOL,USDC --limit 20 --output "$RUNNER_TEMP/pumpswap-indexed-validation.json"
+      - name: Upload indexed PumpSwap validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: indexed-pumpswap-pool-validation
+          path: ${{ runner.temp }}/pumpswap-indexed-validation.json
+          if-no-files-found: ignore
       - name: Direct-address validation of externally sourced Meteora candidate
         env:
           POOL_REGISTRY_REPORT: ${{ runner.temp }}/unverified-candidate-validation.json
