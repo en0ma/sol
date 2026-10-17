@@ -40,7 +40,8 @@ def search_pair(rpc,venue,mint_a,mint_b,limit=8,pace_seconds=0):
         if size is not None:filters.insert(0,{"dataSize":size})
         config={"encoding":"base64","commitment":"confirmed","filters":filters}
         if pace_seconds:time.sleep(pace_seconds)
-        response=call(rpc,"getProgramAccounts",[program,config],timeout=45)
+        response=call(rpc,"getProgramAccounts",[program,config],timeout=45,
+                      retries=4,base_delay=1.0,max_delay=12.0)
         if not isinstance(response,list):
             raise ValueError("unexpected getProgramAccounts result")
         # Fail closed: no silent trimming of incomplete discovery results.
