@@ -34,9 +34,11 @@ def screen(rpc,address,input_mint,gross_input):
             raise
         from arb.whirlpool_ticks import start_tick
         current_start=start_tick(state["tick_current_index"],state["tick_spacing"])
-        statuses=[{"start_tick":a.get("start_tick"),"status":a.get("status")}
+        statuses=[{"start_tick":a.get("start_tick"),"address":a.get("address"),
+                   "status":a.get("status")}
                   for a in arrays]
         raise ValueError("missing tick coverage: "+
+                         f"current_tick={state['tick_current_index']} tick_spacing={state['tick_spacing']} "
                          f"current_start={current_start} direction="+
                          ("a_to_b" if input_mint==mints[0] else "b_to_a")+
                          f" array_statuses={statuses}") from exc
