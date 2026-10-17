@@ -5,20 +5,16 @@ and the existing indicative multi-tick AMM model. NO execution authorization.
 """
 from arb.token2022_epoch_observation import scheduled_epoch_snapshot
 from arb.token2022_transfer_amounts import net_received
-from arb.whirlpool_ticks import inspect
 from arb.orca_multitick_quote import quote_from_decoded_arrays
 
 def screen(rpc,address,input_mint,gross_input):
     if type(gross_input) is not int or not 0<gross_input<2**64:
         raise ValueError("invalid input amount")
-    observed=scheduled_epoch_snapshot(rpc,address)
-    ticks=inspect(rpc,address)
+    observed=scheduled_epoch_snapshot(rpc,address,include_ticks=True)
     state=observed["pool"]
-    if ticks.get("pool")!=address or ticks.get("pool_state")!=state:
-        raise ValueError("pool changed between mint and tick observations")
-    if type(ticks.get("slot")) is not int or ticks["slot"]!=observed["slot"]:
-        raise ValueError("tick arrays and mint/vault snapshot are not same-slot: "
-                         f"mint_vault_slot={observed['slot']} tick_slot={ticks.get('slot')}")
+    arrays=observed["tick_arrays"]
+    if not isinstance(arrays,list) or not arrays:
+        raise ValueError("missing synchronized tick-array evidence")
     mints=observed["mints"]
     if input_mint is None and len(mints)==2:
         input_mint=mints[0]  # diagnostic-only default direction
@@ -31,7 +27,7 @@ def screen(rpc,address,input_mint,gross_input):
     if before["net_base_units"]<=0:
         raise ValueError("input fully consumed by transfer fee")
     quote=quote_from_decoded_arrays(state,input_mint,before["net_base_units"],
-                                    ticks["arrays"])
+                                    arrays)
     gross_output=quote.get("estimated_output_base_units")
     if type(gross_output) is not int or not 0<gross_output<2**64:
         raise ValueError("unusable indicative AMM output")
