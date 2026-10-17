@@ -20,7 +20,7 @@ def epoch_anchored_snapshot(rpc,address,max_slot_spread=32):
     if type(max_slot_spread) is not int or not 0<=max_slot_spread<=128:
         raise ValueError("invalid epoch observation bound")
     before=_epoch_info(call(rpc,"getEpochInfo",[{"commitment":"confirmed"}]))
-    checked=snapshot(rpc,address)
+    checked=snapshot(rpc,address,min_context_slot=before[1])
     after=_epoch_info(call(rpc,"getEpochInfo",[{"commitment":"confirmed"}]))
     epoch=before[0]
     if before[0]!=after[0] or not before[1]<=checked["slot"]<=after[1]:
