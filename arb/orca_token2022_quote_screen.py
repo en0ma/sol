@@ -77,7 +77,8 @@ def diagnostic_failure_category(reason):
         return "TICK_SLOT_MISMATCH"
     if "pool changed between mint and tick observations" in reason:
         return "POOL_STATE_CHANGED"
-    if "missing tick coverage: current_start=" in reason and "\'status\': \'MISSING\'" in reason:
+    if ("missing tick coverage:" in reason and
+            "current_start=" in reason and "\'status\': \'MISSING\'" in reason):
         return "CURRENT_OR_DIRECTIONAL_TICK_ARRAY_MISSING"
     if "missing or unsupported tick array" in reason or "missing tick coverage" in reason:
         return "TICK_COVERAGE_INCOMPLETE"
