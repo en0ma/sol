@@ -24,7 +24,10 @@ def epoch_anchored_snapshot(rpc,address,max_slot_spread=32):
     after=_epoch_info(call(rpc,"getEpochInfo",[{"commitment":"confirmed"}]))
     epoch=before[0]
     if before[0]!=after[0] or not before[1]<=checked["slot"]<=after[1]:
-        raise ValueError("epoch observations do not bracket pool snapshot")
+        raise ValueError("epoch observations do not bracket pool snapshot: "
+                         f"before_epoch={before[0]} before_slot={before[1]} "
+                         f"snapshot_slot={checked['slot']} after_epoch={after[0]} "
+                         f"after_slot={after[1]}")
     if after[1]-before[1]>max_slot_spread:
         raise ValueError("epoch observation window too wide")
     configurations=[]
