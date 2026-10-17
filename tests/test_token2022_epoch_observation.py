@@ -20,6 +20,7 @@ class EpochObservationTests(unittest.TestCase):
         self.assertEqual(result["mint_fee_schedules"][0]["maximum_fee"],50)
         self.assertFalse(result["effective_fee_verified"])
         self.assertFalse(result["actionable"])
+        snapshot.assert_called_once_with("rpc","pool",min_context_slot=100)
 
     @patch("arb.token2022_epoch_observation.snapshot")
     @patch("arb.token2022_epoch_observation.call")
