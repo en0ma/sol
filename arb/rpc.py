@@ -1,5 +1,7 @@
 """Dependency-free Solana JSON-RPC with bounded 429 retries and jitter."""
 import json
+from email.utils import parsedate_to_datetime
+from datetime import datetime, timezone
 import random
 import time
 from urllib.error import HTTPError, URLError
@@ -16,6 +18,27 @@ def _throttled(error):
         return ("429" in msg or "too many requests" in msg or
                 "rate limit" in msg or "rate-limit" in msg)
     return False
+
+def _retry_after(error):
+    """HTTP Retry-After delta-seconds or HTTP-date; ignore malformed values."""
+    if not isinstance(error, HTTPError):
+        return None
+    header = error.headers.get("Retry-After") if error.headers else None
+    if not header:
+        return None
+    try:
+        seconds = float(header)
+        if seconds >= 0 and seconds != float("inf"):
+            return seconds
+    except (ValueError, TypeError):
+        try:
+            target = parsedate_to_datetime(header)
+            if target.tzinfo is None:
+                return None
+            return max(0.0, (target - datetime.now(timezone.utc)).total_seconds())
+        except (ValueError, TypeError, OverflowError):
+            pass
+    return None
 
 def call(url, method, params=None, timeout=20, retries=3, base_delay=0.35, max_delay=3.0):
     """Retry ONLY throttling with capped exponential full jitter; fail closed."""
@@ -39,7 +62,12 @@ def call(url, method, params=None, timeout=20, retries=3, base_delay=0.35, max_d
             if not _throttled(exc) or attempt == retries:
                 raise
             delay = min(max_delay, base_delay * (2 ** attempt))
-            time.sleep(random.uniform(0, delay))
+            minimum = _retry_after(exc)
+            # Never retry earlier than Retry-After, but keep total sleep bounded.
+            # A server asking for a longer wait than the budget fails closed.
+            if minimum is not None and minimum > max_delay:
+                raise RPCError("RPC rate limit Retry-After exceeds backoff budget") from exc
+            time.sleep(max(minimum or 0.0, random.uniform(0, delay)))
     raise AssertionError("unreachable")
 
 def inspect_account(url, address, expected_owner=None):
