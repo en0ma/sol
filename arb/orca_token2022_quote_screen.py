@@ -142,7 +142,8 @@ def main():
     failure_categories={category:sum(x.get("reason_category")==category for x in results)
                         for category in sorted({x.get("reason_category") for x in results if x.get("reason_category")})}
     extension_blocked=sum(bool(x.get("extension_risk",{}).get("blocking_extension_ids")) for x in results)
-    report={"checked":len(results),"failure_categories":failure_categories,
+    hook_pool_count=sum(any(m.get("transfer_hook_extension_present") for m in r.get("mint_execution_evidence",[])) for r in results)
+    report={"checked":len(results),"transfer_hook_pool_count":hook_pool_count,"failure_categories":failure_categories,
             "indicative_with_blocking_mint_extensions":extension_blocked,
             "executable_count":0,
             "indicative_count":sum(x.get("status")=="INDICATIVE_TOKEN2022_QUOTE_ONLY" for x in results),
