@@ -47,6 +47,7 @@ class Token2022ObservationTests(unittest.TestCase):
         raw[32:64]=bytes([7])*32
         raw[64:72]=(101).to_bytes(8,"little")
         raw[108]=1
+        raw[165]=2
         account={"owner":TOKEN_2022,"executable":False,
                  "data":[base64.b64encode(raw).decode(),"base64"]}
         obs=observe_vault(account,b58(bytes([3])*32))
