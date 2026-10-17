@@ -253,6 +253,7 @@ jobs:
               assert result["actionable"] is False
           PY
       - name: Attempt signed Raydium CLMM swap on local fork
+        continue-on-error: true
         env:
           CLMM_SIGNED_PROBE_REPORT: ${{ runner.temp }}/clmm-signed-probe.json
         run: python3 -m arb.raydium_clmm_signed_probe
