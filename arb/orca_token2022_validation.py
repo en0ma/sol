@@ -67,3 +67,38 @@ def snapshot(rpc,address):
             "vault_accounts":vaults,"structurally_verified":True,
             "effective_fee_verified":False,"executable_quote":False,
             "actionable":False,"simulation_verified":False,"broadcast":False}
+
+def main():
+    import argparse,json,os
+    from pathlib import Path
+    p=argparse.ArgumentParser()
+    p.add_argument("--cohort",default="arb/orca_token2022_audit_cohort.json")
+    p.add_argument("--output",required=True)
+    p.add_argument("--limit",type=int,default=15)
+    args=p.parse_args()
+    if type(args.limit) is not int or not 1<=args.limit<=50:
+        raise ValueError("invalid structural audit limit")
+    rows=json.loads(Path(args.cohort).read_text())["addresses"]
+    if not isinstance(rows,list) or len(rows)>50 or len(set(rows))!=len(rows):
+        raise ValueError("invalid candidate cohort")
+    rpc=os.environ.get("SOLANA_RPC_URL","http://127.0.0.1:8899")
+    observations=[]
+    for address in rows[:args.limit]:
+        try:
+            item=snapshot(rpc,address)
+            observations.append({"address":address,"structurally_verified":True,
+                                 "slot":item["slot"],"mint_accounts":item["mint_accounts"],
+                                 "vault_accounts":item["vault_accounts"],
+                                 "actionable":False})
+        except Exception as exc:
+            observations.append({"address":address,"structurally_verified":False,
+                                 "error":type(exc).__name__+": "+str(exc)[:180],
+                                 "actionable":False})
+    result={"cohort_size":len(rows),"checked":len(observations),
+            "structurally_verified_count":sum(x["structurally_verified"] for x in observations),
+            "observations":observations,"actionable":False,"mainnet_broadcast":False}
+    Path(args.output).write_text(json.dumps(result,indent=2))
+    print(json.dumps({k:v for k,v in result.items() if k!="observations"},indent=2))
+
+if __name__=="__main__":
+    main()
