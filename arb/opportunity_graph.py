@@ -1,6 +1,6 @@
 """Read-only arbitrage route discovery over VERIFIED on-chain liquidity pools.
 
-Discover all 2-4 hop directed cycles (including same-venue and cross-venue)
+Discover all 2-4 hop directed cycles (including reused same-pool, same-venue and cross-venue)
 without assuming that a pool decoder implies a usable quote or swap encoder.
 No DEX HTTP APIs, fixed paths, mainnet submissions, or invented profit.
 """
@@ -40,7 +40,6 @@ def cycles(pools,anchors=None,max_hops=MAX_HOPS,max_cycles=MAX_CYCLES):
     found=[];identities=set()
     def visit(start,current,path,used,visited):
         for e in edges[current]:
-            if (e["venue"],e["pool"]) in used:continue
             nxt=e["output"]
             new=path+[e]
             if nxt==start:
@@ -56,7 +55,7 @@ def cycles(pools,anchors=None,max_hops=MAX_HOPS,max_cycles=MAX_CYCLES):
                     "simulation_verified":False,"opportunity_confirmed":False})
                 if len(found)>max_cycles:raise ValueError("cycle budget exceeded")
             elif nxt not in visited and len(new)<max_hops:
-                visit(start,nxt,new,used|{(e["venue"],e["pool"])},visited|{nxt})
+                visit(start,nxt,new,used,visited|{nxt})
     for anchor in sorted(anchors & set(edges)):
         visit(anchor,anchor,[],set(),{anchor})
     return found
