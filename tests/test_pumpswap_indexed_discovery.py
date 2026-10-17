@@ -1,5 +1,6 @@
 import unittest
 from unittest.mock import patch
+from urllib.error import HTTPError
 from arb.pumpswap_indexed_discovery import candidates,scan
 ADDR="HtoZbnFf7BDGvPg3RxwiXN5pPG7hLa78XVGscLF9fkYV"
 class PumpSwapIndexedDiscoveryTests(unittest.TestCase):
@@ -19,6 +20,17 @@ class PumpSwapIndexedDiscoveryTests(unittest.TestCase):
     def test_invalid_pagination_fails_closed(self):
         with self.assertRaises(ValueError):
             scan("local",["mint"],limit=2,pages=11)
+
+    @patch("arb.pool_registry.refresh")
+    @patch("arb.pumpswap_indexed_discovery.fetch")
+    def test_indexer_429_is_reported_not_confused_with_invalid_pools(self,fetch,refresh):
+        fetch.side_effect=HTTPError("indexer",429,"Too Many Requests",{},None)
+        refresh.return_value={"verified_count":0,"rejected_count":0,
+                              "verified_pools":[],"rejected":[]}
+        result=scan("local",["mint"],limit=2,pages=2,pace_seconds=0)
+        self.assertEqual(result["indexer_errors"][0]["http_status"],429)
+        self.assertEqual(result["checked_count"],0)
+        self.assertEqual(result["rejected_count"],0)
 
     @patch("arb.pool_registry.refresh")
     @patch("arb.pumpswap_indexed_discovery.fetch")
