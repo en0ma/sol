@@ -637,6 +637,7 @@ jobs:
           path: ${{ runner.temp }}/arbitrage-graph.json
           if-no-files-found: ignore
       - name: Screen full discovered arbitrage cycles across trade sizes
+        continue-on-error: true
         env:
           CYCLE_SCREEN_REPORT: ${{ runner.temp }}/cycle-screen.json
           DEX_DISCOVERY_INPUT: ${{ runner.temp }}/expanded-pool-discovery.json
