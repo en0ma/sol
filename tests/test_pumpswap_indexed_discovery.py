@@ -23,6 +23,23 @@ class PumpSwapIndexedDiscoveryTests(unittest.TestCase):
 
     @patch("arb.pool_registry.refresh")
     @patch("arb.pumpswap_indexed_discovery.fetch")
+    def test_real_ci_mint_rejections_remain_distinct(self,fetch,refresh):
+        fetch.return_value=[{"venue":"pumpswap","address":ADDR,"verified":False}]
+        refresh.return_value={"verified_count":0,"rejected_count":3,
+                              "verified_pools":[],"rejected":[
+            {"reason":"ValueError: invalid PumpSwap base mint supply"},
+            {"reason":"ValueError: missing classic SPL base mint in snapshot"},
+            {"reason":"ValueError: unsupported or uninitialized PumpSwap base mint"}]}
+        result=scan("local",["token"],limit=2,pace_seconds=0)
+        self.assertEqual(result["rejection_categories"],{
+            "ZERO_BASE_MINT_SUPPLY":1,
+            "MISSING_CLASSIC_SPL_BASE_MINT":1,
+            "UNSUPPORTED_OR_UNINITIALIZED_BASE_MINT":1})
+        self.assertEqual(result["verified_pumpswap_count"],0)
+        self.assertFalse(result["mainnet_broadcast"])
+
+    @patch("arb.pool_registry.refresh")
+    @patch("arb.pumpswap_indexed_discovery.fetch")
     def test_indexer_429_is_reported_not_confused_with_invalid_pools(self,fetch,refresh):
         fetch.side_effect=HTTPError("indexer",429,"Too Many Requests",{},None)
         refresh.return_value={"verified_count":0,"rejected_count":0,
