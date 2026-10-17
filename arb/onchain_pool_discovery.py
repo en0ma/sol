@@ -107,21 +107,34 @@ def verify(rpc,venue,address,state):
 def discover(rpc,pairs,limit=8,pace_seconds=0,registry_entries=None):
     results=[];errors=[]
     upstream_rate_limited=False
+    venue_attempts={venue:{"attempted_pairs":0,"verified_pools":0,
+                            "errors":0,"status":"NOT_ATTEMPTED"} for venue in VENUES}
     for a,b in pairs:
         for venue in VENUES:
             if upstream_rate_limited:break
+            stats=venue_attempts[venue]
+            stats["attempted_pairs"]+=1
+            stats["status"]="SEARCHED"
             try:
                 found=search_pair(rpc,venue,a,b,limit,pace_seconds=pace_seconds)
                 for address,state in found.items():
-                    try:results.append(verify(rpc,venue,address,state))
-                    except ValueError as exc:errors.append({"venue":venue,"address":address,"error":str(exc)})
+                    try:
+                        result=verify(rpc,venue,address,state)
+                        results.append(result)
+                        stats["verified_pools"]+=1
+                    except ValueError as exc:
+                        stats["errors"]+=1
+                        errors.append({"venue":venue,"address":address,"error":str(exc)})
             except Exception as exc:
                 message=type(exc).__name__+": "+str(exc)[:250]
+                stats["errors"]+=1
                 errors.append({"venue":venue,"pair":[a,b],"error":message})
-                # Surfpool may proxy GPA reads to a globally rate-limited provider.
-                # Stop the scan instead of hammering it with another 20+ requests.
                 if "429" in message or "too many requests" in message.lower():
                     upstream_rate_limited=True
+                    stats["status"]="RATE_LIMITED"
+    for stats in venue_attempts.values():
+        if stats["status"]=="NOT_ATTEMPTED" and upstream_rate_limited:
+            stats["status"]="SKIPPED_UPSTREAM_RATE_LIMIT"
     fallback = None
     if upstream_rate_limited and registry_entries is not None:
         # Direct address reads avoid globally rate-limited getProgramAccounts.
@@ -142,6 +155,7 @@ def discover(rpc,pairs,limit=8,pace_seconds=0,registry_entries=None):
     return {"status":("UPSTREAM_RATE_LIMITED" if upstream_rate_limited else
                       "COMPLETE" if not errors else "PARTIAL"),
             "pools_verified":len(results),
+            "venue_attempts":venue_attempts,
             "candidate_graph_verified_count":len(combined),
             "candidate_graph_pool_identities":[{"venue":p["venue"],"address":p["address"],
                 "mints":p["mints"],"slot":p["slot"],"swap_simulated":False}
