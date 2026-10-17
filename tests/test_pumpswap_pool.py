@@ -2,6 +2,8 @@ import hashlib
 import unittest
 from unittest.mock import patch
 from arb.pumpswap_pool import BASE_LEN, DISC, decode, verify, PROGRAM
+
+decode_pool_state = decode
 from arb.orca_whirlpool import b58
 
 def raw_pool(virtual=0):
@@ -80,10 +82,8 @@ class PumpSwapPoolTests(unittest.TestCase):
             self, call, decode, config, fee_pda, fee_decode, canonical, token, fee_modes):
         import base64
         from arb.token_vaults import TOKEN_PROGRAM
-        state={"base_mint":"So11111111111111111111111111111111111111112",
-               "quote_mint":b58(bytes([3])*32),
-               "base_vault":b58(bytes([5])*32),
-               "quote_vault":b58(bytes([6])*32)}
+        state=decode_pool_state(raw_pool())
+        state["base_mint"]="So11111111111111111111111111111111111111112"
         state["base_mint"]="So11111111111111111111111111111111111111112"
         decode.return_value=state
         canonical.return_value={"canonical_pool_verified":True,"canonical":False}
