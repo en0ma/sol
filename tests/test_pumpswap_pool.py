@@ -67,3 +67,45 @@ class PumpSwapPoolTests(unittest.TestCase):
         from arb.pumpswap_global_config import ADDRESS
         self.assertEqual(call.call_args.args[2][0][-3],ADDRESS)
         self.assertEqual(call.call_args.args[2][0][-1],state["base_mint"])
+
+    @patch("arb.pumpswap_fee_modes.compare_fee_modes")
+    @patch("arb.token_vaults.decode_token_account")
+    @patch("arb.pumpswap_canonical.classify_pool")
+    @patch("arb.pumpswap_fee_account.decode_authenticated")
+    @patch("arb.pumpswap_fee_account.authenticated_address",return_value=("fee-pda",4))
+    @patch("arb.pumpswap_global_config.decode")
+    @patch("arb.pumpswap_pool.decode")
+    @patch("arb.pumpswap_pool.call")
+    def test_native_wsol_zero_supply_remains_nonactionable(
+            self, call, decode, config, fee_pda, fee_decode, canonical, token, fee_modes):
+        import base64
+        from arb.token_vaults import TOKEN_PROGRAM
+        state={"base_mint":"So11111111111111111111111111111111111111112",
+               "quote_mint":b58(bytes([3])*32),
+               "base_vault":b58(bytes([5])*32),
+               "quote_vault":b58(bytes([6])*32)}
+        state["base_mint"]="So11111111111111111111111111111111111111112"
+        decode.return_value=state
+        canonical.return_value={"canonical_pool_verified":True,"canonical":False}
+        config.return_value={}
+        fee_decode.return_value={"account_authenticated":True}
+        token.side_effect=[
+            {"mint":state["base_mint"],"authority":"pool","amount_base_units":90000},
+            {"mint":state["quote_mint"],"authority":"pool","amount_base_units":100000}]
+        def account(owner,raw=b"data"):
+            return {"owner":owner,"executable":False,
+                    "data":[base64.b64encode(raw).decode(),"base64"]}
+        mint=bytearray(82)
+        mint[45]=1
+        call.return_value={"context":{"slot":99},"value":[
+            account(PROGRAM),account(TOKEN_PROGRAM),account(TOKEN_PROGRAM),
+            account(PROGRAM),account(PROGRAM),account(TOKEN_PROGRAM,bytes(mint))]}
+        verified=verify("rpc","pool",state)
+        self.assertTrue(verified["verified"])
+        self.assertTrue(verified["native_wsol_zero_supply"])
+        self.assertEqual(verified["fee_mode_diagnostic"]["status"],
+                         "NATIVE_WSOL_SUPPLY_FEE_TIER_UNAVAILABLE")
+        self.assertIsNone(verified["fee_tier_candidate"])
+        self.assertFalse(verified["actionable"])
+        self.assertFalse(verified["executable_quote"])
+        fee_modes.assert_not_called()
