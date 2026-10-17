@@ -16,6 +16,10 @@ class PumpSwapIndexedDiscoveryTests(unittest.TestCase):
         self.assertEqual(result,[])
     def test_invalid_structure_fails_closed(self):
         with self.assertRaises(ValueError):candidates({"data":{}})
+    def test_invalid_pagination_fails_closed(self):
+        with self.assertRaises(ValueError):
+            scan("local",["mint"],limit=2,pages=11)
+
     @patch("arb.pool_registry.refresh")
     @patch("arb.pumpswap_indexed_discovery.fetch")
     def test_rpc_validator_controls_admission(self,fetch,refresh):
@@ -26,4 +30,5 @@ class PumpSwapIndexedDiscoveryTests(unittest.TestCase):
         self.assertEqual(result["candidate_count"],1)
         self.assertEqual(result["verified_pumpswap_count"],0)
         self.assertEqual(result["rejected_count"],1)
+        self.assertEqual(result["pages_per_mint"],1)
         self.assertFalse(result["simulation_verified"])
