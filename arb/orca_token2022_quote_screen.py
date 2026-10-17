@@ -19,7 +19,9 @@ def screen(rpc,address,input_mint,gross_input):
     if type(ticks.get("slot")) is not int or ticks["slot"]!=observed["slot"]:
         raise ValueError("tick arrays and mint/vault snapshot are not same-slot")
     mints=observed["mints"]
-    if input_mint is None and len(mints)==2:\n        input_mint=mints[0]  # diagnostic-only default direction\n    if input_mint not in mints or len(mints)!=2 or mints[0]==mints[1]:
+    if input_mint is None and len(mints)==2:
+        input_mint=mints[0]  # diagnostic-only default direction
+    if input_mint not in mints or len(mints)!=2 or mints[0]==mints[1]:
         raise ValueError("input mint not in distinct pool pair")
     index=mints.index(input_mint)
     epoch=observed["epoch_observation"]["epoch"]
