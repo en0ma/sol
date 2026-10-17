@@ -85,6 +85,23 @@ def diagnostic_failure_category(reason):
         return "UPSTREAM_RATE_LIMIT"
     return "OTHER_UNQUOTABLE"
 
+def screen_with_rate_limit_retry(rpc,address,input_mint,gross_input,*,sleeper=None):
+    """Retry a whole read-only snapshot only for upstream throttling.
+
+    Never combine partial observations from separate attempts. All other
+    failures, including absent tick arrays, remain immediate and fail-closed.
+    """
+    if sleeper is None:
+        import time
+        sleeper=time.sleep
+    for attempt in range(3):
+        try:
+            return screen(rpc,address,input_mint,gross_input)
+        except Exception as exc:
+            if diagnostic_failure_category(str(exc))!="UPSTREAM_RATE_LIMIT" or attempt==2:
+                raise
+            sleeper(1.5*(attempt+1))
+
 def main():
     import argparse,json,os
     from pathlib import Path
@@ -105,7 +122,7 @@ def main():
     results=[]
     for address in addresses[:args.limit]:
         try:
-            results.append(screen(rpc,address,None,args.gross_input))
+            results.append(screen_with_rate_limit_retry(rpc,address,None,args.gross_input))
         except Exception as exc:
             reason=type(exc).__name__+": "+str(exc)[:900]
             results.append({"pool":address,"status":"UNQUOTABLE",
