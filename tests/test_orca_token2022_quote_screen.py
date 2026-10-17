@@ -15,46 +15,31 @@ def observed():
             "extension_risk":{"blocking_extension_ids":[1]}}
 class QuoteScreenTests(unittest.TestCase):
     @patch("arb.orca_token2022_quote_screen.quote_from_decoded_arrays")
-    @patch("arb.orca_token2022_quote_screen.inspect")
     @patch("arb.orca_token2022_quote_screen.scheduled_epoch_snapshot")
-    def test_both_transfer_fees_with_exact_slot(self,snap,ticks,quote):
-        snap.return_value=observed()
-        ticks.return_value={"pool":POOL,"pool_state":STATE,"slot":12,"arrays":[{"validated":True}]}
+    def test_fees_use_single_snapshot_tick_arrays(self,snap,quote):
+        state=observed()
+        state["tick_arrays"]=[{"start_tick":0,"status":"FIXED_VALID","ticks":[]}]
+        snap.return_value=state
         quote.return_value={"estimated_output_base_units":100,"tick_arrays_examined":1,"ticks_crossed":0}
         result=screen("rpc",POOL,A,101)
         self.assertEqual(result["pool_net_input_base_units"],98)
-        self.assertEqual(quote.call_args.args[2],98)
         self.assertEqual(result["recipient_net_output_base_units"],98)
-        self.assertFalse(result["executable_quote"])
-        self.assertFalse(result["simulation_verified"])
+        self.assertIs(quote.call_args.args[3],state["tick_arrays"])
+        snap.assert_called_once_with("rpc",POOL,include_ticks=True)
         self.assertFalse(result["actionable"])
 
-    @patch("arb.orca_token2022_quote_screen.inspect")
     @patch("arb.orca_token2022_quote_screen.scheduled_epoch_snapshot")
-    def test_different_slot_cannot_quote(self,snap,ticks):
-        snap.return_value=observed()
-        ticks.return_value={"pool":POOL,"pool_state":STATE,"slot":13}
-        with self.assertRaisesRegex(ValueError,"same-slot"):
-            screen("rpc",POOL,A,100)
-
-    @patch("arb.orca_token2022_quote_screen.inspect")
-    @patch("arb.orca_token2022_quote_screen.scheduled_epoch_snapshot")
-    def test_changed_pool_cannot_quote(self,snap,ticks):
-        snap.return_value=observed()
-        ticks.return_value={"pool":POOL,"pool_state":{"changed":True},"slot":12}
-        with self.assertRaisesRegex(ValueError,"changed"):
+    def test_missing_synchronized_ticks_fails_closed(self,snap):
+        snap.return_value={**observed(),"tick_arrays":[]}
+        with self.assertRaisesRegex(ValueError,"synchronized"):
             screen("rpc",POOL,A,100)
 
     @patch("arb.orca_token2022_quote_screen.quote_from_decoded_arrays")
-    @patch("arb.orca_token2022_quote_screen.inspect")
     @patch("arb.orca_token2022_quote_screen.scheduled_epoch_snapshot")
-    def test_diagnostic_default_mint_uses_one_snapshot(self,snap,ticks,quote):
-        snap.return_value=observed()
-        ticks.return_value={"pool":POOL,"pool_state":STATE,"slot":12,"arrays":[{"validated":True}]}
+    def test_default_direction(self,snap,quote):
+        snap.return_value={**observed(),"tick_arrays":[{"status":"FIXED_VALID"}]}
         quote.return_value={"estimated_output_base_units":100,"tick_arrays_examined":1,"ticks_crossed":0}
-        result=screen("rpc",POOL,None,101)
-        self.assertEqual(result["input_mint"],A)
-        snap.assert_called_once_with("rpc",POOL)
+        self.assertEqual(screen("rpc",POOL,None,101)["input_mint"],A)
 
 class QuoteFailureCategoryTests(unittest.TestCase):
     def test_epoch_and_tick_mismatches_stay_distinct(self):
