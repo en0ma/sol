@@ -47,11 +47,20 @@ def screen(rpc,address,input_mint,gross_input):
         raise ValueError("unusable indicative AMM output")
     after=net_received(observed["mint_accounts"][1-index]["transfer_fee_config"],
                        epoch,gross_output)
+    mint_execution_evidence=[
+        {"mint":mint_address,
+         "token_program":mint_obs["owner"],
+         "mint_extension_ids":mint_obs["extension_types"],
+         "transfer_hook_extension_present":14 in mint_obs["extension_types"],
+         "transfer_hook_extra_accounts_verified":False,
+         "transfer_fee_configured":mint_obs["transfer_fee_config"] is not None,
+         "swap_account_metas_verified":False}
+        for mint_address,mint_obs in zip(mints,observed["mint_accounts"])]
     blockers=["AMM_MODEL_NOT_SIMULATION_RECONCILED","TRANSFER_HOOK_ACCOUNTS_NOT_VERIFIED",
               "SIGNED_ATOMIC_SIMULATION_NOT_VERIFIED"]
     blockers += ["MINT_EXTENSION_"+str(kind)+"_UNSUPPORTED_FOR_EXECUTION"
                  for kind in observed["extension_risk"]["blocking_extension_ids"]]
-    return {"status":"INDICATIVE_TOKEN2022_QUOTE_ONLY","execution_blockers":blockers,"pool":address,
+    return {"status":"INDICATIVE_TOKEN2022_QUOTE_ONLY","execution_blockers":blockers,"mint_execution_evidence":mint_execution_evidence,"pool":address,
             "slot":observed["slot"],"epoch":epoch,"input_mint":input_mint,
             "output_mint":mints[1-index],
             "source_gross_input_base_units":gross_input,
