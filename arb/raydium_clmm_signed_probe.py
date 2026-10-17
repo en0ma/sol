@@ -112,10 +112,26 @@ def probe(rpc,pool,amount=100000):
 def main():
     with open("arb/pool_registry.json") as f: pools=json.load(f)["pools"]
     pool=next(p["address"] for p in pools if p["venue"]=="raydium_clmm")
-    result=probe(os.environ.get("SOLANA_RPC_URL","http://127.0.0.1:8899"),pool)
-    print(json.dumps(result,indent=2))
+    rpc=os.environ.get("SOLANA_RPC_URL","http://127.0.0.1:8899")
+    observations=[]
+    # Fresh ephemeral wallets for each size; each remains simulation-only.
+    for amount in (10000,100000,1000000):
+        try:
+            observations.append(probe(rpc,pool,amount))
+        except (ValueError,KeyError,TypeError) as exc:
+            observations.append({"amount_in":amount,"status":"PROBE_UNAVAILABLE",
+                                 "reason":str(exc)[:240],
+                                 "post_swap_balances_verified":False,
+                                 "profitable_arbitrage_verified":False})
+    report={"pool":pool,"attempted_sizes":len(observations),
+            "verified_swaps":sum(x.get("post_swap_balances_verified") is True
+                                 for x in observations),
+            "observations":observations,
+            "atomic_cycle_simulated":False,
+            "profitable_arbitrage_verified":False}
+    print(json.dumps(report,indent=2))
     if os.environ.get("CLMM_SIGNED_PROBE_REPORT"):
         with open(os.environ["CLMM_SIGNED_PROBE_REPORT"],"w") as f:
-            json.dump(result,f,indent=2)
+            json.dump(report,f,indent=2)
 
 if __name__=="__main__":main()
