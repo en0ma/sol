@@ -259,17 +259,10 @@ def scan(rpc,entries,amounts=(100000,1000000),max_slot_spread=8,extra_entries=()
                          q["start_mint"],
                          -q.get("estimated_gross_base_units", -(10**30)),
                          q["input_base_units"]))
-    # Reference discrepancy is based on one signed RAY->USDC CLMM swap.
-    # Only routes actually containing CLMM get this diagnostic, and it is
-    # never interpreted as a pool-independent executable slippage bound.
-    from arb.quote_uncertainty import classify
-    quote_error_reference_bps=111
-    for q in rankings:
-        if (q["status"]=="INDICATIVE_ONLY" and
-                any(leg["venue"]=="raydium_clmm" for leg in q["route_legs"])):
-            q["single_swap_error_reference"]=classify(
-                q["estimated_gross_base_units"],quote_error_reference_bps,
-                q["estimated_final_base_units"])
+    # Quote accuracy is snapshot-specific: same-fork signed simulations at
+    # 10k, 100k and 1m input units each matched the CLMM quote exactly.
+    # An earlier 111-bps discrepancy came from different fork snapshots.
+    # Do not project it as a global margin haircut on unrelated cycle legs.
     # WSOL base units are lamports. This illustrative one-signature
     # transaction fee floor is NOT a priority fee, rent, ATA or compute quote.
     # Other starting mints have incomparable units and must remain unclassified.
