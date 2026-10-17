@@ -12,6 +12,8 @@ from arb.rpc import call
 from arb.pumpswap_pool import PROGRAM, decode
 from arb.token_vaults import TOKEN_PROGRAM
 
+NATIVE_WS0L_MINT = "So11111111111111111111111111111111111111112"
+
 def _bytes(account):
     if not isinstance(account, dict) or account.get("executable") is not False:
         raise ValueError("missing or executable account")
@@ -57,6 +59,7 @@ def inspect(rpc, address):
                 out["base_supply"] = int.from_bytes(raw[36:44], "little")
                 out["mint_initialized"] = raw[45] == 1
                 out["mint_observation"] = ("UNINITIALIZED" if raw[45] != 1 else
+                                           "NATIVE_WSOL_ZERO_SUPPLY" if out["base_supply"] == 0 and state["base_mint"] == NATIVE_WS0L_MINT else
                                            "ZERO_SUPPLY" if out["base_supply"] == 0 else
                                            "POSITIVE_SUPPLY")
         out["vault_owners"] = [a.get("owner") if isinstance(a,dict) else None
