@@ -32,6 +32,29 @@ class PumpSwapRejectionAuditTests(unittest.TestCase):
         self.assertEqual(result["slot"],123)
         self.assertEqual(result["status"],"OBSERVED_NOT_VALIDATED")
 
+    @patch("arb.pumpswap_rejection_audit.decode_token_account")
+    @patch("arb.pumpswap_rejection_audit.decode")
+    @patch("arb.pumpswap_rejection_audit.call")
+    def test_vault_evidence_cannot_promote_rejected_pool(self, call, decode, decode_token):
+        state={"base_mint":MINT,"quote_mint":"3"*32,
+               "base_vault":VAULT_A,"quote_vault":VAULT_B}
+        decode.return_value=state
+        mint=bytearray(82)
+        mint[45]=1
+        call.side_effect=[
+            {"value":account(PROGRAM)},
+            {"context":{"slot":234},"value":[account(PROGRAM),
+                account(TOKEN_PROGRAM,bytes(mint)),
+                account(TOKEN_PROGRAM),account(TOKEN_PROGRAM)]}]
+        decode_token.side_effect=[
+            {"mint":MINT,"authority":ADDR,"amount_base_units":4000},
+            {"mint":state["quote_mint"],"authority":ADDR,"amount_base_units":5000}]
+        result=inspect("rpc",ADDR)
+        self.assertEqual(result["mint_observation"],"NATIVE_WSOL_ZERO_SUPPLY")
+        self.assertEqual([v["amount_base_units"] for v in result["vault_observations"]],[4000,5000])
+        self.assertTrue(all(v["authority_matches_pool"] for v in result["vault_observations"]))
+        self.assertEqual(result["status"],"OBSERVED_NOT_VALIDATED")
+
     @patch("arb.pumpswap_rejection_audit.decode")
     @patch("arb.pumpswap_rejection_audit.call")
     def test_non_native_zero_supply_remains_distinct(self, call, decode):
