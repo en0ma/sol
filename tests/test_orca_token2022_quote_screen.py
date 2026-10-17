@@ -71,6 +71,11 @@ class QuoteFailureCategoryTests(unittest.TestCase):
             "missing tick coverage: current_start=1144 direction=a_to_b "
             "array_statuses=[{'start_tick': 1144, 'status': 'MISSING'}]"),
             "CURRENT_OR_DIRECTIONAL_TICK_ARRAY_MISSING")
+        self.assertEqual(diagnostic_failure_category(
+            "ValueError: missing tick coverage: current_tick=1160 tick_spacing=1 "
+            "current_start=1144 direction=a_to_b array_statuses="
+            "[{'start_tick': 1144, 'address': '44Zh7USf', 'status': 'MISSING'}]"),
+            "CURRENT_OR_DIRECTIONAL_TICK_ARRAY_MISSING")
         self.assertEqual(diagnostic_failure_category("unknown failure"),"OTHER_UNQUOTABLE")
 
 class ThrottleRetryTests(unittest.TestCase):
