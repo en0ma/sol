@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import patch
-from arb.orca_token2022_quote_screen import screen
+from arb.orca_token2022_quote_screen import screen, diagnostic_failure_category
 
 A="So11111111111111111111111111111111111111112"
 B="EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
@@ -55,3 +55,15 @@ class QuoteScreenTests(unittest.TestCase):
         result=screen("rpc",POOL,None,101)
         self.assertEqual(result["input_mint"],A)
         snap.assert_called_once_with("rpc",POOL)
+
+class QuoteFailureCategoryTests(unittest.TestCase):
+    def test_epoch_and_tick_mismatches_stay_distinct(self):
+        self.assertEqual(diagnostic_failure_category(
+            "epoch observations do not bracket pool snapshot: before_slot=12 snapshot_slot=11"),
+            "EPOCH_OR_POOL_SLOT_MISMATCH")
+        self.assertEqual(diagnostic_failure_category(
+            "tick arrays and mint/vault snapshot are not same-slot: mint_vault_slot=12 tick_slot=13"),
+            "TICK_SLOT_MISMATCH")
+        self.assertEqual(diagnostic_failure_category("upstream RPC 429 Too Many Requests"),
+                         "UPSTREAM_RATE_LIMIT")
+        self.assertEqual(diagnostic_failure_category("unknown failure"),"OTHER_UNQUOTABLE")
