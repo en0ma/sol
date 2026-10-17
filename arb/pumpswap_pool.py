@@ -13,6 +13,7 @@ from arb.token_vaults import TOKEN_PROGRAM, decode_token_account
 PROGRAM = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"
 DISC = hashlib.sha256(b"account:Pool").digest()[:8]
 BASE_LEN = 245
+NATIVE_WSOL_MINT = "So11111111111111111111111111111111111111112"
 
 
 def decode(raw):
@@ -88,7 +89,8 @@ def verify(rpc, address, state):
     if len(mint_data) != 82 or mint_data[45] != 1:
         raise ValueError("unsupported or uninitialized PumpSwap base mint")
     base_supply = int.from_bytes(mint_data[36:44], "little")
-    if base_supply <= 0:
+    native_wsol_zero_supply = (state["base_mint"] == NATIVE_WSOL_MINT and base_supply == 0)
+    if base_supply <= 0 and not native_wsol_zero_supply:
         raise ValueError("invalid PumpSwap base mint supply")
     balances = []
     for account, mint in zip(accounts[1:], (state["base_mint"], state["quote_mint"])):
@@ -104,24 +106,33 @@ def verify(rpc, address, state):
     if min(balances) <= 0 or balances[1] + state["virtual_quote_reserves"] <= 0:
         raise ValueError("empty or invalid effective PumpSwap liquidity")
     from arb.pumpswap_fee_modes import compare_fee_modes
-    fee_modes = compare_fee_modes({
-        "canonical_pool_verified":canonical["canonical_pool_verified"],
-        "canonical":canonical["canonical"],"fee_config":fee_config,
-        "base_mint_supply":base_supply,"base_reserve":balances[0],
-        "quote_vault_balance":balances[1],
-        "virtual_quote_reserves":state["virtual_quote_reserves"]})
+    if native_wsol_zero_supply:
+        # The native mint's zero supply is not a usable market-cap input.
+        # Preserve structural observations, but never invent a fee tier.
+        fee_modes = {"status":"NATIVE_WSOL_SUPPLY_FEE_TIER_UNAVAILABLE",
+                     "candidate_modes":{}, "unavailable_modes":{"standard":"zero native mint supply"},
+                     "rates_equal":False, "fee_mode_verified":False,
+                     "effective_fee_verified":False, "actionable":False}
+    else:
+        fee_modes = compare_fee_modes({
+            "canonical_pool_verified":canonical["canonical_pool_verified"],
+            "canonical":canonical["canonical"],"fee_config":fee_config,
+            "base_mint_supply":base_supply,"base_reserve":balances[0],
+            "quote_vault_balance":balances[1],
+            "virtual_quote_reserves":state["virtual_quote_reserves"]})
     return {"venue": "pumpswap", "address": address, "verified": True,
             "base_mint": state["base_mint"], "quote_mint": state["quote_mint"],
             "base_vault":state["base_vault"],"quote_vault":state["quote_vault"],
             "coin_creator":state["coin_creator"],
             "base_reserve": balances[0], "quote_vault_balance": balances[1],
             "base_mint_supply": base_supply,
+            "native_wsol_zero_supply": native_wsol_zero_supply,
             "virtual_quote_reserves": state["virtual_quote_reserves"],
             "slot": slot, "creator_fee_bps": state["creator_fee_bps"],
             "protocol_fees_accrued": state["protocol_fees"],
             "creator_fees_accrued": state["creator_fees"],
             "global_config": config, "fee_config": fee_config,
-            "fee_tier_candidate": fee_modes["candidate_modes"]["standard"],
+            "fee_tier_candidate": fee_modes["candidate_modes"].get("standard"),
             "fee_mode_diagnostic": fee_modes,
             "canonical": canonical["canonical"],
             "canonical_pool_verified": canonical["canonical_pool_verified"],
