@@ -10,7 +10,10 @@ class AtomicCycleBuilderTests(unittest.TestCase):
                 sign_atomic("http://127.0.0.1:8899",None,legs)
     @patch("arb.atomic_cycle_builder.local_rpc_only")
     def test_rejects_unverified_instruction_types(self,local):
-        from solders.keypair import Keypair
+        try:
+            from solders.keypair import Keypair
+        except ImportError:
+            self.skipTest("solders only installed in Surfpool fork job")
         with self.assertRaisesRegex(ValueError,"verified builders"):
             sign_atomic("http://127.0.0.1:8899",Keypair(),[object(),object()])
     @patch("arb.atomic_cycle_builder.local_rpc_only")
