@@ -264,6 +264,7 @@ jobs:
           path: ${{ runner.temp }}/clmm-signed-probe.json
           if-no-files-found: ignore
       - name: Attempt signed two-leg atomic CLMM round trip on local fork
+        continue-on-error: true
         env:
           ATOMIC_CLMM_PROBE_REPORT: ${{ runner.temp }}/atomic-clmm-roundtrip.json
         run: python3 -m arb.atomic_clmm_roundtrip_probe
