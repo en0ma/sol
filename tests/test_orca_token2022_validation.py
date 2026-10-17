@@ -2,7 +2,7 @@ import base64
 import unittest
 from unittest.mock import patch
 
-from arb.orca_token2022_validation import snapshot
+from arb.orca_token2022_validation import snapshot, extension_risk
 from arb.orca_whirlpool import PROGRAM, b58
 from arb.token2022_extensions import TOKEN_2022
 from arb.token_vaults import TOKEN_PROGRAM
@@ -72,3 +72,26 @@ class OrcaToken2022StructuralTests(unittest.TestCase):
         call.return_value={"value":[]}
         with self.assertRaises(ValueError):
             snapshot("rpc",POOL)
+
+class Token2022ExtensionRiskTests(unittest.TestCase):
+    def test_transfer_fee_and_hook_require_specialized_quote(self):
+        risk=extension_risk([
+            {"extension_types":[3,18,19,1,14]},
+            {"extension_types":[]}])
+        self.assertEqual(risk["blocking_extension_ids"],[1,14])
+        self.assertTrue(risk["requires_specialized_quote_support"])
+        self.assertFalse(risk["fee_mode_verified"])
+        self.assertFalse(risk["executable_quote"])
+
+    def test_unknown_extension_fails_closed_for_quoting(self):
+        risk=extension_risk([
+            {"extension_types":[65535]},{"extension_types":[]}])
+        self.assertEqual(risk["blocking_extension_ids"],[65535])
+        self.assertFalse(risk["executable_quote"])
+
+    def test_metadata_only_still_needs_quote_authentication(self):
+        risk=extension_risk([
+            {"extension_types":[3,18,19]},{"extension_types":[]}])
+        self.assertEqual(risk["blocking_extension_ids"],[])
+        self.assertFalse(risk["fee_mode_verified"])
+        self.assertFalse(risk["executable_quote"])
