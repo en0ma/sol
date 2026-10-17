@@ -78,7 +78,7 @@ def snapshot(rpc,address,*,min_context_slot=None):
         raise ValueError("missing synchronized pool/vault/mint snapshot")
     if min_context_slot is not None and slot<min_context_slot:
         raise ValueError("RPC returned stale account snapshot despite minContextSlot")
-    pool=decode(_raw(values[0],PROGRAM))
+    pool={"address":address,**decode(_raw(values[0],PROGRAM))}
     if (pool["token_vault_a"]!=addrs[1] or pool["token_vault_b"]!=addrs[2] or
             pool["token_mint_a"]!=addrs[3] or pool["token_mint_b"]!=addrs[4]):
         raise ValueError("pool state changed before synchronized snapshot")
