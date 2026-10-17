@@ -237,7 +237,7 @@ jobs:
         run: python3 -m pip install --disable-pip-version-check solders==0.26.0
       - name: Screen bounded Orca Token-2022 indicative quotes
         continue-on-error: true
-        run: python3 -m arb.orca_token2022_quote_screen --limit 3 --gross-input 100000 --output "$RUNNER_TEMP/orca-token2022-quote-screen.json"
+        run: python3 -m arb.orca_token2022_quote_screen --limit 15 --gross-input 100000 --output "$RUNNER_TEMP/orca-token2022-quote-screen.json"
       - name: Upload Orca Token-2022 quote coverage
         if: always()
         uses: actions/upload-artifact@v4
