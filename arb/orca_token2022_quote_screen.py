@@ -19,7 +19,7 @@ def screen(rpc,address,input_mint,gross_input):
     if type(ticks.get("slot")) is not int or ticks["slot"]!=observed["slot"]:
         raise ValueError("tick arrays and mint/vault snapshot are not same-slot")
     mints=observed["mints"]
-    if input_mint not in mints or len(mints)!=2 or mints[0]==mints[1]:
+    if input_mint is None and len(mints)==2:\n        input_mint=mints[0]  # diagnostic-only default direction\n    if input_mint not in mints or len(mints)!=2 or mints[0]==mints[1]:
         raise ValueError("input mint not in distinct pool pair")
     index=mints.index(input_mint)
     epoch=observed["epoch_observation"]["epoch"]
@@ -70,9 +70,7 @@ def main():
     results=[]
     for address in addresses[:args.limit]:
         try:
-            state=epoch_anchored_snapshot(rpc,address)
-            mint=state["mints"][0]
-            results.append(screen(rpc,address,mint,args.gross_input))
+            results.append(screen(rpc,address,None,args.gross_input))
         except Exception as exc:
             results.append({"pool":address,"status":"UNQUOTABLE",
                             "reason":type(exc).__name__+": "+str(exc)[:180],
