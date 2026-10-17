@@ -274,6 +274,8 @@ def scan(rpc,entries,amounts=(100000,1000000),max_slot_spread=8,extra_entries=()
     wsol_below_signature_fee=sum(
         x["estimated_gross_base_units"]<=signature_fee_reference_lamports
         for x in wsol_gross_positive)
+    from arb.cross_pool_candidate_queue import shortlist
+    cross_pool_queue=shortlist(rankings)
     return {"status":"PARTIAL" if fee_errors else "COMPLETE",
         "validated_pools":len(pools),"cycles_discovered":len(graph),
         "screened_size_routes":len(rankings),
@@ -283,6 +285,8 @@ def scan(rpc,entries,amounts=(100000,1000000),max_slot_spread=8,extra_entries=()
         "max_pool_slot_spread":max_slot_spread,
         "unquotable_routes":sum(x["status"]=="UNQUOTABLE" for x in rankings),
         "candidate_rankings":rankings[:100],
+        "cross_pool_simulation_queue":cross_pool_queue,
+        "cross_pool_simulation_queue_count":len(cross_pool_queue),
         "indicative_positive_gross_count":sum(x["status"]=="INDICATIVE_ONLY" and x.get("estimated_gross_base_units",0)>0 for x in rankings),
         "orca_tick_snapshots":len(orca_evidence),
         "orca_array_gap_evidence":orca_array_gaps,
