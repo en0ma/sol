@@ -26,8 +26,20 @@ def screen(rpc,address,input_mint,gross_input):
                         epoch,gross_input)
     if before["net_base_units"]<=0:
         raise ValueError("input fully consumed by transfer fee")
-    quote=quote_from_decoded_arrays(state,input_mint,before["net_base_units"],
-                                    arrays)
+    try:
+        quote=quote_from_decoded_arrays(state,input_mint,before["net_base_units"],
+                                        arrays)
+    except ValueError as exc:
+        if "tick array" not in str(exc) and "tick coverage" not in str(exc):
+            raise
+        from arb.whirlpool_ticks import start_tick
+        current_start=start_tick(state["tick_current_index"],state["tick_spacing"])
+        statuses=[{"start_tick":a.get("start_tick"),"status":a.get("status")}
+                  for a in arrays]
+        raise ValueError("missing tick coverage: "+
+                         f"current_start={current_start} direction="+
+                         ("a_to_b" if input_mint==mints[0] else "b_to_a")+
+                         f" array_statuses={statuses}") from exc
     gross_output=quote.get("estimated_output_base_units")
     if type(gross_output) is not int or not 0<gross_output<2**64:
         raise ValueError("unusable indicative AMM output")
