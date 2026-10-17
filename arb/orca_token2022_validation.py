@@ -61,16 +61,23 @@ def extension_risk(mint_accounts):
             "blocking_extension_ids":blocking,
             "fee_mode_verified":False,"executable_quote":False}
 
-def snapshot(rpc,address):
+def snapshot(rpc,address,*,min_context_slot=None):
+    if min_context_slot is not None and (type(min_context_slot)is not int or min_context_slot<0):
+        raise ValueError("invalid minimum context slot")
     seed=fetch_pool(rpc,address)
     addrs=[address,seed["token_vault_a"],seed["token_vault_b"],
            seed["token_mint_a"],seed["token_mint_b"]]
     if len(set(addrs))!=5:raise ValueError("pool, vault and mint accounts overlap")
-    response=call(rpc,"getMultipleAccounts",[addrs,{"encoding":"base64","commitment":"confirmed"}])
+    options={"encoding":"base64","commitment":"confirmed"}
+    if min_context_slot is not None:
+        options["minContextSlot"]=min_context_slot
+    response=call(rpc,"getMultipleAccounts",[addrs,options])
     slot=response.get("context",{}).get("slot")
     values=response.get("value")
     if not isinstance(slot,int) or not isinstance(values,list) or len(values)!=5:
         raise ValueError("missing synchronized pool/vault/mint snapshot")
+    if min_context_slot is not None and slot<min_context_slot:
+        raise ValueError("RPC returned stale account snapshot despite minContextSlot")
     pool=decode(_raw(values[0],PROGRAM))
     if (pool["token_vault_a"]!=addrs[1] or pool["token_vault_b"]!=addrs[2] or
             pool["token_mint_a"]!=addrs[3] or pool["token_mint_b"]!=addrs[4]):
