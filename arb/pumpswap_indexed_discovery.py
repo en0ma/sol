@@ -82,8 +82,14 @@ def scan(rpc,mints,limit=30,pages=1,pace_seconds=7):
         reason=item.get("reason","UNKNOWN").lower()
         if "owner mismatch" in reason or "incorrectly owned" in reason:
             category="OTHER_PROGRAM"
-        elif "supply" in reason or "mint" in reason:
-            category="UNSUPPORTED_MINT_OR_TOKEN"
+        elif "invalid pumpswap base mint supply" in reason:
+            category="ZERO_BASE_MINT_SUPPLY"
+        elif "missing classic spl base mint" in reason:
+            category="MISSING_CLASSIC_SPL_BASE_MINT"
+        elif "unsupported or uninitialized pumpswap base mint" in reason:
+            category="UNSUPPORTED_OR_UNINITIALIZED_BASE_MINT"
+        elif "mint" in reason or "supply" in reason:
+            category="OTHER_MINT_OR_TOKEN_FAILURE"
         elif "fee" in reason or "config" in reason:
             category="FEE_OR_CONFIG_UNVERIFIED"
         else:
