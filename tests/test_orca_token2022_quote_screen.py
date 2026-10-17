@@ -27,6 +27,8 @@ class QuoteScreenTests(unittest.TestCase):
         self.assertIs(quote.call_args.args[3],state["tick_arrays"])
         snap.assert_called_once_with("rpc",POOL,include_ticks=True)
         self.assertFalse(result["actionable"])
+        self.assertIn("MINT_EXTENSION_1_UNSUPPORTED_FOR_EXECUTION",result["execution_blockers"])
+        self.assertIn("SIGNED_ATOMIC_SIMULATION_NOT_VERIFIED",result["execution_blockers"])
 
     @patch("arb.orca_token2022_quote_screen.scheduled_epoch_snapshot")
     def test_missing_synchronized_ticks_fails_closed(self,snap):
