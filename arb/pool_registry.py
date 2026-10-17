@@ -45,7 +45,11 @@ def refresh(rpc,entries):
         graph.setdefault(key,[]).append({"venue":pool["venue"],"address":pool["address"]})
     shared=[{"mints":list(pair),"pools":pools} for pair,pools in graph.items()
             if len({p["venue"] for p in pools})>1]
+    coverage={name:{"validated_pools":sum(p["venue"]==name for p in valid),
+                    "rejected_pools":sum(p.get("venue")==name for p in rejected)}
+              for name in VENUES}
     return {"status":"COMPLETE" if not rejected else "PARTIAL",
+            "venue_validation_coverage":coverage,
             "verified_count":len(valid),"rejected_count":len(rejected),
             "verified_pools":valid,"rejected":rejected,"shared_pairs":shared,
             "opportunities_executed":0,"broadcast":False}
