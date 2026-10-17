@@ -103,7 +103,7 @@ def main():
         try:
             results.append(screen(rpc,address,None,args.gross_input))
         except Exception as exc:
-            reason=type(exc).__name__+": "+str(exc)[:180]
+            reason=type(exc).__name__+": "+str(exc)[:900]
             results.append({"pool":address,"status":"UNQUOTABLE",
                             "reason_category":diagnostic_failure_category(reason),
                             "reason":reason,
