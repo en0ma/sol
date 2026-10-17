@@ -36,7 +36,7 @@ def inspect(rpc, address):
         accounts = snapshot.get("value")
         if type(slot) is not int or not isinstance(accounts, list) or len(accounts) != 4:
             raise ValueError("incomplete snapshot")
-        if (accounts[0].get("owner") != PROGRAM or
+        if (not isinstance(accounts[0], dict) or accounts[0].get("owner") != PROGRAM or
                 decode(_bytes(accounts[0])) != state):
             raise ValueError("pool changed in snapshot")
         mint = accounts[1]
@@ -69,6 +69,8 @@ def inspect(rpc, address):
 def audit(rpc, report, limit=20):
     if type(limit) is not int or not 1 <= limit <= 20:
         raise ValueError("invalid audit budget")
+    if not isinstance(report, dict):
+        raise ValueError("invalid rejection report")
     rejected = report.get("rejections")
     if not isinstance(rejected, list):
         raise ValueError("missing rejected candidates")
@@ -81,7 +83,12 @@ def audit(rpc, report, limit=20):
                 or not 32 <= len(address) <= 44 or address in seen):
             continue
         seen.add(address)
-        checked.append(inspect(rpc,address))
+        try:
+            observation = inspect(rpc,address)
+        except Exception as exc:
+            observation = {"address":address, "status":"RPC_OR_SNAPSHOT_ERROR",
+                           "error_type":type(exc).__name__}
+        checked.append(observation)
         if len(checked) >= limit:
             break
     return {"source":"read_only_pumpswap_rejection_audit",
