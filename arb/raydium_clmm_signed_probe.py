@@ -50,7 +50,8 @@ def probe(rpc,pool,amount=100000):
     from arb.token_vaults import decode_token_account
     import base64
     account=call(rpc,"getAccountInfo",[
-        input_ata,{"encoding":"base64","commitment":"processed"}])["value"]
+        input_ata,{"encoding":"base64","commitment":"processed",
+         "accounts":{"encoding":"base64","addresses":[input_ata,output_ata]}}])["value"]
     if not account or account.get("owner")!=TOKEN_PROGRAM:
         raise ValueError("Surfpool-funded input ATA unavailable")
     token=decode_token_account(base64.b64decode(account["data"][0],validate=True))
@@ -81,6 +82,15 @@ def probe(rpc,pool,amount=100000):
          "commitment":"processed"}])["value"]
     error=result.get("err")
     logs=result.get("logs")
+    reconciliation=None
+    if error is None:
+        from arb.raydium_clmm_signed_simulation import simulate_signed
+        # The verifier issues its own signed simulation request and authenticates
+        # both returned SPL token accounts and their balance changes.
+        reconciliation=simulate_signed(
+            rpc,wire,input_ata,output_ata,
+            state["token_mint_0"],state["token_mint_1"],
+            token["amount_base_units"],0,amount,1)
     return {"status":"SIGNED_SIMULATION_SUCCESS" if error is None else "SIGNED_SIMULATION_FAILED",
             "pool":pool,"amount_in":amount,"simulation_error":error,
             "logs_tail":logs[-8:] if isinstance(logs,list) else [],
@@ -89,7 +99,8 @@ def probe(rpc,pool,amount=100000):
             "ata_creation_in_simulated_transaction":True,
             "token_account_funding_verified":True,
             "synthetic_local_input_tokens":True,
-            "post_swap_balances_verified":False,
+            "post_swap_balances_verified":reconciliation is not None,
+            "post_swap_balance_deltas":reconciliation,
             "executable_route_verified":False,"profitable_arbitrage_verified":False}
 
 def main():
