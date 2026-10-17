@@ -88,11 +88,18 @@ def audit(rpc, report, limit=20):
         except Exception as exc:
             observation = {"address":address, "status":"RPC_OR_SNAPSHOT_ERROR",
                            "error_type":type(exc).__name__}
+        observation = {**observation, "address":address,
+                       "original_rejection_reason":str(item.get("reason", "UNKNOWN"))[:200]}
         checked.append(observation)
         if len(checked) >= limit:
             break
+    categories = {}
+    for observation in checked:
+        category = observation.get("mint_observation", observation["status"])
+        categories[category] = categories.get(category, 0) + 1
     return {"source":"read_only_pumpswap_rejection_audit",
-            "observed_count":len(checked), "observations":checked,
+            "observed_count":len(checked), "observation_categories":categories,
+            "observations":checked,
             "pool_validation_performed":False, "actionable":False,
             "simulation_verified":False, "mainnet_broadcast":False}
 
