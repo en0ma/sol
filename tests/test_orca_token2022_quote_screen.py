@@ -10,7 +10,8 @@ def observed():
     cfg={"older":{"epoch":0,"basis_points":100,"maximum_fee":1000},
          "newer":{"epoch":4,"basis_points":200,"maximum_fee":1000}}
     return {"pool":STATE,"slot":12,"mints":[A,B],
-            "mint_accounts":[{"transfer_fee_config":cfg},{"transfer_fee_config":cfg}],
+            "mint_accounts":[{"transfer_fee_config":cfg,"owner":"TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb","extension_types":[1,14]},
+                             {"transfer_fee_config":cfg,"owner":"TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb","extension_types":[1]}],
             "epoch_observation":{"epoch":4},
             "extension_risk":{"blocking_extension_ids":[1]}}
 class QuoteScreenTests(unittest.TestCase):
@@ -30,6 +31,7 @@ class QuoteScreenTests(unittest.TestCase):
         self.assertIn("MINT_EXTENSION_1_UNSUPPORTED_FOR_EXECUTION",result["execution_blockers"])
         self.assertIn("SIGNED_ATOMIC_SIMULATION_NOT_VERIFIED",result["execution_blockers"])
         self.assertEqual(len(result["mint_execution_evidence"]),2)
+        self.assertTrue(result["mint_execution_evidence"][0]["transfer_hook_extension_present"])
         self.assertFalse(result["mint_execution_evidence"][0]["transfer_hook_extra_accounts_verified"])
         self.assertFalse(result["mint_execution_evidence"][1]["swap_account_metas_verified"])
 
