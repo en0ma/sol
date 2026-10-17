@@ -520,16 +520,27 @@ jobs:
         env:
           DEX_DISCOVERY_REPORT: ${{ runner.temp }}/expanded-pool-discovery.json
         run: python3 -m arb.onchain_pool_discovery --pairs WSOL/RAY,USDC/RAY --limit 8 --pace-seconds 2 --registry-fallback arb/pool_registry.json || test "$?" -eq 2
-      - name: Target Meteora and PumpSwap pool recognition separately
+      - name: Attempt independent Meteora DLMM discovery
         env:
-          DEX_DISCOVERY_REPORT: ${{ runner.temp }}/meteora-pumpswap-discovery.json
-        run: python3 -m arb.onchain_pool_discovery --pairs WSOL/RAY,USDC/RAY --venues meteora_dlmm,meteora_damm_v2,pumpswap --limit 8 --pace-seconds 2 || test "$?" -eq 2
-      - name: Upload Meteora and PumpSwap discovery coverage
+          DEX_DISCOVERY_REPORT: ${{ runner.temp }}/meteora-dlmm-discovery.json
+        run: python3 -m arb.onchain_pool_discovery --pairs WSOL/RAY --venues meteora_dlmm --limit 8 --pace-seconds 2 || test "$?" -eq 2
+      - name: Attempt independent Meteora DAMM v2 discovery
+        env:
+          DEX_DISCOVERY_REPORT: ${{ runner.temp }}/meteora-damm-v2-discovery.json
+        run: python3 -m arb.onchain_pool_discovery --pairs WSOL/RAY --venues meteora_damm_v2 --limit 8 --pace-seconds 2 || test "$?" -eq 2
+      - name: Attempt independent PumpSwap discovery
+        env:
+          DEX_DISCOVERY_REPORT: ${{ runner.temp }}/pumpswap-discovery.json
+        run: python3 -m arb.onchain_pool_discovery --pairs WSOL/RAY --venues pumpswap --limit 8 --pace-seconds 2 || test "$?" -eq 2
+      - name: Upload independent Meteora and PumpSwap discovery evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: meteora-pumpswap-discovery
-          path: ${{ runner.temp }}/meteora-pumpswap-discovery.json
+          name: independent-meteora-pumpswap-discovery
+          path: |
+            ${{ runner.temp }}/meteora-dlmm-discovery.json
+            ${{ runner.temp }}/meteora-damm-v2-discovery.json
+            ${{ runner.temp }}/pumpswap-discovery.json
           if-no-files-found: ignore
       - name: Upload expanded five-venue pool discovery
         if: always()
