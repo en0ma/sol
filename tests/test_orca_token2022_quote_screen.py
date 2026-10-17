@@ -48,12 +48,14 @@ class QuoteScreenTests(unittest.TestCase):
     def test_missing_tick_coverage_reports_array_statuses(self,snap,quote):
         state=observed()
         state["pool"]={**STATE,"tick_current_index":5,"tick_spacing":1}
-        state["tick_arrays"]=[{"start_tick":0,"status":"MISSING"}]
+        state["tick_arrays"]=[{"start_tick":0,"address":"missing-current-array-pda","status":"MISSING"}]
         snap.return_value=state
         quote.side_effect=ValueError("missing or unsupported tick array")
         with self.assertRaisesRegex(ValueError,"current_start=0") as result:
             screen("rpc",POOL,A,101)
         self.assertIn("MISSING",str(result.exception))
+        self.assertIn("missing-current-array-pda",str(result.exception))
+        self.assertIn("tick_spacing=1",str(result.exception))
 
 class QuoteFailureCategoryTests(unittest.TestCase):
     def test_epoch_and_tick_mismatches_stay_distinct(self):
