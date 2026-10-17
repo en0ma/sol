@@ -69,7 +69,7 @@ class PumpSwapPoolTests(unittest.TestCase):
         self.assertEqual(call.call_args.args[2][0][-1],state["base_mint"])
 
     @patch("arb.pumpswap_fee_modes.compare_fee_modes")
-    @patch("arb.token_vaults.decode_token_account")
+    @patch("arb.pumpswap_pool.decode_token_account")
     @patch("arb.pumpswap_canonical.classify_pool")
     @patch("arb.pumpswap_fee_account.decode_authenticated")
     @patch("arb.pumpswap_fee_account.authenticated_address",return_value=("fee-pda",4))
