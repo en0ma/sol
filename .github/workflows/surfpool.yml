@@ -575,7 +575,7 @@ jobs:
           if test -s "$RUNNER_TEMP/pumpswap-indexed-validation.json"; then
             python3 -m arb.pumpswap_rejection_audit \
               --rejections "$RUNNER_TEMP/pumpswap-indexed-validation.json" \
-              --limit 10 \
+              --limit 20 \
               --output "$RUNNER_TEMP/pumpswap-rejection-audit.json"
           else
             echo "Indexed discovery report missing; mint audit not attempted"
