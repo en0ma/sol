@@ -3,7 +3,8 @@
 Pool addresses from an indexer are untrusted; only owner/decoder/vault checks
 via pool_registry.refresh promote them to verified pools. No indexer prices.
 """
-import argparse,json,os
+import argparse,json,os,time
+from urllib.error import HTTPError
 from collections import Counter
 from urllib.request import Request,urlopen
 from urllib.parse import quote
@@ -48,16 +49,29 @@ def fetch(mint,timeout=20,page=1):
                  timeout=timeout) as response:
         return candidates(json.load(response))
 
-def scan(rpc,mints,limit=30,pages=1):
+def scan(rpc,mints,limit=30,pages=1,pace_seconds=7):
     from arb.pool_registry import refresh
     if type(limit)is not int or not 1<=limit<=100 or not 1<=len(mints)<=5:
         raise ValueError("invalid indexed scan budget")
     if type(pages)is not int or not 1<=pages<=10:
         raise ValueError("invalid indexed scan pages")
-    all_candidates=[];seen=set()
+    if not 0<=pace_seconds<=60:
+        raise ValueError("invalid page pacing")
+    all_candidates=[];seen=set();fetch_errors=[];requests=0
     for mint in mints:
         for page in range(1,pages+1):
-            for candidate in fetch(mint) if pages==1 else fetch(mint,page=page):
+            if requests and pace_seconds:time.sleep(pace_seconds)
+            requests+=1
+            try:
+                page_candidates=fetch(mint) if pages==1 else fetch(mint,page=page)
+            except HTTPError as exc:
+                fetch_errors.append({"mint":mint,"page":page,"http_status":exc.code})
+                if exc.code==429:break
+                continue
+            except (OSError,ValueError) as exc:
+                fetch_errors.append({"mint":mint,"page":page,"error_type":type(exc).__name__})
+                continue
+            for candidate in page_candidates:
                 if candidate["address"] not in seen:
                     seen.add(candidate["address"])
                     all_candidates.append(candidate)
@@ -77,6 +91,7 @@ def scan(rpc,mints,limit=30,pages=1):
         categories[category]+=1
     return {"source":"geckoterminal","candidate_count":len(all_candidates),
             "pages_per_mint":pages,"rpc_validation_budget":limit,
+            "indexer_requests":requests,"indexer_errors":fetch_errors,
             "rejection_categories":dict(categories),
             "checked_count":len(subset),"verified_pumpswap_count":verified["verified_count"],
             "verified_identities":[{"venue":p["venue"],"address":p["address"],
@@ -90,12 +105,13 @@ def main():
     p.add_argument("--mints",default="WSOL,USDC")
     p.add_argument("--limit",type=int,default=20)
     p.add_argument("--pages",type=int,default=1)
+    p.add_argument("--pace-seconds",type=float,default=7)
     p.add_argument("--output",default="")
     args=p.parse_args()
     labels=[x.strip() for x in args.mints.split(",")]
     if any(x not in MINTS for x in labels):raise SystemExit("unsupported mint label")
     report=scan(os.environ.get("SOLANA_RPC_URL","http://127.0.0.1:8899"),
-                [MINTS[x] for x in labels],args.limit,args.pages)
+                [MINTS[x] for x in labels],args.limit,args.pages,args.pace_seconds)
     print(json.dumps(report,indent=2))
     if args.output:
         with open(args.output,"w") as f:json.dump(report,f,indent=2)
