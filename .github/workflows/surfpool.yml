@@ -568,6 +568,16 @@ jobs:
           name: indexed-pumpswap-pool-validation
           path: ${{ runner.temp }}/pumpswap-indexed-validation.json
           if-no-files-found: ignore
+      - name: Discover PumpSwap-specific DEX pools and validate on-chain
+        continue-on-error: true
+        run: python3 -m arb.pumpswap_dex_discovery --pages 3 --limit 60 --pace-seconds 7 --output "$RUNNER_TEMP/pumpswap-dex-validation.json"
+      - name: Upload PumpSwap DEX-wide discovery evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dex-indexed-pumpswap-pool-validation
+          path: ${{ runner.temp }}/pumpswap-dex-validation.json
+          if-no-files-found: ignore
       - name: Direct-address validation of externally sourced Meteora candidate
         env:
           POOL_REGISTRY_REPORT: ${{ runner.temp }}/unverified-candidate-validation.json
