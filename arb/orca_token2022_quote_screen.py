@@ -53,6 +53,22 @@ def screen(rpc,address,input_mint,gross_input):
             "actionable":False,"executable_quote":False,
             "simulation_verified":False,"broadcast":False}
 
+def diagnostic_failure_category(reason):
+    """Classify observed failures without interpreting them as quote success."""
+    if "epoch observations do not bracket pool snapshot" in reason:
+        return "EPOCH_OR_POOL_SLOT_MISMATCH"
+    if "stale account snapshot" in reason or "minimum context slot" in reason.lower():
+        return "STALE_RPC_CONTEXT"
+    if "tick arrays and mint/vault snapshot are not same-slot" in reason:
+        return "TICK_SLOT_MISMATCH"
+    if "pool changed between mint and tick observations" in reason:
+        return "POOL_STATE_CHANGED"
+    if "missing or unsupported tick array" in reason or "missing tick coverage" in reason:
+        return "TICK_COVERAGE_INCOMPLETE"
+    if "429" in reason or "Too Many Requests" in reason:
+        return "UPSTREAM_RATE_LIMIT"
+    return "OTHER_UNQUOTABLE"
+
 def main():
     import argparse,json,os
     from pathlib import Path
@@ -75,10 +91,14 @@ def main():
         try:
             results.append(screen(rpc,address,None,args.gross_input))
         except Exception as exc:
+            reason=type(exc).__name__+": "+str(exc)[:180]
             results.append({"pool":address,"status":"UNQUOTABLE",
-                            "reason":type(exc).__name__+": "+str(exc)[:180],
+                            "reason_category":diagnostic_failure_category(reason),
+                            "reason":reason,
                             "actionable":False,"executable_quote":False})
-    report={"checked":len(results),
+    failure_categories={category:sum(x.get("reason_category")==category for x in results)
+                        for category in sorted({x.get("reason_category") for x in results if x.get("reason_category")})}
+    report={"checked":len(results),"failure_categories":failure_categories,
             "indicative_count":sum(x.get("status")=="INDICATIVE_TOKEN2022_QUOTE_ONLY" for x in results),
             "results":results,"actionable":False,"simulation_verified":False,
             "mainnet_broadcast":False}
