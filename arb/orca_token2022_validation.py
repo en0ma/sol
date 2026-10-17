@@ -87,7 +87,7 @@ def snapshot(rpc,address):
     if vaults[0]["authority"]!=vaults[1]["authority"] or int(pool["liquidity"])<=0:
         raise ValueError("vault authorities differ or active liquidity zero")
     risks=extension_risk(mints)
-    return {"venue":"orca","address":address,"slot":slot,
+    return {"venue":"orca","address":address,"slot":slot,"pool":pool,
             "mints":[addrs[3],addrs[4]],"mint_accounts":mints,
             "vault_accounts":vaults,"extension_risk":risks,"structurally_verified":True,
             "effective_fee_verified":False,"executable_quote":False,
