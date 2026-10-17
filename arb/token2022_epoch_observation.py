@@ -50,3 +50,52 @@ def epoch_anchored_snapshot(rpc,address,max_slot_spread=32):
             "mint_fee_schedules":configurations,
             "effective_fee_verified":False,"executable_quote":False,
             "actionable":False,"simulation_verified":False,"broadcast":False}
+
+def _scheduled_epoch(slot,schedule):
+    """Map a snapshot slot to a normal (non-warmup) Solana epoch."""
+    if type(slot)is not int or slot<0 or not isinstance(schedule,dict):
+        raise ValueError("invalid slot or epoch schedule")
+    slots=schedule.get("slotsPerEpoch")
+    first_slot=schedule.get("firstNormalSlot")
+    first_epoch=schedule.get("firstNormalEpoch")
+    if (type(slots)is not int or slots<=0 or type(first_slot)is not int or
+            first_slot<0 or type(first_epoch)is not int or first_epoch<0):
+        raise ValueError("invalid epoch schedule fields")
+    if slot<first_slot:
+        raise ValueError("warmup epoch schedule unsupported")
+    return first_epoch+(slot-first_slot)//slots
+
+def scheduled_epoch_snapshot(rpc,address):
+    """Authenticate snapshot epoch via schedule, without fork head-slot assumptions.
+
+    The fee schedule applies at the observed account slot only. This is NOT a
+    current-epoch executable quote or a claim that later tick reads share it.
+    """
+    schedule=call(rpc,"getEpochSchedule",[])
+    checked=snapshot(rpc,address)
+    current=_epoch_info(call(rpc,"getEpochInfo",[{"commitment":"confirmed"}]))
+    snapshot_epoch=_scheduled_epoch(checked["slot"],schedule)
+    current_epoch=_scheduled_epoch(current[1],schedule)
+    if current[0]!=current_epoch:
+        raise ValueError("RPC epoch info conflicts with schedule")
+    if checked["slot"]>current[1] or snapshot_epoch!=current_epoch:
+        raise ValueError("snapshot ahead of epoch info or epoch boundary crossed")
+    fees=[]
+    for mint in checked["mint_accounts"]:
+        cfg=mint["transfer_fee_config"]
+        if cfg is None:
+            fees.append({"transfer_fee_configured":False})
+        else:
+            selected=cfg["newer"] if snapshot_epoch>=cfg["newer"]["epoch"] else cfg["older"]
+            fee_for_epoch(cfg,snapshot_epoch,10000)
+            fees.append({"transfer_fee_configured":True,
+                         "schedule_epoch":selected["epoch"],
+                         "basis_points":selected["basis_points"],
+                         "maximum_fee":selected["maximum_fee"]})
+    return {**checked,"epoch_observation":{
+                "epoch":snapshot_epoch,"snapshot_slot":checked["slot"],
+                "reported_epoch":current_epoch,"reported_absolute_slot":current[1],
+                "source":"VERIFIED_EPOCH_SCHEDULE_AT_SNAPSHOT_SLOT"},
+            "mint_fee_schedules":fees,"effective_fee_verified":False,
+            "executable_quote":False,"actionable":False,
+            "simulation_verified":False,"broadcast":False}
