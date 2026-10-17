@@ -20,6 +20,13 @@ def candidates(payload):
         if not isinstance(row,dict):continue
         attributes=row.get("attributes")
         if not isinstance(attributes,dict):continue
+        relationships=row.get("relationships",{})
+        dex=relationships.get("dex",{}).get("data",{}) if isinstance(relationships,dict) else {}
+        dex_id=dex.get("id") if isinstance(dex,dict) else None
+        # GeckoTerminal may omit the DEX relationship; in that case the
+        # identity remains untrusted and must pass the full on-chain check.
+        if isinstance(dex_id,str) and "pump" not in dex_id.lower():
+            continue
         address=attributes.get("address")
         if (not isinstance(address,str) or not 32<=len(address)<=44 or
             any(c not in BASE58 for c in address) or address in seen):
