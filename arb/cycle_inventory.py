@@ -1,8 +1,6 @@
 """Preserve ALL currently quoted cycle topologies for recurring rescans.
 
-Profit is a per-snapshot prioritization, never a route blacklist. Repeated
-same-pool cycles, distinct pools within a venue, and cross-venue cycles all
-remain discoverable even when their current gross is negative.
+Profit is a per-snapshot prioritization, never a route blacklist. Distinct pools within a venue and cross-venue cycles remain discoverable even when their current gross is negative.
 """
 def inventory(rankings):
     if not isinstance(rankings,list):
@@ -18,10 +16,10 @@ def inventory(rankings):
                or not isinstance(x.get("venue"),str) for x in legs):
             continue
         pools={(x["venue"],x["pool"]) for x in legs}
+        if len(pools)!=len(legs):
+            continue
         venues={x["venue"] for x in legs}
-        topology=("SAME_POOL" if len(pools)==1 else
-                  "SAME_VENUE_MULTIPOOL" if len(venues)==1 else
-                  "CROSS_VENUE")
+        topology=("SAME_VENUE_MULTIPOOL" if len(venues)==1 else "CROSS_VENUE")
         gross=r.get("estimated_gross_base_units")
         status=r.get("status")
         if status!="INDICATIVE_ONLY" or type(gross)is not int:
