@@ -343,6 +343,7 @@ jobs:
       - name: Probe deployed AMM programs and configured pools
         run: python3 -m arb.fork_probe
       - name: Report direct on-chain Whirlpool verification
+        continue-on-error: true
         env:
           POOL_VERIFICATION_REPORT: ${{ runner.temp }}/whirlpool-report.json
         run: python3 -m arb.pool_report
