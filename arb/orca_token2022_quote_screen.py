@@ -17,7 +17,8 @@ def screen(rpc,address,input_mint,gross_input):
     if ticks.get("pool")!=address or ticks.get("pool_state")!=state:
         raise ValueError("pool changed between mint and tick observations")
     if type(ticks.get("slot")) is not int or ticks["slot"]!=observed["slot"]:
-        raise ValueError("tick arrays and mint/vault snapshot are not same-slot")
+        raise ValueError("tick arrays and mint/vault snapshot are not same-slot: "
+                         f"mint_vault_slot={observed['slot']} tick_slot={ticks.get('slot')}")
     mints=observed["mints"]
     if input_mint is None and len(mints)==2:
         input_mint=mints[0]  # diagnostic-only default direction
