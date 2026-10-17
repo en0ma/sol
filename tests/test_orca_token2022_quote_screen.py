@@ -44,3 +44,14 @@ class QuoteScreenTests(unittest.TestCase):
         ticks.return_value={"pool":POOL,"pool_state":{"changed":True},"slot":12}
         with self.assertRaisesRegex(ValueError,"changed"):
             screen("rpc",POOL,A,100)
+
+    @patch("arb.orca_token2022_quote_screen.quote_from_decoded_arrays")
+    @patch("arb.orca_token2022_quote_screen.inspect")
+    @patch("arb.orca_token2022_quote_screen.epoch_anchored_snapshot")
+    def test_diagnostic_default_mint_uses_one_snapshot(self,snap,ticks,quote):
+        snap.return_value=observed()
+        ticks.return_value={"pool":POOL,"pool_state":STATE,"slot":12,"arrays":[{"validated":True}]}
+        quote.return_value={"estimated_output_base_units":100,"tick_arrays_examined":1,"ticks_crossed":0}
+        result=screen("rpc",POOL,None,101)
+        self.assertEqual(result["input_mint"],A)
+        snap.assert_called_once_with("rpc",POOL)
