@@ -152,6 +152,14 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
         "So11111111111111111111111111111111111111112"
       ]
+    },
+    {
+      "venue": "pumpswap",
+      "address": "5wNu5QhdpRGrL37ffcd6TMMqZugQgxwafgz477rShtHy",
+      "mints": [
+        "Ce2gx9KGXJ6C9Mp5b5x1sn9Mg87JwEbrQby4Zqo3pump",
+        "So11111111111111111111111111111111111111112"
+      ]
     }
   ]
 }
