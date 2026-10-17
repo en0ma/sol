@@ -6,11 +6,8 @@ class FullRouteCoverageTests(unittest.TestCase):
     def pool(self,venue,address,a="A",b="B"):
         return {"verified":True,"venue":venue,"address":address,"mints":[a,b]}
 
-    def test_same_pool_roundtrip_is_not_blocked(self):
-        found=cycles([self.pool("orca","pool")])
-        self.assertEqual(len(found),2)
-        self.assertTrue(all(x["hops"]==2 for x in found))
-        self.assertTrue(all(len({y["pool"] for y in x["legs"]})==1 for x in found))
+    def test_same_pool_roundtrip_is_excluded(self):
+        self.assertEqual(cycles([self.pool("orca","pool")]),[])
 
     def test_cross_pool_and_cross_venue_still_discovered(self):
         found=cycles([self.pool("orca","a"),
@@ -23,9 +20,14 @@ class FullRouteCoverageTests(unittest.TestCase):
                "input_base_units":100,
                "estimated_gross_base_units":-2,
                "route_legs":[{"venue":"orca","pool":"p"},
-                             {"venue":"orca","pool":"p"}]}]
+                             {"venue":"orca","pool":"q"}]}]
         entry=inventory(rows)[0]
-        self.assertEqual(entry["topology"],"SAME_POOL")
+        self.assertEqual(entry["topology"],"SAME_VENUE_MULTIPOOL")
         self.assertEqual(entry["current_priority"],"RESCAN_ON_NEXT_SNAPSHOT")
         self.assertTrue(entry["eligible_for_future_rescan"])
         self.assertFalse(entry["actionable"])
+
+    def test_inventory_rejects_reused_pool(self):
+        rows=[{"status":"INDICATIVE_ONLY","route_legs":[
+            {"venue":"orca","pool":"p"},{"venue":"orca","pool":"p"}]}]
+        self.assertEqual(inventory(rows),[])
