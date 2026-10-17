@@ -65,4 +65,8 @@ class QuoteFailureCategoryTests(unittest.TestCase):
             "TICK_SLOT_MISMATCH")
         self.assertEqual(diagnostic_failure_category("upstream RPC 429 Too Many Requests"),
                          "UPSTREAM_RATE_LIMIT")
+        self.assertEqual(diagnostic_failure_category(
+            "missing tick coverage: current_start=1144 direction=a_to_b "
+            "array_statuses=[{'start_tick': 1144, 'status': 'MISSING'}]"),
+            "CURRENT_OR_DIRECTIONAL_TICK_ARRAY_MISSING")
         self.assertEqual(diagnostic_failure_category("unknown failure"),"OTHER_UNQUOTABLE")
