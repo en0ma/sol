@@ -36,8 +36,7 @@ class PumpSwapRejectionAuditTests(unittest.TestCase):
     @patch("arb.pumpswap_rejection_audit.decode")
     @patch("arb.pumpswap_rejection_audit.call")
     def test_vault_evidence_cannot_promote_rejected_pool(self, call, decode, decode_token):
-        state={"base_mint":MINT,"quote_mint":"3"*32,
-               "quote_mint":"3"*32,"base_vault":VAULT_A,"quote_vault":VAULT_B}
+        state={"base_mint":MINT,"quote_mint":"3"*32,"base_vault":VAULT_A,"quote_vault":VAULT_B}
         decode.return_value=state
         mint=bytearray(82)
         mint[45]=1
@@ -58,7 +57,7 @@ class PumpSwapRejectionAuditTests(unittest.TestCase):
     @patch("arb.pumpswap_rejection_audit.decode")
     @patch("arb.pumpswap_rejection_audit.call")
     def test_non_native_zero_supply_remains_distinct(self, call, decode):
-        other_mint="3"*32
+        other_mint="4"*32
         decode.return_value={"base_mint":other_mint,
                              "quote_mint":"3"*32,"base_vault":VAULT_A,"quote_vault":VAULT_B}
         mint=bytearray(82)
