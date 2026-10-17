@@ -49,3 +49,40 @@ def screen(rpc,address,input_mint,gross_input):
             "quote_model_verified":False,"transfer_hooks_verified":False,
             "actionable":False,"executable_quote":False,
             "simulation_verified":False,"broadcast":False}
+
+def main():
+    import argparse,json,os
+    from pathlib import Path
+    p=argparse.ArgumentParser()
+    p.add_argument("--cohort",default="arb/orca_token2022_audit_cohort.json")
+    p.add_argument("--output",required=True)
+    p.add_argument("--limit",type=int,default=3)
+    p.add_argument("--gross-input",type=int,default=100000)
+    args=p.parse_args()
+    if type(args.limit)is not int or not 1<=args.limit<=15:
+        raise ValueError("invalid bounded cohort limit")
+    if not 0<args.gross_input<=10000000:
+        raise ValueError("invalid diagnostic input")
+    addresses=json.loads(Path(args.cohort).read_text())["addresses"]
+    if not isinstance(addresses,list) or not 1<=len(addresses)<=50 or len(set(addresses))!=len(addresses):
+        raise ValueError("invalid cohort")
+    rpc=os.environ.get("SOLANA_RPC_URL","http://127.0.0.1:8899")
+    results=[]
+    for address in addresses[:args.limit]:
+        try:
+            state=epoch_anchored_snapshot(rpc,address)
+            mint=state["mints"][0]
+            results.append(screen(rpc,address,mint,args.gross_input))
+        except Exception as exc:
+            results.append({"pool":address,"status":"UNQUOTABLE",
+                            "reason":type(exc).__name__+": "+str(exc)[:180],
+                            "actionable":False,"executable_quote":False})
+    report={"checked":len(results),
+            "indicative_count":sum(x.get("status")=="INDICATIVE_TOKEN2022_QUOTE_ONLY" for x in results),
+            "results":results,"actionable":False,"simulation_verified":False,
+            "mainnet_broadcast":False}
+    Path(args.output).write_text(json.dumps(report,indent=2))
+    print(json.dumps({k:v for k,v in report.items() if k!="results"},indent=2))
+
+if __name__=="__main__":
+    main()
