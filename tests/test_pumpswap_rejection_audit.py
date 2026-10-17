@@ -34,6 +34,23 @@ class PumpSwapRejectionAuditTests(unittest.TestCase):
 
     @patch("arb.pumpswap_rejection_audit.decode")
     @patch("arb.pumpswap_rejection_audit.call")
+    def test_non_native_zero_supply_remains_distinct(self, call, decode):
+        other_mint="3"*32
+        decode.return_value={"base_mint":other_mint,
+                             "base_vault":VAULT_A,"quote_vault":VAULT_B}
+        mint=bytearray(82)
+        mint[45]=1
+        call.side_effect=[
+            {"value":account(PROGRAM)},
+            {"context":{"slot":123},"value":[account(PROGRAM),
+                account(TOKEN_PROGRAM,bytes(mint)),
+                account(TOKEN_PROGRAM),account(TOKEN_PROGRAM)]}]
+        result=inspect("rpc",ADDR)
+        self.assertEqual(result["mint_observation"],"ZERO_SUPPLY")
+        self.assertEqual(result["status"],"OBSERVED_NOT_VALIDATED")
+
+    @patch("arb.pumpswap_rejection_audit.decode")
+    @patch("arb.pumpswap_rejection_audit.call")
     def test_nonclassic_mint_is_observed_not_accepted(self, call, decode):
         decode.return_value={"base_mint":MINT,"base_vault":VAULT_A,"quote_vault":VAULT_B}
         call.side_effect=[
