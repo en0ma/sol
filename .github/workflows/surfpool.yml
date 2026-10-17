@@ -197,6 +197,17 @@ jobs:
             echo "Configure repository secret SOLANA_MAINNET_RPC_URL to enable fork verification." >&2
             exit 1
           fi
+      - name: Compare upstream RPC methods without retries
+        env:
+          UPSTREAM_RPC_DIAGNOSTIC_REPORT: ${{ runner.temp }}/upstream-rpc-method-diagnostic.json
+        run: python3 -m arb.upstream_rpc_method_diagnostic
+      - name: Upload upstream RPC method comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: upstream-rpc-method-comparison
+          path: ${{ runner.temp }}/upstream-rpc-method-diagnostic.json
+          if-no-files-found: ignore
       - name: Install Surfpool
         run: |
           set -euo pipefail
