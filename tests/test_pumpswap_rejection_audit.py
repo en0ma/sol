@@ -28,7 +28,7 @@ class PumpSwapRejectionAuditTests(unittest.TestCase):
                 account(TOKEN_PROGRAM,bytes(mint)),
                 account(TOKEN_PROGRAM),account(TOKEN_PROGRAM)]}]
         result=inspect("rpc",ADDR)
-        self.assertEqual(result["mint_observation"],"ZERO_SUPPLY")
+        self.assertEqual(result["mint_observation"],"NATIVE_WSOL_ZERO_SUPPLY")
         self.assertEqual(result["slot"],123)
         self.assertEqual(result["status"],"OBSERVED_NOT_VALIDATED")
 
