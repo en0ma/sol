@@ -568,6 +568,25 @@ jobs:
           name: indexed-pumpswap-pool-validation
           path: ${{ runner.temp }}/pumpswap-indexed-validation.json
           if-no-files-found: ignore
+      - name: Diagnose bounded PumpSwap rejected mint snapshots
+        if: always()
+        continue-on-error: true
+        run: |
+          if test -s "$RUNNER_TEMP/pumpswap-indexed-validation.json"; then
+            python3 -m arb.pumpswap_rejection_audit \
+              --rejections "$RUNNER_TEMP/pumpswap-indexed-validation.json" \
+              --limit 10 \
+              --output "$RUNNER_TEMP/pumpswap-rejection-audit.json"
+          else
+            echo "Indexed discovery report missing; mint audit not attempted"
+          fi
+      - name: Upload read-only PumpSwap rejection evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pumpswap-rejected-mint-snapshots
+          path: ${{ runner.temp }}/pumpswap-rejection-audit.json
+          if-no-files-found: ignore
       - name: Discover PumpSwap-specific DEX pools and validate on-chain
         continue-on-error: true
         run: python3 -m arb.pumpswap_dex_discovery --pages 3 --limit 60 --pace-seconds 7 --output "$RUNNER_TEMP/pumpswap-dex-validation.json"
