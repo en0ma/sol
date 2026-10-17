@@ -33,7 +33,11 @@ def screen(rpc,address,input_mint,gross_input):
         raise ValueError("unusable indicative AMM output")
     after=net_received(observed["mint_accounts"][1-index]["transfer_fee_config"],
                        epoch,gross_output)
-    return {"status":"INDICATIVE_TOKEN2022_QUOTE_ONLY","pool":address,
+    blockers=["AMM_MODEL_NOT_SIMULATION_RECONCILED","TRANSFER_HOOK_ACCOUNTS_NOT_VERIFIED",
+              "SIGNED_ATOMIC_SIMULATION_NOT_VERIFIED"]
+    blockers += ["MINT_EXTENSION_"+str(kind)+"_UNSUPPORTED_FOR_EXECUTION"
+                 for kind in observed["extension_risk"]["blocking_extension_ids"]]
+    return {"status":"INDICATIVE_TOKEN2022_QUOTE_ONLY","execution_blockers":blockers,"pool":address,
             "slot":observed["slot"],"epoch":epoch,"input_mint":input_mint,
             "output_mint":mints[1-index],
             "source_gross_input_base_units":gross_input,
@@ -94,7 +98,10 @@ def main():
                             "actionable":False,"executable_quote":False})
     failure_categories={category:sum(x.get("reason_category")==category for x in results)
                         for category in sorted({x.get("reason_category") for x in results if x.get("reason_category")})}
+    extension_blocked=sum(bool(x.get("extension_risk",{}).get("blocking_extension_ids")) for x in results)
     report={"checked":len(results),"failure_categories":failure_categories,
+            "indicative_with_blocking_mint_extensions":extension_blocked,
+            "executable_count":0,
             "indicative_count":sum(x.get("status")=="INDICATIVE_TOKEN2022_QUOTE_ONLY" for x in results),
             "results":results,"actionable":False,"simulation_verified":False,
             "mainnet_broadcast":False}
