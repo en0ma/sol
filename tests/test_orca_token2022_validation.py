@@ -55,6 +55,7 @@ class OrcaToken2022StructuralTests(unittest.TestCase):
         self.assertFalse(output["effective_fee_verified"])
         self.assertEqual(call.call_args.args[1],"getMultipleAccounts")
         self.assertEqual(len(call.call_args.args[2][0]),5)
+        self.assertNotIn("minContextSlot",call.call_args.args[2][1])
 
     @patch("arb.orca_token2022_validation.decode",return_value=STATE)
     @patch("arb.orca_token2022_validation.fetch_pool",return_value=STATE)
@@ -96,3 +97,16 @@ class Token2022ExtensionRiskTests(unittest.TestCase):
         self.assertEqual(risk["blocking_extension_ids"],[])
         self.assertFalse(risk["fee_mode_verified"])
         self.assertFalse(risk["executable_quote"])
+
+    @patch("arb.orca_token2022_validation.decode",return_value=STATE)
+    @patch("arb.orca_token2022_validation.fetch_pool",return_value=STATE)
+    @patch("arb.orca_token2022_validation.call")
+    def test_rpc_stale_context_fails_closed(self,call,fetch,decode):
+        call.return_value={"context":{"slot":55},"value":[
+            acct(PROGRAM,b"pool"),
+            acct(TOKEN_PROGRAM,vault(1,TOKEN_PROGRAM)),
+            acct(TOKEN_2022,vault(2,TOKEN_2022)),
+            acct(TOKEN_PROGRAM,mint()),acct(TOKEN_2022,mint())]}
+        with self.assertRaisesRegex(ValueError,"stale"):
+            snapshot("rpc",POOL,min_context_slot=56)
+        self.assertEqual(call.call_args.args[2][1]["minContextSlot"],56)
