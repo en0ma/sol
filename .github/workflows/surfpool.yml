@@ -695,6 +695,16 @@ jobs:
           name: orca-token2022-structural-cohort
           path: ${{ runner.temp }}/orca-token2022-structural.json
           if-no-files-found: ignore
+      - name: Screen bounded Orca Token-2022 indicative quotes
+        continue-on-error: true
+        run: python3 -m arb.orca_token2022_quote_screen --limit 3 --gross-input 100000 --output "$RUNNER_TEMP/orca-token2022-quote-screen.json"
+      - name: Upload Orca Token-2022 quote coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orca-token2022-indicative-quote-screen
+          path: ${{ runner.temp }}/orca-token2022-quote-screen.json
+          if-no-files-found: ignore
       - name: Probe Orca public API for new on-chain verified Whirlpools
         continue-on-error: true
         run: |
