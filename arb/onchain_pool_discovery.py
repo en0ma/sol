@@ -135,8 +135,10 @@ def discover(rpc,pairs,limit=8,pace_seconds=0,registry_entries=None,venues=None)
                 if "429" in message or "too many requests" in message.lower():
                     upstream_rate_limited=True
                     stats["status"]="RATE_LIMITED"
-    for stats in venue_attempts.values():
-        if stats["status"]=="NOT_ATTEMPTED" and upstream_rate_limited:
+    for venue,stats in venue_attempts.items():
+        if venue not in order:
+            stats["status"]="NOT_SELECTED"
+        elif stats["status"]=="NOT_ATTEMPTED" and upstream_rate_limited:
             stats["status"]="SKIPPED_UPSTREAM_RATE_LIMIT"
     fallback = None
     if upstream_rate_limited and registry_entries is not None:
