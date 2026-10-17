@@ -104,13 +104,16 @@ def verify(rpc,venue,address,state):
     return {"venue":venue,"address":address,"mints":list(pair),"slot":slot,
             "vault_base_units":amounts,"swap_simulated":False}
 
-def discover(rpc,pairs,limit=8,pace_seconds=0,registry_entries=None):
+def discover(rpc,pairs,limit=8,pace_seconds=0,registry_entries=None,venues=None):
+    order=list(VENUES) if venues is None else list(venues)
+    if len(order)!=len(set(order)) or not order or any(v not in VENUES for v in order):
+        raise ValueError("invalid venue discovery selection")
     results=[];errors=[]
     upstream_rate_limited=False
     venue_attempts={venue:{"attempted_pairs":0,"verified_pools":0,
                             "errors":0,"status":"NOT_ATTEMPTED"} for venue in VENUES}
     for a,b in pairs:
-        for venue in VENUES:
+        for venue in order:
             if upstream_rate_limited:break
             stats=venue_attempts[venue]
             stats["attempted_pairs"]+=1
@@ -172,6 +175,7 @@ def main():
     p.add_argument("--limit",type=int,default=8)
     p.add_argument("--pace-seconds",type=float,default=0)
     p.add_argument("--registry-fallback",default="")
+    p.add_argument("--venues",default=",".join(VENUES))
     args=p.parse_args()
     pairs=[]
     for item in args.pairs.split(","):
@@ -182,7 +186,8 @@ def main():
     entries=(json.load(open(args.registry_fallback))["pools"]
              if args.registry_fallback else None)
     report=discover(os.environ.get("SOLANA_RPC_URL","http://127.0.0.1:8899"),pairs,args.limit,
-                    pace_seconds=args.pace_seconds,registry_entries=entries)
+                    pace_seconds=args.pace_seconds,registry_entries=entries,
+                    venues=[v.strip() for v in args.venues.split(",")])
     print(json.dumps(report,indent=2))
     if args.output:
         with open(args.output,"w") as f:json.dump(report,f,indent=2)
