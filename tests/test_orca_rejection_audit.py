@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from arb.orca_rejection_audit import audit, classify
+from arb.orca_rejection_audit import audit, classify, observe_vault, TOKEN_2022
 from arb.orca_whirlpool import PROGRAM
 
 ADDRESS="7qbRF6YsyGuLUVs6Y1q64bdVrfe4ZcUUz1JRdoVNUJnm"
@@ -37,3 +37,28 @@ class OrcaRejectionAuditTests(unittest.TestCase):
     def test_bounded_audit(self):
         with self.assertRaises(ValueError):
             audit("rpc",{"rejections":[]},limit=201)
+
+class Token2022ObservationTests(unittest.TestCase):
+    def test_token2022_vault_observation_never_claims_execution(self):
+        import base64
+        from arb.orca_whirlpool import b58
+        raw=bytearray(170)
+        raw[:32]=bytes([3])*32
+        raw[32:64]=bytes([7])*32
+        raw[64:72]=(101).to_bytes(8,"little")
+        raw[108]=1
+        account={"owner":TOKEN_2022,"executable":False,
+                 "data":[base64.b64encode(raw).decode(),"base64"]}
+        obs=observe_vault(account,b58(bytes([3])*32))
+        self.assertTrue(obs["mint_matches_pool"])
+        self.assertEqual(obs["amount_base_units"],101)
+        self.assertEqual(obs["token_program"],"token_2022")
+        self.assertEqual(obs["extension_state"],"NOT_YET_DECODED")
+        self.assertFalse(obs["eligible_for_executable_quote"])
+
+    def test_truncated_extension_account_is_rejected(self):
+        import base64
+        account={"owner":TOKEN_2022,"executable":False,
+                 "data":[base64.b64encode(bytes(40)).decode(),"base64"]}
+        with self.assertRaises(ValueError):
+            observe_vault(account,"mint")
