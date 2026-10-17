@@ -7,12 +7,32 @@ import json
 import os
 from pathlib import Path
 
-from arb.orca_whirlpool import PROGRAM, decode
+from arb.orca_whirlpool import PROGRAM, decode, b58
 from arb.rpc import call
-from arb.token_vaults import TOKEN_PROGRAM
+from arb.token_vaults import TOKEN_PROGRAM, decode_token_account
 import base64
 
-# Non-classic owners are reported, never accepted as verified.
+TOKEN_2022 = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+
+# Structural observations only: unknown Token-2022 extensions remain unsupported.
+def observe_vault(account, expected_mint):
+    owner=account.get("owner")
+    raw=base64.b64decode(account["data"][0],validate=True)
+    if owner not in (TOKEN_PROGRAM,TOKEN_2022) or account.get("executable") or len(raw)<165:
+        raise ValueError("unsupported vault owner or truncated account")
+    mint=b58(raw[:32]);authority=b58(raw[32:64])
+    state=raw[108];amount=int.from_bytes(raw[64:72],"little")
+    observation={"mint":mint,"mint_matches_pool":mint==expected_mint,
+                 "authority":authority,"amount_base_units":amount,
+                 "initialized":state==1,"account_length":len(raw),
+                 "token_program":"token_2022" if owner==TOKEN_2022 else "classic"}
+    if owner==TOKEN_PROGRAM:
+        decode_token_account(raw)
+        observation["extension_state"]="NOT_APPLICABLE"
+    else:
+        observation["extension_state"]="NOT_YET_DECODED"
+        observation["eligible_for_executable_quote"]=False
+    return observation
 
 def classify(rpc,address):
     result={"address":address,"verified":False,"actionable":False}
@@ -37,6 +57,10 @@ def classify(rpc,address):
         result["vaults"]=[{"address":addr,"owner":acc.get("owner") if isinstance(acc,dict) else None,
                             "exists":acc is not None}
                            for addr,acc in zip(vaults,accounts)]
+        for i,acc in enumerate(accounts):
+            if acc is not None:
+                result["vaults"][i]["observation"]=observe_vault(
+                    acc,state["token_mint_a"] if i==0 else state["token_mint_b"])
         if any(acc is None for acc in accounts):
             result["category"]="VAULT_MISSING"
         elif any(acc.get("owner")!=TOKEN_PROGRAM or acc.get("executable") for acc in accounts):
