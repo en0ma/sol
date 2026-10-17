@@ -3,7 +3,7 @@
 Combines an epoch-anchored pool snapshot, integer input/output transfer fees,
 and the existing indicative multi-tick AMM model. NO execution authorization.
 """
-from arb.token2022_epoch_observation import epoch_anchored_snapshot
+from arb.token2022_epoch_observation import scheduled_epoch_snapshot
 from arb.token2022_transfer_amounts import net_received
 from arb.whirlpool_ticks import inspect
 from arb.orca_multitick_quote import quote_from_decoded_arrays
@@ -11,7 +11,7 @@ from arb.orca_multitick_quote import quote_from_decoded_arrays
 def screen(rpc,address,input_mint,gross_input):
     if type(gross_input) is not int or not 0<gross_input<2**64:
         raise ValueError("invalid input amount")
-    observed=epoch_anchored_snapshot(rpc,address)
+    observed=scheduled_epoch_snapshot(rpc,address)
     ticks=inspect(rpc,address)
     state=observed["pool"]
     if ticks.get("pool")!=address or ticks.get("pool_state")!=state:
