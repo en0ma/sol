@@ -44,6 +44,31 @@ class PumpSwapRejectionAuditTests(unittest.TestCase):
         result=inspect("rpc",ADDR)
         self.assertEqual(result["mint_observation"],"NON_CLASSIC_TOKEN_PROGRAM")
 
+
+    @patch("arb.pumpswap_rejection_audit.inspect")
+    def test_single_rpc_error_does_not_abort_following_candidates(self, inspect_mock):
+        second = "4"*32
+        inspect_mock.side_effect=[RuntimeError("RPC unavailable"),
+                                  {"address":second,"status":"OBSERVED_NOT_VALIDATED"}]
+        result=audit("rpc", {"rejections":[
+            {"venue":"pumpswap","address":ADDR},
+            {"venue":"pumpswap","address":second}]},limit=2)
+        self.assertEqual(result["observed_count"],2)
+        self.assertEqual(result["observations"][0]["status"],"RPC_OR_SNAPSHOT_ERROR")
+        self.assertEqual(result["observations"][1]["status"],"OBSERVED_NOT_VALIDATED")
+        self.assertFalse(result["actionable"])
+
+    @patch("arb.pumpswap_rejection_audit.decode")
+    @patch("arb.pumpswap_rejection_audit.call")
+    def test_missing_pool_in_snapshot_reports_unsupported(self, call, decode):
+        decode.return_value={"base_mint":MINT,"base_vault":VAULT_A,"quote_vault":VAULT_B}
+        call.side_effect=[
+            {"value":account(PROGRAM)},
+            {"context":{"slot":123},"value":[None, account(TOKEN_PROGRAM),
+                account(TOKEN_PROGRAM),account(TOKEN_PROGRAM)]}]
+        result=inspect("rpc",ADDR)
+        self.assertEqual(result["status"],"SNAPSHOT_UNSUPPORTED")
+
     @patch("arb.pumpswap_rejection_audit.inspect")
     def test_bounded_deduplicated_rejections_never_promoted(self, inspect_mock):
         inspect_mock.return_value={"status":"OBSERVED_NOT_VALIDATED"}
