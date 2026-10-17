@@ -77,6 +77,8 @@ class PumpSwapRejectionAuditTests(unittest.TestCase):
                               {"venue":"orca","address":"3"*32}]}
         result=audit("rpc",report,limit=1)
         self.assertEqual(result["observed_count"],1)
+        self.assertEqual(result["observation_categories"],{"OBSERVED_NOT_VALIDATED":1})
+        self.assertEqual(result["observations"][0]["original_rejection_reason"],"UNKNOWN")
         self.assertEqual(inspect_mock.call_count,1)
         self.assertFalse(result["actionable"])
         self.assertFalse(result["pool_validation_performed"])
