@@ -61,20 +61,27 @@ def extension_risk(mint_accounts):
             "blocking_extension_ids":blocking,
             "fee_mode_verified":False,"executable_quote":False}
 
-def snapshot(rpc,address,*,min_context_slot=None):
+def snapshot(rpc,address,*,min_context_slot=None,include_ticks=False):
     if min_context_slot is not None and (type(min_context_slot)is not int or min_context_slot<0):
         raise ValueError("invalid minimum context slot")
     seed=fetch_pool(rpc,address)
     addrs=[address,seed["token_vault_a"],seed["token_vault_b"],
            seed["token_mint_a"],seed["token_mint_b"]]
     if len(set(addrs))!=5:raise ValueError("pool, vault and mint accounts overlap")
+    tick_starts=[]
+    tick_keys=[]
+    if include_ticks:
+        from arb.whirlpool_ticks import candidate_starts,addresses
+        tick_starts=candidate_starts(seed["tick_current_index"],seed["tick_spacing"])
+        tick_keys=addresses(address,tick_starts)
+        addrs+=tick_keys
     options={"encoding":"base64","commitment":"confirmed"}
     if min_context_slot is not None:
         options["minContextSlot"]=min_context_slot
     response=call(rpc,"getMultipleAccounts",[addrs,options])
     slot=response.get("context",{}).get("slot")
     values=response.get("value")
-    if not isinstance(slot,int) or not isinstance(values,list) or len(values)!=5:
+    if not isinstance(slot,int) or not isinstance(values,list) or len(values)!=len(addrs):
         raise ValueError("missing synchronized pool/vault/mint snapshot")
     if min_context_slot is not None and slot<min_context_slot:
         raise ValueError("RPC returned stale account snapshot despite minContextSlot")
@@ -93,10 +100,31 @@ def snapshot(rpc,address,*,min_context_slot=None):
         vaults.append(obs)
     if vaults[0]["authority"]!=vaults[1]["authority"] or int(pool["liquidity"])<=0:
         raise ValueError("vault authorities differ or active liquidity zero")
+    tick_arrays=None
+    if include_ticks:
+        from arb.whirlpool_ticks import (decode_fixed_ticks,decode_dynamic_ticks,
+                                          FIXED_LEN,DISC,DYNAMIC_DISC)
+        if (pool["tick_current_index"]!=seed["tick_current_index"] or
+                pool["tick_spacing"]!=seed["tick_spacing"]):
+            raise ValueError("pool tick index changed before synchronized snapshot")
+        tick_arrays=[]
+        for start,key,account in zip(tick_starts,tick_keys,values[5:]):
+            entry={"start_tick":start,"address":key,"status":"MISSING"}
+            if account is not None:
+                raw=_raw(account,PROGRAM)
+                if len(raw)==FIXED_LEN and raw[:8]==DISC:
+                    entry["ticks"]=decode_fixed_ticks(raw,address,start,pool["tick_spacing"])
+                    entry["status"]="FIXED_VALID"
+                elif raw[:8]==DYNAMIC_DISC:
+                    entry["ticks"]=decode_dynamic_ticks(raw,address,start,pool["tick_spacing"])
+                    entry["status"]="FIXED_VALID"
+                else:
+                    entry["status"]="UNSUPPORTED_LAYOUT"
+            tick_arrays.append(entry)
     risks=extension_risk(mints)
     return {"venue":"orca","address":address,"slot":slot,"pool":pool,
             "mints":[addrs[3],addrs[4]],"mint_accounts":mints,
-            "vault_accounts":vaults,"extension_risk":risks,"structurally_verified":True,
+            "vault_accounts":vaults,"tick_arrays":tick_arrays,"extension_risk":risks,"structurally_verified":True,
             "effective_fee_verified":False,"executable_quote":False,
             "actionable":False,"simulation_verified":False,"broadcast":False}
 
