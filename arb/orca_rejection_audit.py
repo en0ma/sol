@@ -12,8 +12,7 @@ from arb.rpc import call
 from arb.token_vaults import TOKEN_PROGRAM
 import base64
 
-TOKEN_2022="TokenzQdBNbLqP5VEhdkAS6EPF8V6cSrxt2yXhG6Pab"
-# The owner may be other than the classic token program; report it without accepting it.
+# Non-classic owners are reported, never accepted as verified.
 
 def classify(rpc,address):
     result={"address":address,"verified":False,"actionable":False}
