@@ -40,9 +40,9 @@ def account_observation(owner,raw):
                 "execution_eligible":True}
     if owner!=TOKEN_2022:
         raise ValueError("unsupported token account owner")
-    if len(raw)<166 or raw[108]!=1:
+    if len(raw)<165 or raw[108]!=1:
         raise ValueError("uninitialized or truncated Token-2022 account")
-    types=extension_types(raw,ACCOUNT_TYPE_ACCOUNT)
+    types=[] if len(raw)==165 else extension_types(raw,ACCOUNT_TYPE_ACCOUNT)
     return {"mint":b58(raw[:32]),"authority":b58(raw[32:64]),
             "amount_base_units":int.from_bytes(raw[64:72],"little"),
             "state":raw[108],"token_program":"token_2022",
