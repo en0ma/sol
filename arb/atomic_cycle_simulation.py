@@ -44,8 +44,10 @@ def verify_atomic_cycle(rpc, signed_wire, tokens, venue_programs,
     if not isinstance(logs,list):
         raise ValueError("missing atomic route logs")
     for program in set(venue_programs):
-        if not any("Program "+program+" invoke" in line for line in logs):
-            raise ValueError("atomic route venue invocation missing: "+program)
+        expected=venue_programs.count(program)
+        observed=sum(line.startswith("Program "+program+" invoke") for line in logs)
+        if observed<expected:
+            raise ValueError("atomic route venue invocation count missing: "+program)
     accounts=value.get("accounts")
     if not isinstance(accounts,list) or len(accounts)!=len(tokens):
         raise ValueError("atomic route missing post-state")
