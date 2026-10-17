@@ -32,14 +32,16 @@ def verify(rpc,address,state):
     keys=[address,state["reserve_x"],state["reserve_y"]]
     resp=call(rpc,"getMultipleAccounts",[keys,{"encoding":"base64","commitment":"confirmed"}])
     values=resp.get("value")
-    if not isinstance(values,list) or len(values)!=3:raise ValueError("missing DLMM accounts")
+    slot=resp.get("context",{}).get("slot")
+    if type(slot)is not int or slot<0 or not isinstance(values,list) or len(values)!=3:
+        raise ValueError("incomplete DLMM synchronized account snapshot")
     pool=values[0]
-    if not pool or pool.get("owner")!=PROGRAM or decode(base64.b64decode(
+    if not pool or pool.get("owner")!=PROGRAM or pool.get("executable") or decode(base64.b64decode(
             pool["data"][0],validate=True))!=state:raise ValueError("DLMM pool owner or state mismatch")
     balances=[];authorities=[]
     for i,(mint,idx) in enumerate(((state["token_x_mint"],1),(state["token_y_mint"],2))):
         v=values[idx]
-        if not v or v.get("owner")!=TOKEN_PROGRAM:raise ValueError("DLMM non-classic SPL vault")
+        if not v or v.get("owner")!=TOKEN_PROGRAM or v.get("executable"):raise ValueError("DLMM non-classic SPL vault")
         token=decode_token_account(base64.b64decode(v["data"][0],validate=True))
         if token["mint"]!=mint:raise ValueError("DLMM vault mint mismatch")
         balances.append(token["amount_base_units"])
@@ -48,4 +50,4 @@ def verify(rpc,address,state):
         raise ValueError("DLMM empty vault or inconsistent authority")
     return {"venue":"meteora_dlmm","address":address,"mints":[state["token_x_mint"],
              state["token_y_mint"]],"vault_base_units":balances,
-             "slot":resp.get("context",{}).get("slot"),"swap_simulated":False}
+             "slot":slot,"swap_simulated":False}
