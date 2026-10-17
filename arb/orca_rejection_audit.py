@@ -11,6 +11,7 @@ from arb.orca_whirlpool import PROGRAM, decode, b58
 from arb.rpc import call
 from arb.token_vaults import TOKEN_PROGRAM
 from arb.token2022_extensions import TOKEN_2022, account_observation
+from arb.orca_token2022_validation import snapshot as token2022_snapshot
 import base64
 
 
@@ -63,6 +64,16 @@ def classify(rpc,address):
             result["category"]="VAULT_MISSING"
         elif any(acc.get("owner")!=TOKEN_PROGRAM or acc.get("executable") for acc in accounts):
             result["category"]="VAULT_NONCLASSIC_OWNER"
+            try:
+                checked=token2022_snapshot(rpc,address)
+                result["structural_validation"]={
+                    "verified":checked["structurally_verified"],
+                    "slot":checked["slot"],"mint_accounts":checked["mint_accounts"],
+                    "vault_accounts":checked["vault_accounts"],
+                    "actionable":False,"executable_quote":False}
+            except Exception as exc:
+                result["structural_validation"]={"verified":False,
+                    "error":type(exc).__name__+": "+str(exc)[:140]}
         else:
             result["category"]="CLASSIC_VAULTS_PRESENT_RETRY_FULL_VALIDATION"
     except Exception as exc:
