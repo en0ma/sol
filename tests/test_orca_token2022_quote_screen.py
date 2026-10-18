@@ -173,6 +173,7 @@ class LowExtensionRiskShortlistTests(unittest.TestCase):
              "extension_risk":{"blocking_extension_ids":[]},
              "execution_blockers":["SWAP_ACCOUNT_METAS_NOT_VERIFIED",
                                    "SIGNED_ATOMIC_SIMULATION_NOT_VERIFIED"]}
+        row["swap_account_candidates"]={"oracle_account_verified":True}
         selected=simple_mint_extension_candidates([row])
         self.assertEqual(len(selected),1)
         self.assertEqual(selected[0]["input_token_program"],"TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb")
