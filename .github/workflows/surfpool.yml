@@ -5,6 +5,11 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Avoid competing Surfpool forks against the same free-tier Alchemy account.
+concurrency:
+  group: surfpool-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
