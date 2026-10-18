@@ -153,7 +153,7 @@ class HookProgramParsingTests(unittest.TestCase):
 class LowExtensionRiskShortlistTests(unittest.TestCase):
     def test_shortlist_requires_all_nonexecution_gates(self):
         row={"pool":POOL,"slot":42,"input_mint":A,"output_mint":B,
-             "mint_execution_evidence":[{"mint":A,"token_program":"Tokenz"},{"mint":B,"token_program":"Tokenkeg"}],
+             "mint_execution_evidence":[{"mint":A,"token_program":"TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"},{"mint":B,"token_program":"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"}],
              "status":"INDICATIVE_TOKEN2022_QUOTE_ONLY",
              "actionable":False,"executable_quote":False,
              "extension_risk":{"blocking_extension_ids":[]},
@@ -161,10 +161,10 @@ class LowExtensionRiskShortlistTests(unittest.TestCase):
                                    "SIGNED_ATOMIC_SIMULATION_NOT_VERIFIED"]}
         selected=simple_mint_extension_candidates([row])
         self.assertEqual(len(selected),1)
-        self.assertEqual(selected[0]["input_token_program"],"Tokenz")
-        self.assertEqual(selected[0]["output_token_program"],"Tokenkeg")
+        self.assertEqual(selected[0]["input_token_program"],"TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb")
+        self.assertEqual(selected[0]["output_token_program"],"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
         reverse=simple_mint_extension_candidates([{**row,"input_mint":B,"output_mint":A}])
-        self.assertEqual(reverse[0]["input_token_program"],"Tokenkeg")
+        self.assertEqual(reverse[0]["input_token_program"],"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
         self.assertFalse(selected[0]["actionable"])
         self.assertFalse(selected[0]["executable_quote"])
         self.assertFalse(selected[0]["simulation_verified"])
