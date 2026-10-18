@@ -55,6 +55,7 @@ class OrcaToken2022StructuralTests(unittest.TestCase):
         self.assertFalse(output["effective_fee_verified"])
         self.assertEqual(call.call_args.args[1],"getMultipleAccounts")
         self.assertEqual(len(call.call_args.args[2][0]),5)
+        self.assertIsNone(output["oracle_evidence"])
         self.assertNotIn("minContextSlot",call.call_args.args[2][1])
 
     @patch("arb.orca_token2022_validation.decode",return_value=STATE)
