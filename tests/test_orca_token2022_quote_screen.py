@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import patch
-from arb.orca_token2022_quote_screen import screen, diagnostic_failure_category, screen_with_rate_limit_retry, simple_mint_extension_candidates, validate_directional_snapshot_accounts, directional_tick_array_candidates
+from arb.orca_token2022_quote_screen import screen, diagnostic_failure_category, screen_with_rate_limit_retry, simple_mint_extension_candidates, validate_directional_snapshot_accounts, directional_tick_array_candidates, swap_v2_snapshot_layout_evidence
 
 A="So11111111111111111111111111111111111111112"
 B="EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
@@ -230,3 +230,25 @@ class DirectionalTickArrayCandidatesTests(unittest.TestCase):
         self.assertFalse(directional_tick_array_candidates(STATE,arrays,True)["all_present"])
         arrays[1]["address"]=arrays[0]["address"]
         self.assertFalse(directional_tick_array_candidates(STATE,arrays,True)["all_present"])
+
+class SwapV2SnapshotLayoutEvidenceTests(unittest.TestCase):
+    def test_pool_side_accounts_do_not_authorize_execution(self):
+        obs=observed()
+        obs["pool_address"]=POOL
+        obs["pool"]["token_vault_a"]="vault-A"
+        obs["pool"]["token_vault_b"]="vault-B"
+        ticks={"addresses":["tick-0","tick-1","tick-2"],"all_present":True}
+        result=swap_v2_snapshot_layout_evidence(obs,A,ticks,"oracle-pda")
+        self.assertEqual(result["observed_pool_side_accounts"]["whirlpool"],POOL)
+        self.assertEqual(result["observed_pool_side_accounts"]["tick_array_1"],"tick-1")
+        self.assertIn("token_authority",result["missing_or_unverified_roles"])
+        self.assertIn("token_owner_account_a",result["missing_or_unverified_roles"])
+        self.assertFalse(result["actionable"])
+        self.assertFalse(result["signed_simulation_verified"])
+
+    def test_missing_tick_stays_missing(self):
+        obs=observed()
+        ticks={"addresses":["tick-0",None,None],"all_present":False}
+        result=swap_v2_snapshot_layout_evidence(obs,A,ticks,"oracle-pda")
+        self.assertIn("tick_array_1",result["missing_or_unverified_roles"])
+        self.assertFalse(result["directional_ticks_complete"])
