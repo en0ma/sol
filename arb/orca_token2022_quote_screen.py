@@ -151,7 +151,12 @@ def main():
     extension_blocked=sum(bool(x.get("extension_risk",{}).get("blocking_extension_ids")) for x in results)
     hook_pool_count=sum(any(m.get("transfer_hook_extension_present") for m in r.get("mint_execution_evidence",[])) for r in results)
     configured_hook_pools=sum(any(m.get("transfer_hook_configuration_status")=="PROGRAM_CONFIGURED" for m in r.get("mint_execution_evidence",[])) for r in results)
-    report={"checked":len(results),"transfer_hook_pool_count":hook_pool_count,
+    blocker_counts={name:sum(name in row.get("execution_blockers",[])
+                              for row in results)
+                    for name in sorted({item for row in results
+                                        for item in row.get("execution_blockers",[])})}
+    report={"checked":len(results),"execution_blocker_counts":blocker_counts,
+            "transfer_hook_pool_count":hook_pool_count,
             "configured_hook_pool_count":configured_hook_pools,"failure_categories":failure_categories,
             "indicative_with_blocking_mint_extensions":extension_blocked,
             "executable_count":0,
