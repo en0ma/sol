@@ -59,6 +59,34 @@ def directional_tick_array_candidates(state,arrays,a_to_b):
                            and len({a["address"] for a in selected if a})==3,
             "instruction_account_metas_verified":False}
 
+def swap_v2_snapshot_layout_evidence(observed,input_mint,directed_ticks,oracle_pda):
+    """Bind observed pool-side accounts to fixed SwapV2 order, never user metas."""
+    from arb.orca_swap_v2_metas import ACCOUNT_ROLES
+    state=observed["pool"]
+    mints=observed["mints"]
+    if input_mint not in mints or len(mints)!=2:
+        raise ValueError("invalid direction for SwapV2 layout evidence")
+    programs=[m.get("owner") for m in observed["mint_accounts"]]
+    known={
+        "token_program_a":programs[0],"token_program_b":programs[1],
+        "whirlpool":observed.get("pool_address"),
+        "token_mint_a":mints[0],"token_mint_b":mints[1],
+        "token_vault_a":state.get("token_vault_a"),
+        "token_vault_b":state.get("token_vault_b"),
+        "oracle":oracle_pda,
+    }
+    for i,address in enumerate(directed_ticks.get("addresses",[])[:3]):
+        known[f"tick_array_{i}"]=address
+    required=("token_authority","token_owner_account_a","token_owner_account_b")
+    missing=[role for role in ACCOUNT_ROLES if role in required or not known.get(role)]
+    return {"ordered_roles":list(ACCOUNT_ROLES),
+            "observed_pool_side_accounts":known,
+            "missing_or_unverified_roles":missing,
+            "directional_ticks_complete":bool(directed_ticks.get("all_present")),
+            "onchain_account_metas_verified":False,
+            "signed_simulation_verified":False,
+            "actionable":False,"executable_quote":False,"broadcast":False}
+
 def screen(rpc,address,input_mint,gross_input):
     if type(gross_input) is not int or not 0<gross_input<2**64:
         raise ValueError("invalid input amount")
@@ -134,6 +162,8 @@ def screen(rpc,address,input_mint,gross_input):
         "input_token_program":directional["input_token_program"],
         "output_token_program":directional["output_token_program"],
         "directional_tick_array_candidates":directed_ticks,
+        "swap_v2_layout_evidence":swap_v2_snapshot_layout_evidence(
+            {**observed,"pool_address":address},input_mint,directed_ticks,oracle_pda),
         "tick_array_addresses":[a.get("address") for a in arrays],
         "tick_array_statuses":[a.get("status") for a in arrays],
         "tick_array_accounts_present":sum(a.get("status")=="FIXED_VALID" for a in arrays),
