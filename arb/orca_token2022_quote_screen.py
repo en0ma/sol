@@ -102,6 +102,9 @@ def screen(rpc,address,input_mint,gross_input):
         "input_token_program":directional["input_token_program"],
         "output_token_program":directional["output_token_program"],
         "tick_array_addresses":[a.get("address") for a in arrays],
+        "tick_array_statuses":[a.get("status") for a in arrays],
+        "tick_array_accounts_present":sum(a.get("status")=="FIXED_VALID" for a in arrays),
+        "token_programs_distinct":directional["input_token_program"]!=directional["output_token_program"],
         "vault_mint_relationships_verified":True,
         "instruction_account_metas_verified":False,
         "remaining_accounts_verified":False,"actionable":False}
