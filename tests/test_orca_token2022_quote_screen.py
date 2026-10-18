@@ -30,6 +30,8 @@ class QuoteScreenTests(unittest.TestCase):
         self.assertFalse(result["actionable"])
         self.assertIn("MINT_EXTENSION_1_UNSUPPORTED_FOR_EXECUTION",result["execution_blockers"])
         self.assertIn("SIGNED_ATOMIC_SIMULATION_NOT_VERIFIED",result["execution_blockers"])
+        self.assertIn("SWAP_ACCOUNT_METAS_NOT_VERIFIED",result["execution_blockers"])
+        self.assertNotIn("TRANSFER_HOOK_ACCOUNTS_NOT_VERIFIED",result["execution_blockers"])
         self.assertEqual(len(result["mint_execution_evidence"]),2)
         self.assertTrue(result["mint_execution_evidence"][0]["transfer_hook_extension_present"])
         self.assertEqual(result["mint_execution_evidence"][0]["transfer_hook_configuration_status"],"EXTENSION_PRESENT_NO_ACTIVE_PROGRAM")
@@ -37,6 +39,21 @@ class QuoteScreenTests(unittest.TestCase):
         self.assertFalse(result["mint_execution_evidence"][0]["transfer_hook_extra_accounts_verified"])
         self.assertFalse(result["mint_execution_evidence"][1]["swap_account_metas_verified"])
         self.assertFalse(result["mint_execution_evidence"][0]["transfer_hook_program_identity_observed"])
+
+    @patch("arb.orca_token2022_quote_screen.quote_from_decoded_arrays")
+    @patch("arb.orca_token2022_quote_screen.scheduled_epoch_snapshot")
+    def test_configured_hook_keeps_extra_account_blocker(self,snap,quote):
+        state=observed()
+        state["tick_arrays"]=[{"status":"FIXED_VALID"}]
+        state["mint_accounts"][0]["transfer_hook_program_id"]="HookProgramID"
+        snap.return_value=state
+        quote.return_value={"estimated_output_base_units":100,
+                            "tick_arrays_examined":1,"ticks_crossed":0}
+        result=screen("rpc",POOL,A,101)
+        self.assertIn("TRANSFER_HOOK_ACCOUNTS_NOT_VERIFIED",result["execution_blockers"])
+        self.assertEqual(result["mint_execution_evidence"][0]["transfer_hook_configuration_status"],
+                         "PROGRAM_CONFIGURED")
+        self.assertFalse(result["executable_quote"])
 
     @patch("arb.orca_token2022_quote_screen.scheduled_epoch_snapshot")
     def test_missing_synchronized_ticks_fails_closed(self,snap):
