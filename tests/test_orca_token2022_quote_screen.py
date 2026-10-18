@@ -34,6 +34,7 @@ class QuoteScreenTests(unittest.TestCase):
         self.assertTrue(result["mint_execution_evidence"][0]["transfer_hook_extension_present"])
         self.assertFalse(result["mint_execution_evidence"][0]["transfer_hook_extra_accounts_verified"])
         self.assertFalse(result["mint_execution_evidence"][1]["swap_account_metas_verified"])
+        self.assertFalse(result["mint_execution_evidence"][0]["transfer_hook_program_identity_observed"])
 
     @patch("arb.orca_token2022_quote_screen.scheduled_epoch_snapshot")
     def test_missing_synchronized_ticks_fails_closed(self,snap):
