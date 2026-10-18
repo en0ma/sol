@@ -94,9 +94,12 @@ def screen(rpc,address,input_mint,gross_input):
          "swap_account_metas_verified":False}
         for mint_address,mint_obs in zip(mints,observed["mint_accounts"])]
     directional=validate_directional_snapshot_accounts(observed,input_mint)
+    from solders.pubkey import Pubkey
+    from arb.orca_whirlpool import PROGRAM
+    oracle_pda=str(Pubkey.find_program_address([b"oracle",bytes(Pubkey.from_string(address))],Pubkey.from_string(PROGRAM))[0])
     account_candidates={
         "pool":address,"snapshot_slot":observed["slot"],
-        "oracle_account_verified":False,
+        "oracle_account_verified":False,"oracle_pda_candidate":oracle_pda,
         "input_mint":input_mint,"output_mint":mints[1-index],
         "input_vault":directional["input_vault"],
         "output_vault":directional["output_vault"],
