@@ -64,6 +64,9 @@ jobs:
       - name: Install Python Solana PDA dependency for offline tests
         run: python3 -m pip install --disable-pip-version-check solders==0.26.0
 
+      - name: Probe ephemeral signer token accounts on offline Surfpool (read-only)
+        run: python3 -m arb.orca_swap_v2_offline_probe
+
       - name: Enforce arbitrage mission and development priorities
         run: python3 -m arb.arbitrage_mission
       - name: Test honest venue-coverage capability accounting
