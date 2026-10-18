@@ -194,6 +194,7 @@ jobs:
       SURFPOOL_DATASOURCE_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
       # Conservative pacing for Python RPC calls to Surfpool (fork fetches may bypass it).
       SOLANA_RPC_MIN_INTERVAL_SECONDS: "0.5"
+      SOLANA_RPC_ALCHEMY_FREE_TIER: "1"
       SOLANA_RPC_PACING_FILE: ${{ runner.temp }}/solana-rpc-last-request
     steps:
       - uses: actions/checkout@v4
