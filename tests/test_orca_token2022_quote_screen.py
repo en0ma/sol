@@ -112,3 +112,21 @@ class ThrottleRetryTests(unittest.TestCase):
             screen_with_rate_limit_retry("rpc",POOL,None,100,sleeper=delays.append)
         self.assertEqual(mocked.call_count,3)
         self.assertEqual(delays,[1.5,3.0])
+
+class HookProgramParsingTests(unittest.TestCase):
+    def test_hook_program_id_parsed_from_mint_tlv(self):
+        from arb.token2022_extensions import transfer_hook_program_id
+        from arb.orca_whirlpool import b58
+        base=bytearray(166)
+        base[165]=1
+        raw=bytes(base)+(14).to_bytes(2,"little")+(64).to_bytes(2,"little")+bytes(32)+bytes([7])*32
+        self.assertEqual(transfer_hook_program_id(raw),b58(bytes([7])*32))
+
+    def test_absent_or_malformed_hook_is_not_authorized(self):
+        from arb.token2022_extensions import transfer_hook_program_id
+        base=bytearray(166)
+        base[165]=1
+        self.assertIsNone(transfer_hook_program_id(bytes(base)))
+        bad=bytes(base)+(14).to_bytes(2,"little")+(63).to_bytes(2,"little")+bytes(63)
+        with self.assertRaisesRegex(ValueError,"length"):
+            transfer_hook_program_id(bad)
