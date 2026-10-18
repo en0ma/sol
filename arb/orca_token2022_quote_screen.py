@@ -41,6 +41,20 @@ def validate_directional_snapshot_accounts(observed,input_mint):
             "vault_mint_relationships_verified":True,
             "instruction_account_metas_verified":False,"actionable":False}
 
+def directional_tick_array_candidates(state,arrays,a_to_b):
+    """Direction-ordered, observed tick arrays; not authenticated SwapV2 metas."""
+    from arb.whirlpool_ticks import start_tick, ARRAY_TICKS
+    spacing=state["tick_spacing"]
+    center=start_tick(state["tick_current_index"],spacing)
+    step=spacing*ARRAY_TICKS*(-1 if a_to_b else 1)
+    by_start={a["start_tick"]:a for a in arrays}
+    requested=[center+i*step for i in range(3)]
+    selected=[by_start.get(start) for start in requested]
+    return {"starts":requested,
+            "addresses":[a.get("address") if a else None for a in selected],
+            "all_present":all(a is not None and a.get("status")=="FIXED_VALID" for a in selected),
+            "instruction_account_metas_verified":False}
+
 def screen(rpc,address,input_mint,gross_input):
     if type(gross_input) is not int or not 0<gross_input<2**64:
         raise ValueError("invalid input amount")
@@ -102,6 +116,7 @@ def screen(rpc,address,input_mint,gross_input):
                                   state["tick_spacing"]!=state["fee_tier_index_seed"])
     oracle_fee_mode_known=(type(state.get("fee_tier_index_seed")) is int and
                            type(state.get("tick_spacing")) is int)
+    directed_ticks=directional_tick_array_candidates(state,arrays,index==0)
     account_candidates={
         "pool":address,"snapshot_slot":observed["slot"],
         "oracle_account_verified":bool((observed.get("oracle_evidence") or {}).get("same_slot_verified")),
@@ -114,6 +129,7 @@ def screen(rpc,address,input_mint,gross_input):
         "output_vault":directional["output_vault"],
         "input_token_program":directional["input_token_program"],
         "output_token_program":directional["output_token_program"],
+        "directional_tick_array_candidates":directed_ticks,
         "tick_array_addresses":[a.get("address") for a in arrays],
         "tick_array_statuses":[a.get("status") for a in arrays],
         "tick_array_accounts_present":sum(a.get("status")=="FIXED_VALID" for a in arrays),
