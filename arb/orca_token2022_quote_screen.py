@@ -125,6 +125,7 @@ def simple_mint_extension_candidates(results):
         raise ValueError("invalid quote results")
     return [{"pool":r["pool"],"slot":r["slot"],
              "status":"INDICATIVE_ONLY_REQUIRES_SWAP_META_AND_SIMULATION",
+             "input_mint":r["input_mint"],"output_mint":r["output_mint"],
              "actionable":False,"executable_quote":False,"simulation_verified":False}
             for r in results
             if (isinstance(r,dict) and
