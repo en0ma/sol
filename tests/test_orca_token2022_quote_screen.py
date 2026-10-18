@@ -27,7 +27,7 @@ class QuoteScreenTests(unittest.TestCase):
         self.assertEqual(result["pool_net_input_base_units"],98)
         self.assertEqual(result["recipient_net_output_base_units"],98)
         self.assertIs(quote.call_args.args[3],state["tick_arrays"])
-        snap.assert_called_once_with("rpc",POOL,include_ticks=True)
+        snap.assert_called_once_with("rpc",POOL,include_ticks=True,include_oracle=True)
         self.assertFalse(result["actionable"])
         self.assertEqual(result["swap_account_candidates"]["input_mint"],A)
         self.assertFalse(result["swap_account_candidates"]["instruction_account_metas_verified"])
@@ -36,6 +36,7 @@ class QuoteScreenTests(unittest.TestCase):
         oracle=str(Pubkey.find_program_address([b"oracle",bytes(Pubkey.from_string(POOL))],Pubkey.from_string(PROGRAM))[0])
         self.assertEqual(result["swap_account_candidates"]["oracle_pda_candidate"],oracle)
         self.assertFalse(result["swap_account_candidates"]["oracle_account_verified"])
+        self.assertIsNone(result["swap_account_candidates"]["oracle_same_slot_evidence"])
         self.assertFalse(result["swap_account_candidates"]["remaining_accounts_verified"])
         for requirement in ("swap_v2_user_token_accounts_verified","swap_v2_authority_verified","swap_v2_oracle_verified","swap_v2_tick_order_verified"):
             self.assertIs(result["swap_account_candidates"][requirement],False)
