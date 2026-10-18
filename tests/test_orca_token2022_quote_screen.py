@@ -32,6 +32,8 @@ class QuoteScreenTests(unittest.TestCase):
         self.assertEqual(result["swap_account_candidates"]["input_mint"],A)
         self.assertFalse(result["swap_account_candidates"]["instruction_account_metas_verified"])
         self.assertFalse(result["swap_account_candidates"]["remaining_accounts_verified"])
+        for requirement in ("swap_v2_user_token_accounts_verified","swap_v2_authority_verified","swap_v2_oracle_verified","swap_v2_tick_order_verified"):
+            self.assertIs(result["swap_account_candidates"][requirement],False)
         self.assertEqual(result["swap_account_candidates"]["tick_array_accounts_present"],1)
         self.assertEqual(result["swap_account_candidates"]["tick_array_statuses"],["FIXED_VALID"])
         self.assertIn("MINT_EXTENSION_1_UNSUPPORTED_FOR_EXECUTION",result["execution_blockers"])
