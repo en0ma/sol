@@ -190,6 +190,7 @@ def simple_mint_extension_candidates(results):
                 r.get("status")=="INDICATIVE_TOKEN2022_QUOTE_ONLY" and
                 r.get("actionable") is False and
                 r.get("executable_quote") is False and
+                (r.get("swap_account_candidates") or {}).get("oracle_account_verified") is True and
                 isinstance(r.get("pool"),str) and
                 type(r.get("slot")) is int and
                 isinstance(r.get("mint_execution_evidence"),list) and
@@ -251,8 +252,13 @@ def main():
                               for row in results)
                     for name in sorted({item for row in results
                                         for item in row.get("execution_blockers",[])})}
+    oracle_verified_count=sum(
+        r.get("status")=="INDICATIVE_TOKEN2022_QUOTE_ONLY" and
+        (r.get("swap_account_candidates") or {}).get("oracle_account_verified") is True
+        for r in results)
     simple_candidates=simple_mint_extension_candidates(results)
-    report={"checked":len(results),"simple_mint_extension_candidates":simple_candidates,
+    report={"checked":len(results),"synchronized_oracle_observed_count":oracle_verified_count,
+            "simple_mint_extension_candidates":simple_candidates,
             "execution_blocker_counts":blocker_counts,
             "transfer_hook_pool_count":hook_pool_count,
             "configured_hook_pool_count":configured_hook_pools,"failure_categories":failure_categories,
