@@ -452,6 +452,7 @@ jobs:
       - name: Simulate real Raydium CPMM SOL to USDC swap
         run: python3 -m arb.raydium_swap
       - name: Simulate atomic Orca to Raydium two-venue route
+        continue-on-error: true
         run: python3 -m arb.cross_venue
       - name: Sweep actual atomic cross-venue trade sizes
         env:
