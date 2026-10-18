@@ -107,7 +107,7 @@ def screen(rpc,address,input_mint,gross_input):
         "token_programs_distinct":directional["input_token_program"]!=directional["output_token_program"],
         "vault_mint_relationships_verified":True,
         "instruction_account_metas_verified":False,
-        "remaining_accounts_verified":False,"actionable":False}
+        "remaining_accounts_verified":False,"swap_v2_user_token_accounts_verified":False,"swap_v2_authority_verified":False,"swap_v2_oracle_verified":False,"swap_v2_tick_order_verified":False,"actionable":False}
     blockers=["AMM_MODEL_NOT_SIMULATION_RECONCILED",
               "SWAP_ACCOUNT_METAS_NOT_VERIFIED",
               "SIGNED_ATOMIC_SIMULATION_NOT_VERIFIED"]
