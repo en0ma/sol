@@ -79,10 +79,18 @@ def swap_v2_snapshot_layout_evidence(observed,input_mint,directed_ticks,oracle_p
         known[f"tick_array_{i}"]=address
     required=("token_authority","token_owner_account_a","token_owner_account_b")
     missing=[role for role in ACCOUNT_ROLES if role in required or not known.get(role)]
+    oracle_verified=bool((observed.get("oracle_evidence") or {}).get("same_slot_verified"))
+    if not oracle_verified and "oracle" not in missing:
+        missing.append("oracle")
+    if not directed_ticks.get("all_present"):
+        for role in ("tick_array_0","tick_array_1","tick_array_2"):
+            if role not in missing:
+                missing.append(role)
     return {"ordered_roles":list(ACCOUNT_ROLES),
             "observed_pool_side_accounts":known,
             "missing_or_unverified_roles":missing,
             "directional_ticks_complete":bool(directed_ticks.get("all_present")),
+            "oracle_initialized_same_slot_verified":oracle_verified,
             "onchain_account_metas_verified":False,
             "signed_simulation_verified":False,
             "actionable":False,"executable_quote":False,"broadcast":False}
