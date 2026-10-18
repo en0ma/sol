@@ -32,6 +32,8 @@ class QuoteScreenTests(unittest.TestCase):
         self.assertIn("SIGNED_ATOMIC_SIMULATION_NOT_VERIFIED",result["execution_blockers"])
         self.assertEqual(len(result["mint_execution_evidence"]),2)
         self.assertTrue(result["mint_execution_evidence"][0]["transfer_hook_extension_present"])
+        self.assertEqual(result["mint_execution_evidence"][0]["transfer_hook_configuration_status"],"EXTENSION_PRESENT_NO_ACTIVE_PROGRAM")
+        self.assertEqual(result["mint_execution_evidence"][1]["transfer_hook_configuration_status"],"NO_HOOK_EXTENSION")
         self.assertFalse(result["mint_execution_evidence"][0]["transfer_hook_extra_accounts_verified"])
         self.assertFalse(result["mint_execution_evidence"][1]["swap_account_metas_verified"])
         self.assertFalse(result["mint_execution_evidence"][0]["transfer_hook_program_identity_observed"])
