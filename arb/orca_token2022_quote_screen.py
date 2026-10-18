@@ -44,7 +44,7 @@ def validate_directional_snapshot_accounts(observed,input_mint):
 def screen(rpc,address,input_mint,gross_input):
     if type(gross_input) is not int or not 0<gross_input<2**64:
         raise ValueError("invalid input amount")
-    observed=scheduled_epoch_snapshot(rpc,address,include_ticks=True)
+    observed=scheduled_epoch_snapshot(rpc,address,include_ticks=True,include_oracle=True)
     state=observed["pool"]
     arrays=observed["tick_arrays"]
     if not isinstance(arrays,list) or not arrays:
@@ -99,7 +99,9 @@ def screen(rpc,address,input_mint,gross_input):
     oracle_pda=str(Pubkey.find_program_address([b"oracle",bytes(Pubkey.from_string(address))],Pubkey.from_string(PROGRAM))[0])
     account_candidates={
         "pool":address,"snapshot_slot":observed["slot"],
-        "oracle_account_verified":False,"oracle_pda_candidate":oracle_pda,
+        "oracle_account_verified":bool((observed.get("oracle_evidence") or {}).get("same_slot_verified")),
+        "oracle_pda_candidate":oracle_pda,
+        "oracle_same_slot_evidence":observed.get("oracle_evidence"),
         "input_mint":input_mint,"output_mint":mints[1-index],
         "input_vault":directional["input_vault"],
         "output_vault":directional["output_vault"],
