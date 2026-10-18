@@ -558,18 +558,22 @@ jobs:
           path: ${{ runner.temp }}/clmm-readiness.json
           if-no-files-found: ignore
       - name: Scan additional RAY and stablecoin pools on five DEX programs
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         env:
           DEX_DISCOVERY_REPORT: ${{ runner.temp }}/expanded-pool-discovery.json
         run: python3 -m arb.onchain_pool_discovery --pairs WSOL/RAY,USDC/RAY --limit 8 --pace-seconds 2 --registry-fallback arb/pool_registry.json || test "$?" -eq 2
       - name: Attempt independent Meteora DLMM discovery
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         env:
           DEX_DISCOVERY_REPORT: ${{ runner.temp }}/meteora-dlmm-discovery.json
         run: python3 -m arb.onchain_pool_discovery --pairs WSOL/RAY --venues meteora_dlmm --limit 8 --pace-seconds 2 || test "$?" -eq 2
       - name: Attempt independent Meteora DAMM v2 discovery
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         env:
           DEX_DISCOVERY_REPORT: ${{ runner.temp }}/meteora-damm-v2-discovery.json
         run: python3 -m arb.onchain_pool_discovery --pairs WSOL/RAY --venues meteora_damm_v2 --limit 8 --pace-seconds 2 || test "$?" -eq 2
       - name: Attempt independent PumpSwap discovery
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         env:
           DEX_DISCOVERY_REPORT: ${{ runner.temp }}/pumpswap-discovery.json
         run: python3 -m arb.onchain_pool_discovery --pairs WSOL/RAY --venues pumpswap --limit 8 --pace-seconds 2 || test "$?" -eq 2
