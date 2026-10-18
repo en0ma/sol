@@ -803,6 +803,31 @@ jobs:
         run: python3 -m arb.pool_readiness
       - name: Test on-chain account discovery against Surfpool
         run: python3 -m unittest discover -s tests -p test_onchain_discovery.py -v
+      - name: Report Surfpool upstream rate-limit evidence
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json,os,re
+          from pathlib import Path
+          path=Path(os.environ["RUNNER_TEMP"])/"fork.log"
+          raw=path.read_text(errors="replace") if path.exists() else ""
+          report={"fork_log_present":path.exists(),
+                  "upstream_429_log_lines":sum(bool(re.search(r"429|too many requests",line,re.I))
+                                                for line in raw.splitlines()),
+                  "python_rpc_interval_seconds":os.environ.get("SOLANA_RPC_MIN_INTERVAL_SECONDS"),
+                  "internal_surfpool_upstream_throttling_verified":False}
+          output=Path(os.environ["RUNNER_TEMP"])/"surfpool-rpc-rate-limit.json"
+          output.write_text(json.dumps(report,indent=2))
+          print(json.dumps(report,indent=2))
+          PY
+      - name: Upload Surfpool rate-limit observations
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surfpool-rate-limit-observations
+          path: ${{ runner.temp }}/surfpool-rpc-rate-limit.json
+          if-no-files-found: ignore
       - name: Upload fork logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
