@@ -143,6 +143,11 @@ def simple_mint_extension_candidates(results):
                     for m in r["mint_execution_evidence"]) and
                 {m["mint"] for m in r["mint_execution_evidence"]}==
                 {r.get("input_mint"),r.get("output_mint")} and
+                r.get("input_mint")!=r.get("output_mint") and
+                all(m["token_program"] in (
+                    "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+                    "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
+                    for m in r["mint_execution_evidence"]) and
                 isinstance(r.get("extension_risk"),dict) and
                 r["extension_risk"].get("blocking_extension_ids")==[] and
                 isinstance(r.get("execution_blockers"),list) and
