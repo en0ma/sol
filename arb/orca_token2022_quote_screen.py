@@ -47,7 +47,8 @@ def directional_tick_array_candidates(state,arrays,a_to_b):
     spacing=state["tick_spacing"]
     center=start_tick(state["tick_current_index"],spacing)
     step=spacing*ARRAY_TICKS*(-1 if a_to_b else 1)
-    by_start={a["start_tick"]:a for a in arrays}
+    by_start={a["start_tick"]:a for a in arrays
+              if isinstance(a,dict) and type(a.get("start_tick")) is int}
     requested=[center+i*step for i in range(3)]
     selected=[by_start.get(start) for start in requested]
     return {"starts":requested,
