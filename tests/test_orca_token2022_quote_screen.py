@@ -1,15 +1,16 @@
 import unittest
 from unittest.mock import patch
-from arb.orca_token2022_quote_screen import screen, diagnostic_failure_category, screen_with_rate_limit_retry, simple_mint_extension_candidates
+from arb.orca_token2022_quote_screen import screen, diagnostic_failure_category, screen_with_rate_limit_retry, simple_mint_extension_candidates, validate_directional_snapshot_accounts
 
 A="So11111111111111111111111111111111111111112"
 B="EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
 POOL="7qbRF6YsyGuLUVs6Y1q64bdVrfe4ZcUUz1JRdoVNUJnm"
-STATE={"token_mint_a":A,"token_mint_b":B}
+STATE={"token_mint_a":A,"token_mint_b":B,"token_vault_a":"vault-A","token_vault_b":"vault-B"}
 def observed():
     cfg={"older":{"epoch":0,"basis_points":100,"maximum_fee":1000},
          "newer":{"epoch":4,"basis_points":200,"maximum_fee":1000}}
     return {"pool":STATE,"slot":12,"mints":[A,B],
+            "vault_accounts":[{"mint":A,"state":1},{"mint":B,"state":1}],
             "mint_accounts":[{"transfer_fee_config":cfg,"owner":"TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb","extension_types":[1,14]},
                              {"transfer_fee_config":cfg,"owner":"TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb","extension_types":[1]}],
             "epoch_observation":{"epoch":4},
@@ -177,3 +178,19 @@ class LowExtensionRiskShortlistTests(unittest.TestCase):
             {**row,"execution_blockers":[]}]),[])
         self.assertEqual(simple_mint_extension_candidates([
             {**row,"executable_quote":True}]),[])
+
+class DirectionalAccountEvidenceTests(unittest.TestCase):
+    def test_vaults_and_programs_follow_swap_direction(self):
+        snap=observed()
+        forward=validate_directional_snapshot_accounts(snap,A)
+        reverse=validate_directional_snapshot_accounts(snap,B)
+        self.assertEqual(forward["input_vault"],"vault-A")
+        self.assertEqual(reverse["input_vault"],"vault-B")
+        self.assertTrue(forward["vault_mint_relationships_verified"])
+        self.assertFalse(forward["instruction_account_metas_verified"])
+
+    def test_wrong_vault_mint_fails_closed(self):
+        snap=observed()
+        snap["vault_accounts"][0]["mint"]=B
+        with self.assertRaisesRegex(ValueError,"mismatch"):
+            validate_directional_snapshot_accounts(snap,A)
