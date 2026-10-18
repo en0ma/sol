@@ -1,5 +1,7 @@
 """Dependency-free Solana JSON-RPC with bounded 429 retries and jitter."""
 import json
+import os
+import fcntl
 from email.utils import parsedate_to_datetime
 from datetime import datetime, timezone
 import random
@@ -40,6 +42,37 @@ def _retry_after(error):
             pass
     return None
 
+def _pace_request():
+    """Optional cross-process RPC pacing. Disabled unless configured in CI."""
+    value=os.environ.get("SOLANA_RPC_MIN_INTERVAL_SECONDS")
+    if value is None:
+        return
+    try:
+        interval=float(value)
+    except (TypeError,ValueError) as exc:
+        raise ValueError("invalid RPC pacing interval") from exc
+    if not 0 < interval <= 10:
+        raise ValueError("invalid RPC pacing interval")
+    path=os.environ.get("SOLANA_RPC_PACING_FILE","/tmp/solana-rpc-last-request")
+    with open(path,"a+") as state:
+        fcntl.flock(state,fcntl.LOCK_EX)
+        try:
+            state.seek(0)
+            try:
+                last=float(state.read().strip())
+            except ValueError:
+                last=0.0
+            now=time.monotonic()
+            remaining=last+interval-now
+            if remaining>0:
+                time.sleep(remaining)
+            state.seek(0)
+            state.truncate()
+            state.write(str(time.monotonic()))
+            state.flush()
+        finally:
+            fcntl.flock(state,fcntl.LOCK_UN)
+
 def call(url, method, params=None, timeout=20, retries=3, base_delay=0.35, max_delay=3.0):
     """Retry ONLY throttling with capped exponential full jitter; fail closed."""
     if not isinstance(retries, int) or not 0 <= retries <= 6:
@@ -50,6 +83,7 @@ def call(url, method, params=None, timeout=20, retries=3, base_delay=0.35, max_d
                        "params": [] if params is None else params}).encode()
     for attempt in range(retries + 1):
         try:
+            _pace_request()
             request = Request(url, data=data, headers={"Content-Type": "application/json"})
             with urlopen(request, timeout=timeout) as res:
                 response = json.load(res)
