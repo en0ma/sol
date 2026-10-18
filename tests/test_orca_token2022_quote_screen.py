@@ -1,11 +1,11 @@
 import unittest
 from unittest.mock import patch
-from arb.orca_token2022_quote_screen import screen, diagnostic_failure_category, screen_with_rate_limit_retry, simple_mint_extension_candidates, validate_directional_snapshot_accounts
+from arb.orca_token2022_quote_screen import screen, diagnostic_failure_category, screen_with_rate_limit_retry, simple_mint_extension_candidates, validate_directional_snapshot_accounts, directional_tick_array_candidates
 
 A="So11111111111111111111111111111111111111112"
 B="EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
 POOL="7qbRF6YsyGuLUVs6Y1q64bdVrfe4ZcUUz1JRdoVNUJnm"
-STATE={"token_mint_a":A,"token_mint_b":B,"token_vault_a":"vault-A","token_vault_b":"vault-B"}
+STATE={"token_mint_a":A,"token_mint_b":B,"token_vault_a":"vault-A","token_vault_b":"vault-B","tick_current_index":0,"tick_spacing":1}
 def observed():
     cfg={"older":{"epoch":0,"basis_points":100,"maximum_fee":1000},
          "newer":{"epoch":4,"basis_points":200,"maximum_fee":1000}}
@@ -208,3 +208,17 @@ class DirectionalAccountEvidenceTests(unittest.TestCase):
         snap["vault_accounts"][0]["mint"]=B
         with self.assertRaisesRegex(ValueError,"mismatch"):
             validate_directional_snapshot_accounts(snap,A)
+
+class DirectionalTickArrayCandidatesTests(unittest.TestCase):
+    def test_direction_order_and_missing_arrays(self):
+        arrays=[{"start_tick":start,"address":str(start),"status":"FIXED_VALID"}
+                for start in (0,88,176,-88,-176)]
+        forward=directional_tick_array_candidates(STATE,arrays,True)
+        reverse=directional_tick_array_candidates(STATE,arrays,False)
+        self.assertEqual(forward["starts"],[0,-88,-176])
+        self.assertEqual(reverse["starts"],[0,88,176])
+        self.assertTrue(forward["all_present"])
+        self.assertFalse(forward["instruction_account_metas_verified"])
+        missing=directional_tick_array_candidates(STATE,arrays[:2],True)
+        self.assertFalse(missing["all_present"])
+        self.assertIsNone(missing["addresses"][1])
