@@ -126,6 +126,8 @@ def simple_mint_extension_candidates(results):
     return [{"pool":r["pool"],"slot":r["slot"],
              "status":"INDICATIVE_ONLY_REQUIRES_SWAP_META_AND_SIMULATION",
              "input_mint":r["input_mint"],"output_mint":r["output_mint"],
+             "input_token_program":r["mint_execution_evidence"][0]["token_program"],
+             "output_token_program":r["mint_execution_evidence"][1]["token_program"],
              "actionable":False,"executable_quote":False,"simulation_verified":False}
             for r in results
             if (isinstance(r,dict) and
@@ -134,6 +136,10 @@ def simple_mint_extension_candidates(results):
                 r.get("executable_quote") is False and
                 isinstance(r.get("pool"),str) and
                 type(r.get("slot")) is int and
+                isinstance(r.get("mint_execution_evidence"),list) and
+                len(r["mint_execution_evidence"])==2 and
+                all(isinstance(m,dict) and isinstance(m.get("token_program"),str)
+                    for m in r["mint_execution_evidence"]) and
                 isinstance(r.get("extension_risk"),dict) and
                 r["extension_risk"].get("blocking_extension_ids")==[] and
                 isinstance(r.get("execution_blockers"),list) and
