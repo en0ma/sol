@@ -63,6 +63,33 @@ def extension_risk(mint_accounts):
             "blocking_extension_ids":blocking,
             "fee_mode_verified":False,"executable_quote":False}
 
+def observe_oracle_account(rpc,pool_address,minimum_slot):
+    """Read-only oracle observation; separate RPC read is not same-slot proof."""
+    from solders.pubkey import Pubkey
+    if type(minimum_slot) is not int or minimum_slot<0:
+        raise ValueError("invalid oracle minimum slot")
+    pool=Pubkey.from_string(pool_address)
+    key=str(Pubkey.find_program_address(
+        [b"oracle",bytes(pool)],Pubkey.from_string(PROGRAM))[0])
+    response=call(rpc,"getAccountInfo",
+                  [key,{"encoding":"base64","commitment":"confirmed",
+                        "minContextSlot":minimum_slot}])
+    slot=response.get("context",{}).get("slot")
+    if type(slot) is not int or slot<minimum_slot:
+        raise ValueError("oracle account read is stale")
+    account=response.get("value")
+    present=account is not None
+    if present:
+        raw=_raw(account,PROGRAM)
+        if len(raw)<8:
+            raise ValueError("oracle account truncated")
+    return {"oracle_pda":key,"oracle_observation_slot":slot,
+            "oracle_account_present":present,
+            "oracle_owner_checked":present,
+            "same_slot_verified":False,
+            "instruction_account_metas_verified":False,
+            "actionable":False,"executable_quote":False}
+
 def snapshot(rpc,address,*,min_context_slot=None,include_ticks=False):
     if min_context_slot is not None and (type(min_context_slot)is not int or min_context_slot<0):
         raise ValueError("invalid minimum context slot")
