@@ -53,7 +53,10 @@ def directional_tick_array_candidates(state,arrays,a_to_b):
     selected=[by_start.get(start) for start in requested]
     return {"starts":requested,
             "addresses":[a.get("address") if a else None for a in selected],
-            "all_present":all(a is not None and a.get("status")=="FIXED_VALID" for a in selected),
+            "all_present":all(a is not None and a.get("status")=="FIXED_VALID"
+                              and isinstance(a.get("address"),str)
+                              and bool(a["address"]) for a in selected)
+                           and len({a["address"] for a in selected if a})==3,
             "instruction_account_metas_verified":False}
 
 def screen(rpc,address,input_mint,gross_input):
