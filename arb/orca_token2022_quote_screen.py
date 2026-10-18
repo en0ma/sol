@@ -7,6 +7,40 @@ from arb.token2022_epoch_observation import scheduled_epoch_snapshot
 from arb.token2022_transfer_amounts import net_received
 from arb.orca_multitick_quote import quote_from_decoded_arrays
 
+def validate_directional_snapshot_accounts(observed,input_mint):
+    """Confirm direction mapping only; does not validate instruction account metas."""
+    if not isinstance(observed,dict) or not isinstance(observed.get("pool"),dict):
+        raise ValueError("invalid synchronized swap account evidence")
+    state=observed["pool"]
+    mints=observed.get("mints")
+    mint_accounts=observed.get("mint_accounts")
+    vault_accounts=observed.get("vault_accounts")
+    if (not isinstance(mints,list) or len(mints)!=2 or mints[0]==mints[1] or
+            input_mint not in mints or not isinstance(mint_accounts,list) or
+            len(mint_accounts)!=2 or not isinstance(vault_accounts,list) or
+            len(vault_accounts)!=2):
+        raise ValueError("invalid synchronized swap pair")
+    if [state.get("token_mint_a"),state.get("token_mint_b")]!=mints:
+        raise ValueError("synchronized mint identities disagree with pool")
+    vaults=[state.get("token_vault_a"),state.get("token_vault_b")]
+    if not all(isinstance(v,str) and v for v in vaults) or vaults[0]==vaults[1]:
+        raise ValueError("invalid pool vault identities")
+    for i in range(2):
+        if (not isinstance(mint_accounts[i],dict) or
+                not isinstance(vault_accounts[i],dict) or
+                vault_accounts[i].get("mint")!=mints[i] or
+                vault_accounts[i].get("state")!=1 or
+                mint_accounts[i].get("owner") not in (
+                    "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+                    "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")):
+            raise ValueError("synchronized vault/mint account mismatch")
+    index=mints.index(input_mint)
+    return {"input_vault":vaults[index],"output_vault":vaults[1-index],
+            "input_token_program":mint_accounts[index]["owner"],
+            "output_token_program":mint_accounts[1-index]["owner"],
+            "vault_mint_relationships_verified":True,
+            "instruction_account_metas_verified":False,"actionable":False}
+
 def screen(rpc,address,input_mint,gross_input):
     if type(gross_input) is not int or not 0<gross_input<2**64:
         raise ValueError("invalid input amount")
@@ -59,14 +93,16 @@ def screen(rpc,address,input_mint,gross_input):
          "transfer_fee_configured":mint_obs["transfer_fee_config"] is not None,
          "swap_account_metas_verified":False}
         for mint_address,mint_obs in zip(mints,observed["mint_accounts"])]
+    directional=validate_directional_snapshot_accounts(observed,input_mint)
     account_candidates={
         "pool":address,"snapshot_slot":observed["slot"],
         "input_mint":input_mint,"output_mint":mints[1-index],
-        "input_vault":state.get("token_vault_a" if index==0 else "token_vault_b"),
-        "output_vault":state.get("token_vault_b" if index==0 else "token_vault_a"),
-        "input_token_program":observed["mint_accounts"][index]["owner"],
-        "output_token_program":observed["mint_accounts"][1-index]["owner"],
+        "input_vault":directional["input_vault"],
+        "output_vault":directional["output_vault"],
+        "input_token_program":directional["input_token_program"],
+        "output_token_program":directional["output_token_program"],
         "tick_array_addresses":[a.get("address") for a in arrays],
+        "vault_mint_relationships_verified":True,
         "instruction_account_metas_verified":False,
         "remaining_accounts_verified":False,"actionable":False}
     blockers=["AMM_MODEL_NOT_SIMULATION_RECONCILED",
