@@ -54,6 +54,7 @@ def screen(rpc,address,input_mint,gross_input):
          "transfer_hook_extension_present":14 in mint_obs["extension_types"],
          "transfer_hook_program_id":mint_obs.get("transfer_hook_program_id"),
          "transfer_hook_program_identity_observed":bool(mint_obs.get("transfer_hook_program_id")),
+         "transfer_hook_configuration_status":("PROGRAM_CONFIGURED" if mint_obs.get("transfer_hook_program_id") else "EXTENSION_PRESENT_NO_ACTIVE_PROGRAM" if 14 in mint_obs["extension_types"] else "NO_HOOK_EXTENSION"),
          "transfer_hook_extra_accounts_verified":False,
          "transfer_fee_configured":mint_obs["transfer_fee_config"] is not None,
          "swap_account_metas_verified":False}
@@ -145,7 +146,9 @@ def main():
                         for category in sorted({x.get("reason_category") for x in results if x.get("reason_category")})}
     extension_blocked=sum(bool(x.get("extension_risk",{}).get("blocking_extension_ids")) for x in results)
     hook_pool_count=sum(any(m.get("transfer_hook_extension_present") for m in r.get("mint_execution_evidence",[])) for r in results)
-    report={"checked":len(results),"transfer_hook_pool_count":hook_pool_count,"failure_categories":failure_categories,
+    configured_hook_pools=sum(any(m.get("transfer_hook_configuration_status")=="PROGRAM_CONFIGURED" for m in r.get("mint_execution_evidence",[])) for r in results)
+    report={"checked":len(results),"transfer_hook_pool_count":hook_pool_count,
+            "configured_hook_pool_count":configured_hook_pools,"failure_categories":failure_categories,
             "indicative_with_blocking_mint_extensions":extension_blocked,
             "executable_count":0,
             "indicative_count":sum(x.get("status")=="INDICATIVE_TOKEN2022_QUOTE_ONLY" for x in results),
