@@ -61,3 +61,16 @@ class RPCPacingTests(unittest.TestCase):
         with patch.dict(os.environ,{"SOLANA_RPC_MIN_INTERVAL_SECONDS":"not-a-number"}):
             with self.assertRaises(ValueError):
                 _pace_request()
+
+class AlchemyFreeTierRetryTests(unittest.TestCase):
+    @patch("arb.rpc.time.sleep")
+    @patch("arb.rpc.random.uniform",return_value=0.01)
+    @patch("arb.rpc.urlopen")
+    def test_late_429_recovery_without_live_network(self,open,jitter,sleep):
+        response=MagicMock()
+        response.__enter__.return_value=io.BytesIO(b'{"result":17}')
+        open.side_effect=[HTTPError("url",429,"limit",None,None)]*4+[response]
+        with patch.dict(os.environ,{"SOLANA_RPC_ALCHEMY_FREE_TIER":"1"}):
+            self.assertEqual(call("http://rpc","getSlot",retries=1),17)
+        self.assertEqual(open.call_count,5)
+        self.assertEqual(sleep.call_count,4)
