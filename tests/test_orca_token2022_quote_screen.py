@@ -252,3 +252,22 @@ class SwapV2SnapshotLayoutEvidenceTests(unittest.TestCase):
         result=swap_v2_snapshot_layout_evidence(obs,A,ticks,"oracle-pda")
         self.assertIn("tick_array_1",result["missing_or_unverified_roles"])
         self.assertFalse(result["directional_ticks_complete"])
+
+    def test_oracle_pda_is_not_initialized_oracle_evidence(self):
+        obs=observed()
+        ticks={"addresses":["tick-0","tick-1","tick-2"],"all_present":True}
+        result=swap_v2_snapshot_layout_evidence(obs,A,ticks,"oracle-pda")
+        self.assertIn("oracle",result["missing_or_unverified_roles"])
+        self.assertFalse(result["oracle_initialized_same_slot_verified"])
+        obs["oracle_evidence"]={"same_slot_verified":True}
+        result=swap_v2_snapshot_layout_evidence(obs,A,ticks,"oracle-pda")
+        self.assertNotIn("oracle",result["missing_or_unverified_roles"])
+        self.assertTrue(result["oracle_initialized_same_slot_verified"])
+
+    def test_incomplete_tick_status_stays_unverified_even_with_addresses(self):
+        obs=observed()
+        ticks={"addresses":["tick-0","tick-1","tick-2"],"all_present":False}
+        result=swap_v2_snapshot_layout_evidence(obs,A,ticks,"oracle-pda")
+        for role in ("tick_array_0","tick_array_1","tick_array_2"):
+            self.assertIn(role,result["missing_or_unverified_roles"])
+        self.assertFalse(result["actionable"])
