@@ -96,6 +96,7 @@ def screen(rpc,address,input_mint,gross_input):
     directional=validate_directional_snapshot_accounts(observed,input_mint)
     account_candidates={
         "pool":address,"snapshot_slot":observed["slot"],
+        "oracle_account_verified":False,
         "input_mint":input_mint,"output_mint":mints[1-index],
         "input_vault":directional["input_vault"],
         "output_vault":directional["output_vault"],
