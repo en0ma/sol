@@ -90,7 +90,7 @@ def observe_oracle_account(rpc,pool_address,minimum_slot):
             "instruction_account_metas_verified":False,
             "actionable":False,"executable_quote":False}
 
-def snapshot(rpc,address,*,min_context_slot=None,include_ticks=False):
+def snapshot(rpc,address,*,min_context_slot=None,include_ticks=False,include_oracle=False):
     if min_context_slot is not None and (type(min_context_slot)is not int or min_context_slot<0):
         raise ValueError("invalid minimum context slot")
     seed=fetch_pool(rpc,address)
@@ -104,6 +104,13 @@ def snapshot(rpc,address,*,min_context_slot=None,include_ticks=False):
         tick_starts=candidate_starts(seed["tick_current_index"],seed["tick_spacing"])
         tick_keys=addresses(address,tick_starts)
         addrs+=tick_keys
+    oracle_address=None
+    if include_oracle:
+        from solders.pubkey import Pubkey
+        oracle_address=str(Pubkey.find_program_address(
+            [b"oracle",bytes(Pubkey.from_string(address))],
+            Pubkey.from_string(PROGRAM))[0])
+        addrs.append(oracle_address)
     options={"encoding":"base64","commitment":"confirmed"}
     if min_context_slot is not None:
         options["minContextSlot"]=min_context_slot
@@ -150,10 +157,23 @@ def snapshot(rpc,address,*,min_context_slot=None,include_ticks=False):
                 else:
                     entry["status"]="UNSUPPORTED_LAYOUT"
             tick_arrays.append(entry)
+    oracle_evidence=None
+    if include_oracle:
+        oracle_account=values[-1]
+        if oracle_account is None:
+            oracle_evidence={"address":oracle_address,"present":False,
+                             "owner_verified":False,"same_slot_verified":False}
+        else:
+            oracle_raw=_raw(oracle_account,PROGRAM)
+            if len(oracle_raw)<8:
+                raise ValueError("synchronized oracle truncated")
+            oracle_evidence={"address":oracle_address,"present":True,
+                             "owner_verified":True,"same_slot_verified":True}
     risks=extension_risk(mints)
     return {"venue":"orca","address":address,"slot":slot,"pool":pool,
             "mints":[addrs[3],addrs[4]],"mint_accounts":mints,
-            "vault_accounts":vaults,"tick_arrays":tick_arrays,"extension_risk":risks,"structurally_verified":True,
+            "vault_accounts":vaults,"tick_arrays":tick_arrays,
+            "oracle_evidence":oracle_evidence,"extension_risk":risks,"structurally_verified":True,
             "effective_fee_verified":False,"executable_quote":False,
             "actionable":False,"simulation_verified":False,"broadcast":False}
 
