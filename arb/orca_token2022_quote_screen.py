@@ -119,6 +119,26 @@ def screen_with_rate_limit_retry(rpc,address,input_mint,gross_input,*,sleeper=No
                 raise
             sleeper(1.5*(attempt+1))
 
+def simple_mint_extension_candidates(results):
+    """Read-only prioritization; never returns trade or simulation approval."""
+    if not isinstance(results,list):
+        raise ValueError("invalid quote results")
+    return [{"pool":r["pool"],"slot":r["slot"],
+             "status":"INDICATIVE_ONLY_REQUIRES_SWAP_META_AND_SIMULATION",
+             "actionable":False,"executable_quote":False,"simulation_verified":False}
+            for r in results
+            if (isinstance(r,dict) and
+                r.get("status")=="INDICATIVE_TOKEN2022_QUOTE_ONLY" and
+                r.get("actionable") is False and
+                r.get("executable_quote") is False and
+                isinstance(r.get("pool"),str) and
+                type(r.get("slot")) is int and
+                isinstance(r.get("extension_risk"),dict) and
+                r["extension_risk"].get("blocking_extension_ids")==[] and
+                isinstance(r.get("execution_blockers"),list) and
+                "SWAP_ACCOUNT_METAS_NOT_VERIFIED" in r["execution_blockers"] and
+                "SIGNED_ATOMIC_SIMULATION_NOT_VERIFIED" in r["execution_blockers"])]
+
 def main():
     import argparse,json,os
     from pathlib import Path
@@ -160,7 +180,9 @@ def main():
                               for row in results)
                     for name in sorted({item for row in results
                                         for item in row.get("execution_blockers",[])})}
-    report={"checked":len(results),"execution_blocker_counts":blocker_counts,
+    simple_candidates=simple_mint_extension_candidates(results)
+    report={"checked":len(results),"simple_mint_extension_candidates":simple_candidates,
+            "execution_blocker_counts":blocker_counts,
             "transfer_hook_pool_count":hook_pool_count,
             "configured_hook_pool_count":configured_hook_pools,"failure_categories":failure_categories,
             "indicative_with_blocking_mint_extensions":extension_blocked,
