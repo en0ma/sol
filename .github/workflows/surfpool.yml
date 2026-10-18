@@ -210,6 +210,8 @@ jobs:
             exit 1
           fi
       - name: Compare upstream RPC methods without retries
+        # Run direct Alchemy method diagnostics only on explicit demand.
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         env:
           UPSTREAM_RPC_DIAGNOSTIC_REPORT: ${{ runner.temp }}/upstream-rpc-method-diagnostic.json
         run: python3 -m arb.upstream_rpc_method_diagnostic
