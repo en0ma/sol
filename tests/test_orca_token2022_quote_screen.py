@@ -174,6 +174,8 @@ class LowExtensionRiskShortlistTests(unittest.TestCase):
              "execution_blockers":["SWAP_ACCOUNT_METAS_NOT_VERIFIED",
                                    "SIGNED_ATOMIC_SIMULATION_NOT_VERIFIED"]}
         row["swap_account_candidates"]={"oracle_account_verified":True}
+        self.assertEqual(simple_mint_extension_candidates([{**row,"swap_account_candidates":{"oracle_account_verified":False,"oracle_fee_mode_known":True,"adaptive_fee_oracle_required":True}}]),[])
+        self.assertEqual(len(simple_mint_extension_candidates([{**row,"swap_account_candidates":{"oracle_account_verified":False,"oracle_fee_mode_known":True,"adaptive_fee_oracle_required":False}}])),1)
         self.assertEqual(simple_mint_extension_candidates([{**row,"swap_account_candidates":{"oracle_account_verified":False}}]),[])
         selected=simple_mint_extension_candidates([row])
         self.assertEqual(len(selected),1)
