@@ -56,6 +56,14 @@ class RPCPacingTests(unittest.TestCase):
                 self.assertGreaterEqual(second-first,0.009)
             open.assert_not_called()
 
+    def test_nonfinite_interval_fails_closed(self):
+        from arb.rpc import _pace_request
+        for value in ("nan","inf","-inf"):
+            with self.subTest(value=value):
+                with patch.dict(os.environ,{"SOLANA_RPC_MIN_INTERVAL_SECONDS":value}):
+                    with self.assertRaises(ValueError):
+                        _pace_request()
+
     def test_invalid_interval_fails_closed(self):
         from arb.rpc import _pace_request
         with patch.dict(os.environ,{"SOLANA_RPC_MIN_INTERVAL_SECONDS":"not-a-number"}):
