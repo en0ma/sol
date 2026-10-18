@@ -1,4 +1,4 @@
-import io,json,unittest
+import io,json,unittest,os,tempfile
 from unittest.mock import patch,MagicMock
 from urllib.error import HTTPError
 from arb.rpc import call,RPCError
@@ -39,3 +39,25 @@ class RPCRetryTests(unittest.TestCase):
         with self.assertRaises(RPCError):call("http://rpc","getSlot")
         self.assertEqual(open.call_count,1)
         sleep.assert_not_called()
+
+class RPCPacingTests(unittest.TestCase):
+    @patch("arb.rpc.urlopen")
+    def test_pacing_is_opt_in_and_shared_by_calls(self,open):
+        from arb.rpc import _pace_request
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as folder:
+            path=str(Path(folder)/"pacing")
+            with patch.dict(os.environ,{"SOLANA_RPC_MIN_INTERVAL_SECONDS":"0.01",
+                                        "SOLANA_RPC_PACING_FILE":path}):
+                _pace_request()
+                first=float(Path(path).read_text())
+                _pace_request()
+                second=float(Path(path).read_text())
+                self.assertGreaterEqual(second-first,0.009)
+            open.assert_not_called()
+
+    def test_invalid_interval_fails_closed(self):
+        from arb.rpc import _pace_request
+        with patch.dict(os.environ,{"SOLANA_RPC_MIN_INTERVAL_SECONDS":"not-a-number"}):
+            with self.assertRaises(ValueError):
+                _pace_request()
