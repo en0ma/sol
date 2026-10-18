@@ -35,7 +35,7 @@ def _mint(info):
             raise ValueError("invalid Token-2022 mint padding")
         extensions=extension_types(raw,1)
     fee_config=transfer_fee_config(raw) if owner==TOKEN_2022 and 1 in extensions else None
-    hook_id=transfer_hook_program_id(raw) if owner==TOKEN_2022 else None
+    hook_id=transfer_hook_program_id(raw) if 14 in extensions else None
     return {"owner":owner,"extension_types":extensions,
             "transfer_hook_program_id":hook_id,
             "transfer_fee_config":fee_config,
