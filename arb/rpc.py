@@ -79,6 +79,10 @@ def call(url, method, params=None, timeout=20, retries=3, base_delay=0.35, max_d
         raise ValueError("invalid retry bound")
     if not (0 < base_delay <= max_delay <= 15):
         raise ValueError("invalid backoff settings")
+    if os.environ.get("SOLANA_RPC_ALCHEMY_FREE_TIER")=="1":
+        retries=max(retries,6)
+        base_delay=max(base_delay,1.0)
+        max_delay=max(max_delay,10.0)
     data = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method,
                        "params": [] if params is None else params}).encode()
     for attempt in range(retries + 1):
