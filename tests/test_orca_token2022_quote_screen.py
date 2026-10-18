@@ -222,3 +222,11 @@ class DirectionalTickArrayCandidatesTests(unittest.TestCase):
         missing=directional_tick_array_candidates(STATE,arrays[:2],True)
         self.assertFalse(missing["all_present"])
         self.assertIsNone(missing["addresses"][1])
+
+    def test_missing_or_duplicate_address_is_not_complete_evidence(self):
+        arrays=[{"start_tick":start,"address":str(start),"status":"FIXED_VALID"}
+                for start in (0,-88,-176)]
+        arrays[1]["address"]=""
+        self.assertFalse(directional_tick_array_candidates(STATE,arrays,True)["all_present"])
+        arrays[1]["address"]=arrays[0]["address"]
+        self.assertFalse(directional_tick_array_candidates(STATE,arrays,True)["all_present"])
