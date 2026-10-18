@@ -52,6 +52,8 @@ def screen(rpc,address,input_mint,gross_input):
          "token_program":mint_obs["owner"],
          "mint_extension_ids":mint_obs["extension_types"],
          "transfer_hook_extension_present":14 in mint_obs["extension_types"],
+         "transfer_hook_program_id":mint_obs.get("transfer_hook_program_id"),
+         "transfer_hook_program_identity_observed":bool(mint_obs.get("transfer_hook_program_id")),
          "transfer_hook_extra_accounts_verified":False,
          "transfer_fee_configured":mint_obs["transfer_fee_config"] is not None,
          "swap_account_metas_verified":False}
