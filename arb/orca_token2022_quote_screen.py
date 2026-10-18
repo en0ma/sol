@@ -126,8 +126,8 @@ def simple_mint_extension_candidates(results):
     return [{"pool":r["pool"],"slot":r["slot"],
              "status":"INDICATIVE_ONLY_REQUIRES_SWAP_META_AND_SIMULATION",
              "input_mint":r["input_mint"],"output_mint":r["output_mint"],
-             "input_token_program":r["mint_execution_evidence"][0]["token_program"],
-             "output_token_program":r["mint_execution_evidence"][1]["token_program"],
+             "input_token_program":next(m["token_program"] for m in r["mint_execution_evidence"] if m["mint"]==r["input_mint"]),
+             "output_token_program":next(m["token_program"] for m in r["mint_execution_evidence"] if m["mint"]==r["output_mint"]),
              "actionable":False,"executable_quote":False,"simulation_verified":False}
             for r in results
             if (isinstance(r,dict) and
@@ -139,7 +139,10 @@ def simple_mint_extension_candidates(results):
                 isinstance(r.get("mint_execution_evidence"),list) and
                 len(r["mint_execution_evidence"])==2 and
                 all(isinstance(m,dict) and isinstance(m.get("token_program"),str)
+                    and isinstance(m.get("mint"),str)
                     for m in r["mint_execution_evidence"]) and
+                {m["mint"] for m in r["mint_execution_evidence"]}==
+                {r.get("input_mint"),r.get("output_mint")} and
                 isinstance(r.get("extension_risk"),dict) and
                 r["extension_risk"].get("blocking_extension_ids")==[] and
                 isinstance(r.get("execution_blockers"),list) and
