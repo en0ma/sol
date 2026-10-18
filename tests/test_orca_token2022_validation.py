@@ -2,7 +2,7 @@ import base64
 import unittest
 from unittest.mock import patch
 
-from arb.orca_token2022_validation import snapshot, extension_risk
+from arb.orca_token2022_validation import snapshot, extension_risk, observe_oracle_account
 from arb.orca_whirlpool import PROGRAM, b58
 from arb.token2022_extensions import TOKEN_2022
 from arb.token_vaults import TOKEN_PROGRAM
@@ -110,3 +110,29 @@ class Token2022ExtensionRiskTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"stale"):
             snapshot("rpc",POOL,min_context_slot=56)
         self.assertEqual(call.call_args.args[2][1]["minContextSlot"],56)
+
+class OracleAccountObservationTests(unittest.TestCase):
+    @patch("arb.orca_token2022_validation.call")
+    def test_owner_checked_but_not_same_slot_verified(self,rpc):
+        rpc.return_value={"context":{"slot":60},"value":acct(PROGRAM,b"12345678")}
+        evidence=observe_oracle_account("rpc",POOL,55)
+        self.assertTrue(evidence["oracle_account_present"])
+        self.assertTrue(evidence["oracle_owner_checked"])
+        self.assertFalse(evidence["same_slot_verified"])
+        self.assertFalse(evidence["executable_quote"])
+        self.assertEqual(rpc.call_args.args[1],"getAccountInfo")
+        self.assertEqual(rpc.call_args.args[2][1]["minContextSlot"],55)
+
+    @patch("arb.orca_token2022_validation.call")
+    def test_wrong_oracle_owner_fails(self,rpc):
+        rpc.return_value={"context":{"slot":60},"value":acct(TOKEN_PROGRAM,b"12345678")}
+        with self.assertRaises(ValueError):
+            observe_oracle_account("rpc",POOL,55)
+
+    @patch("arb.orca_token2022_validation.call")
+    def test_missing_oracle_is_not_verified(self,rpc):
+        rpc.return_value={"context":{"slot":60},"value":None}
+        evidence=observe_oracle_account("rpc",POOL,55)
+        self.assertFalse(evidence["oracle_account_present"])
+        self.assertFalse(evidence["oracle_owner_checked"])
+        self.assertFalse(evidence["actionable"])
