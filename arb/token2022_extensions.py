@@ -83,6 +83,24 @@ def transfer_fee_config(raw):
         offset+=4+size
     return found
 
+def transfer_hook_program_id(raw):
+    """Inspect Token-2022 mint transfer-hook TLV; never authorize execution."""
+    if not isinstance(raw,bytes) or len(raw)<166 or raw[165]!=ACCOUNT_TYPE_MINT:
+        raise ValueError("invalid Token-2022 mint")
+    if 14 not in extension_types(raw,ACCOUNT_TYPE_MINT):
+        return None
+    off=166
+    while off<len(raw):
+        kind=int.from_bytes(raw[off:off+2],"little")
+        size=int.from_bytes(raw[off+2:off+4],"little")
+        if kind==14:
+            if size!=64:
+                raise ValueError("invalid transfer-hook configuration length")
+            key=raw[off+36:off+68]
+            return b58(key) if any(key) else None
+        off+=4+size
+    raise ValueError("transfer-hook extension missing")
+
 def fee_for_epoch(config,epoch,amount):
     """Integer fee for known epoch and gross transfer amount; not swap readiness."""
     if (not isinstance(config,dict) or type(epoch)is not int or epoch<0 or
