@@ -59,8 +59,12 @@ def screen(rpc,address,input_mint,gross_input):
          "transfer_fee_configured":mint_obs["transfer_fee_config"] is not None,
          "swap_account_metas_verified":False}
         for mint_address,mint_obs in zip(mints,observed["mint_accounts"])]
-    blockers=["AMM_MODEL_NOT_SIMULATION_RECONCILED","TRANSFER_HOOK_ACCOUNTS_NOT_VERIFIED",
+    blockers=["AMM_MODEL_NOT_SIMULATION_RECONCILED",
+              "SWAP_ACCOUNT_METAS_NOT_VERIFIED",
               "SIGNED_ATOMIC_SIMULATION_NOT_VERIFIED"]
+    if any(m["transfer_hook_configuration_status"]=="PROGRAM_CONFIGURED"
+           for m in mint_execution_evidence):
+        blockers.append("TRANSFER_HOOK_ACCOUNTS_NOT_VERIFIED")
     blockers += ["MINT_EXTENSION_"+str(kind)+"_UNSUPPORTED_FOR_EXECUTION"
                  for kind in observed["extension_risk"]["blocking_extension_ids"]]
     return {"status":"INDICATIVE_TOKEN2022_QUOTE_ONLY","execution_blockers":blockers,"mint_execution_evidence":mint_execution_evidence,"pool":address,
