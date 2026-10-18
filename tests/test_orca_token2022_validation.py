@@ -137,3 +137,33 @@ class OracleAccountObservationTests(unittest.TestCase):
         self.assertFalse(evidence["oracle_account_present"])
         self.assertFalse(evidence["oracle_owner_checked"])
         self.assertFalse(evidence["actionable"])
+
+class SameSlotOracleTests(unittest.TestCase):
+    @patch("arb.orca_token2022_validation.decode",return_value=STATE)
+    @patch("arb.orca_token2022_validation.fetch_pool",return_value=STATE)
+    @patch("arb.orca_token2022_validation.call")
+    def test_oracle_verified_in_single_rpc_response(self,rpc,fetch,decode):
+        rpc.return_value={"context":{"slot":55},"value":[
+            acct(PROGRAM,b"pool"),
+            acct(TOKEN_PROGRAM,vault(1,TOKEN_PROGRAM)),
+            acct(TOKEN_2022,vault(2,TOKEN_2022)),
+            acct(TOKEN_PROGRAM,mint()),acct(TOKEN_2022,mint()),
+            acct(PROGRAM,b"oracle-data")]}
+        result=snapshot("rpc",POOL,include_oracle=True)
+        self.assertTrue(result["oracle_evidence"]["same_slot_verified"])
+        self.assertEqual(result["oracle_evidence"]["address"],rpc.call_args.args[2][0][-1])
+        self.assertFalse(result["actionable"])
+        self.assertFalse(result["executable_quote"])
+
+    @patch("arb.orca_token2022_validation.decode",return_value=STATE)
+    @patch("arb.orca_token2022_validation.fetch_pool",return_value=STATE)
+    @patch("arb.orca_token2022_validation.call")
+    def test_missing_oracle_never_receives_verification(self,rpc,fetch,decode):
+        rpc.return_value={"context":{"slot":55},"value":[
+            acct(PROGRAM,b"pool"),
+            acct(TOKEN_PROGRAM,vault(1,TOKEN_PROGRAM)),
+            acct(TOKEN_2022,vault(2,TOKEN_2022)),
+            acct(TOKEN_PROGRAM,mint()),acct(TOKEN_2022,mint()),None]}
+        result=snapshot("rpc",POOL,include_oracle=True)
+        self.assertFalse(result["oracle_evidence"]["present"])
+        self.assertFalse(result["oracle_evidence"]["same_slot_verified"])
