@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import patch
-from arb.orca_token2022_quote_screen import screen, diagnostic_failure_category, screen_with_rate_limit_retry
+from arb.orca_token2022_quote_screen import screen, diagnostic_failure_category, screen_with_rate_limit_retry, simple_mint_extension_candidates
 
 A="So11111111111111111111111111111111111111112"
 B="EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
@@ -149,3 +149,22 @@ class HookProgramParsingTests(unittest.TestCase):
         bad=bytes(base)+(14).to_bytes(2,"little")+(63).to_bytes(2,"little")+bytes(63)
         with self.assertRaisesRegex(ValueError,"length"):
             transfer_hook_program_id(bad)
+
+class LowExtensionRiskShortlistTests(unittest.TestCase):
+    def test_shortlist_requires_all_nonexecution_gates(self):
+        row={"pool":POOL,"slot":42,"status":"INDICATIVE_TOKEN2022_QUOTE_ONLY",
+             "actionable":False,"executable_quote":False,
+             "extension_risk":{"blocking_extension_ids":[]},
+             "execution_blockers":["SWAP_ACCOUNT_METAS_NOT_VERIFIED",
+                                   "SIGNED_ATOMIC_SIMULATION_NOT_VERIFIED"]}
+        selected=simple_mint_extension_candidates([row])
+        self.assertEqual(len(selected),1)
+        self.assertFalse(selected[0]["actionable"])
+        self.assertFalse(selected[0]["executable_quote"])
+        self.assertFalse(selected[0]["simulation_verified"])
+        self.assertEqual(simple_mint_extension_candidates([
+            {**row,"extension_risk":{"blocking_extension_ids":[14]}}]),[])
+        self.assertEqual(simple_mint_extension_candidates([
+            {**row,"execution_blockers":[]}]),[])
+        self.assertEqual(simple_mint_extension_candidates([
+            {**row,"executable_quote":True}]),[])
