@@ -146,6 +146,11 @@ def main():
                             "reason_category":diagnostic_failure_category(reason),
                             "reason":reason,
                             "actionable":False,"executable_quote":False})
+    if any(row.get("actionable") is not False or
+           row.get("executable_quote") is not False or
+           row.get("simulation_verified") is True or
+           row.get("broadcast") is True for row in results):
+        raise ValueError("unsafe executable state in diagnostic-only quote report")
     failure_categories={category:sum(x.get("reason_category")==category for x in results)
                         for category in sorted({x.get("reason_category") for x in results if x.get("reason_category")})}
     extension_blocked=sum(bool(x.get("extension_risk",{}).get("blocking_extension_ids")) for x in results)
