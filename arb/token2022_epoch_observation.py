@@ -65,14 +65,14 @@ def _scheduled_epoch(slot,schedule):
         raise ValueError("warmup epoch schedule unsupported")
     return first_epoch+(slot-first_slot)//slots
 
-def scheduled_epoch_snapshot(rpc,address,*,include_ticks=False):
+def scheduled_epoch_snapshot(rpc,address,*,include_ticks=False,include_oracle=False):
     """Authenticate snapshot epoch via schedule, without fork head-slot assumptions.
 
     The fee schedule applies at the observed account slot only. This is NOT a
     current-epoch executable quote or a claim that later tick reads share it.
     """
     schedule=call(rpc,"getEpochSchedule",[])
-    checked=snapshot(rpc,address,include_ticks=True) if include_ticks else snapshot(rpc,address)
+    checked=snapshot(rpc,address,include_ticks=include_ticks,include_oracle=True) if include_oracle else (snapshot(rpc,address,include_ticks=True) if include_ticks else snapshot(rpc,address))
     current=_epoch_info(call(rpc,"getEpochInfo",[{"commitment":"confirmed"}]))
     snapshot_epoch=_scheduled_epoch(checked["slot"],schedule)
     current_epoch=_scheduled_epoch(current[1],schedule)
