@@ -152,7 +152,7 @@ class HookProgramParsingTests(unittest.TestCase):
 
 class LowExtensionRiskShortlistTests(unittest.TestCase):
     def test_shortlist_requires_all_nonexecution_gates(self):
-        row={"pool":POOL,"slot":42,"status":"INDICATIVE_TOKEN2022_QUOTE_ONLY",
+        row={"pool":POOL,"slot":42,"input_mint":A,"output_mint":B,"status":"INDICATIVE_TOKEN2022_QUOTE_ONLY",
              "actionable":False,"executable_quote":False,
              "extension_risk":{"blocking_extension_ids":[]},
              "execution_blockers":["SWAP_ACCOUNT_METAS_NOT_VERIFIED",
