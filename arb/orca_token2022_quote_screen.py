@@ -97,9 +97,16 @@ def screen(rpc,address,input_mint,gross_input):
     from solders.pubkey import Pubkey
     from arb.orca_whirlpool import PROGRAM
     oracle_pda=str(Pubkey.find_program_address([b"oracle",bytes(Pubkey.from_string(address))],Pubkey.from_string(PROGRAM))[0])
+    adaptive_fee_oracle_required=(type(state.get("fee_tier_index_seed")) is int and
+                                  type(state.get("tick_spacing")) is int and
+                                  state["tick_spacing"]!=state["fee_tier_index_seed"])
+    oracle_fee_mode_known=(type(state.get("fee_tier_index_seed")) is int and
+                           type(state.get("tick_spacing")) is int)
     account_candidates={
         "pool":address,"snapshot_slot":observed["slot"],
         "oracle_account_verified":bool((observed.get("oracle_evidence") or {}).get("same_slot_verified")),
+        "adaptive_fee_oracle_required":adaptive_fee_oracle_required,
+        "oracle_fee_mode_known":oracle_fee_mode_known,
         "oracle_pda_candidate":oracle_pda,
         "oracle_same_slot_evidence":observed.get("oracle_evidence"),
         "input_mint":input_mint,"output_mint":mints[1-index],
@@ -190,7 +197,9 @@ def simple_mint_extension_candidates(results):
                 r.get("status")=="INDICATIVE_TOKEN2022_QUOTE_ONLY" and
                 r.get("actionable") is False and
                 r.get("executable_quote") is False and
-                (r.get("swap_account_candidates") or {}).get("oracle_account_verified") is True and
+                ((r.get("swap_account_candidates") or {}).get("oracle_account_verified") is True or
+                 ((r.get("swap_account_candidates") or {}).get("oracle_fee_mode_known") is True and
+                  (r.get("swap_account_candidates") or {}).get("adaptive_fee_oracle_required") is False)) and
                 isinstance(r.get("pool"),str) and
                 type(r.get("slot")) is int and
                 isinstance(r.get("mint_execution_evidence"),list) and
