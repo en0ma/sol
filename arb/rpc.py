@@ -2,6 +2,7 @@
 import json
 import os
 import fcntl
+import math
 from email.utils import parsedate_to_datetime
 from datetime import datetime, timezone
 import random
@@ -51,7 +52,7 @@ def _pace_request():
         interval=float(value)
     except (TypeError,ValueError) as exc:
         raise ValueError("invalid RPC pacing interval") from exc
-    if not 0 < interval <= 10:
+    if not math.isfinite(interval) or not 0 < interval <= 10:
         raise ValueError("invalid RPC pacing interval")
     path=os.environ.get("SOLANA_RPC_PACING_FILE","/tmp/solana-rpc-last-request")
     with open(path,"a+") as state:
@@ -61,6 +62,8 @@ def _pace_request():
             try:
                 last=float(state.read().strip())
             except ValueError:
+                last=0.0
+            if not math.isfinite(last) or last<0:
                 last=0.0
             now=time.monotonic()
             remaining=last+interval-now
