@@ -152,13 +152,17 @@ class HookProgramParsingTests(unittest.TestCase):
 
 class LowExtensionRiskShortlistTests(unittest.TestCase):
     def test_shortlist_requires_all_nonexecution_gates(self):
-        row={"pool":POOL,"slot":42,"input_mint":A,"output_mint":B,"status":"INDICATIVE_TOKEN2022_QUOTE_ONLY",
+        row={"pool":POOL,"slot":42,"input_mint":A,"output_mint":B,
+             "mint_execution_evidence":[{"token_program":"Tokenz"},{"token_program":"Tokenkeg"}],
+             "status":"INDICATIVE_TOKEN2022_QUOTE_ONLY",
              "actionable":False,"executable_quote":False,
              "extension_risk":{"blocking_extension_ids":[]},
              "execution_blockers":["SWAP_ACCOUNT_METAS_NOT_VERIFIED",
                                    "SIGNED_ATOMIC_SIMULATION_NOT_VERIFIED"]}
         selected=simple_mint_extension_candidates([row])
         self.assertEqual(len(selected),1)
+        self.assertEqual(selected[0]["input_token_program"],"Tokenz")
+        self.assertEqual(selected[0]["output_token_program"],"Tokenkeg")
         self.assertFalse(selected[0]["actionable"])
         self.assertFalse(selected[0]["executable_quote"])
         self.assertFalse(selected[0]["simulation_verified"])
