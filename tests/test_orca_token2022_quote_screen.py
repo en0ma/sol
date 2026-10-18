@@ -31,6 +31,11 @@ class QuoteScreenTests(unittest.TestCase):
         self.assertFalse(result["actionable"])
         self.assertEqual(result["swap_account_candidates"]["input_mint"],A)
         self.assertFalse(result["swap_account_candidates"]["instruction_account_metas_verified"])
+        from solders.pubkey import Pubkey
+        from arb.orca_whirlpool import PROGRAM
+        oracle=str(Pubkey.find_program_address([b"oracle",bytes(Pubkey.from_string(POOL))],Pubkey.from_string(PROGRAM))[0])
+        self.assertEqual(result["swap_account_candidates"]["oracle_pda_candidate"],oracle)
+        self.assertFalse(result["swap_account_candidates"]["oracle_account_verified"])
         self.assertFalse(result["swap_account_candidates"]["remaining_accounts_verified"])
         for requirement in ("swap_v2_user_token_accounts_verified","swap_v2_authority_verified","swap_v2_oracle_verified","swap_v2_tick_order_verified"):
             self.assertIs(result["swap_account_candidates"][requirement],False)
