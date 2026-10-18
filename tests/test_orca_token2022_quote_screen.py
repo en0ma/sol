@@ -32,6 +32,8 @@ class QuoteScreenTests(unittest.TestCase):
         self.assertEqual(result["swap_account_candidates"]["input_mint"],A)
         self.assertFalse(result["swap_account_candidates"]["instruction_account_metas_verified"])
         self.assertFalse(result["swap_account_candidates"]["remaining_accounts_verified"])
+        self.assertEqual(result["swap_account_candidates"]["tick_array_accounts_present"],1)
+        self.assertEqual(result["swap_account_candidates"]["tick_array_statuses"],["FIXED_VALID"])
         self.assertIn("MINT_EXTENSION_1_UNSUPPORTED_FOR_EXECUTION",result["execution_blockers"])
         self.assertIn("SIGNED_ATOMIC_SIMULATION_NOT_VERIFIED",result["execution_blockers"])
         self.assertIn("SWAP_ACCOUNT_METAS_NOT_VERIFIED",result["execution_blockers"])
