@@ -57,6 +57,15 @@ def export(rpc, output):
             raise ValueError("unexpected upgradeable program account layout")
         programdata = str(Pubkey.from_bytes(raw[4:36]))
         accounts.update(fetch_accounts(rpc, [programdata]))
+        pd = accounts[programdata]
+        if not isinstance(pd, dict):
+            raise ValueError("UPSTREAM_PROGRAMDATA_MISSING")
+        pd_raw = base64.b64decode(pd["data"][0], validate=True)
+        elf_start = pd_raw.find(b"\\x7fELF", 45, min(len(pd_raw), 4096))
+        if elf_start != 45:
+            raise ValueError("UPSTREAM_PROGRAMDATA_ELF_NOT_AVAILABLE: bytes=" +
+                             str(len(pd_raw)) + " elf_header_offset=" + str(elf_start) +
+                             " first_64_hex=" + pd_raw[:64].hex())
     payload = {"pool": CANDIDATE_POOL, "snapshot_slot": obs["slot"],
                "observed": obs, "accounts": accounts,
                "source": "READ_ONLY_MAINNET_BACKED_SURFPOOL",
