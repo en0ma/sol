@@ -77,9 +77,22 @@ def run(rpc):
     accounting = (reconcile_transfer_simulation(
         result, amount=1, initial_source=1000000, initial_destination=0)
         if status == "TOKEN_TRANSFER_SIMULATION_ACCEPTED" else None)
+    logs = result.get("logs")
+    program_executed = (
+        isinstance(logs, list)
+        and any("Program log: Instruction: TransferChecked" in line for line in logs)
+        and any("Program " + TOKEN_2022 + " success" in line for line in logs)
+    )
+    if status != "TOKEN_TRANSFER_SIMULATION_ACCEPTED":
+        raise ValueError("initialized offline Token-2022 transfer was not accepted")
+    if accounting is None or accounting.get("post_token_balances_verified") is not True:
+        raise ValueError("signed Token-2022 post-balances did not reconcile")
+    if not program_executed:
+        raise ValueError("Token-2022 TransferChecked program success logs missing")
     return {"status": status, "observed_simulation_error": result.get("err"),
             "transfer_accounting": accounting,
-            "program_logs": result.get("logs"),
+            "token_2022_execution_logs_verified": program_executed,
+            "program_logs": logs,
             "compute_units_consumed": result.get("unitsConsumed"),
             "initialized_synthetic_mint_owner_verified": True,
             "synthetic_fixture_only": True,
