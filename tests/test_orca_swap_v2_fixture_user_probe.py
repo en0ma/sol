@@ -28,7 +28,7 @@ class FixtureUserProbeTests(unittest.TestCase):
                         "signed_simulation_verified": False, "broadcast": False}
         with patch("arb.orca_swap_v2_fixture_user_probe.snapshot", return_value={"structurally_verified": True}), \
              patch("arb.orca_swap_v2_fixture_user_probe.plan_user_account_binding", return_value={"status": "USER_ACCOUNT_BINDING_PLAN_ONLY"}), \
-             patch("arb.orca_swap_v2_fixture_user_probe.observe_fixture_user_accounts", return_value=observations):
+             patch("arb.orca_swap_v2_fixture_user_probe.observe_fixture_user_accounts", side_effect=lambda *args: observations.copy()):
             funded = run(RPC, account_a="a", account_b="b", authority="c",
                          a_to_b=True, required_amount=80)
             lacking = run(RPC, account_a="a", account_b="b", authority="c",
