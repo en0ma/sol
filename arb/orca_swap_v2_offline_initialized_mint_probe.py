@@ -30,6 +30,14 @@ def initialized_mint_bytes(authority, decimals=6):
     raw[45] = 1
     return bytes(raw)
 
+def verify_token2022_transfer_logs(logs):
+    if not isinstance(logs, list) or any(not isinstance(line, str) for line in logs):
+        raise ValueError("missing Token-2022 runtime logs")
+    invoked = any("Program " + TOKEN_2022 + " invoke" in line for line in logs)
+    instruction = any("Program log: Instruction: TransferChecked" in line for line in logs)
+    succeeded = any("Program " + TOKEN_2022 + " success" in line for line in logs)
+    return invoked and instruction and succeeded
+
 def run(rpc):
     require_loopback_rpc(rpc)
     if os.environ.get("SURFPOOL_EXPLICITLY_OFFLINE") != "1":
@@ -78,11 +86,7 @@ def run(rpc):
         result, amount=1, initial_source=1000000, initial_destination=0)
         if status == "TOKEN_TRANSFER_SIMULATION_ACCEPTED" else None)
     logs = result.get("logs")
-    program_executed = (
-        isinstance(logs, list)
-        and any("Program log: Instruction: TransferChecked" in line for line in logs)
-        and any("Program " + TOKEN_2022 + " success" in line for line in logs)
-    )
+    program_executed = verify_token2022_transfer_logs(logs)
     if status != "TOKEN_TRANSFER_SIMULATION_ACCEPTED":
         raise ValueError("initialized offline Token-2022 transfer was not accepted")
     if accounting is None or accounting.get("post_token_balances_verified") is not True:
