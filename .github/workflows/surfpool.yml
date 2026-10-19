@@ -77,6 +77,19 @@ jobs:
           SURFPOOL_EXPLICITLY_OFFLINE: "1"
         run: python3 -m arb.orca_swap_v2_fixture_offline_integration
 
+      - name: Probe signed Token-2022 runtime on explicitly offline Surfpool
+        continue-on-error: true
+        env:
+          SURFPOOL_EXPLICITLY_OFFLINE: "1"
+        run: python3 -m arb.orca_swap_v2_offline_token_runtime_probe > "$RUNNER_TEMP/orca-token-runtime.json"
+      - name: Upload signed Token-2022 runtime diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orca-token-runtime
+          path: ${{ runner.temp }}/orca-token-runtime.json
+          if-no-files-found: ignore
+
       - name: Validate signed transaction simulation transport on offline Surfpool
         env:
           SURFPOOL_EXPLICITLY_OFFLINE: "1"
