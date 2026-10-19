@@ -63,8 +63,8 @@ def observe_atomic_pool_user_identities(rpc, plan, addresses, authority):
             raise ValueError("pool vault mint or initialization mismatch")
         vault_authorities.append(str(Pubkey.from_bytes(raw[32:64])))
         vault_balances.append(int.from_bytes(raw[64:72], "little"))
-    if vault_authorities[0] != vault_authorities[1] or min(vault_balances) <= 0:
-        raise ValueError("pool vault authorities differ or balances are empty")
+    if vault_authorities != [keys[0], keys[0]] or min(vault_balances) <= 0:
+        raise ValueError("pool vault authority is not the Whirlpool PDA or balances are empty")
     balances = []
     for index, (info, needed) in enumerate(zip(values[1:], required)):
         if (not isinstance(needed, dict) or needed.get("role") != (
