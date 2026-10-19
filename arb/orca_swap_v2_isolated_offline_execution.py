@@ -72,24 +72,37 @@ def hydrate_and_attempt(rpc, input_path):
     payload = json.loads(Path(input_path).read_text())
     if payload.get("source") != "READ_ONLY_MAINNET_BACKED_SURFPOOL":
         raise ValueError("unsupported fixture provenance")
-    restore_order = sorted(payload["accounts"], key=lambda address: (
-        address == PROGRAM,
-        len(payload["accounts"][address]["data"][0])
-        if isinstance(payload["accounts"][address], dict) else 0))
-    for address in restore_order:
-        info = payload["accounts"][address]
-        if info is None:
+    program_info = payload["accounts"].get(PROGRAM)
+    if not isinstance(program_info, dict):
+        raise ValueError("captured Whirlpool executable program missing")
+    program_raw = base64.b64decode(program_info["data"][0], validate=True)
+    loader = "BPFLoaderUpgradeab1e11111111111111111111111"
+    if program_info.get("owner") != loader or len(program_raw) < 36 or program_raw[:4] != bytes([2, 0, 0, 0]):
+        raise ValueError("only authenticated upgradeable Whirlpool programs supported")
+    programdata_address = str(Pubkey.from_bytes(program_raw[4:36]))
+    programdata_info = payload["accounts"].get(programdata_address)
+    if not isinstance(programdata_info, dict) or programdata_info.get("owner") != loader:
+        raise ValueError("captured Whirlpool ProgramData missing")
+    programdata_raw = base64.b64decode(programdata_info["data"][0], validate=True)
+    if len(programdata_raw) < 49 or programdata_raw[:4] != bytes([3, 0, 0, 0]):
+        raise ValueError("unexpected upgradeable ProgramData layout")
+    elf = programdata_raw[45:]
+    if elf[:4] != b"\\x7fELF":
+        raise ValueError("captured Whirlpool program bytes do not begin with ELF")
+    # Restore ordinary accounts first. Chunked program deployment is intentionally
+    # handled via Surfpool's dedicated method, not oversized setAccount requests.
+    for address, info in payload["accounts"].items():
+        if address in (PROGRAM, programdata_address) or info is None:
             continue
         data = info.get("data")
         if not isinstance(data, list) or len(data) != 2 or data[1] != "base64":
             raise ValueError("invalid captured account encoding")
         raw = base64.b64decode(data[0], validate=True)
-        if len(raw) > 500000:
-            raise ValueError("PROGRAMDATA_RESTORE_REQUIRES_CHUNKED_DEPLOY: " +
-                             address + " bytes=" + str(len(raw)))
         call(rpc, "surfnet_setAccount", [address, {
             "lamports": info["lamports"], "data": raw.hex(),
             "owner": info["owner"], "executable": info["executable"]}])
+    for offset in range(0, len(elf), 16384):
+        call(rpc, "surfnet_writeProgram", [PROGRAM, elf[offset:offset + 16384].hex(), offset])
     signer = Keypair()
     plan = {"status": "USER_ACCOUNT_BINDING_PLAN_ONLY", "required_accounts": [
         {"role": "token_owner_account_a", "mint": mint, "token_program": mint_info["owner"]}
