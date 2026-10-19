@@ -62,8 +62,14 @@ def prepare_authenticated_attempt(observed, signer, account_a, account_b, *, a_t
     metas = [{"role": role, "address": addresses[role],
               "is_writable": i in WRITABLE, "is_signer": i in SIGNERS}
              for i, role in enumerate(ACCOUNT_ROLES)]
+    current_sqrt = pool.get("sqrt_price")
+    if type(current_sqrt) is not int or not 4295048017 < current_sqrt < 79226673515401279992447579054:
+        raise ValueError("invalid Whirlpool current sqrt price")
+    # Whirlpool v2 requires the limit strictly in the direction of movement.
+    # Use the extreme legal bound for this one-unit diagnostic, not a quote.
+    sqrt_limit = 4295048017 if a_to_b else 79226673515401279992447579054
     candidate = unsigned_swap_v2_candidate(
-        metas, 1, 0, 2**64, True, a_to_b)
+        metas, 1, 0, sqrt_limit, True, a_to_b)
     return candidate["instruction"]
 
 def run(rpc, pool=CANDIDATE_POOL):
