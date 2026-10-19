@@ -96,7 +96,7 @@ def hydrate_and_attempt(rpc, input_path):
     if len(programdata_raw) < 49 or programdata_raw[:4] != bytes([3, 0, 0, 0]):
         raise ValueError("unexpected upgradeable ProgramData layout")
     elf = programdata_raw[45:]
-    if elf[:4] != b"\\x7fELF":
+    if elf[:4] != bytes([127]) + b"ELF":
         raise ValueError("captured Whirlpool program bytes do not begin with ELF")
     # Restore ordinary accounts first. Chunked program deployment is intentionally
     # handled via Surfpool's dedicated method, not oversized setAccount requests.
