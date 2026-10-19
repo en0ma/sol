@@ -19,6 +19,17 @@ def run(rpc):
     if os.environ.get("SURFPOOL_EXPLICITLY_OFFLINE")!="1":
         raise ValueError("signed simulation requires explicit offline mode")
     signer=Keypair()
+    # An ephemeral fee payer does not exist on a fresh offline validator.
+    # Provision only its local System-owned account; never send a transaction.
+    call(rpc,"surfnet_setAccount",[str(signer.pubkey()),{
+        "lamports":1000000000,"data":"","owner":"11111111111111111111111111111111",
+        "executable":False}])
+    payer=call(rpc,"getAccountInfo",[str(signer.pubkey()),{"encoding":"base64"}])
+    payer_info=payer.get("value") if isinstance(payer,dict) else None
+    if (not isinstance(payer_info,dict) or
+            payer_info.get("owner")!="11111111111111111111111111111111" or
+            payer_info.get("lamports",0)<5000):
+        raise ValueError("offline fee payer was not funded and verified")
     latest=call(rpc,"getLatestBlockhash",[{"commitment":"confirmed"}])
     blockhash=Hash.from_string(latest["value"]["blockhash"])
     instruction=Instruction(Pubkey.from_string(MEMO_PROGRAM),
