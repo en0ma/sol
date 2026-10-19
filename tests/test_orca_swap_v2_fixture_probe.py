@@ -1,14 +1,16 @@
 import unittest
 from unittest.mock import patch
 from arb.orca_swap_v2_fixture_probe import classify, run
+from arb.orca_swap_v2_local_token_accounts import TOKEN_PROGRAMS
 
 def fixture():
     return {
         "structurally_verified": True, "address": "pool", "slot": 27,
         "pool": {"tick_current_index": 10, "tick_spacing": 1,
-                 "token_vault_a": "vault-a", "token_vault_b": "vault-b"},
+                 "token_vault_a": "vault-a", "token_vault_b": "vault-b",
+                 "token_mint_a": "mint-a", "token_mint_b": "mint-b"},
         "mints": ["mint-a", "mint-b"],
-        "mint_accounts": [{"owner": "token-a"}, {"owner": "token-b"}],
+        "mint_accounts": [{"owner": sorted(TOKEN_PROGRAMS)[0]}, {"owner": sorted(TOKEN_PROGRAMS)[1]}],
         "tick_arrays": [], "oracle_evidence": {"address": "oracle", "same_slot_verified": False},
         "extension_risk": {"requires_specialized_quote_support": True},
     }
@@ -20,6 +22,8 @@ class SwapV2FixtureProbeTests(unittest.TestCase):
         self.assertIn("ORACLE_NOT_INITIALIZED_IN_SNAPSHOT", result["blockers"])
         self.assertIn("FEE_MODE_NOT_VERIFIED", result["blockers"])
         self.assertIn("OFFLINE_PROVISIONING_MINTS_DO_NOT_MATCH_POOL", result["blockers"])
+        self.assertEqual(result["user_account_binding_plan"]["required_accounts"][0]["mint"], "mint-a")
+        self.assertFalse(result["user_account_binding_plan"]["user_token_accounts_verified"])
         self.assertFalse(result["signed_simulation_verified"])
         self.assertFalse(result["executable_quote"])
 
