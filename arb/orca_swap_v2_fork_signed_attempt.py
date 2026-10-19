@@ -19,6 +19,7 @@ from arb.orca_token2022_quote_screen import directional_tick_array_candidates
 from arb.orca_swap_v2_fixture_probe import CANDIDATE_POOL
 from arb.orca_swap_v2_candidate import unsigned_swap_v2_candidate
 from arb.orca_swap_v2_metas import ACCOUNT_ROLES, WRITABLE, SIGNERS, MEMO_PROGRAM
+from arb.orca_whirlpool import PROGRAM
 
 def prepare_authenticated_attempt(observed, signer, account_a, account_b, *, a_to_b=True):
     if not isinstance(observed, dict) or observed.get("structurally_verified") is not True:
@@ -33,8 +34,13 @@ def prepare_authenticated_attempt(observed, signer, account_a, account_b, *, a_t
     if not ticks["all_present"]:
         raise ValueError("directional tick arrays incomplete")
     oracle = observed.get("oracle_evidence") or {}
-    if not oracle.get("same_slot_verified") or not oracle.get("address"):
-        raise ValueError("initialized same-slot oracle absent")
+    expected_oracle = str(Pubkey.find_program_address(
+        [b"oracle", bytes(Pubkey.from_string(observed["address"]))],
+        Pubkey.from_string(PROGRAM))[0])
+    if oracle.get("address") not in (None, expected_oracle):
+        raise ValueError("oracle PDA evidence mismatches authenticated pool")
+    # The oracle PDA can be absent for ordinary fee mode; do not claim
+    # initialization, but allow simulation to reveal the actual requirement.
     addresses = {
         "token_program_a": mint_accounts[0]["owner"],
         "token_program_b": mint_accounts[1]["owner"],
@@ -47,7 +53,7 @@ def prepare_authenticated_attempt(observed, signer, account_a, account_b, *, a_t
         "token_vault_a": pool["token_vault_a"],
         "token_owner_account_b": account_b,
         "token_vault_b": pool["token_vault_b"],
-        "oracle": oracle["address"],
+        "oracle": expected_oracle,
     }
     for i, address in enumerate(ticks["addresses"]):
         addresses[f"tick_array_{i}"] = address
@@ -87,6 +93,7 @@ def run(rpc, pool=CANDIDATE_POOL):
                        if value.get("err") is None else "SIGNED_SWAPV2_ATTEMPT_REJECTED"),
             "pool_snapshot_slot": observed["slot"],
             "signature_verification_requested": True,
+            "oracle_account_initialized_verified": bool((observed.get("oracle_evidence") or {}).get("same_slot_verified")),
             "simulation_error": value.get("err"),
             "simulation_logs": value.get("logs"),
             "compute_units_consumed": value.get("unitsConsumed"),
