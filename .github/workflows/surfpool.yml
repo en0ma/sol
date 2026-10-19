@@ -72,6 +72,11 @@ jobs:
           SURFPOOL_EXPLICITLY_OFFLINE: "1"
         run: python3 -m arb.orca_swap_v2_offline_provision
 
+      - name: Validate signed transaction simulation transport on offline Surfpool
+        env:
+          SURFPOOL_EXPLICITLY_OFFLINE: "1"
+        run: python3 -m arb.orca_swap_v2_offline_signed_transport
+
       - name: Enforce arbitrage mission and development priorities
         run: python3 -m arb.arbitrage_mission
       - name: Test honest venue-coverage capability accounting
