@@ -28,13 +28,19 @@ def observe_atomic_pool_user_identities(rpc, plan, addresses, authority):
         keys = [str(Pubkey.from_string(key)) for key in (pool_address, *addresses, authority)]
     except (TypeError, ValueError) as exc:
         raise ValueError("invalid account public key") from exc
+    try:
+        vault_keys = [str(Pubkey.from_string(v)) for v in planned_vaults]
+    except (TypeError, ValueError) as exc:
+        raise ValueError("invalid planned vault address") from exc
+    if len(set(keys[:3] + vault_keys)) != 5:
+        raise ValueError("pool, users and vaults must be distinct")
     if len(set(keys[:3])) != 3:
         raise ValueError("pool and user accounts must be distinct")
-    response = call(rpc, "getMultipleAccounts", [keys[:3], {
+    response = call(rpc, "getMultipleAccounts", [keys[:3] + vault_keys, {
         "encoding": "base64", "commitment": "confirmed", "minContextSlot": minimum}])
     slot = response.get("context", {}).get("slot") if isinstance(response, dict) else None
     values = response.get("value") if isinstance(response, dict) else None
-    if type(slot) is not int or slot < minimum or not isinstance(values, list) or len(values) != 3:
+    if type(slot) is not int or slot < minimum or not isinstance(values, list) or len(values) != 5:
         raise ValueError("missing synchronized pool and user snapshot")
     pool_info = values[0]
     if not isinstance(pool_info, dict) or pool_info.get("owner") != PROGRAM or pool_info.get("executable"):
@@ -45,6 +51,14 @@ def observe_atomic_pool_user_identities(rpc, plan, addresses, authority):
         raise ValueError("pool token mints differ from authenticated plan")
     if [pool.get("token_vault_a"), pool.get("token_vault_b")] != planned_vaults:
         raise ValueError("pool vault identities changed since authenticated snapshot")
+    for index, (info, needed) in enumerate(zip(values[3:], required)):
+        if (not isinstance(info, dict) or info.get("executable") or
+                info.get("owner") != needed["token_program"]):
+            raise ValueError("pool vault token program mismatch")
+        raw = _bytes(info)
+        if (len(raw) < 165 or raw[108] != 1 or
+                str(Pubkey.from_bytes(raw[:32])) != needed["mint"]):
+            raise ValueError("pool vault mint or initialization mismatch")
     balances = []
     for index, (info, needed) in enumerate(zip(values[1:], required)):
         if (not isinstance(needed, dict) or needed.get("role") != (
@@ -64,6 +78,7 @@ def observe_atomic_pool_user_identities(rpc, plan, addresses, authority):
             "user_token_accounts": keys[1:3],
             "observed_balances_base_units": balances,
             "same_context_pool_user_identities_verified": True,
+            "same_context_vault_mint_programs_verified": True,
             "signer_control_verified": False,
             "full_swap_account_set_verified": False,
             "signed_simulation_verified": False,
