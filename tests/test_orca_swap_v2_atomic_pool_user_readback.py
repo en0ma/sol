@@ -35,7 +35,7 @@ def token(mint, owner, authority=AUTH, amount=10):
 def response(slot=101):
     return {"context": {"slot": slot}, "value": [
         data(bytes(300), PROGRAM), token(MINT_A, TOKEN22), token(MINT_B, TOKEN),
-        token(MINT_A, TOKEN22), token(MINT_B, TOKEN)]}
+        token(MINT_A, TOKEN22, authority=POOL), token(MINT_B, TOKEN, authority=POOL)]}
 
 class AtomicPoolUserReadbackTests(unittest.TestCase):
     def test_single_rpc_context_binds_pool_and_both_accounts(self):
@@ -83,7 +83,7 @@ class AtomicPoolUserReadbackTests(unittest.TestCase):
     def test_empty_or_mismatched_vault_authorities_rejected(self):
         variants = [
             token(MINT_A, TOKEN22, amount=0),
-            token(MINT_A, TOKEN22, authority=POOL),
+            token(MINT_A, TOKEN22, authority=AUTH),
         ]
         for replacement in variants:
             invalid = response()
@@ -92,7 +92,7 @@ class AtomicPoolUserReadbackTests(unittest.TestCase):
                  patch("arb.orca_swap_v2_atomic_pool_user_readback.decode",
                        return_value={"token_mint_a": MINT_A, "token_mint_b": MINT_B,
                                      "token_vault_a": VAULT_A, "token_vault_b": VAULT_B}):
-                with self.assertRaisesRegex(ValueError, "vault authorities differ or balances are empty"):
+                with self.assertRaisesRegex(ValueError, "vault authority is not the Whirlpool PDA or balances are empty"):
                     observe_atomic_pool_user_identities(
                         "http://127.0.0.1:8899", plan(), [MINT_A, MINT_B], AUTH)
 
