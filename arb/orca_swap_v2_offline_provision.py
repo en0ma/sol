@@ -40,8 +40,27 @@ def run(rpc):
               for account,mint in zip(accounts,MINTS)]
     if observed[0]["slot"]!=observed[1]["slot"]:
         raise ValueError("offline account reads not slot-aligned")
+    import base64
+    snapshot=call(rpc,"getMultipleAccounts",[accounts,{"encoding":"base64","commitment":"confirmed"}])
+    slot=snapshot.get("context",{}).get("slot") if isinstance(snapshot,dict) else None
+    values=snapshot.get("value") if isinstance(snapshot,dict) else None
+    if type(slot) is not int or not isinstance(values,list) or len(values)!=2:
+        raise ValueError("missing synchronized offline token account snapshot")
+    for i,(value,mint,amount) in enumerate(zip(values,MINTS,(1000000,2000000))):
+        if not isinstance(value,dict) or value.get("owner")!=TOKEN:
+            raise ValueError("offline token account program owner mismatch")
+        data=value.get("data")
+        if not isinstance(data,list) or len(data)!=2 or data[1]!="base64":
+            raise ValueError("offline token account encoding mismatch")
+        raw=base64.b64decode(data[0],validate=True)
+        if len(raw)<165 or str(Pubkey.from_bytes(raw[:32]))!=mint or str(Pubkey.from_bytes(raw[32:64]))!=authority or raw[108]!=1:
+            raise ValueError("offline token account content mismatch")
+        if int.from_bytes(raw[64:72],"little")!=amount:
+            raise ValueError("offline token account balance mismatch")
     return {"status":"LOCAL_TEST_ACCOUNTS_CREATED_AND_READ_BACK",
             "account_count":2,"same_context_slot":True,
+            "synchronized_balance_snapshot_slot":slot,
+            "amounts_verified_base_units":[1000000,2000000],
             "ephemeral_authority_observed":True,
             "signed_swap_simulation_verified":False,
             "actionable":False,"executable_quote":False,"broadcast":False}
