@@ -1010,8 +1010,6 @@ jobs:
               raise SystemExit("isolated Surfpool RPC did not become ready")
           PY
       - name: Hydrate disposable offline Orca fixture and attempt signed SwapV2
-        if: always()
-        continue-on-error: true
         env:
           SURFPOOL_EXPLICITLY_OFFLINE: "1"
         run: |
