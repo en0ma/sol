@@ -61,7 +61,7 @@ def export(rpc, output):
         if not isinstance(pd, dict):
             raise ValueError("UPSTREAM_PROGRAMDATA_MISSING")
         pd_raw = base64.b64decode(pd["data"][0], validate=True)
-        elf_start = pd_raw.find(b"\\x7fELF", 45, min(len(pd_raw), 4096))
+        elf_start = pd_raw.find(bytes([127]) + b"ELF", 45, min(len(pd_raw), 4096))
         if elf_start != 45:
             raise ValueError("UPSTREAM_PROGRAMDATA_ELF_NOT_AVAILABLE: bytes=" +
                              str(len(pd_raw)) + " elf_header_offset=" + str(elf_start) +
