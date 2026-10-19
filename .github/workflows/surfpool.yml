@@ -936,9 +936,49 @@ jobs:
           path: ${{ runner.temp }}/fork.log
           if-no-files-found: ignore
 
+  isolated-orca-execution:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SOLANA_RPC_URL: http://127.0.0.1:8899
+      SURFPOOL_DATASOURCE_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
+      SOLANA_RPC_MIN_INTERVAL_SECONDS: "0.5"
+      SOLANA_RPC_ALCHEMY_FREE_TIER: "1"
+      SOLANA_RPC_PACING_FILE: /tmp/solana-rpc-isolated-last-request
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require upstream RPC secret
+        run: test -n "$SURFPOOL_DATASOURCE_RPC_URL"
+      - name: Install Surfpool
+        run: |
+          set -euo pipefail
+          curl --fail --show-error --silent --location https://run.surfpool.run/ -o /tmp/install-surfpool.sh
+          bash /tmp/install-surfpool.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - name: Install transaction dependency
+        run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Launch read-only source fork
+        run: |
+          nohup surfpool start --ci --rpc-url "$SURFPOOL_DATASOURCE_RPC_URL" --no-deploy > "$RUNNER_TEMP/fork.log" 2>&1 < /dev/null &
+          echo $! > "$RUNNER_TEMP/fork.pid"
+      - name: Wait for source fork RPC
+        run: |
+          python3 - <<'PY'
+          import time
+          from arb.rpc import call
+          for _ in range(60):
+              try:
+                  assert call("http://127.0.0.1:8899", "getLatestBlockhash")["value"]["blockhash"]
+                  break
+              except Exception:
+                  time.sleep(2)
+          else:
+              raise SystemExit("source fork RPC unavailable")
+          PY
+
       # The upstream-backed process is stopped BEFORE any surfnet_setAccount call.
       - name: Export authenticated Orca state from read-only fork
-        continue-on-error: true
         run: python3 -m arb.orca_swap_v2_isolated_offline_execution export "$RUNNER_TEMP/orca-isolated-state.json"
       - name: Stop upstream-backed fork and start isolated offline Surfpool
         if: ${{ hashFiles('arb/orca_swap_v2_isolated_offline_execution.py') != '' }}
