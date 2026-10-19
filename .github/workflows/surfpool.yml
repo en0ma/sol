@@ -67,6 +67,11 @@ jobs:
       - name: Probe ephemeral signer token accounts on offline Surfpool (read-only)
         run: python3 -m arb.orca_swap_v2_offline_probe
 
+      - name: Provision and verify ephemeral token accounts on offline Surfpool
+        env:
+          SURFPOOL_EXPLICITLY_OFFLINE: "1"
+        run: python3 -m arb.orca_swap_v2_offline_provision
+
       - name: Enforce arbitrage mission and development priorities
         run: python3 -m arb.arbitrage_mission
       - name: Test honest venue-coverage capability accounting
