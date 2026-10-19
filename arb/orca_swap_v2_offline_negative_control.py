@@ -51,6 +51,15 @@ def run(rpc):
     value=result.get("value") if isinstance(result,dict) else None
     if not isinstance(value,dict) or value.get("err") is None:
         raise ValueError("unverified SwapV2 negative-control unexpectedly succeeded")
+    # Offline Surfpool has no loaded Whirlpool executable by default.
+    # Report that limitation without claiming pool validation occurred.
+    if str(value["err"])=="InvalidProgramForExecution":
+        return {"status":"SWAP_V2_NEGATIVE_CONTROL_BLOCKED",
+                "blocker":"ORCA_PROGRAM_NOT_EXECUTABLE",
+                "observed_simulation_error":str(value["err"]),
+                "signature_verification_requested":True,
+                "rejected":False,"signed_swap_simulation_verified":False,
+                "actionable":False,"executable_quote":False,"broadcast":False}
     error_text=require_pool_rejection_error(value["err"])
     return {"status":"SWAP_V2_NEGATIVE_CONTROL_REJECTED",
             "observed_simulation_error":error_text,
