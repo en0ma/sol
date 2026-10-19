@@ -935,3 +935,56 @@ jobs:
           name: surfpool-mainnet-fork-log
           path: ${{ runner.temp }}/fork.log
           if-no-files-found: ignore
+
+      # The upstream-backed process is stopped BEFORE any surfnet_setAccount call.
+      - name: Export authenticated Orca state from read-only fork
+        continue-on-error: true
+        run: python3 -m arb.orca_swap_v2_isolated_offline_execution export "$RUNNER_TEMP/orca-isolated-state.json"
+      - name: Stop upstream-backed fork and start isolated offline Surfpool
+        if: ${{ hashFiles('arb/orca_swap_v2_isolated_offline_execution.py') != '' }}
+        run: |
+          set -euo pipefail
+          kill "$(cat "$RUNNER_TEMP/fork.pid")"
+          for attempt in $(seq 1 30); do
+            if ! kill -0 "$(cat "$RUNNER_TEMP/fork.pid")" 2>/dev/null; then break; fi
+            sleep 1
+          done
+          # A pending process MUST NOT receive synthetic account writes.
+          if kill -0 "$(cat "$RUNNER_TEMP/fork.pid")" 2>/dev/null; then
+            echo "Mainnet-backed Surfpool still alive; refusing offline provisioning" >&2
+            exit 1
+          fi
+          nohup surfpool start --ci --offline > "$RUNNER_TEMP/orca-isolated-offline.log" 2>&1 < /dev/null &
+          echo $! > "$RUNNER_TEMP/orca-isolated-offline.pid"
+          python3 - <<'PY'
+          import time
+          from arb.rpc import call
+          for _ in range(60):
+              try:
+                  assert call("http://127.0.0.1:8899", "getLatestBlockhash")["value"]["blockhash"]
+                  break
+              except Exception:
+                  time.sleep(2)
+          else:
+              raise SystemExit("isolated Surfpool RPC did not become ready")
+          PY
+      - name: Hydrate disposable offline Orca fixture and attempt signed SwapV2
+        if: always()
+        continue-on-error: true
+        env:
+          SURFPOOL_EXPLICITLY_OFFLINE: "1"
+        run: |
+          if [ -s "$RUNNER_TEMP/orca-isolated-state.json" ] && [ -s "$RUNNER_TEMP/orca-isolated-offline.pid" ]; then
+            python3 -m arb.orca_swap_v2_isolated_offline_execution offline "$RUNNER_TEMP/orca-isolated-state.json" > "$RUNNER_TEMP/orca-isolated-attempt.json"
+          else
+            echo '{"status":"ISOLATED_FIXTURE_NOT_READY","signed_simulation_verified":false,"broadcast":false}' > "$RUNNER_TEMP/orca-isolated-attempt.json"
+          fi
+      - name: Upload disposable offline Orca SwapV2 execution evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orca-isolated-offline-swapv2
+          path: |
+            ${{ runner.temp }}/orca-isolated-attempt.json
+            ${{ runner.temp }}/orca-isolated-offline.log
+          if-no-files-found: ignore
