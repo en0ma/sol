@@ -48,12 +48,17 @@ def observe_fixture_user_accounts(rpc, plan, addresses, authority):
         owner = str(Pubkey.from_bytes(raw[32:64]))
         if mint != needed.get("mint") or owner != authority:
             raise ValueError("token account mint or authority mismatch")
+        amount = int.from_bytes(raw[64:72], "little")
         observations.append({
+            "amount_base_units": amount,
             "account": address, "mint": mint, "authority": owner,
             "token_program": account["owner"], "slot": slot,
             "initialized": True, "local_rpc_verified": True
         })
     result = verify_fixture_user_observations(plan, *observations, authority)
+    result["observed_balances_base_units"] = [item["amount_base_units"] for item in observations]
+    result["balance_snapshot_slot"] = slot
+    result["input_funding_verified"] = False
     result["observation_method"] = "getMultipleAccounts"
     result["same_context_user_accounts_verified"] = True
     return result
