@@ -1,6 +1,6 @@
 import unittest
 from solders.keypair import Keypair
-from arb.orca_swap_v2_offline_initialized_mint_probe import initialized_mint_bytes
+from arb.orca_swap_v2_offline_initialized_mint_probe import initialized_mint_bytes, verify_token2022_transfer_logs, TOKEN_2022
 
 class OfflineInitializedTokenMintTests(unittest.TestCase):
     def test_mint_layout_and_initialized_flag(self):
@@ -12,6 +12,18 @@ class OfflineInitializedTokenMintTests(unittest.TestCase):
         self.assertEqual(raw[44],6)
         self.assertEqual(raw[45],1)
         self.assertEqual(raw[46:],bytes(36))
+
+    def test_token_execution_log_provenance(self):
+        logs = ["Program " + TOKEN_2022 + " invoke [1]",
+                "Program log: Instruction: TransferChecked",
+                "Program " + TOKEN_2022 + " success"]
+        self.assertTrue(verify_token2022_transfer_logs(logs))
+        for index in range(3):
+            with self.subTest(removed=index):
+                self.assertFalse(verify_token2022_transfer_logs(
+                    logs[:index] + logs[index+1:]))
+        with self.assertRaises(ValueError):
+            verify_token2022_transfer_logs(None)
 
     def test_invalid_decimals_rejected(self):
         for invalid in (-1,10,True,"6"):
