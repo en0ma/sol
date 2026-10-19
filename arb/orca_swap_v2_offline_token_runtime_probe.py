@@ -27,6 +27,12 @@ def classify_token_runtime_simulation(value):
     err = value.get("err")
     if err is None:
         return "TOKEN_TRANSFER_SIMULATION_ACCEPTED"
+    error_text = str(err).lower()
+    if any(marker in error_text for marker in (
+            "invalidprogramforexecution", "programaccountnotfound",
+            "blockhashnotfound", "signaturefailure", "signature verification",
+            "insufficientfundsforfee")):
+        return "TOKEN_TRANSFER_SIMULATION_BLOCKED"
     return "TOKEN_TRANSFER_SIMULATION_REJECTED"
 
 def run(rpc):
@@ -73,6 +79,8 @@ def run(rpc):
         "signature_verification_requested": True,
         "historical_mint_not_authenticated_on_offline_validator": True,
         "token_runtime_transfer_accepted": status == "TOKEN_TRANSFER_SIMULATION_ACCEPTED",
+        "token_program_execution_evidence": status in (
+            "TOKEN_TRANSFER_SIMULATION_ACCEPTED", "TOKEN_TRANSFER_SIMULATION_REJECTED"),
         "orca_swap_simulation_verified": False,
         "signed_simulation_verified": False,
         "actionable": False, "executable_quote": False, "broadcast": False,
