@@ -72,6 +72,11 @@ jobs:
           SURFPOOL_EXPLICITLY_OFFLINE: "1"
         run: python3 -m arb.orca_swap_v2_offline_provision
 
+      - name: Exercise historical Token-2022 fixture synthetic account readback offline
+        env:
+          SURFPOOL_EXPLICITLY_OFFLINE: "1"
+        run: python3 -m arb.orca_swap_v2_fixture_offline_integration
+
       - name: Validate signed transaction simulation transport on offline Surfpool
         env:
           SURFPOOL_EXPLICITLY_OFFLINE: "1"
