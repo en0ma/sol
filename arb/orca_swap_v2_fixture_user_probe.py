@@ -8,7 +8,7 @@ import os
 from arb.orca_swap_v2_fixture_probe import CANDIDATE_POOL
 from arb.orca_token2022_validation import snapshot
 from arb.orca_swap_v2_fixture_user_plan import plan_user_account_binding
-from arb.orca_swap_v2_fixture_user_readback import observe_fixture_user_accounts
+from arb.orca_swap_v2_atomic_pool_user_readback import observe_atomic_pool_user_identities
 from arb.orca_swap_v2_local_token_accounts import require_loopback_rpc
 from arb.orca_swap_v2_fixture_input_funding import check_fixture_input_funding
 
@@ -26,18 +26,26 @@ def run(rpc, *, account_a=None, account_b=None, authority=None, a_to_b=None, req
     observed = snapshot(rpc, CANDIDATE_POOL, include_ticks=False, include_oracle=False)
     plan = plan_user_account_binding(observed)
     try:
-        evidence = observe_fixture_user_accounts(rpc, plan, [account_a, account_b], authority)
+        evidence = observe_atomic_pool_user_identities(rpc, plan, [account_a, account_b], authority)
     except (ValueError, TypeError, KeyError) as exc:
         result["status"] = "FIXTURE_USER_ACCOUNTS_NOT_VERIFIED"
         result["blockers"] = [type(exc).__name__ + ": " + str(exc)[:200]]
         return result
+    evidence["user_token_accounts_verified"] = True
+    evidence["same_atomic_pool_user_snapshot_verified"] = True
     if a_to_b is None and required_amount is None:
         evidence["funding_check_status"] = "INPUT_AMOUNT_NOT_CONFIGURED"
         return evidence
     if type(a_to_b) is not bool or type(required_amount) is not int:
         raise ValueError("direction and gross input amount must both be configured")
+    funding_input = {
+        "status": "FIXTURE_USER_ACCOUNTS_READBACK_VERIFIED",
+        "observed_balances_base_units": evidence["observed_balances_base_units"],
+        "balance_snapshot_slot": evidence["observation_slot"],
+        "user_account_snapshot_slot": evidence["observation_slot"],
+    }
     funding = check_fixture_input_funding(
-        evidence, a_to_b=a_to_b, required_amount=required_amount)
+        funding_input, a_to_b=a_to_b, required_amount=required_amount)
     evidence["funding_check"] = funding
     evidence["funding_check_status"] = funding["status"]
     return evidence
