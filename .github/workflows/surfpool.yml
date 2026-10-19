@@ -90,6 +90,18 @@ jobs:
           path: ${{ runner.temp }}/orca-token-runtime.json
           if-no-files-found: ignore
 
+      - name: Probe signed Token-2022 transfer with initialized synthetic mint offline
+        env:
+          SURFPOOL_EXPLICITLY_OFFLINE: "1"
+        run: python3 -m arb.orca_swap_v2_offline_initialized_mint_probe > "$RUNNER_TEMP/orca-initialized-mint-runtime.json"
+      - name: Upload initialized offline Token-2022 runtime diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orca-initialized-mint-runtime
+          path: ${{ runner.temp }}/orca-initialized-mint-runtime.json
+          if-no-files-found: ignore
+
       - name: Validate signed transaction simulation transport on offline Surfpool
         env:
           SURFPOOL_EXPLICITLY_OFFLINE: "1"
