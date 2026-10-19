@@ -325,6 +325,15 @@ jobs:
           name: orca-fixture-user-account
           path: ${{ runner.temp }}/orca-fixture-user-account.json
           if-no-files-found: ignore
+      - name: Attempt signed Orca SwapV2 against authenticated fork fixture
+        run: python3 -m arb.orca_swap_v2_fork_signed_attempt > "$RUNNER_TEMP/orca-signed-swapv2-attempt.json"
+      - name: Upload signed Orca SwapV2 fork attempt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orca-signed-swapv2-attempt
+          path: ${{ runner.temp }}/orca-signed-swapv2-attempt.json
+          if-no-files-found: error
       - name: Screen bounded Orca Token-2022 indicative quotes
         continue-on-error: true
         run: python3 -m arb.orca_token2022_quote_screen --limit 15 --gross-input 100000 --output "$RUNNER_TEMP/orca-token2022-quote-screen.json"
