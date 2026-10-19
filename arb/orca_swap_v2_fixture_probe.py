@@ -8,6 +8,7 @@ from arb.orca_token2022_validation import snapshot
 from arb.orca_token2022_quote_screen import directional_tick_array_candidates
 from arb.orca_swap_v2_local_token_accounts import require_loopback_rpc
 from arb.orca_swap_v2_offline_provision import MINTS as OFFLINE_PROVISIONED_MINTS
+from arb.orca_swap_v2_fixture_user_plan import plan_user_account_binding
 
 CANDIDATE_POOL = "94BpFoyri4uTT55NFSHKYNFyUMtoWXEisMA4LK7nTKPU"
 
@@ -43,6 +44,7 @@ def classify(observed):
         "snapshot_slot": observed["slot"],
         "mints": observed["mints"],
         "offline_provisioned_mints": list(OFFLINE_PROVISIONED_MINTS),
+        "user_account_binding_plan": plan_user_account_binding(observed),
         "mint_token_programs": [m["owner"] for m in observed["mint_accounts"]],
         "vaults": [state["token_vault_a"], state["token_vault_b"]],
         "directions": directions,
