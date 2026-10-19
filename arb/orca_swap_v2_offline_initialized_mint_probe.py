@@ -14,6 +14,7 @@ from solders.transaction import Transaction
 from arb.rpc import call
 from arb.orca_swap_v2_local_token_accounts import require_loopback_rpc
 from arb.orca_swap_v2_fixture_offline_provision import provision_offline_fixture_accounts
+from arb.orca_swap_v2_offline_transfer_accounting import reconcile_transfer_simulation
 from arb.orca_swap_v2_offline_token_runtime_probe import (
     SYSTEM, TOKEN_2022, classify_token_runtime_simulation,
 )
@@ -69,10 +70,17 @@ def run(rpc):
     response = call(rpc, "simulateTransaction", [
         base64.b64encode(bytes(tx)).decode(),
         {"encoding": "base64", "sigVerify": True,
-         "replaceRecentBlockhash": False, "commitment": "confirmed"}])
+         "replaceRecentBlockhash": False, "commitment": "confirmed",
+         "accounts": {"encoding": "base64", "addresses": provision["addresses"]}}])
     result = response.get("value") if isinstance(response, dict) else None
     status = classify_token_runtime_simulation(result)
+    accounting = (reconcile_transfer_simulation(
+        result, amount=1, initial_source=1000000, initial_destination=0)
+        if status == "TOKEN_TRANSFER_SIMULATION_ACCEPTED" else None)
     return {"status": status, "observed_simulation_error": result.get("err"),
+            "transfer_accounting": accounting,
+            "program_logs": result.get("logs"),
+            "compute_units_consumed": result.get("unitsConsumed"),
             "initialized_synthetic_mint_owner_verified": True,
             "synthetic_fixture_only": True,
             "signature_verification_requested": True,
