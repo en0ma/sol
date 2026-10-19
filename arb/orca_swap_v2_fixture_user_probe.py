@@ -10,8 +10,9 @@ from arb.orca_token2022_validation import snapshot
 from arb.orca_swap_v2_fixture_user_plan import plan_user_account_binding
 from arb.orca_swap_v2_fixture_user_readback import observe_fixture_user_accounts
 from arb.orca_swap_v2_local_token_accounts import require_loopback_rpc
+from arb.orca_swap_v2_fixture_input_funding import check_fixture_input_funding
 
-def run(rpc, *, account_a=None, account_b=None, authority=None):
+def run(rpc, *, account_a=None, account_b=None, authority=None, a_to_b=None, required_amount=None):
     require_loopback_rpc(rpc)
     result = {"status": "FIXTURE_USER_ACCOUNTS_NOT_CONFIGURED",
               "blockers": ["USER_ACCOUNT_ADDRESSES_OR_AUTHORITY_MISSING"],
@@ -30,6 +31,15 @@ def run(rpc, *, account_a=None, account_b=None, authority=None):
         result["status"] = "FIXTURE_USER_ACCOUNTS_NOT_VERIFIED"
         result["blockers"] = [type(exc).__name__ + ": " + str(exc)[:200]]
         return result
+    if a_to_b is None and required_amount is None:
+        evidence["funding_check_status"] = "INPUT_AMOUNT_NOT_CONFIGURED"
+        return evidence
+    if type(a_to_b) is not bool or type(required_amount) is not int:
+        raise ValueError("direction and gross input amount must both be configured")
+    funding = check_fixture_input_funding(
+        evidence, a_to_b=a_to_b, required_amount=required_amount)
+    evidence["funding_check"] = funding
+    evidence["funding_check_status"] = funding["status"]
     return evidence
 
 if __name__ == "__main__":
@@ -38,4 +48,8 @@ if __name__ == "__main__":
         account_a=os.environ.get("ORCA_FIXTURE_USER_ACCOUNT_A"),
         account_b=os.environ.get("ORCA_FIXTURE_USER_ACCOUNT_B"),
         authority=os.environ.get("ORCA_FIXTURE_TOKEN_AUTHORITY"),
+        a_to_b={"a_to_b": True, "b_to_a": False}.get(
+            os.environ.get("ORCA_FIXTURE_INPUT_DIRECTION")),
+        required_amount=(int(os.environ["ORCA_FIXTURE_GROSS_INPUT"])
+                         if "ORCA_FIXTURE_GROSS_INPUT" in os.environ else None),
     )))
