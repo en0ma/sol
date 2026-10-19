@@ -27,6 +27,7 @@ def plan_user_account_binding(observed):
         "status": "USER_ACCOUNT_BINDING_PLAN_ONLY",
         "pool_address": observed.get("address"),
         "pool_snapshot_slot": slot,
+        "pool_vault_addresses": [state.get("token_vault_a"), state.get("token_vault_b")],
         "required_accounts": [
             {"role": "token_owner_account_a", "mint": mints[0], "token_program": programs[0]},
             {"role": "token_owner_account_b", "mint": mints[1], "token_program": programs[1]},
