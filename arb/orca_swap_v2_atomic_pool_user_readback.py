@@ -51,6 +51,8 @@ def observe_atomic_pool_user_identities(rpc, plan, addresses, authority):
         raise ValueError("pool token mints differ from authenticated plan")
     if [pool.get("token_vault_a"), pool.get("token_vault_b")] != planned_vaults:
         raise ValueError("pool vault identities changed since authenticated snapshot")
+    vault_authorities = []
+    vault_balances = []
     for index, (info, needed) in enumerate(zip(values[3:], required)):
         if (not isinstance(info, dict) or info.get("executable") or
                 info.get("owner") != needed["token_program"]):
@@ -59,6 +61,10 @@ def observe_atomic_pool_user_identities(rpc, plan, addresses, authority):
         if (len(raw) < 165 or raw[108] != 1 or
                 str(Pubkey.from_bytes(raw[:32])) != needed["mint"]):
             raise ValueError("pool vault mint or initialization mismatch")
+        vault_authorities.append(str(Pubkey.from_bytes(raw[32:64])))
+        vault_balances.append(int.from_bytes(raw[64:72], "little"))
+    if vault_authorities[0] != vault_authorities[1] or min(vault_balances) <= 0:
+        raise ValueError("pool vault authorities differ or balances are empty")
     balances = []
     for index, (info, needed) in enumerate(zip(values[1:], required)):
         if (not isinstance(needed, dict) or needed.get("role") != (
@@ -77,6 +83,7 @@ def observe_atomic_pool_user_identities(rpc, plan, addresses, authority):
             "pool_address": keys[0], "observation_slot": slot,
             "user_token_accounts": keys[1:3],
             "observed_balances_base_units": balances,
+            "observed_vault_balances_base_units": vault_balances,
             "same_context_pool_user_identities_verified": True,
             "same_context_vault_mint_programs_verified": True,
             "signer_control_verified": False,
