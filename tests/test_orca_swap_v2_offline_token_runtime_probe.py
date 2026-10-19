@@ -7,6 +7,8 @@ class OfflineTokenRuntimeClassificationTests(unittest.TestCase):
                          "TOKEN_TRANSFER_SIMULATION_ACCEPTED")
         self.assertEqual(classify_token_runtime_simulation({"err": "InvalidProgramForExecution"}),
                          "TOKEN_TRANSFER_SIMULATION_BLOCKED")
+        self.assertEqual(classify_token_runtime_simulation({"err": {"InstructionError": [0, "IncorrectProgramId"]}}),
+                         "TOKEN_TRANSFER_SIMULATION_BLOCKED")
         self.assertEqual(classify_token_runtime_simulation({"err": "BlockhashNotFound"}),
                          "TOKEN_TRANSFER_SIMULATION_BLOCKED")
         self.assertEqual(classify_token_runtime_simulation({"err": {"InstructionError": [0, "InvalidAccountData"]}}),
