@@ -24,10 +24,14 @@ def run(rpc):
     result=call(rpc,"getMultipleAccounts",[addresses,{"encoding":"base64","commitment":"confirmed"}])
     if not isinstance(result,dict) or not isinstance(result.get("value"),list) or len(result["value"])!=2:
         raise ValueError("malformed offline Surfpool token account evidence")
+    slot=result.get("context",{}).get("slot")
+    if type(slot) is not int or slot<0:
+        raise ValueError("offline Surfpool response missing context slot")
     present=[account is not None for account in result["value"]]
     return {"status":"BLOCKED_NO_LOCAL_TOKEN_PAIR" if not all(present) else "UNVERIFIED_ACCOUNT_CONTENTS",
             "token_account_presence":present,
-            "same_rpc_response":True,
+            "same_rpc_response":True,"observed_slot":slot,
+            "associated_account_creation_required":not all(present),
             "signer_controlled_accounts_verified":False,
             "signed_simulation_verified":False,
             "actionable":False,"executable_quote":False,"broadcast":False}
