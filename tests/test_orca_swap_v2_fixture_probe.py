@@ -18,6 +18,8 @@ class SwapV2FixtureProbeTests(unittest.TestCase):
         result = classify(fixture())
         self.assertIn("DIRECTIONAL_TICKS_INCOMPLETE", result["blockers"])
         self.assertIn("ORACLE_NOT_INITIALIZED_IN_SNAPSHOT", result["blockers"])
+        self.assertIn("FEE_MODE_NOT_VERIFIED", result["blockers"])
+        self.assertIn("OFFLINE_PROVISIONING_MINTS_DO_NOT_MATCH_POOL", result["blockers"])
         self.assertFalse(result["signed_simulation_verified"])
         self.assertFalse(result["executable_quote"])
 
