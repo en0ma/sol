@@ -15,6 +15,16 @@ from arb.orca_swap_v2_local_token_accounts import require_loopback_rpc
 from arb.orca_swap_v2_metas import ACCOUNT_ROLES,WRITABLE,SIGNERS,MEMO_PROGRAM
 from arb.orca_swap_v2_candidate import unsigned_swap_v2_candidate
 
+def require_pool_rejection_error(error):
+    """Reject transport/runtime failures that never establish Orca pool validation."""
+    error_text=str(error)
+    if any(reason in error_text.lower() for reason in (
+            "blockhashnotfound","signaturefailure","signature verification",
+            "insufficientfundsforfee","invalidprogramforexecution",
+            "programaccountnotfound","accountnotfound")):
+        raise ValueError("SwapV2 rejected before pool validation: "+error_text)
+    return error_text
+
 def run(rpc):
     require_loopback_rpc(rpc)
     if os.environ.get("SURFPOOL_EXPLICITLY_OFFLINE")!="1":
@@ -41,14 +51,7 @@ def run(rpc):
     value=result.get("value") if isinstance(result,dict) else None
     if not isinstance(value,dict) or value.get("err") is None:
         raise ValueError("unverified SwapV2 negative-control unexpectedly succeeded")
-    error=value["err"]
-    error_text=str(error)
-    # A nonzero simulation error alone does not prove that the pool guard
-    # was exercised: blockhash and signature failures are unrelated.
-    if any(reason in error_text.lower() for reason in (
-            "blockhashnotfound","signaturefailure","signature verification",
-            "insufficientfundsforfee")):
-        raise ValueError("SwapV2 rejected before pool validation: "+error_text)
+    error_text=require_pool_rejection_error(value["err"])
     return {"status":"SWAP_V2_NEGATIVE_CONTROL_REJECTED",
             "observed_simulation_error":error_text,
             "signature_verification_requested":True,
