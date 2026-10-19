@@ -16,7 +16,11 @@ def observe_atomic_pool_user_identities(rpc, plan, addresses, authority):
     pool_address = plan.get("pool_address")
     required = plan.get("required_accounts")
     minimum = plan.get("pool_snapshot_slot")
-    if (not isinstance(required, list) or len(required) != 2 or
+    planned_vaults = plan.get("pool_vault_addresses")
+    if (not isinstance(planned_vaults, list) or len(planned_vaults) != 2 or
+            any(not isinstance(v, str) or not v for v in planned_vaults) or
+            len(set(planned_vaults)) != 2 or
+            not isinstance(required, list) or len(required) != 2 or
             type(minimum) is not int or minimum < 0 or
             not isinstance(addresses, (list, tuple)) or len(addresses) != 2):
         raise ValueError("invalid user binding plan or addresses")
@@ -39,6 +43,8 @@ def observe_atomic_pool_user_identities(rpc, plan, addresses, authority):
     pool = decode(pool_raw)
     if [pool.get("token_mint_a"), pool.get("token_mint_b")] != [r.get("mint") for r in required]:
         raise ValueError("pool token mints differ from authenticated plan")
+    if [pool.get("token_vault_a"), pool.get("token_vault_b")] != planned_vaults:
+        raise ValueError("pool vault identities changed since authenticated snapshot")
     balances = []
     for index, (info, needed) in enumerate(zip(values[1:], required)):
         if (not isinstance(needed, dict) or needed.get("role") != (
