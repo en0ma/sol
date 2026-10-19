@@ -72,13 +72,21 @@ def hydrate_and_attempt(rpc, input_path):
     payload = json.loads(Path(input_path).read_text())
     if payload.get("source") != "READ_ONLY_MAINNET_BACKED_SURFPOOL":
         raise ValueError("unsupported fixture provenance")
-    for address, info in payload["accounts"].items():
+    restore_order = sorted(payload["accounts"], key=lambda address: (
+        address == PROGRAM,
+        len(payload["accounts"][address]["data"][0])
+        if isinstance(payload["accounts"][address], dict) else 0))
+    for address in restore_order:
+        info = payload["accounts"][address]
         if info is None:
             continue
         data = info.get("data")
         if not isinstance(data, list) or len(data) != 2 or data[1] != "base64":
             raise ValueError("invalid captured account encoding")
         raw = base64.b64decode(data[0], validate=True)
+        if len(raw) > 500000:
+            raise ValueError("PROGRAMDATA_RESTORE_REQUIRES_CHUNKED_DEPLOY: " +
+                             address + " bytes=" + str(len(raw)))
         call(rpc, "surfnet_setAccount", [address, {
             "lamports": info["lamports"], "data": raw.hex(),
             "owner": info["owner"], "executable": info["executable"]}])
