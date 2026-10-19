@@ -24,12 +24,12 @@ def data(raw, owner):
     return {"owner": owner, "executable": False,
             "data": [base64.b64encode(raw).decode(), "base64"]}
 
-def token(mint, owner):
+def token(mint, owner, authority=AUTH, amount=10):
     raw = bytearray(165)
     raw[:32] = bytes(Pubkey.from_string(mint))
-    raw[32:64] = bytes(Pubkey.from_string(AUTH))
+    raw[32:64] = bytes(Pubkey.from_string(authority))
     raw[108] = 1
-    raw[64:72] = (10).to_bytes(8, "little")
+    raw[64:72] = amount.to_bytes(8, "little")
     return data(raw, owner)
 
 def response(slot=101):
@@ -79,6 +79,22 @@ class AtomicPoolUserReadbackTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "pool vault mint"):
                 observe_atomic_pool_user_identities(
                     "http://127.0.0.1:8899", plan(), [MINT_A, MINT_B], AUTH)
+
+    def test_empty_or_mismatched_vault_authorities_rejected(self):
+        variants = [
+            token(MINT_A, TOKEN22, amount=0),
+            token(MINT_A, TOKEN22, authority=POOL),
+        ]
+        for replacement in variants:
+            invalid = response()
+            invalid["value"][3] = replacement
+            with patch("arb.orca_swap_v2_atomic_pool_user_readback.call", return_value=invalid), \
+                 patch("arb.orca_swap_v2_atomic_pool_user_readback.decode",
+                       return_value={"token_mint_a": MINT_A, "token_mint_b": MINT_B,
+                                     "token_vault_a": VAULT_A, "token_vault_b": VAULT_B}):
+                with self.assertRaisesRegex(ValueError, "vault authorities differ or balances are empty"):
+                    observe_atomic_pool_user_identities(
+                        "http://127.0.0.1:8899", plan(), [MINT_A, MINT_B], AUTH)
 
     def test_stale_slot_and_invalid_rpc_fail(self):
         with patch("arb.orca_swap_v2_atomic_pool_user_readback.call", return_value=response(99)):
