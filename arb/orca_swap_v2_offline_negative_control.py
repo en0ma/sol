@@ -41,7 +41,16 @@ def run(rpc):
     value=result.get("value") if isinstance(result,dict) else None
     if not isinstance(value,dict) or value.get("err") is None:
         raise ValueError("unverified SwapV2 negative-control unexpectedly succeeded")
-    return {"status":"EXPECTED_SWAP_V2_REJECTION_UNVERIFIED_POOL",
+    error=value["err"]
+    error_text=str(error)
+    # A nonzero simulation error alone does not prove that the pool guard
+    # was exercised: blockhash and signature failures are unrelated.
+    if any(reason in error_text.lower() for reason in (
+            "blockhashnotfound","signaturefailure","signature verification",
+            "insufficientfundsforfee")):
+        raise ValueError("SwapV2 rejected before pool validation: "+error_text)
+    return {"status":"SWAP_V2_NEGATIVE_CONTROL_REJECTED",
+            "observed_simulation_error":error_text,
             "signature_verification_requested":True,
             "rejected":True,"signed_swap_simulation_verified":False,
             "actionable":False,"executable_quote":False,"broadcast":False}
