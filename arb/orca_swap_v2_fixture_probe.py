@@ -7,6 +7,7 @@ import os
 from arb.orca_token2022_validation import snapshot
 from arb.orca_token2022_quote_screen import directional_tick_array_candidates
 from arb.orca_swap_v2_local_token_accounts import require_loopback_rpc
+from arb.orca_swap_v2_offline_provision import MINTS as OFFLINE_PROVISIONED_MINTS
 
 CANDIDATE_POOL = "94BpFoyri4uTT55NFSHKYNFyUMtoWXEisMA4LK7nTKPU"
 
@@ -32,11 +33,16 @@ def classify(observed):
         blockers.append("MINT_EXTENSIONS_REQUIRE_REVIEW")
     if not oracle.get("same_slot_verified", False):
         blockers.append("ORACLE_NOT_INITIALIZED_IN_SNAPSHOT")
+    if risk.get("fee_mode_verified") is not True:
+        blockers.append("FEE_MODE_NOT_VERIFIED")
+    if tuple(observed["mints"]) != tuple(OFFLINE_PROVISIONED_MINTS):
+        blockers.append("OFFLINE_PROVISIONING_MINTS_DO_NOT_MATCH_POOL")
     return {
         "status": "STRUCTURAL_FIXTURE_OBSERVED",
         "pool_address": observed["address"],
         "snapshot_slot": observed["slot"],
         "mints": observed["mints"],
+        "offline_provisioned_mints": list(OFFLINE_PROVISIONED_MINTS),
         "mint_token_programs": [m["owner"] for m in observed["mint_accounts"]],
         "vaults": [state["token_vault_a"], state["token_vault_b"]],
         "directions": directions,
