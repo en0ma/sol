@@ -30,6 +30,7 @@ def classify_token_runtime_simulation(value):
     error_text = str(err).lower()
     if any(marker in error_text for marker in (
             "invalidprogramforexecution", "programaccountnotfound",
+            "incorrectprogramid",
             "blockhashnotfound", "signaturefailure", "signature verification",
             "insufficientfundsforfee")):
         return "TOKEN_TRANSFER_SIMULATION_BLOCKED"
@@ -53,6 +54,10 @@ def run(rpc):
     account = payer.get("value") if isinstance(payer, dict) else None
     if not isinstance(account, dict) or account.get("owner") != SYSTEM or account.get("lamports", 0) < 5000:
         raise ValueError("offline fee payer not verified")
+    mint_observation = call(rpc, "getAccountInfo", [
+        HISTORICAL_MINT_A, {"encoding": "base64", "commitment": "confirmed"}])
+    mint_info = mint_observation.get("value") if isinstance(mint_observation, dict) else None
+    mint_owner_verified = isinstance(mint_info, dict) and mint_info.get("owner") == TOKEN_2022
     latest = call(rpc, "getLatestBlockhash", [{"commitment": "confirmed"}])
     blockhash = Hash.from_string(latest["value"]["blockhash"])
     # SPL Token TransferChecked: tag=12, amount (u64 LE), decimals (u8).
@@ -79,8 +84,9 @@ def run(rpc):
         "signature_verification_requested": True,
         "historical_mint_not_authenticated_on_offline_validator": True,
         "token_runtime_transfer_accepted": status == "TOKEN_TRANSFER_SIMULATION_ACCEPTED",
-        "token_program_execution_evidence": status in (
+        "token_program_execution_evidence": mint_owner_verified and status in (
             "TOKEN_TRANSFER_SIMULATION_ACCEPTED", "TOKEN_TRANSFER_SIMULATION_REJECTED"),
+        "historical_mint_token_program_owner_verified": mint_owner_verified,
         "orca_swap_simulation_verified": False,
         "signed_simulation_verified": False,
         "actionable": False, "executable_quote": False, "broadcast": False,
