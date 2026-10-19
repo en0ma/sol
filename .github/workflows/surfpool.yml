@@ -267,6 +267,15 @@ jobs:
           PY
       - name: Install transaction serialization dependency
         run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Probe Orca Whirlpool program availability on local fork
+        run: python3 -m arb.orca_swap_v2_program_probe > "$RUNNER_TEMP/orca-program-readiness.json"
+      - name: Upload Orca Whirlpool program readiness
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orca-program-readiness
+          path: ${{ runner.temp }}/orca-program-readiness.json
+          if-no-files-found: ignore
       - name: Screen bounded Orca Token-2022 indicative quotes
         continue-on-error: true
         run: python3 -m arb.orca_token2022_quote_screen --limit 15 --gross-input 100000 --output "$RUNNER_TEMP/orca-token2022-quote-screen.json"
