@@ -21,10 +21,10 @@ from arb.orca_swap_v2_candidate import unsigned_swap_v2_candidate
 from arb.orca_swap_v2_metas import ACCOUNT_ROLES, WRITABLE, SIGNERS, MEMO_PROGRAM
 from arb.orca_whirlpool import PROGRAM
 
-def prepare_authenticated_attempt(observed, signer, account_a, account_b, *, a_to_b=True):
+def prepare_authenticated_attempt(observed, signer, account_a, account_b, *, a_to_b=True, amount=1):
     if not isinstance(observed, dict) or observed.get("structurally_verified") is not True:
         raise ValueError("authenticated Whirlpool snapshot required")
-    if not isinstance(signer, Keypair) or type(a_to_b) is not bool:
+    if not isinstance(signer, Keypair) or type(a_to_b) is not bool or type(amount) is not int or not 0 < amount < 2**64:
         raise ValueError("ephemeral signer and exact direction required")
     pool = observed["pool"]
     mint_accounts = observed["mint_accounts"]
@@ -69,7 +69,7 @@ def prepare_authenticated_attempt(observed, signer, account_a, account_b, *, a_t
     # Use the extreme legal bound for this one-unit diagnostic, not a quote.
     sqrt_limit = 4295048017 if a_to_b else 79226673515401279992447579054
     candidate = unsigned_swap_v2_candidate(
-        metas, 1, 0, sqrt_limit, True, a_to_b)
+        metas, amount, 0, sqrt_limit, True, a_to_b)
     return candidate["instruction"]
 
 def run(rpc, pool=CANDIDATE_POOL):
