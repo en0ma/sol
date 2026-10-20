@@ -332,6 +332,20 @@ jobs:
           path: ${{ runner.temp }}/token-cycle-verified.json
           if-no-files-found: ignore
 
+      - name: Classify closed-cycle atomic execution readiness
+        env:
+          TOKEN_GRAPH_VERIFICATION_REPORT: ${{ runner.temp }}/token-cycle-verified.json
+          TOKEN_GRAPH_READINESS_REPORT: ${{ runner.temp }}/token-cycle-readiness.json
+        run: python3 -m arb.token_cycle_readiness
+
+      - name: Upload closed-cycle execution readiness
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: token-cycle-execution-readiness
+          path: ${{ runner.temp }}/token-cycle-readiness.json
+          if-no-files-found: ignore
+
       - name: Discover and simulate bounded cross-venue pool combinations
         env:
           CROSS_VENUE_INDEX_ENABLED: "1"
