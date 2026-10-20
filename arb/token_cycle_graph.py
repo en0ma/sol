@@ -5,6 +5,9 @@ authorize an executable route, or broadcast. Pool adapters must independently
 verify accounts and simulate every hop before calling a cycle actionable.
 """
 import json
+import os
+from urllib.request import Request, urlopen
+from solders.pubkey import Pubkey
 from collections import defaultdict
 from pathlib import Path
 
@@ -12,6 +15,56 @@ MAX_POOLS = 500
 MAX_CYCLES = 200
 SOL = "So11111111111111111111111111111111111111112"
 USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+
+def fetch_anchor_pool_hints(*, anchors=(SOL, USDC)):
+    """Bounded untrusted SOL/* and USDC/* edges; not verified liquidity."""
+    pools, errors, seen = [], [], set()
+    venues = {"orca": "orca", "raydium": "raydium_unclassified",
+              "meteora": "meteora_unclassified", "meteora-dlmm": "meteora_dlmm",
+              "pumpswap": "pumpswap"}
+    for anchor in anchors:
+        try:
+            Pubkey.from_string(anchor)
+            request = Request(
+                "https://api.dexscreener.com/token-pairs/v1/solana/" + anchor,
+                headers={"Accept": "application/json", "User-Agent": "sol-fork-research/1"})
+            with urlopen(request, timeout=12) as response:
+                raw = response.read(524289)
+            if len(raw) > 524288:
+                raise ValueError("index response over size cap")
+            pairs = json.loads(raw)
+            if not isinstance(pairs, list):
+                raise ValueError("index response must be a list")
+            for item in pairs[:200]:
+                if not isinstance(item, dict) or item.get("chainId") != "solana":
+                    continue
+                base, quote = item.get("baseToken"), item.get("quoteToken")
+                if not isinstance(base, dict) or not isinstance(quote, dict):
+                    continue
+                mints = [base.get("address"), quote.get("address")]
+                if anchor not in mints or len(set(mints)) != 2:
+                    continue
+                venue = venues.get(str(item.get("dexId", "")).lower())
+                address = item.get("pairAddress")
+                if not venue or not isinstance(address, str):
+                    continue
+                try:
+                    Pubkey.from_string(address)
+                    for mint in mints:
+                        Pubkey.from_string(mint)
+                except ValueError:
+                    continue
+                identity = (venue, address)
+                if identity in seen:
+                    continue
+                seen.add(identity)
+                if len(pools) >= 300:
+                    break
+                pools.append({"venue": venue, "address": address,
+                              "mints": mints, "candidate_source": "UNTRUSTED_PUBLIC_INDEX"})
+        except (OSError, TimeoutError, ValueError) as exc:
+            errors.append({"anchor": anchor, "error": str(exc)[:200]})
+    return pools, errors
 
 def candidate_cycles(entries, *, starts=(SOL, USDC), max_cycles=MAX_CYCLES):
     if type(max_cycles) is not int or not 1 <= max_cycles <= MAX_CYCLES:
@@ -101,7 +154,16 @@ def candidate_cycles(entries, *, starts=(SOL, USDC), max_cycles=MAX_CYCLES):
 def main():
     with Path("arb/pool_registry.json").open() as stream:
         entries = json.load(stream)["pools"]
-    report = candidate_cycles(entries)
+    index_hints, index_errors = ([], [])
+    if os.environ.get("TOKEN_GRAPH_INDEX_ENABLED") == "1":
+        index_hints, index_errors = fetch_anchor_pool_hints()
+    report = candidate_cycles(entries + index_hints)
+    report["registry_entries"] = len(entries)
+    report["public_index_hints"] = len(index_hints)
+    report["public_index_errors"] = index_errors
+    report["index_coverage"] = "TWO_ANCHOR_BOUNDED_SAMPLE" if index_hints else "NONE"
+    if index_hints:
+        report["source"] = "REGISTRY_AND_UNTRUSTED_PUBLIC_INDEX"
     print(json.dumps(report, indent=2))
     return 0
 
