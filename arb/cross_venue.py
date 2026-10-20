@@ -88,10 +88,20 @@ def run(rpc,orca_pool,raydium_pool,maximum_wsol_input=1000000,usdc_amount=10000,
     wire=bytes(tx)
     if len(wire)>1232:
         return {"status":"TX_TOO_LARGE","cross_venue_success":False,"bytes":len(wire)}
+    simulated_addresses=[str(a.pubkey()),str(b.pubkey())]
+    def assert_ephemeral_accounts_absent():
+        result=call(rpc,"getMultipleAccounts",[simulated_addresses,{"encoding":"base64"}])
+        values=result.get("value") if isinstance(result,dict) else None
+        if not isinstance(values,list) or len(values)!=2 or any(x is not None for x in values):
+            raise ValueError("atomic simulation token accounts unexpectedly persisted")
+    assert_ephemeral_accounts_absent()
     value=call(rpc,"simulateTransaction",[base64.b64encode(wire).decode(),{
         "encoding":"base64","sigVerify":True,"commitment":"processed",
         "accounts":{"encoding":"base64","addresses":[str(a.pubkey()),str(b.pubkey())]}}])["value"]
-    output={"direction":"raydium_to_orca" if reverse else "orca_to_raydium",
+    assert_ephemeral_accounts_absent()
+    output={"simulation_did_not_persist":True,
+        "signed_simulation_requested":True,
+        "direction":"raydium_to_orca" if reverse else "orca_to_raydium",
         "status":"SIMULATION_FAILED","cross_venue_success":False,
         "error":value.get("err"),"compute_units":value.get("unitsConsumed"),
         "transaction_bytes":len(wire),"local_only":True,
