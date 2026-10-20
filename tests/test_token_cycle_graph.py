@@ -33,6 +33,20 @@ class CycleGraphTests(unittest.TestCase):
         self.assertEqual(report["cycles_returned"],0)
         self.assertEqual(len(report["rejected_hints"]),1)
 
+    def test_both_anchors_receive_budget_under_truncation(self):
+        entries=[]
+        for i in range(8):
+            entries.append(pool("sol-left-"+str(i),"orca",S,R))
+            entries.append(pool("sol-right-"+str(i),"orca",R,S))
+            entries.append(pool("usdc-left-"+str(i),"orca",U,R))
+            entries.append(pool("usdc-right-"+str(i),"orca",R,U))
+        report=candidate_cycles(entries,starts=(S,U),max_cycles=20)
+        self.assertEqual(report["cycles_by_start"][S],10)
+        self.assertEqual(report["cycles_by_start"][U],10)
+        self.assertEqual(report["cycles_returned"],20)
+        self.assertTrue(all(c["tokens"][0]==c["tokens"][-1]
+                            for c in report["cycles"]))
+
     def test_bounded_and_no_reuse_of_same_pool(self):
         with self.assertRaises(ValueError):
             candidate_cycles([],max_cycles=201)
