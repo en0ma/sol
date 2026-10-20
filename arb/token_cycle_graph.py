@@ -113,7 +113,8 @@ def candidate_cycles(entries, *, starts=(SOL, USDC), max_cycles=MAX_CYCLES, incl
                         "is_closed_arbitrage": False, "quote_verified": False,
                         "simulation_verified": False, "actionable": False,
                         "live_execution_approved": False, "broadcast": False})
-                return
+                # A cross-anchor path may also be the prefix of a closed
+                # triangular cycle. Keep traversing up to the hop limit.
             if len(legs) >= 2 and token == start:
                 sig = (start, tuple((leg["pool"], leg["from"], leg["to"])
                                     for leg in legs))
