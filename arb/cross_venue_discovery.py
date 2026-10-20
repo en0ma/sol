@@ -8,6 +8,7 @@ import json
 import os
 from arb.orca_whirlpool import find_pair, SOL, USDC
 from arb.raydium_cpmm import candidates, verify_vaults
+from arb.rpc import RPCError
 from arb.cross_venue import run
 from arb.cross_venue_sweep import evaluate
 from arb.orca_swap_v2_local_token_accounts import require_loopback_rpc
@@ -75,14 +76,24 @@ def discover_and_simulate(rpc, max_routes=MAX_ROUTES):
     return result
 
 def main():
-    report = discover_and_simulate(
-        os.environ.get("SOLANA_RPC_URL", "http://127.0.0.1:8899"))
+    rpc = os.environ.get("SOLANA_RPC_URL", "http://127.0.0.1:8899")
+    try:
+        report = discover_and_simulate(rpc)
+    except (RPCError, TimeoutError, OSError) as exc:
+        # An upstream provider rate limit is NOT evidence that no pools exist.
+        message = str(exc)
+        report = {"status": "DISCOVERY_BLOCKED_UPSTREAM_RATE_LIMIT"
+                  if "429" in message or "Too Many Requests" in message
+                  else "DISCOVERY_BLOCKED_RPC",
+                  "reason": message[:400], "routes": [],
+                  "pool_counts_verified": False, "broadcast": False,
+                  "actionable": False, "live_execution_approved": False}
     path = os.environ.get("CROSS_VENUE_DISCOVERY_REPORT")
     if path:
         with open(path, "w") as f:
             json.dump(report, f, indent=2)
     print(json.dumps(report, indent=2))
-    return 0
+    return 0 if report["status"] == "BOUNDED_DISCOVERY_COMPLETE" else 2
 
 if __name__ == "__main__":
     raise SystemExit(main())
