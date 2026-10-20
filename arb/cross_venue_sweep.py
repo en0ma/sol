@@ -11,10 +11,13 @@ def evaluate(result,min_profit=MIN_PROFIT_LAMPORTS):
     inventory=result.get("residual_usdc_base_units")
     eligible=(result.get("cross_venue_success") is True and
               type(pnl) is int and type(inventory) is int and inventory==0 and
-              result.get("venues_executed")==2 and pnl>=min_profit)
+              result.get("venues_executed")==2 and
+              result.get("simulation_did_not_persist") is True and
+              result.get("signed_simulation_requested") is True and pnl>=min_profit)
     if eligible: reason="SIMULATED_NET_PROFIT"
     elif result.get("cross_venue_success") is not True: reason="SWAP_FAILED_OR_UNCLOSED"
     elif type(inventory) is not int or inventory!=0: reason="RESIDUAL_INTERMEDIATE_TOKEN"
+    elif result.get("simulation_did_not_persist") is not True or result.get("signed_simulation_requested") is not True: reason="SIMULATION_ISOLATION_UNVERIFIED"
     elif type(pnl) is not int: reason="MISSING_NETWORK_FEE"
     elif pnl<min_profit: reason="BELOW_MINIMUM_NET_PROFIT"
     else: reason="INELIGIBLE"
