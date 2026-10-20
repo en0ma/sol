@@ -7,8 +7,10 @@ from arb.cross_venue_discovery import main
 from arb.rpc import RPCError
 
 class DiscoveryFailureTests(unittest.TestCase):
+    @patch("arb.cross_venue_discovery.pinned_fallback")
     @patch("arb.cross_venue_discovery.discover_and_simulate")
-    def test_upstream_rate_limit_produces_explicit_artifact(self, discover):
+    def test_upstream_rate_limit_produces_explicit_artifact(self, discover, fallback):
+        fallback.side_effect = RPCError("429 Too Many Requests")
         discover.side_effect = RPCError("429 Too Many Requests")
         with tempfile.TemporaryDirectory() as d:
             path = str(Path(d) / "discovery.json")
@@ -30,3 +32,4 @@ class DiscoveryFailureTests(unittest.TestCase):
                 self.assertEqual(main(), 0)
             self.assertEqual(json.loads(Path(path).read_text())["status"],
                              "BOUNDED_DISCOVERY_COMPLETE")
+
