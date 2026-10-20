@@ -146,7 +146,7 @@ def pinned_fallback(rpc):
                     report["routes"].append(item)
     report["routes_tested"] = len(report["routes"])
     report["pool_pairs_considered"] = len(valid_orca) * len(valid_ray)
-    report["full_size_coverage"] = (report["routes_tested"] == min(MAX_FALLBACK_ROUTES, 2 * len(FALLBACK_USDC_SIZES) * report["pool_pairs_considered"]))
+    report["full_size_coverage"] = (report["routes_tested"] == 2 * len(FALLBACK_USDC_SIZES) * report["pool_pairs_considered"])
     report["simulated_profitable_candidates"] = sum(
         r.get("decision", {}).get("simulated_profitable") is True for r in report["routes"])
     successful = [r for r in report["routes"]
