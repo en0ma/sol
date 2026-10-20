@@ -306,6 +306,8 @@ jobs:
       - name: Install transaction serialization dependency
         run: python3 -m pip install --disable-pip-version-check solders==0.26.0
       - name: Enumerate multi-pair token graph cycles
+        env:
+          TOKEN_GRAPH_INDEX_ENABLED: "1"
         run: python3 -m arb.token_cycle_graph > "${{ runner.temp }}/token-cycle-graph.json"
 
       - name: Upload unverified token graph candidates
