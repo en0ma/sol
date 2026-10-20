@@ -32,10 +32,9 @@ class AnchorIndexTests(unittest.TestCase):
         self.assertTrue(any(c["tokens"]==[SOL,RAY,USDC,SOL]
                             for c in graph["cycles"]))
         self.assertTrue(all(not c["actionable"] for c in graph["cycles"]))
-        self.assertTrue(any(p["tokens"] == [SOL, RAY, USDC]
-                            for p in graph["cross_anchor_paths"]))
-        self.assertTrue(all(not p["is_closed_arbitrage"]
-                            for p in graph["cross_anchor_paths"]))
+        self.assertTrue(all(cycle["tokens"][0] == cycle["tokens"][-1]
+                            for cycle in graph["cycles"]))
+        self.assertNotIn("cross_anchor_paths", graph)
 
     @patch("arb.token_cycle_graph.urlopen")
     def test_wrong_anchor_is_ignored(self, fetch):
