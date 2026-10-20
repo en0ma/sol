@@ -98,11 +98,14 @@ def candidate_cycles(entries, *, starts=(SOL, USDC), max_cycles=MAX_CYCLES):
         neighbors.sort(key=lambda e: (e[0], e[1]["venue"], e[1]["address"]))
     cycles = []
     identities = set()
-    for start in dict.fromkeys(starts):
+    unique_starts = list(dict.fromkeys(starts))
+    for start_index, start in enumerate(unique_starts):
+        # Reserve an equal bounded candidate budget per starting asset.
+        start_limit = max_cycles * (start_index + 1) // len(unique_starts)
         if start not in adjacency:
             continue
         def walk(token, path_tokens, legs, used):
-            if len(cycles) >= max_cycles:
+            if len(cycles) >= start_limit:
                 return
             if len(legs) >= 2 and token == start:
                 sig = (start, tuple((leg["pool"], leg["from"], leg["to"])
@@ -125,7 +128,7 @@ def candidate_cycles(entries, *, starts=(SOL, USDC), max_cycles=MAX_CYCLES):
             if len(legs) >= 3 or (token in path_tokens[:-1]):
                 return
             for destination, pool in adjacency[token]:
-                if len(cycles) >= max_cycles:
+                if len(cycles) >= start_limit:
                     return
                 identity = (pool["venue"], pool["address"])
                 if identity in used:
@@ -146,6 +149,8 @@ def candidate_cycles(entries, *, starts=(SOL, USDC), max_cycles=MAX_CYCLES):
         "rejected_hints": rejected,
         "cycles_returned": len(cycles),
         "truncated": len(cycles) == max_cycles,
+        "cycles_by_start": {start: sum(c["tokens"][0] == start for c in cycles)
+                            for start in unique_starts},
         "cycles": cycles,
         "actionable": False, "live_execution_approved": False, "broadcast": False,
         "note": "No cycle is executable without all-leg onchain verification, quotes, account setup, atomic signed simulation and settled-balance checks."
