@@ -8,7 +8,7 @@ class SweepTests(unittest.TestCase):
             "net_wsol_change_lamports":-1})["simulated_profitable"])
     def test_profitable_still_not_live_approved(self):
         r=evaluate({"cross_venue_success":True,"residual_usdc_base_units":0,
-            "venues_executed":2,"net_wsol_change_lamports":10001})
+            "venues_executed":2,"simulation_did_not_persist":True,"signed_simulation_requested":True,"net_wsol_change_lamports":10001})
         self.assertTrue(r["simulated_profitable"])
         self.assertFalse(r["live_execution_approved"])
     def test_residual_token_blocks(self):
