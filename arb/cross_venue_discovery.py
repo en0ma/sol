@@ -31,18 +31,18 @@ def indexed_candidates():
     returned address still undergoes program-owner, mint and vault checks.
     """
     request = Request(
-        "https://api.dexscreener.com/latest/dex/search?q=SOL%2FUSDC",
+        "https://api.dexscreener.com/token-pairs/v1/solana/" + SOL,
         headers={"Accept": "application/json", "User-Agent": "sol-fork-research/1"})
     with urlopen(request, timeout=12) as response:
         payload = response.read(524289)
     if len(payload) > 524288:
         raise ValueError("public index response too large")
     data = json.loads(payload)
-    pairs = data.get("pairs") if isinstance(data, dict) else None
+    pairs = data if isinstance(data, list) else None
     if not isinstance(pairs, list):
         raise ValueError("public pool index returned no pair list")
     result = {"orca": [], "raydium_cpmm": []}
-    for item in pairs[:100]:
+    for item in pairs[:200]:
         if not isinstance(item, dict) or item.get("chainId") != "solana":
             continue
         base, quote = item.get("baseToken"), item.get("quoteToken")
