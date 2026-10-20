@@ -307,6 +307,7 @@ jobs:
         run: python3 -m pip install --disable-pip-version-check solders==0.26.0
       - name: Discover and simulate bounded cross-venue pool combinations
         env:
+          CROSS_VENUE_INDEX_ENABLED: "1"
           CROSS_VENUE_DISCOVERY_REPORT: ${{ runner.temp }}/cross-venue-discovery.json
         run: python3 -m arb.cross_venue_discovery
       - name: Upload cross-venue pool discovery evidence
