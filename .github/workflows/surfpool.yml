@@ -1028,6 +1028,7 @@ jobs:
           PY
           else
             echo '{"status":"ISOLATED_FIXTURE_NOT_READY","signed_simulation_verified":false,"broadcast":false}' > "$RUNNER_TEMP/orca-isolated-attempt.json"
+            exit 1
           fi
       - name: Upload disposable offline Orca SwapV2 execution evidence
         if: always()
