@@ -4,7 +4,7 @@ from arb.cross_venue_sweep import evaluate,sweep
 class SweepTests(unittest.TestCase):
     def test_negative_pnl_rejected(self):
         self.assertFalse(evaluate({"cross_venue_success":True,
-            "residual_usdc_base_units":0,"venues_executed":2,
+            "residual_usdc_base_units":0,"venues_executed":2,"simulation_did_not_persist":True,"signed_simulation_requested":True,
             "net_wsol_change_lamports":-1})["simulated_profitable"])
     def test_profitable_still_not_live_approved(self):
         r=evaluate({"cross_venue_success":True,"residual_usdc_base_units":0,
