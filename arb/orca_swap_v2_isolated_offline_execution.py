@@ -119,11 +119,11 @@ def hydrate_and_attempt(rpc, input_path):
                                    payload["observed"]["mint_accounts"])]}
     plan["required_accounts"][1]["role"] = "token_owner_account_b"
     provision = provision_offline_fixture_accounts(
-        rpc, plan, signer, amounts=(1000000, 0))
+        rpc, plan, signer, amounts=(10000000, 0))
     call(rpc, "surfnet_setAccount", [str(signer.pubkey()), {
         "lamports": 1000000000, "data": "", "owner": SYSTEM, "executable": False}])
     instruction = prepare_authenticated_attempt(
-        payload["observed"], signer, *provision["addresses"])
+        payload["observed"], signer, *provision["addresses"], amount=1000000)
     latest = call(rpc, "getLatestBlockhash", [{"commitment": "confirmed"}])
     tx = Transaction.new_signed_with_payer(
         [instruction], signer.pubkey(), [signer],
@@ -140,7 +140,7 @@ def hydrate_and_attempt(rpc, input_path):
     program_invoked = any(("Program " + PROGRAM + " invoke") in line for line in logs)
     program_succeeded = any(("Program " + PROGRAM + " success") in line for line in logs)
     token_transfers = sum("Program log: Instruction: TransferChecked" in line for line in logs)
-    initial_balances = [1000000, 0]
+    initial_balances = [10000000, 0]
     accounts = value.get("accounts")
     post_balances = []
     if isinstance(accounts, list) and len(accounts) == 2:
