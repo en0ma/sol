@@ -7,6 +7,8 @@ A result is never live-actionable, including when simulated PnL is positive.
 import json
 import os
 import base64
+from urllib.request import Request, urlopen
+from solders.pubkey import Pubkey
 from arb.rpc import call
 from arb.orca_whirlpool import find_pair, fetch_pool, SOL, USDC
 from arb.raydium_cpmm import candidates, verify_vaults, decode, PROGRAM as RAYDIUM_PROGRAM
@@ -22,10 +24,52 @@ MAX_FALLBACK_ROUTES = 12
 FALLBACK_USDC_SIZES = (1000, 10000, 50000)
 TEST_USDC_BASE_UNITS = 10000
 
+def indexed_candidates():
+    """Untrusted public address hints; never treated as verified pool evidence.
+
+    The bounded public search supplements curated candidates only. Every
+    returned address still undergoes program-owner, mint and vault checks.
+    """
+    request = Request(
+        "https://api.dexscreener.com/latest/dex/search?q=SOL%2FUSDC",
+        headers={"Accept": "application/json", "User-Agent": "sol-fork-research/1"})
+    with urlopen(request, timeout=12) as response:
+        payload = response.read(524289)
+    if len(payload) > 524288:
+        raise ValueError("public index response too large")
+    data = json.loads(payload)
+    pairs = data.get("pairs") if isinstance(data, dict) else None
+    if not isinstance(pairs, list):
+        raise ValueError("public pool index returned no pair list")
+    result = {"orca": [], "raydium_cpmm": []}
+    for item in pairs[:100]:
+        if not isinstance(item, dict) or item.get("chainId") != "solana":
+            continue
+        base, quote = item.get("baseToken"), item.get("quoteToken")
+        if not isinstance(base, dict) or not isinstance(quote, dict):
+            continue
+        if {base.get("address"), quote.get("address")} != {SOL, USDC}:
+            continue
+        dex = str(item.get("dexId", "")).lower()
+        venue = "orca" if dex == "orca" else (
+            "raydium_cpmm" if dex == "raydium" else None)
+        if venue is None:
+            continue
+        address = item.get("pairAddress")
+        if not isinstance(address, str):
+            continue
+        try:
+            Pubkey.from_string(address)
+        except ValueError:
+            continue
+        if address not in result[venue] and len(result[venue]) < 12:
+            result[venue].append(address)
+    return result
+
 def pinned_fallback(rpc):
     """Restricted known-address fallback, NOT discovery of additional pools."""
     report = {"status": "PINNED_FALLBACK_INCOMPLETE",
-              "scan_coverage": "PINNED_ADDRESSES_ONLY",
+              "scan_coverage": "KNOWN_ADDRESSES_AND_OPTIONAL_PUBLIC_INDEX_HINTS",
               "broadcast": False, "actionable": False,
               "live_execution_approved": False, "routes": [], "rejections": []}
     # Merge existing address manifests with the bounded repository registry.
@@ -36,14 +80,24 @@ def pinned_fallback(rpc):
         primary_ray = [p["address"] for p in json.load(f)["pools"]]
     with open("arb/pool_registry.json") as f:
         entries = json.load(f)["pools"]
+    indexed = {"orca": [], "raydium_cpmm": []}
+    if os.environ.get("CROSS_VENUE_INDEX_ENABLED") == "1":
+        try:
+            indexed = indexed_candidates()
+            report["index_status"] = "PUBLIC_ADDRESS_HINTS_UNVERIFIED"
+        except (OSError, TimeoutError, ValueError, json.JSONDecodeError) as exc:
+            report["index_status"] = "INDEX_UNAVAILABLE"
+            report["index_error"] = str(exc)[:240]
+    else:
+        report["index_status"] = "DISABLED"
     orca_addresses = list(dict.fromkeys(primary_orca + [
         p["address"] for p in entries
         if p.get("venue") == "orca" and
-        (p.get("mints") is None or p["mints"] == [SOL, USDC])]))[:MAX_ORCA]
+        (p.get("mints") is None or p["mints"] == [SOL, USDC])]+ indexed["orca"]))[:MAX_ORCA]
     ray_addresses = list(dict.fromkeys(primary_ray + [
         p["address"] for p in entries
         if p.get("venue") == "raydium_cpmm" and
-        (p.get("mints") is None or p["mints"] == [SOL, USDC])]))[:MAX_RAYDIUM]
+        (p.get("mints") is None or p["mints"] == [SOL, USDC])]+ indexed["raydium_cpmm"]))[:MAX_RAYDIUM]
     valid_orca = []
     for address in orca_addresses:
         try:
@@ -67,6 +121,8 @@ def pinned_fallback(rpc):
             valid_ray.append(address)
         except (ValueError, KeyError, TypeError) as e:
             report["rejections"].append({"raydium": address, "reason": str(e)})
+    report["index_hints_orca"] = len(indexed["orca"])
+    report["index_hints_raydium"] = len(indexed["raydium_cpmm"])
     report["orca_addresses_checked"], report["raydium_addresses_checked"] = len(orca_addresses), len(ray_addresses)
     report["orca_verified"], report["raydium_verified"] = len(valid_orca), len(valid_ray)
     for pool in valid_orca:
@@ -103,6 +159,9 @@ def pinned_fallback(rpc):
          "usdc_amount_base_units": best["usdc_amount_base_units"]}
         if best else None)
     report["status"] = "PINNED_FALLBACK_COMPLETE"
+    report["address_sources"] = ["REPOSITORY_MANIFESTS", "REPOSITORY_REGISTRY"] + (
+        ["PUBLIC_INDEX_UNTRUSTED_HINTS"] if report["index_status"] == "PUBLIC_ADDRESS_HINTS_UNVERIFIED"
+        else [])
     return report
 
 def discover_and_simulate(rpc, max_routes=MAX_ROUTES):
