@@ -18,6 +18,8 @@ from arb.orca_swap_v2_local_token_accounts import require_loopback_rpc
 MAX_ORCA = 4
 MAX_RAYDIUM = 4
 MAX_ROUTES = 6
+MAX_FALLBACK_ROUTES = 12
+FALLBACK_USDC_SIZES = (1000, 10000, 50000)
 TEST_USDC_BASE_UNITS = 10000
 
 def pinned_fallback(rpc):
@@ -70,22 +72,36 @@ def pinned_fallback(rpc):
     for pool in valid_orca:
         for ray in valid_ray:
             for reverse in (False, True):
-                if len(report["routes"]) >= MAX_ROUTES:
-                    break
-                item = {"orca": pool, "raydium": ray, "direction":
-                        "raydium_to_orca" if reverse else "orca_to_raydium",
-                        "broadcast": False, "actionable": False}
-                try:
-                    value = run(rpc, pool, ray, 1000000, TEST_USDC_BASE_UNITS, reverse=reverse)
-                    item["simulation"] = {k: v for k, v in value.items() if k != "log_tail"}
-                    item["decision"] = evaluate(value)
-                except (ValueError, KeyError, TypeError) as e:
-                    item["status"] = "SIMULATION_BLOCKED"
-                    item["reason"] = str(e)
-                report["routes"].append(item)
+                for size in FALLBACK_USDC_SIZES:
+                    if len(report["routes"]) >= MAX_FALLBACK_ROUTES:
+                        break
+                    item = {"orca": pool, "raydium": ray,
+                            "direction": "raydium_to_orca" if reverse else "orca_to_raydium",
+                            "usdc_amount_base_units": size,
+                            "broadcast": False, "actionable": False}
+                    try:
+                        value = run(rpc, pool, ray, 1000000, size, reverse=reverse)
+                        item["simulation"] = {k: v for k, v in value.items()
+                                              if k != "log_tail"}
+                        item["decision"] = evaluate(value)
+                    except (ValueError, KeyError, TypeError) as e:
+                        item["status"] = "SIMULATION_BLOCKED"
+                        item["reason"] = str(e)
+                    report["routes"].append(item)
     report["routes_tested"] = len(report["routes"])
     report["simulated_profitable_candidates"] = sum(
         r.get("decision", {}).get("simulated_profitable") is True for r in report["routes"])
+    successful = [r for r in report["routes"]
+                  if r.get("simulation", {}).get("cross_venue_success") is True
+                  and type(r["simulation"].get("net_wsol_change_lamports")) is int]
+    best = max(successful, key=lambda r: r["simulation"]["net_wsol_change_lamports"]) if successful else None
+    report["best_net_wsol_change_lamports"] = (
+        best["simulation"]["net_wsol_change_lamports"] if best else None)
+    report["best_route"] = (
+        {"orca": best["orca"], "raydium": best["raydium"],
+         "direction": best["direction"],
+         "usdc_amount_base_units": best["usdc_amount_base_units"]}
+        if best else None)
     report["status"] = "PINNED_FALLBACK_COMPLETE"
     return report
 
