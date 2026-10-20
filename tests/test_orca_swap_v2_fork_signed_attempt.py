@@ -38,7 +38,7 @@ class ForkSwapAttemptTests(unittest.TestCase):
         mint_b = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
         observed = {
             "structurally_verified": True, "address": pool,
-            "pool": {"token_vault_a": str(Keypair().pubkey()),
+            "pool": {"sqrt_price_x64": str(2**64), "token_vault_a": str(Keypair().pubkey()),
                      "token_vault_b": str(Keypair().pubkey())},
             "mint_accounts": [{"owner": token22}, {"owner": token}],
             "mints": [mint_a, mint_b],
