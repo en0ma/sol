@@ -22,9 +22,11 @@ class MultiSizeFallbackTests(unittest.TestCase):
         run.side_effect = simulate
         result = pinned_fallback("http://127.0.0.1:8899")
         self.assertEqual(result["status"], "PINNED_FALLBACK_COMPLETE")
-        self.assertEqual(result["routes_tested"], 6)
+        self.assertEqual(result["routes_tested"], 12)
         self.assertEqual(set(r["usdc_amount_base_units"] for r in result["routes"]), {1000, 10000, 50000})
         self.assertEqual(result["best_net_wsol_change_lamports"], -1000)
+        self.assertEqual(result["orca_verified"], 2)
+        self.assertEqual(result["raydium_verified"], 1)
         self.assertEqual(result["simulated_profitable_candidates"], 0)
         self.assertFalse(result["actionable"])
         self.assertFalse(result["broadcast"])
