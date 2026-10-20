@@ -576,6 +576,18 @@ jobs:
           name: cross-venue-size-sweep
           path: ${{ runner.temp }}/cross-venue-sweep.json
           if-no-files-found: ignore
+      - name: Discover and simulate bounded cross-venue pool combinations
+        continue-on-error: true
+        env:
+          CROSS_VENUE_DISCOVERY_REPORT: ${{ runner.temp }}/cross-venue-discovery.json
+        run: python3 -m arb.cross_venue_discovery
+      - name: Upload cross-venue pool discovery evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cross-venue-verified-pool-discovery
+          path: ${{ runner.temp }}/cross-venue-discovery.json
+          if-no-files-found: ignore
       - name: Probe five on-chain DEX venue capability levels
         env:
           DEX_VENUE_REPORT: ${{ runner.temp }}/dex-venues.json
