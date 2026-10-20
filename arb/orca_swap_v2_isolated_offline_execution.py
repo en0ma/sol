@@ -138,16 +138,48 @@ def hydrate_and_attempt(rpc, input_path):
         raise ValueError("missing swap simulation result")
     logs = value.get("logs") or []
     program_invoked = any(("Program " + PROGRAM + " invoke") in line for line in logs)
-    return {"status": ("OFFLINE_SWAP_PROGRAM_EXECUTED" if program_invoked else
-                       "OFFLINE_SWAP_BLOCKED_BEFORE_PROGRAM"),
+    program_succeeded = any(("Program " + PROGRAM + " success") in line for line in logs)
+    token_transfers = sum("Program log: Instruction: TransferChecked" in line for line in logs)
+    initial_balances = [1000000, 0]
+    accounts = value.get("accounts")
+    post_balances = []
+    if isinstance(accounts, list) and len(accounts) == 2:
+        for account, mint, program in zip(
+                accounts, payload["observed"]["mints"],
+                [m["owner"] for m in payload["observed"]["mint_accounts"]]):
+            if not isinstance(account, dict) or account.get("owner") != program:
+                raise ValueError("simulated token account program mismatch")
+            encoded = account.get("data")
+            if not isinstance(encoded, list) or len(encoded) != 2 or encoded[1] != "base64":
+                raise ValueError("missing simulated token account data")
+            raw = base64.b64decode(encoded[0], validate=True)
+            if (len(raw) < 165 or raw[108] != 1 or
+                    str(Pubkey.from_bytes(raw[:32])) != mint or
+                    str(Pubkey.from_bytes(raw[32:64])) != str(signer.pubkey())):
+                raise ValueError("simulated token account mint or authority mismatch")
+            post_balances.append(int.from_bytes(raw[64:72], "little"))
+    signed_swap_verified = (
+        value.get("err") is None and program_invoked and program_succeeded and
+        token_transfers >= 1 and len(post_balances) == 2 and
+        0 <= post_balances[0] < initial_balances[0] and
+        post_balances[1] > initial_balances[1])
+    return {"status": ("OFFLINE_SIGNED_SWAP_RECONCILED" if signed_swap_verified
+                       else "OFFLINE_SWAP_NOT_RECONCILED"),
             "simulation_error": value.get("err"), "logs": logs,
             "units_consumed": value.get("unitsConsumed"),
-            "post_accounts_returned": bool(value.get("accounts")),
+            "pre_user_balances_base_units": initial_balances,
+            "post_user_balances_base_units": post_balances,
+            "input_debit_base_units": initial_balances[0] - post_balances[0]
+                if len(post_balances) == 2 else None,
+            "output_credit_base_units": post_balances[1] - initial_balances[1]
+                if len(post_balances) == 2 else None,
             "orca_program_invoked": program_invoked,
+            "orca_program_succeeded": program_succeeded,
+            "token_transfer_log_count": token_transfers,
             "synthetically_funded_users": True,
             "genuine_same_fork_user_accounts": False,
-            "signed_simulation_verified": False, "actionable": False,
-            "executable_quote": False, "broadcast": False}
+            "signed_simulation_verified": signed_swap_verified,
+            "actionable": False, "executable_quote": False, "broadcast": False}
 
 if __name__ == "__main__":
     mode, path = sys.argv[1:3]
