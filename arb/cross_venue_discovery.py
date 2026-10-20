@@ -6,8 +6,10 @@ A result is never live-actionable, including when simulated PnL is positive.
 """
 import json
 import os
-from arb.orca_whirlpool import find_pair, SOL, USDC
-from arb.raydium_cpmm import candidates, verify_vaults
+import base64
+from arb.rpc import call
+from arb.orca_whirlpool import find_pair, fetch_pool, SOL, USDC
+from arb.raydium_cpmm import candidates, verify_vaults, decode, PROGRAM as RAYDIUM_PROGRAM
 from arb.rpc import RPCError
 from arb.cross_venue import run
 from arb.cross_venue_sweep import evaluate
@@ -17,6 +19,62 @@ MAX_ORCA = 4
 MAX_RAYDIUM = 4
 MAX_ROUTES = 6
 TEST_USDC_BASE_UNITS = 10000
+
+def pinned_fallback(rpc):
+    """Restricted known-address fallback, NOT discovery of additional pools."""
+    report = {"status": "PINNED_FALLBACK_INCOMPLETE",
+              "scan_coverage": "PINNED_ADDRESSES_ONLY",
+              "broadcast": False, "actionable": False,
+              "live_execution_approved": False, "routes": [], "rejections": []}
+    with open("arb/whirlpool_pools.json") as f:
+        orca_addresses = [p["address"] for p in json.load(f)["pools"]][:MAX_ORCA]
+    with open("arb/raydium_cpmm_pools.json") as f:
+        ray_addresses = [p["address"] for p in json.load(f)["pools"]][:MAX_RAYDIUM]
+    valid_orca = []
+    for address in orca_addresses:
+        try:
+            p = fetch_pool(rpc, address)
+            if (p["token_mint_a"], p["token_mint_b"]) != (SOL, USDC):
+                raise ValueError("unsupported mint ordering")
+            valid_orca.append(address)
+        except (ValueError, KeyError, TypeError) as e:
+            report["rejections"].append({"orca": address, "reason": str(e)})
+    valid_ray = []
+    for address in ray_addresses:
+        try:
+            info = call(rpc, "getAccountInfo", [address, {"encoding": "base64"}])["value"]
+            if not info or info["owner"] != RAYDIUM_PROGRAM or info.get("executable"):
+                raise ValueError("invalid CPMM owner")
+            state = decode(base64.b64decode(info["data"][0], validate=True))
+            if (state["token_0_mint"], state["token_1_mint"]) != (SOL, USDC):
+                raise ValueError("unsupported mint ordering")
+            if verify_vaults(rpc, address, state).get("verified") is not True:
+                raise ValueError("unverified CPMM vaults")
+            valid_ray.append(address)
+        except (ValueError, KeyError, TypeError) as e:
+            report["rejections"].append({"raydium": address, "reason": str(e)})
+    report["orca_verified"], report["raydium_verified"] = len(valid_orca), len(valid_ray)
+    for pool in valid_orca:
+        for ray in valid_ray:
+            for reverse in (False, True):
+                if len(report["routes"]) >= MAX_ROUTES:
+                    break
+                item = {"orca": pool, "raydium": ray, "direction":
+                        "raydium_to_orca" if reverse else "orca_to_raydium",
+                        "broadcast": False, "actionable": False}
+                try:
+                    value = run(rpc, pool, ray, 1000000, TEST_USDC_BASE_UNITS, reverse=reverse)
+                    item["simulation"] = {k: v for k, v in value.items() if k != "log_tail"}
+                    item["decision"] = evaluate(value)
+                except (ValueError, KeyError, TypeError) as e:
+                    item["status"] = "SIMULATION_BLOCKED"
+                    item["reason"] = str(e)
+                report["routes"].append(item)
+    report["routes_tested"] = len(report["routes"])
+    report["simulated_profitable_candidates"] = sum(
+        r.get("decision", {}).get("simulated_profitable") is True for r in report["routes"])
+    report["status"] = "PINNED_FALLBACK_COMPLETE"
+    return report
 
 def discover_and_simulate(rpc, max_routes=MAX_ROUTES):
     require_loopback_rpc(rpc)
@@ -88,12 +146,19 @@ def main():
                   "reason": message[:400], "routes": [],
                   "pool_counts_verified": False, "broadcast": False,
                   "actionable": False, "live_execution_approved": False}
+    if report.get("status") == "DISCOVERY_BLOCKED_UPSTREAM_RATE_LIMIT":
+        try:
+            limited = pinned_fallback(rpc)
+            limited["upstream_scan_status"] = report["status"]
+            report = limited
+        except (RPCError, TimeoutError, OSError, ValueError) as exc:
+            report["pinned_fallback_error"] = str(exc)[:400]
     path = os.environ.get("CROSS_VENUE_DISCOVERY_REPORT")
     if path:
         with open(path, "w") as f:
             json.dump(report, f, indent=2)
     print(json.dumps(report, indent=2))
-    return 0 if report["status"] == "BOUNDED_DISCOVERY_COMPLETE" else 2
+    return 0 if report["status"] in ("BOUNDED_DISCOVERY_COMPLETE", "PINNED_FALLBACK_COMPLETE") else 2
 
 if __name__ == "__main__":
     raise SystemExit(main())
