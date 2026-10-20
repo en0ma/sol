@@ -66,7 +66,7 @@ def fetch_anchor_pool_hints(*, anchors=(SOL, USDC)):
             errors.append({"anchor": anchor, "error": str(exc)[:200]})
     return pools, errors
 
-def candidate_cycles(entries, *, starts=(SOL, USDC), max_cycles=MAX_CYCLES, include_cross_anchor=True):
+def candidate_cycles(entries, *, starts=(SOL, USDC), max_cycles=MAX_CYCLES):
     if type(max_cycles) is not int or not 1 <= max_cycles <= MAX_CYCLES:
         raise ValueError("cycle limit must be bounded")
     if len(entries) > MAX_POOLS:
@@ -97,7 +97,6 @@ def candidate_cycles(entries, *, starts=(SOL, USDC), max_cycles=MAX_CYCLES, incl
     for neighbors in adjacency.values():
         neighbors.sort(key=lambda e: (e[0], e[1]["venue"], e[1]["address"]))
     cycles = []
-    cross_anchor_paths = []
     identities = set()
     for start in dict.fromkeys(starts):
         if start not in adjacency:
@@ -105,16 +104,6 @@ def candidate_cycles(entries, *, starts=(SOL, USDC), max_cycles=MAX_CYCLES, incl
         def walk(token, path_tokens, legs, used):
             if len(cycles) >= max_cycles:
                 return
-            if len(legs) >= 1 and token in starts and token != start:
-                if include_cross_anchor and len(legs) >= 2 and len(cross_anchor_paths) < max_cycles:
-                    cross_anchor_paths.append({
-                        "tokens": path_tokens[:], "legs": legs[:], "hops": len(legs),
-                        "status": "UNVERIFIED_CROSS_ANCHOR_CONVERSION",
-                        "is_closed_arbitrage": False, "quote_verified": False,
-                        "simulation_verified": False, "actionable": False,
-                        "live_execution_approved": False, "broadcast": False})
-                # A cross-anchor path may also be the prefix of a closed
-                # triangular cycle. Keep traversing up to the hop limit.
             if len(legs) >= 2 and token == start:
                 sig = (start, tuple((leg["pool"], leg["from"], leg["to"])
                                     for leg in legs))
@@ -158,8 +147,6 @@ def candidate_cycles(entries, *, starts=(SOL, USDC), max_cycles=MAX_CYCLES, incl
         "cycles_returned": len(cycles),
         "truncated": len(cycles) == max_cycles,
         "cycles": cycles,
-        "cross_anchor_paths": cross_anchor_paths,
-        "cross_anchor_paths_returned": len(cross_anchor_paths),
         "actionable": False, "live_execution_approved": False, "broadcast": False,
         "note": "No cycle is executable without all-leg onchain verification, quotes, account setup, atomic signed simulation and settled-balance checks."
     }
