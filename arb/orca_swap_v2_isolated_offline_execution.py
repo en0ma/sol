@@ -158,9 +158,31 @@ def hydrate_and_attempt(rpc, input_path):
                     str(Pubkey.from_bytes(raw[32:64])) != str(signer.pubkey())):
                 raise ValueError("simulated token account mint or authority mismatch")
             post_balances.append(int.from_bytes(raw[64:72], "little"))
+    # simulateTransaction must not persist state. Read both user accounts back
+    # from the offline validator and compare against the provisioned balances.
+    live = call(rpc, "getMultipleAccounts", [
+        provision["addresses"], {"encoding": "base64", "commitment": "confirmed"}])
+    live_values = live.get("value") if isinstance(live, dict) else None
+    persistent_balances = []
+    if isinstance(live_values, list) and len(live_values) == 2:
+        for account, mint, program in zip(
+                live_values, payload["observed"]["mints"],
+                [m["owner"] for m in payload["observed"]["mint_accounts"]]):
+            if not isinstance(account, dict) or account.get("owner") != program:
+                raise ValueError("persistent offline token program mismatch")
+            encoded = account.get("data")
+            if not isinstance(encoded, list) or len(encoded) != 2 or encoded[1] != "base64":
+                raise ValueError("persistent offline token data missing")
+            raw = base64.b64decode(encoded[0], validate=True)
+            if (len(raw) < 165 or raw[108] != 1 or
+                    str(Pubkey.from_bytes(raw[:32])) != mint or
+                    str(Pubkey.from_bytes(raw[32:64])) != str(signer.pubkey())):
+                raise ValueError("persistent offline mint/authority mismatch")
+            persistent_balances.append(int.from_bytes(raw[64:72], "little"))
+    simulation_did_not_persist = persistent_balances == initial_balances
     signed_swap_verified = (
         value.get("err") is None and program_invoked and program_succeeded and
-        token_transfers >= 1 and len(post_balances) == 2 and
+        token_transfers >= 1 and simulation_did_not_persist and len(post_balances) == 2 and
         0 <= post_balances[0] < initial_balances[0] and
         post_balances[1] > initial_balances[1])
     return {"status": ("OFFLINE_SIGNED_SWAP_RECONCILED" if signed_swap_verified
@@ -169,6 +191,8 @@ def hydrate_and_attempt(rpc, input_path):
             "units_consumed": value.get("unitsConsumed"),
             "pre_user_balances_base_units": initial_balances,
             "post_user_balances_base_units": post_balances,
+            "persistent_user_balances_base_units": persistent_balances,
+            "simulation_did_not_persist": simulation_did_not_persist,
             "input_debit_base_units": initial_balances[0] - post_balances[0]
                 if len(post_balances) == 2 else None,
             "output_credit_base_units": post_balances[1] - initial_balances[1]
