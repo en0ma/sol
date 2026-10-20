@@ -20,13 +20,13 @@ class PublicPoolIndexTests(unittest.TestCase):
         def pair(dex, address, base=SOL, quote=USDC, chain="solana"):
             return {"chainId":chain,"dexId":dex,"pairAddress":address,
                     "baseToken":{"address":base},"quoteToken":{"address":quote}}
-        urlopen.return_value = FakeResponse({"pairs": [
+        urlopen.return_value = FakeResponse([
             pair("orca", ORCA), pair("orca", ORCA),
             pair("raydium", RAY, USDC, SOL),
             pair("raydium", ORCA, base="WrongMint"),
             pair("orca", RAY, chain="ethereum"),
             pair("unknown", ORCA),
-            pair("orca", "not-a-valid-pubkey")]})
+            pair("orca", "not-a-valid-pubkey")])
         result = indexed_candidates()
         self.assertEqual(result, {"orca":[ORCA], "raydium_cpmm":[RAY]})
 
