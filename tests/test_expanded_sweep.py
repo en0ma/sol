@@ -6,7 +6,7 @@ class ExpandedSweepTests(unittest.TestCase):
         self.assertEqual(evaluate({"cross_venue_success":False})["reason"],"SWAP_FAILED_OR_UNCLOSED")
     def test_reason_for_loss(self):
         self.assertEqual(evaluate({"cross_venue_success":True,"residual_usdc_base_units":0,
-          "venues_executed":2,"net_wsol_change_lamports":-900})["reason"],"BELOW_MINIMUM_NET_PROFIT")
+          "venues_executed":2,"simulation_did_not_persist":True,"signed_simulation_requested":True,"net_wsol_change_lamports":-900})["reason"],"BELOW_MINIMUM_NET_PROFIT")
     @patch("arb.cross_venue_sweep.run")
     def test_best_excludes_failed(self,run):
         def fake(rpc,orca,raydium,max_wsol,size,reverse=False):
