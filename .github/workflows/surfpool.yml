@@ -318,6 +318,20 @@ jobs:
           path: ${{ runner.temp }}/token-cycle-graph.json
           if-no-files-found: error
 
+      - name: Verify closed token-cycle pool states
+        env:
+          TOKEN_GRAPH_CANDIDATES_REPORT: ${{ runner.temp }}/token-cycle-graph.json
+          TOKEN_GRAPH_VERIFICATION_REPORT: ${{ runner.temp }}/token-cycle-verified.json
+        run: python3 -m arb.token_cycle_verify
+
+      - name: Upload on-chain token-cycle pool verification
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: token-cycle-onchain-verification
+          path: ${{ runner.temp }}/token-cycle-verified.json
+          if-no-files-found: ignore
+
       - name: Discover and simulate bounded cross-venue pool combinations
         env:
           CROSS_VENUE_INDEX_ENABLED: "1"
