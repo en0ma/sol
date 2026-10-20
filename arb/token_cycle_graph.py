@@ -1,0 +1,109 @@
+"""Read-only graph enumeration of candidate atomic arbitrage cycles.
+
+Registry mint pairs are UNVERIFIED hints. This module does not quote swaps,
+authorize an executable route, or broadcast. Pool adapters must independently
+verify accounts and simulate every hop before calling a cycle actionable.
+"""
+import json
+from collections import defaultdict
+from pathlib import Path
+
+MAX_POOLS = 500
+MAX_CYCLES = 200
+SOL = "So11111111111111111111111111111111111111112"
+USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+
+def candidate_cycles(entries, *, starts=(SOL, USDC), max_cycles=MAX_CYCLES):
+    if type(max_cycles) is not int or not 1 <= max_cycles <= MAX_CYCLES:
+        raise ValueError("cycle limit must be bounded")
+    if len(entries) > MAX_POOLS:
+        raise ValueError("pool registry exceeds bounded graph")
+    adjacency = defaultdict(list)
+    rejected = []
+    seen = set()
+    for entry in entries:
+        if not isinstance(entry, dict):
+            rejected.append({"reason": "invalid registry entry"})
+            continue
+        address, venue, mints = entry.get("address"), entry.get("venue"), entry.get("mints")
+        if not isinstance(address, str) or not isinstance(venue, str) or (
+            not isinstance(mints, list) or len(mints) != 2 or
+            not all(isinstance(m, str) and m for m in mints) or mints[0] == mints[1]
+        ):
+            rejected.append({"address": address, "reason": "no valid two-token mint hint"})
+            continue
+        key = (venue, address)
+        if key in seen:
+            rejected.append({"address": address, "reason": "duplicate pool"})
+            continue
+        seen.add(key)
+        a, b = mints
+        pool = {"venue": venue, "address": address}
+        adjacency[a].append((b, pool))
+        adjacency[b].append((a, pool))
+    for neighbors in adjacency.values():
+        neighbors.sort(key=lambda e: (e[0], e[1]["venue"], e[1]["address"]))
+    cycles = []
+    identities = set()
+    for start in dict.fromkeys(starts):
+        if start not in adjacency:
+            continue
+        def walk(token, path_tokens, legs, used):
+            if len(cycles) >= max_cycles:
+                return
+            if len(legs) >= 2 and token == start:
+                sig = (start, tuple((leg["pool"], leg["from"], leg["to"])
+                                    for leg in legs))
+                if sig not in identities:
+                    identities.add(sig)
+                    cycles.append({
+                        "tokens": path_tokens[:],
+                        "legs": legs[:],
+                        "hops": len(legs),
+                        "venues": sorted({leg["venue"] for leg in legs}),
+                        "status": "UNVERIFIED_GRAPH_CANDIDATE",
+                        "quote_verified": False,
+                        "simulation_verified": False,
+                        "actionable": False,
+                        "live_execution_approved": False,
+                        "broadcast": False,
+                    })
+                return
+            if len(legs) >= 3 or (token in path_tokens[:-1]):
+                return
+            for destination, pool in adjacency[token]:
+                if len(cycles) >= max_cycles:
+                    return
+                identity = (pool["venue"], pool["address"])
+                if identity in used:
+                    continue
+                if destination == start and len(legs) < 1:
+                    continue
+                if destination != start and destination in path_tokens:
+                    continue
+                leg = {"venue": pool["venue"], "pool": pool["address"],
+                       "from": token, "to": destination}
+                walk(destination, path_tokens + [destination],
+                     legs + [leg], used | {identity})
+        walk(start, [start], [], set())
+    return {
+        "status": "UNVERIFIED_GRAPH_CANDIDATES",
+        "source": "REPOSITORY_REGISTRY_MINT_HINTS",
+        "pool_hints_with_mints": len(seen),
+        "rejected_hints": rejected,
+        "cycles_returned": len(cycles),
+        "truncated": len(cycles) == max_cycles,
+        "cycles": cycles,
+        "actionable": False, "live_execution_approved": False, "broadcast": False,
+        "note": "No cycle is executable without all-leg onchain verification, quotes, account setup, atomic signed simulation and settled-balance checks."
+    }
+
+def main():
+    with Path("arb/pool_registry.json").open() as stream:
+        entries = json.load(stream)["pools"]
+    report = candidate_cycles(entries)
+    print(json.dumps(report, indent=2))
+    return 0
+
+if __name__ == "__main__":
+    raise SystemExit(main())
