@@ -26,10 +26,22 @@ def pinned_fallback(rpc):
               "scan_coverage": "PINNED_ADDRESSES_ONLY",
               "broadcast": False, "actionable": False,
               "live_execution_approved": False, "routes": [], "rejections": []}
+    # Merge existing address manifests with the bounded repository registry.
+    # Mint hints do not establish authenticity: fetch_pool/verify_vaults do.
     with open("arb/whirlpool_pools.json") as f:
-        orca_addresses = [p["address"] for p in json.load(f)["pools"]][:MAX_ORCA]
+        primary_orca = [p["address"] for p in json.load(f)["pools"]]
     with open("arb/raydium_cpmm_pools.json") as f:
-        ray_addresses = [p["address"] for p in json.load(f)["pools"]][:MAX_RAYDIUM]
+        primary_ray = [p["address"] for p in json.load(f)["pools"]]
+    with open("arb/pool_registry.json") as f:
+        entries = json.load(f)["pools"]
+    orca_addresses = list(dict.fromkeys(primary_orca + [
+        p["address"] for p in entries
+        if p.get("venue") == "orca" and
+        (p.get("mints") is None or p["mints"] == [SOL, USDC])]))[:MAX_ORCA]
+    ray_addresses = list(dict.fromkeys(primary_ray + [
+        p["address"] for p in entries
+        if p.get("venue") == "raydium_cpmm" and
+        (p.get("mints") is None or p["mints"] == [SOL, USDC])]))[:MAX_RAYDIUM]
     valid_orca = []
     for address in orca_addresses:
         try:
@@ -53,6 +65,7 @@ def pinned_fallback(rpc):
             valid_ray.append(address)
         except (ValueError, KeyError, TypeError) as e:
             report["rejections"].append({"raydium": address, "reason": str(e)})
+    report["orca_addresses_checked"], report["raydium_addresses_checked"] = len(orca_addresses), len(ray_addresses)
     report["orca_verified"], report["raydium_verified"] = len(valid_orca), len(valid_ray)
     for pool in valid_orca:
         for ray in valid_ray:
