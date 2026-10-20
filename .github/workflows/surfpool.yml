@@ -1015,6 +1015,17 @@ jobs:
         run: |
           if [ -s "$RUNNER_TEMP/orca-isolated-state.json" ] && [ -s "$RUNNER_TEMP/orca-isolated-offline.pid" ]; then
             python3 -m arb.orca_swap_v2_isolated_offline_execution offline "$RUNNER_TEMP/orca-isolated-state.json" > "$RUNNER_TEMP/orca-isolated-attempt.json"
+            python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          report=json.loads((Path(os.environ["RUNNER_TEMP"])/"orca-isolated-attempt.json").read_text())
+          assert report.get("status")=="OFFLINE_SIGNED_SWAP_RECONCILED", report.get("status")
+          assert report.get("simulation_error") is None, report.get("simulation_error")
+          assert report.get("signed_simulation_verified") is True
+          assert report.get("broadcast") is False
+          assert report.get("actionable") is False
+          print("Signed offline SwapV2 token balance reconciliation verified")
+          PY
           else
             echo '{"status":"ISOLATED_FIXTURE_NOT_READY","signed_simulation_verified":false,"broadcast":false}' > "$RUNNER_TEMP/orca-isolated-attempt.json"
           fi
