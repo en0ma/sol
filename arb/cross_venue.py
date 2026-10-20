@@ -13,7 +13,7 @@ from arb.raydium_swap import instruction as raydium_instruction
 from arb.whirlpool_simulation import prepare_token_accounts,TOKEN_SPACE
 from arb.token_vaults import TOKEN_PROGRAM,decode_token_account
 
-def measure(value, max_input):
+def measure(value, max_input, *, expected_authority=None):
     if value.get("err") is not None: raise ValueError("simulation errored")
     logs=value.get("logs") or []
     for program in (ORCA,RAYDIUM):
@@ -31,6 +31,8 @@ def measure(value, max_input):
         if not isinstance(d,list) or len(d)!=2 or d[1]!="base64":raise ValueError("bad returned token encoding")
         account=decode_token_account(base64.b64decode(d[0],validate=True))
         if account["mint"]!=mint: raise ValueError("unexpected final mint")
+        if expected_authority is not None and account["authority"]!=expected_authority:
+            raise ValueError("final token account authority mismatch")
         amounts.append(account["amount_base_units"])
     if amounts[1]!=0:raise ValueError("USDC remains: route not closed")
     return {"starting_wsol_lamports":max_input,"final_wsol_lamports":amounts[0],
@@ -95,7 +97,7 @@ def run(rpc,orca_pool,raydium_pool,maximum_wsol_input=1000000,usdc_amount=10000,
         "transaction_bytes":len(wire),"local_only":True,
         "log_tail":(value.get("logs") or [])[-18:]}
     if value.get("err") is not None:return output
-    try:stats=measure(value,maximum_wsol_input)
+    try:stats=measure(value,maximum_wsol_input,expected_authority=str(payer.pubkey()))
     except ValueError as e:
         output["verification_error"]=str(e)
         return output
