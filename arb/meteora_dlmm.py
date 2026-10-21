@@ -15,6 +15,7 @@ def decode(raw):
     key=lambda off:b58(raw[off:off+32])
     result={"token_x_mint":key(88),"token_y_mint":key(120),
       "reserve_x":key(152),"reserve_y":key(184),
+      "oracle":key(552),
       "active_id":int.from_bytes(raw[76:80],"little",signed=True),
       "bin_step":int.from_bytes(raw[80:82],"little"),
       "status":raw[82],"version":raw[882],
