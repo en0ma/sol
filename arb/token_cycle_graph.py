@@ -177,16 +177,32 @@ def main():
     with Path("arb/pool_registry.json").open() as stream:
         entries = json.load(stream)["pools"]
     index_hints, index_errors = ([], [])
+    gecko_hints, gecko_errors = ([], [])
     if os.environ.get("TOKEN_GRAPH_INDEX_ENABLED") == "1":
         index_hints, index_errors = fetch_anchor_pool_hints()
-    report = candidate_cycles(entries + index_hints)
+    if os.environ.get("TOKEN_GRAPH_GECKO_ENABLED") == "1":
+        from arb.gecko_anchor_index import fetch_gecko_anchor_hints
+        gecko_hints, gecko_errors = fetch_gecko_anchor_hints()
+    # Deduplicate by venue+address before the 500-pool graph limit.
+    combined, seen = [], set()
+    for pool in entries + index_hints + gecko_hints:
+        identity = (pool.get("venue"), pool.get("address"))
+        if identity in seen:
+            continue
+        seen.add(identity)
+        combined.append(pool)
+    report = candidate_cycles(combined[:MAX_POOLS])
     report["registry_entries"] = len(entries)
     report["public_index_hints"] = len(index_hints)
+    report["gecko_index_hints"] = len(gecko_hints)
+    report["gecko_index_errors"] = gecko_errors
+    report["total_distinct_pool_hints"] = len(combined)
+    report["graph_pool_cap_reached"] = len(combined) > MAX_POOLS
     report["index_min_liquidity_usd"] = MIN_INDEX_LIQUIDITY_USD
     report["public_index_errors"] = index_errors
     report["index_coverage"] = "TWO_ANCHOR_BOUNDED_SAMPLE" if index_hints else "NONE"
-    if index_hints:
-        report["source"] = "REGISTRY_AND_UNTRUSTED_PUBLIC_INDEX"
+    if index_hints or gecko_hints:
+        report["source"] = "REGISTRY_AND_UNTRUSTED_PUBLIC_INDICES"
     print(json.dumps(report, indent=2))
     return 0
 
