@@ -10,10 +10,11 @@ def graph():
                     {"venue":"orca","pool":"b","from":USDC,"to":SOL}]}]}
 
 class TickPreflightTests(unittest.TestCase):
+    @patch("arb.token_cycle_tick_preflight.verify_oracle", return_value={"verified":True})
     @patch("arb.token_cycle_tick_preflight.inspect_swap_requirements")
     @patch("arb.token_cycle_tick_preflight.fetch_pool")
-    def test_each_leg_uses_mint_order_and_directional_ticks(self, fetch, inspect):
-        fetch.return_value={"token_mint_a":SOL,"token_mint_b":USDC}
+    def test_each_leg_uses_mint_order_and_directional_ticks(self, fetch, inspect, oracle):
+        fetch.return_value={"token_mint_a":SOL,"token_mint_b":USDC,"tick_spacing":64,"fee_tier_index_seed":64}
         inspect.return_value={"directions":{"a_to_b":{"available":True,"required_starts":[0,1,2]},
                                             "b_to_a":{"available":True,"required_starts":[3,4,5]}}}
         result=preflight("http://127.0.0.1:8899",graph())
@@ -23,10 +24,11 @@ class TickPreflightTests(unittest.TestCase):
         self.assertFalse(result["routes"][0]["signed_simulation_completed"])
         self.assertFalse(result["actionable"])
 
+    @patch("arb.token_cycle_tick_preflight.verify_oracle", return_value={"verified":True})
     @patch("arb.token_cycle_tick_preflight.inspect_swap_requirements")
     @patch("arb.token_cycle_tick_preflight.fetch_pool")
-    def test_one_missing_tick_blocks_cycle(self,fetch,inspect):
-        fetch.return_value={"token_mint_a":SOL,"token_mint_b":USDC}
+    def test_one_missing_tick_blocks_cycle(self,fetch,inspect,oracle):
+        fetch.return_value={"token_mint_a":SOL,"token_mint_b":USDC,"tick_spacing":64,"fee_tier_index_seed":64}
         inspect.return_value={"directions":{"a_to_b":{"available":True,"required_starts":[]},
                                             "b_to_a":{"available":False,"required_starts":[9]}}}
         result=preflight("http://127.0.0.1:8899",graph())
