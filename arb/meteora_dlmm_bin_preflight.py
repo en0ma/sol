@@ -55,3 +55,24 @@ def check_active_bin_array(rpc,pool):
         raise ValueError("active bin array index or parent pool mismatch")
     return dict(report,status="ACTIVE_BIN_ARRAY_AUTHENTICATED",
                 active_bin_array_byte_length=len(raw))
+
+def main():
+    import json
+    import os
+    from pathlib import Path
+    readiness=json.loads(Path(os.environ["TOKEN_MIXED_READINESS_REPORT"]).read_text())
+    target=readiness.get("first_dlmm_only_offline_target")
+    report={"status":"NO_VERIFIED_DLMM_TARGET","actionable":False,"broadcast":False,
+            "swap_instruction_supported":False}
+    if target:
+        legs=[leg for leg in target["legs"] if leg["venue"]=="meteora_dlmm"]
+        if len(legs)!=1:
+            raise ValueError("expected exactly one DLMM leg in selected target")
+        report=check_active_bin_array(
+            os.environ.get("SOLANA_RPC_URL","http://127.0.0.1:8899"),legs[0]["pool"])
+        report["target_tokens"]=target["tokens"]
+    Path(os.environ["TOKEN_DLMM_BIN_PREFLIGHT_REPORT"]).write_text(json.dumps(report,indent=2))
+    print(json.dumps(report,indent=2))
+
+if __name__=="__main__":
+    main()
