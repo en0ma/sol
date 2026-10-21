@@ -56,7 +56,7 @@ def verify_graph(rpc, graph):
                     raise ValueError("unsupported or mismatched pool program owner")
                 if owner == RAYDIUM_PROGRAM:
                     state = decode(raw)
-                    if verify_vaults(rpc, address, state).get("verified") is not True:
+                    if verify_vaults(rpc, address, state, expected_mints=None).get("verified") is not True:
                         raise ValueError("CPMM vaults not verified")
                     mints = frozenset((state["token_0_mint"], state["token_1_mint"]))
                 elif owner == raydium_clmm.PROGRAM:
