@@ -94,11 +94,21 @@ def simulate_cycle(rpc, route):
         route,states,oracles,{mint:str(key.pubkey()) for mint,key in accounts.items()},
         str(payer.pubkey()),list(TEST_INPUTS),[1,1,1])
     bh=call(rpc,"getLatestBlockhash")["value"]["blockhash"]
+    # Measure the only safe next architecture: all account setup happens in
+    # a separately isolated OFFLINE fixture, never the mainnet-backed fork.
+    # This is size evidence only; it does not fund or create those accounts.
+    swap_only_tx = Transaction.new_signed_with_payer(
+        swaps, payer.pubkey(), [payer], Hash.from_string(bh))
+    swap_only_bytes = len(bytes(swap_only_tx))
     tx=Transaction.new_signed_with_payer(
         setup+swaps,payer.pubkey(),[payer,*accounts.values()],Hash.from_string(bh))
     wire = bytes(tx)
     oversized = transaction_size_block(len(wire))
     if oversized is not None:
+        oversized["swap_only_transaction_bytes"] = swap_only_bytes
+        oversized["swap_only_fits_limit"] = swap_only_bytes <= MAX_TRANSACTION_BYTES
+        oversized["offline_fixture_required"] = True
+        oversized["fixture_prepared"] = False
         return oversized
     encoded=base64.b64encode(wire).decode()
     ephemeral_addresses=[str(accounts[m].pubkey()) for m in tokens[:-1]]
