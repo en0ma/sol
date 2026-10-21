@@ -58,7 +58,10 @@ def assess_mixed_routes(verified):
         len(item["legs"]),
         tuple(item["missing_venues"]),
         tuple((leg["venue"],leg["pool"]) for leg in item["legs"])))
-    priority_target = next((item for item in prioritized\n        if item["missing_venues"] == ["meteora_dlmm"]\n        and item["tokens"][0] in (SOL,USDC)), None)\n    prioritized_total=len(prioritized)
+    priority_target = next((item for item in prioritized
+        if item["missing_venues"] == ["meteora_dlmm"]
+        and item["tokens"][0] in (SOL,USDC)), None)
+    prioritized_total=len(prioritized)
     prioritized=prioritized[:MAX_REPORT_ROUTES]
     return {"status":"MIXED_ROUTE_BUILDER_READINESS_ONLY",
             "prioritized_candidate_total":prioritized_total,
