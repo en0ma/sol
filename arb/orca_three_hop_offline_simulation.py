@@ -24,6 +24,8 @@ LOADER = "BPFLoaderUpgradeab1e11111111111111111111111"
 SYSTEM = "11111111111111111111111111111111"
 MAX_BYTES = 1232
 INITIAL_WSOL = 1000000
+TEST_SIZES = (100000, 1000000, 5000000)
+MAX_TEST_SIZES = 3
 
 def assess_cycle_economics(initial_lamports, final_lamports, network_fee):
     """Pure, conservative WSOL-denominated accounting; never approves execution."""
@@ -50,7 +52,7 @@ def offline_gate(rpc):
     if os.environ.get("SURFPOOL_EXPLICITLY_OFFLINE") != "1":
         raise ValueError("offline fixture writes prohibited without explicit offline opt-in")
 
-def quote_hops_offline(rpc, route, states, oracles, user_accounts, signer):
+def quote_hops_offline(rpc, route, states, oracles, user_accounts, signer, input_lamports=INITIAL_WSOL):
     """Probe exact-input quantities, funding only disposable offline token accounts.
 
     Each hop is simulated against its own authenticated pool snapshot. These
@@ -61,7 +63,7 @@ def quote_hops_offline(rpc, route, states, oracles, user_accounts, signer):
     offline_gate(rpc)
     legs, tokens = route["legs"], route["tokens"]
     amounts = []
-    current_amount = INITIAL_WSOL
+    current_amount = input_lamports
     probes = []
     for i, leg in enumerate(legs):
         if current_amount <= 0:
@@ -120,7 +122,9 @@ def quote_hops_offline(rpc, route, states, oracles, user_accounts, signer):
             "owner":TOKEN_PROGRAM,"executable":False}])
     return amounts, probes
 
-def hydrate_and_simulate(rpc, fixture):
+def hydrate_and_simulate(rpc, fixture, input_lamports=INITIAL_WSOL):
+    if type(input_lamports) is not int or not 0 < input_lamports <= 100000000:
+        raise ValueError("bounded positive input amount required")
     offline_gate(rpc)
     if fixture.get("source") != "READ_ONLY_MAINNET_BACKED_SURFPOOL":
         raise ValueError("untrusted fixture provenance")
@@ -172,7 +176,7 @@ def hydrate_and_simulate(rpc, fixture):
         if not isinstance(mint_info,dict) or mint_info["owner"] != TOKEN_PROGRAM:
             raise ValueError("unsupported non-classic SPL intermediate token: "+mint)
         address=str(Keypair().pubkey())
-        amount=INITIAL_WSOL if mint==SOL else 0
+        amount=input_lamports if mint==SOL else 0
         call(rpc,"surfnet_setAccount",[address,{
             "lamports":2039280,
             "data":token_account_bytes(mint,str(signer.pubkey()),amount).hex(),
@@ -191,7 +195,7 @@ def hydrate_and_simulate(rpc, fixture):
             adaptive_fee=state["tick_spacing"]!=state["fee_tier_index_seed"])
     try:
         quoted_amounts, quote_probes = quote_hops_offline(
-            rpc,route,states,oracles,user_accounts,signer)
+            rpc,route,states,oracles,user_accounts,signer,input_lamports)
     except ValueError as exc:
         return {"status":"CHAINED_QUOTE_BLOCKED","reason":str(exc)[:500],
                 "fixture_hydrated":True,"signed_simulation_requested":False,
@@ -202,6 +206,7 @@ def hydrate_and_simulate(rpc, fixture):
     tx=Transaction.new_signed_with_payer(swaps,signer.pubkey(),[signer],Hash.from_string(bh))
     wire=bytes(tx)
     result={"status":"SIMULATION_NOT_ATTEMPTED","route":tokens,
+            "input_wsol_lamports":input_lamports,
             "independent_hop_quote_probes":quote_probes,
             "transaction_bytes":len(wire),"fixture_hydrated":True,
             "signed_simulation_requested":False,"actionable":False,
@@ -225,7 +230,7 @@ def hydrate_and_simulate(rpc, fixture):
             amounts[mint]=decoded["amount_base_units"]
         return amounts
     before=balances()
-    if any(before[t]!=(INITIAL_WSOL if t==SOL else 0) for t in tokens[:-1]):
+    if any(before[t]!=(input_lamports if t==SOL else 0) for t in tokens[:-1]):
         raise ValueError("offline fixture not at exact initial balances")
     resp=call(rpc,"simulateTransaction",[base64.b64encode(wire).decode(),{
         "encoding":"base64","sigVerify":True,"replaceRecentBlockhash":False,
@@ -268,7 +273,7 @@ def hydrate_and_simulate(rpc, fixture):
         result["status"]="RESIDUAL_INTERMEDIATE_TOKENS"
     else:
         result["status"]="ATOMIC_SWAP_SIMULATED_NOT_PROFIT_VALIDATED"
-        result["net_wsol_before_fees"]=final[SOL]-INITIAL_WSOL
+        result["net_wsol_before_fees"]=final[SOL]-input_lamports
         try:
             fee_response=call(rpc,"getFeeForMessage",[
                 base64.b64encode(bytes(tx.message)).decode()])
@@ -277,22 +282,43 @@ def hydrate_and_simulate(rpc, fixture):
                 fee=None
         except (RPCError,ValueError,KeyError,TypeError,OSError,TimeoutError):
             fee=None
-        result["economics"]=assess_cycle_economics(INITIAL_WSOL,final[SOL],fee)
+        result["economics"]=assess_cycle_economics(input_lamports,final[SOL],fee)
         result["status"]=result["economics"]["status"]
     return result
 
 def main():
-    report={"status":"OFFLINE_SIMULATION_NOT_STARTED","broadcast":False,
+    report={"status":"OFFLINE_SIZE_SWEEP_NOT_STARTED","broadcast":False,
             "actionable":False,"live_execution_approved":False}
     try:
-        offline_gate(os.environ.get("SOLANA_RPC_URL","http://127.0.0.1:8899"))
-        report=hydrate_and_simulate(os.environ.get("SOLANA_RPC_URL","http://127.0.0.1:8899"),
-                                   json.loads(Path(sys.argv[1]).read_text()))
+        rpc=os.environ.get("SOLANA_RPC_URL","http://127.0.0.1:8899")
+        offline_gate(rpc)
+        fixture=json.loads(Path(sys.argv[1]).read_text())
+        selected=TEST_SIZES
+        if len(sys.argv)>3:
+            selected=tuple(int(x) for x in sys.argv[3].split(","))
+        if not 1 <= len(selected) <= MAX_TEST_SIZES or len(set(selected))!=len(selected):
+            raise ValueError("one to three unique sizes required")
+        results=[]
+        for size in selected:
+            try:
+                results.append(hydrate_and_simulate(rpc,fixture,size))
+            except (RPCError,ValueError,KeyError,TypeError,OSError,TimeoutError) as exc:
+                results.append({"status":"OFFLINE_SIZE_BLOCKED","input_wsol_lamports":size,
+                                "reason":str(exc)[:500],"broadcast":False,"actionable":False})
+        report={"status":"OFFLINE_SIZE_SWEEP_RECORDED",
+                "sizes_tested_lamports":list(selected),"results":results,
+                "successful_atomic_simulations":sum(
+                    item.get("simulation_error") is None and
+                    item.get("whirlpool_successes")==3 and
+                    item.get("simulation_did_not_persist") is True
+                    and item.get("status") in ("SIMULATED_LOSS","SIMULATED_POSITIVE_NOT_ACTIONABLE","UNVERIFIED_NET_PROFIT")
+                    for item in results),
+                "actionable":False,"live_execution_approved":False,"broadcast":False}
     except (RPCError,ValueError,KeyError,TypeError,OSError,TimeoutError) as exc:
-        report={"status":"OFFLINE_SIMULATION_BLOCKED","reason":str(exc)[:500],
+        report={"status":"OFFLINE_SIZE_SWEEP_BLOCKED","reason":str(exc)[:500],
                 "broadcast":False,"actionable":False,"live_execution_approved":False}
     Path(sys.argv[2]).write_text(json.dumps(report,indent=2))
-    print(json.dumps(report,indent=2))
+    print(json.dumps({k:v for k,v in report.items() if k!="results"},indent=2))
 
 if __name__=="__main__":
     main()
