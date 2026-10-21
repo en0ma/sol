@@ -1,0 +1,59 @@
+"""Fail-closed atomic instruction assembly for Orca Whirlpool and Raydium CPMM.
+
+Assembly only: independently verified account states, SPL user accounts,
+per-hop exact-input amounts, oracles and onchain quotes remain caller duties.
+Never broadcasts or authorizes live trading.
+"""
+from arb.orca_whirlpool import SOL, USDC
+from arb.whirlpool_swap import build_swap
+from arb.raydium_swap import instruction as build_cpmm
+from arb.token_vaults import TOKEN_PROGRAM
+
+MAX_HOPS=3
+
+def assemble_mixed_cycle(route, pool_states, oracles, user_accounts,
+                         authority, amounts, min_outputs):
+    legs=route.get("legs",[])
+    tokens=route.get("tokens",[])
+    if not 2<=len(legs)<=MAX_HOPS or len(tokens)!=len(legs)+1:
+        raise ValueError("two or three connected swap legs required")
+    if tokens[0] not in (SOL,USDC) or tokens[-1]!=tokens[0]:
+        raise ValueError("route must close in exact WSOL or USDC starting mint")
+    if len(set((leg["venue"],leg["pool"]) for leg in legs))!=len(legs):
+        raise ValueError("pool reuse disabled")
+    if len(amounts)!=len(legs) or len(min_outputs)!=len(legs):
+        raise ValueError("per-hop quantities required")
+    if not isinstance(authority,str) or not authority or any(t not in user_accounts for t in tokens):
+        raise ValueError("missing authority or user token account")
+    instructions=[]
+    for i,leg in enumerate(legs):
+        source,target=tokens[i:i+2]
+        if (leg.get("from"),leg.get("to"))!=(source,target):
+            raise ValueError("graph leg disconnected")
+        amount,threshold=amounts[i],min_outputs[i]
+        if any(type(x) is not int or not 0<x<1<<64 for x in (amount,threshold)):
+            raise ValueError("invalid per-hop exact-input amount or nonzero minimum")
+        state=pool_states[leg["pool"]]
+        venue=leg.get("venue")
+        if venue=="orca":
+            a,b=state["token_mint_a"],state["token_mint_b"]
+            if (source,target)!=(a,b) and (source,target)!=(b,a):
+                raise ValueError("Orca onchain pool mints disagree")
+            instructions.append(build_swap(
+                leg["pool"],state,authority,user_accounts[a],user_accounts[b],
+                oracles[leg["pool"]],amount,threshold,
+                a_to_b=source==a,amount_specified_is_input=True))
+        elif venue=="raydium_cpmm":
+            a,b=state["token_0_mint"],state["token_1_mint"]
+            if (source,target)!=(a,b) and (source,target)!=(b,a):
+                raise ValueError("CPMM onchain pool mints disagree")
+            if state["token_0_program"]!=TOKEN_PROGRAM or state["token_1_program"]!=TOKEN_PROGRAM:
+                raise ValueError("unsupported CPMM token program")
+            # Raydium accounts are passed in INPUT/OUTPUT order, unlike Orca.
+            instructions.append(build_cpmm(
+                leg["pool"],state,authority,user_accounts[source],user_accounts[target],
+                amount,threshold,input_is_token_0=source==a,exact_output=False,
+                expected_mints=None))
+        else:
+            raise ValueError("unsupported executable venue: "+str(venue))
+    return instructions
