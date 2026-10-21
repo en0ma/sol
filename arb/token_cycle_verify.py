@@ -11,8 +11,9 @@ from arb.rpc import call, RPCError
 from arb.orca_whirlpool import fetch_pool, SOL, USDC
 from arb.raydium_cpmm import PROGRAM as RAYDIUM_PROGRAM, decode, verify_vaults
 from arb.orca_swap_v2_local_token_accounts import require_loopback_rpc
+from arb import raydium_clmm, meteora_dlmm
 
-MAX_UNIQUE_POOLS = 60
+MAX_UNIQUE_POOLS = 80
 
 def verify_graph(rpc, graph):
     require_loopback_rpc(rpc)
@@ -33,17 +34,39 @@ def verify_graph(rpc, graph):
             if venue == "orca":
                 state = fetch_pool(rpc, address)
                 mints = frozenset((state["token_mint_a"], state["token_mint_b"]))
-            elif venue == "raydium_cpmm":
-                info = call(rpc, "getAccountInfo", [address, {"encoding": "base64"}])["value"]
-                if not info or info.get("owner") != RAYDIUM_PROGRAM or info.get("executable"):
-                    raise ValueError("invalid Raydium CPMM program owner")
-                data = info.get("data")
-                if not isinstance(data, list) or len(data) != 2 or data[1] != "base64":
-                    raise ValueError("bad CPMM base64 response")
-                state = decode(base64.b64decode(data[0], validate=True))
-                if verify_vaults(rpc, address, state).get("verified") is not True:
-                    raise ValueError("CPMM vaults not verified")
-                mints = frozenset((state["token_0_mint"], state["token_1_mint"]))
+            elif venue in ("raydium_cpmm", "raydium_unclassified",
+                           "raydium_clmm", "meteora_unclassified", "meteora_dlmm"):
+                info = call(rpc, "getAccountInfo",
+                            [address, {"encoding": "base64", "commitment": "confirmed"}])["value"]
+                if not info or info.get("executable"):
+                    raise ValueError("pool missing or executable")
+                owner = info.get("owner")
+                payload = info.get("data")
+                if not isinstance(payload, list) or len(payload) != 2 or payload[1] != "base64":
+                    raise ValueError("invalid pool encoding")
+                raw = base64.b64decode(payload[0], validate=True)
+                allowed = {
+                    "raydium_cpmm": {RAYDIUM_PROGRAM},
+                    "raydium_clmm": {raydium_clmm.PROGRAM},
+                    "raydium_unclassified": {RAYDIUM_PROGRAM, raydium_clmm.PROGRAM},
+                    "meteora_dlmm": {meteora_dlmm.PROGRAM},
+                    "meteora_unclassified": {meteora_dlmm.PROGRAM},
+                }
+                if owner not in allowed[venue]:
+                    raise ValueError("unsupported or mismatched pool program owner")
+                if owner == RAYDIUM_PROGRAM:
+                    state = decode(raw)
+                    if verify_vaults(rpc, address, state).get("verified") is not True:
+                        raise ValueError("CPMM vaults not verified")
+                    mints = frozenset((state["token_0_mint"], state["token_1_mint"]))
+                elif owner == raydium_clmm.PROGRAM:
+                    state = raydium_clmm.decode(raw)
+                    raydium_clmm.verify(rpc, address, state)
+                    mints = frozenset((state["token_mint_0"], state["token_mint_1"]))
+                else:
+                    state = meteora_dlmm.decode(raw)
+                    meteora_dlmm.verify(rpc, address, state)
+                    mints = frozenset((state["token_x_mint"], state["token_y_mint"]))
             else:
                 reason = "unsupported venue adapter"
             if reason is None and (len(mints) != 2 or mints not in pool_hints[(venue, address)]):
