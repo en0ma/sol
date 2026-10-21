@@ -51,8 +51,16 @@ def assess_mixed_routes(verified):
                            "unsupported_venues":sorted(venues-SUPPORTED_BUILDERS),
                            "signed_atomic_simulation_verified":False,
                            "actionable":False,"broadcast":False})
-    prioritized.sort(key=lambda item:(item["missing_venue_count"],\n                                        tuple(item["missing_venues"]),\n                                        tuple(item["tokens"])))
-    return {"status":"MIXED_ROUTE_BUILDER_READINESS_ONLY",\n            "missing_venue_counts":dict(sorted(missing_venue_counts.items())),\n            "missing_venue_combinations":[{"venues":list(k),"count":v}\n                for k,v in sorted(missing_venue_sets.items(),key=lambda x:(-x[1],x[0]))],\n            "supported_venue_combinations":[{"venues":list(k),"count":v}\n                for k,v in sorted(supported_venue_sets.items(),key=lambda x:(-x[1],x[0]))],\n            "candidate_routes_by_fewest_missing_builders":prioritized,
+    prioritized.sort(key=lambda item:(item["missing_venue_count"],
+                                        tuple(item["missing_venues"]),
+                                        tuple(item["tokens"])))
+    return {"status":"MIXED_ROUTE_BUILDER_READINESS_ONLY",
+            "missing_venue_counts":dict(sorted(missing_venue_counts.items())),
+            "missing_venue_combinations":[{"venues":list(k),"count":v}
+                for k,v in sorted(missing_venue_sets.items(),key=lambda x:(-x[1],x[0]))],
+            "supported_venue_combinations":[{"venues":list(k),"count":v}
+                for k,v in sorted(supported_venue_sets.items(),key=lambda x:(-x[1],x[0]))],
+            "candidate_routes_by_fewest_missing_builders":prioritized,
             "verified_cross_venue_cycles":counts["verified_cross_venue"],
             "verified_cross_venue_with_builder_types":counts["available_builder_types"],
             "verified_cross_venue_missing_builder_types":counts["unsupported_builder_types"],
