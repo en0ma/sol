@@ -55,7 +55,15 @@ def hydrate_and_simulate(rpc, fixture):
         raise ValueError("invalid authenticated programdata")
     # All fixture state mutations are local cheatcodes on explicitly offline Surfpool.
     for address, info in accounts.items():
-        if address in (PROGRAM,programdata_key) or info is None:
+        if address in (PROGRAM,programdata_key):
+            continue
+        if info is None:
+            # A non-adaptive Whirlpool oracle PDA may be absent in the
+            # authenticated fork; the legacy swap leaves it unchecked.
+            from arb.whirlpool_preflight import oracle_address
+            known_oracles={oracle_address(leg["pool"]) for leg in legs}
+            if address not in known_oracles:
+                raise ValueError("missing non-oracle authenticated state: " + address)
             continue
         data = info["data"]
         if not isinstance(data,list) or data[1] != "base64":
