@@ -5,6 +5,7 @@ No swap is quoted or simulated. Does not fabricate unsupported program adapters.
 import json
 import os
 from collections import Counter
+from arb.orca_whirlpool import SOL, USDC
 
 SUPPORTED_BUILDERS = frozenset(("orca", "raydium_cpmm"))
 MAX_REPORT_ROUTES = 50
@@ -51,13 +52,17 @@ def assess_mixed_routes(verified):
                            "unsupported_venues":sorted(venues-SUPPORTED_BUILDERS),
                            "signed_atomic_simulation_verified":False,
                            "actionable":False,"broadcast":False})
-    prioritized.sort(key=lambda item:(item["missing_venue_count"],
-                                        tuple(item["missing_venues"]),
-                                        tuple(item["tokens"])))
-    prioritized_total=len(prioritized)
+    prioritized.sort(key=lambda item:(
+        item["missing_venue_count"],
+        0 if item["tokens"][0]==SOL else 1 if item["tokens"][0]==USDC else 2,
+        len(item["legs"]),
+        tuple(item["missing_venues"]),
+        tuple((leg["venue"],leg["pool"]) for leg in item["legs"])))
+    priority_target = next((item for item in prioritized\n        if item["missing_venues"] == ["meteora_dlmm"]\n        and item["tokens"][0] in (SOL,USDC)), None)\n    prioritized_total=len(prioritized)
     prioritized=prioritized[:MAX_REPORT_ROUTES]
     return {"status":"MIXED_ROUTE_BUILDER_READINESS_ONLY",
             "prioritized_candidate_total":prioritized_total,
+            "first_dlmm_only_offline_target":priority_target,
             "prioritized_candidates_truncated":prioritized_total>MAX_REPORT_ROUTES,
             "missing_venue_counts":dict(sorted(missing_venue_counts.items())),
             "missing_venue_combinations":[{"venues":list(k),"count":v}
