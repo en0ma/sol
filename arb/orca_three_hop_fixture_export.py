@@ -17,8 +17,9 @@ from arb.orca_swap_v2_isolated_offline_execution import fetch_accounts
 
 LOADER = "BPFLoaderUpgradeab1e11111111111111111111111"
 MAX_FIXTURE_ACCOUNTS = 45
+MAX_DISTINCT_ROUTES = 3
 
-def export_cycle(rpc, preflight, output):
+def export_cycle(rpc, preflight, output, route_index=0):
     require_loopback_rpc(rpc)
     eligible = [r for r in preflight.get("routes", [])
                 if r.get("all_directional_tick_arrays_ready")
@@ -27,7 +28,9 @@ def export_cycle(rpc, preflight, output):
                 and r["tokens"][-1] == SOL]
     if not eligible:
         return {"status": "NO_VERIFIED_THREE_HOP_ORCA_FIXTURE", "broadcast": False}
-    route = eligible[0]
+    if not 0 <= route_index < len(eligible):
+        raise ValueError("route index outside verified fixture candidates")
+    route = eligible[route_index]
     accounts_to_read = [PROGRAM]
     optional_oracles = set()
     for i, leg in enumerate(route["legs"]):
@@ -86,8 +89,31 @@ def main():
     with open(os.environ["TOKEN_CYCLE_TICK_PREFLIGHT_REPORT"]) as stream:
         ready=json.load(stream)
     target=os.environ["TOKEN_CYCLE_FIXTURE_EXPORT_REPORT"]
-    report=export_cycle(os.environ.get("SOLANA_RPC_URL","http://127.0.0.1:8899"),ready,target)
-    print(json.dumps(report,indent=2))
+    rpc=os.environ.get("SOLANA_RPC_URL","http://127.0.0.1:8899")
+    eligible=[r for r in ready.get("routes",[]) if r.get("all_directional_tick_arrays_ready")
+              and len(r.get("legs",[]))==3 and r.get("tokens",[None])[0]==SOL
+              and r["tokens"][-1]==SOL]
+    selected=[]
+    distinct=set()
+    # Select distinct three-pool sets, not reversed permutations of one route.
+    for i,route in enumerate(eligible):
+        key=frozenset(leg["pool"] for leg in route["legs"])
+        if key in distinct:
+            continue
+        distinct.add(key)
+        selected.append(i)
+        if len(selected)>=MAX_DISTINCT_ROUTES:
+            break
+    reports=[]
+    for number,index in enumerate(selected):
+        destination=target if number==0 else target.removesuffix(".json")+"-"+str(number)+".json"
+        try:
+            reports.append(export_cycle(rpc,ready,destination,route_index=index))
+        except (ValueError,KeyError,TypeError,OSError,TimeoutError) as exc:
+            reports.append({"status":"THREE_HOP_EXPORT_BLOCKED","route_index":index,
+                            "reason":str(exc)[:240],"broadcast":False})
+    print(json.dumps({"routes_selected":len(selected),"exports":reports,
+                      "broadcast":False},indent=2))
 
 if __name__=="__main__":
     main()
