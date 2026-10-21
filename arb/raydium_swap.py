@@ -30,6 +30,8 @@ def instruction(pool,state,authority,user_a,user_b,amount_in,min_output,input_is
         raise ValueError("duplicate Raydium token mint")
     if expected_mints is not None and set(actual)!=set(expected_mints):
         raise ValueError("unexpected token pair")
+    if expected_mints == (SOL,USDC) and actual != (SOL,USDC):
+        raise ValueError("legacy WSOL/USDC caller requires WSOL token0")
     if state["token_0_program"]!=TOKEN_PROGRAM or state["token_1_program"]!=TOKEN_PROGRAM:
         raise ValueError("only classic SPL token programs supported")
     if state.get("swap_enabled") is not True:
