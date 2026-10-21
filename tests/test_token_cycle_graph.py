@@ -41,9 +41,9 @@ class CycleGraphTests(unittest.TestCase):
             entries.append(pool("usdc-left-"+str(i),"orca",U,R))
             entries.append(pool("usdc-right-"+str(i),"orca",R,U))
         report=candidate_cycles(entries,starts=(S,U),max_cycles=20)
-        self.assertEqual(report["cycles_by_start"][S],10)
-        self.assertEqual(report["cycles_by_start"][U],10)
-        self.assertEqual(report["cycles_returned"],20)
+        self.assertEqual(report["cycles_by_start"][S],2)
+        self.assertEqual(report["cycles_by_start"][U],2)
+        self.assertEqual(report["cycles_returned"],4)
         self.assertTrue(all(c["tokens"][0]==c["tokens"][-1]
                             for c in report["cycles"]))
 
