@@ -198,6 +198,17 @@ def main():
     report["gecko_index_errors"] = gecko_errors
     report["total_distinct_pool_hints"] = len(combined)
     report["graph_pool_cap_reached"] = len(combined) > MAX_POOLS
+    report["pool_hint_counts_by_venue"] = {
+        venue: sum(p.get("venue") == venue for p in combined)
+        for venue in sorted({p.get("venue") for p in combined if p.get("venue")})
+    }
+    report["distinct_anchor_partner_tokens"] = {
+        anchor: len({other for p in combined
+                     for mints in [p.get("mints")]
+                     if isinstance(mints, list) and len(mints) == 2 and anchor in mints
+                     for other in mints if other != anchor})
+        for anchor in (SOL, USDC)
+    }
     report["index_min_liquidity_usd"] = MIN_INDEX_LIQUIDITY_USD
     report["public_index_errors"] = index_errors
     report["index_coverage"] = "TWO_ANCHOR_BOUNDED_SAMPLE" if index_hints else "NONE"
