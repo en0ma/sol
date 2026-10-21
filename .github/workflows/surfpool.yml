@@ -12,6 +12,7 @@ concurrency:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   surfpool-smoke-test:
@@ -1149,8 +1150,6 @@ jobs:
           if-no-files-found: ignore
 
   orca-three-hop-offline:
-    needs: mainnet-fork-probe
-    if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -1158,12 +1157,24 @@ jobs:
       SURFPOOL_EXPLICITLY_OFFLINE: "1"
     steps:
       - uses: actions/checkout@v4
-      - name: Download read-only fixture from mainnet-backed job
-        uses: actions/download-artifact@v4
-        continue-on-error: true
-        with:
-          name: orca-three-hop-readonly-fixture
-          path: ${{ runner.temp }}/orca-three-hop-export
+      - name: Wait for read-only fixture artifact without blocking on full fork job
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/orca-three-hop-export"
+          for attempt in $(seq 1 90); do
+            id=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" \
+              --jq '.artifacts[] | select(.name == "orca-three-hop-readonly-fixture") | .id' | head -n 1) || true
+            if [ -n "$id" ]; then
+              gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" > "$RUNNER_TEMP/orca-fixture.zip"
+              unzip -q "$RUNNER_TEMP/orca-fixture.zip" -d "$RUNNER_TEMP/orca-three-hop-export"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Read-only three-hop fixture not available in bounded interval" >&2
       - name: Install simulation dependency
         run: python3 -m pip install --disable-pip-version-check solders==0.26.0
       - name: Install Surfpool for disposable offline instance
