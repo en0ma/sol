@@ -85,9 +85,18 @@ def simulate_cycle(rpc, route):
     tx=Transaction.new_signed_with_payer(
         setup+swaps,payer.pubkey(),[payer,*accounts.values()],Hash.from_string(bh))
     encoded=base64.b64encode(bytes(tx)).decode()
+    ephemeral_addresses=[str(accounts[m].pubkey()) for m in tokens[:-1]]
+    def assert_accounts_absent():
+        found=call(rpc,"getMultipleAccounts",[ephemeral_addresses,{"encoding":"base64"}])
+        values=found.get("value")
+        if not isinstance(values,list) or len(values)!=3 or any(v is not None for v in values):
+            raise ValueError("ephemeral accounts persisted or could not be checked")
+    assert_accounts_absent()
     response=call(rpc,"simulateTransaction",[encoded,{
         "encoding":"base64","sigVerify":True,"commitment":"processed",
         "accounts":{"encoding":"base64","addresses":[str(accounts[m].pubkey()) for m in tokens[:-1]]}}])
+    assert_accounts_absent()
+    result["simulation_did_not_persist"]=True
     value=response["value"]
     result["signed_simulation_requested"]=True
     result["simulation_error"]=value.get("err")
