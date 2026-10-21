@@ -7,6 +7,7 @@ import json
 import os
 from arb.orca_whirlpool import fetch_pool
 from arb.whirlpool_swap import inspect_swap_requirements
+from arb.whirlpool_preflight import verify_oracle
 from arb.orca_swap_v2_local_token_accounts import require_loopback_rpc
 from arb.rpc import RPCError
 
@@ -36,13 +37,21 @@ def preflight(rpc, verified):
                     raise ValueError("on-chain mint order disagrees with leg")
                 readiness = inspect_swap_requirements(rpc, leg["pool"])
                 ready = readiness["directions"][direction]["available"] is True
+                oracle = verify_oracle(
+                    rpc, leg["pool"],
+                    adaptive_fee=state["tick_spacing"] != state["fee_tier_index_seed"])
+                if not oracle:
+                    raise ValueError("Orca oracle verification returned no evidence")
                 checks.append({"pool": leg["pool"], "direction": direction,
                                "tick_arrays_ready": ready,
+                               "oracle_verified": True,
                                "required_starts": readiness["directions"][direction]["required_starts"]})
             except (ValueError, KeyError, TypeError, RPCError, TimeoutError, OSError) as exc:
                 checks.append({"pool": leg["pool"], "tick_arrays_ready": False,
+                               "oracle_verified": False,
                                "error": str(exc)[:240]})
-        all_ready = len(checks) == len(legs) and all(c["tick_arrays_ready"] for c in checks)
+        all_ready = len(checks) == len(legs) and all(
+            c["tick_arrays_ready"] and c["oracle_verified"] for c in checks)
         result["routes"].append({
             "tokens": tokens, "legs": legs, "checks": checks,
             "all_directional_tick_arrays_ready": all_ready,
@@ -50,6 +59,7 @@ def preflight(rpc, verified):
             "signed_simulation_completed": False,
             "actionable": False, "live_execution_approved": False, "broadcast": False})
     result["routes_checked"] = len(result["routes"])
+    result["oracle_verification_required"] = True
     result["routes_with_ready_ticks"] = sum(r["all_directional_tick_arrays_ready"] for r in result["routes"])
     return result
 
