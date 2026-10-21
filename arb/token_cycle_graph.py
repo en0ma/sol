@@ -12,6 +12,7 @@ from collections import defaultdict
 from pathlib import Path
 
 MAX_POOLS = 500
+MIN_INDEX_LIQUIDITY_USD = 50000
 MAX_CYCLES = 200
 SOL = "So11111111111111111111111111111111111111112"
 USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
@@ -44,6 +45,13 @@ def fetch_anchor_pool_hints(*, anchors=(SOL, USDC)):
                 mints = [base.get("address"), quote.get("address")]
                 if anchor not in mints or len(set(mints)) != 2:
                     continue
+                liquidity = item.get("liquidity")
+                try:
+                    usd_liquidity = float(liquidity["usd"])
+                except (ValueError, TypeError, KeyError):
+                    continue
+                if not MIN_INDEX_LIQUIDITY_USD <= usd_liquidity < float("inf"):
+                    continue
                 venue = venues.get(str(item.get("dexId", "")).lower())
                 address = item.get("pairAddress")
                 if not venue or not isinstance(address, str):
@@ -61,7 +69,8 @@ def fetch_anchor_pool_hints(*, anchors=(SOL, USDC)):
                 if len(pools) >= 300:
                     break
                 pools.append({"venue": venue, "address": address,
-                              "mints": mints, "candidate_source": "UNTRUSTED_PUBLIC_INDEX"})
+                              "mints": mints, "index_liquidity_usd": usd_liquidity,
+                              "candidate_source": "UNTRUSTED_PUBLIC_INDEX"})
         except (OSError, TimeoutError, ValueError) as exc:
             errors.append({"anchor": anchor, "error": str(exc)[:200]})
     return pools, errors
@@ -173,6 +182,7 @@ def main():
     report = candidate_cycles(entries + index_hints)
     report["registry_entries"] = len(entries)
     report["public_index_hints"] = len(index_hints)
+    report["index_min_liquidity_usd"] = MIN_INDEX_LIQUIDITY_USD
     report["public_index_errors"] = index_errors
     report["index_coverage"] = "TWO_ANCHOR_BOUNDED_SAMPLE" if index_hints else "NONE"
     if index_hints:
