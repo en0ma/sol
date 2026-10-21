@@ -95,12 +95,14 @@ def main():
               and r["tokens"][-1]==SOL]
     selected=[]
     distinct=set()
-    # Select distinct three-pool sets, not reversed permutations of one route.
+    pool_sets=set()
+    # Distinct directed paths are economically different even when reversing\n    # the same three pools; report pool-set diversity separately.
     for i,route in enumerate(eligible):
-        key=frozenset(leg["pool"] for leg in route["legs"])
+        key=tuple((leg["pool"],leg["from"],leg["to"]) for leg in route["legs"])
         if key in distinct:
             continue
         distinct.add(key)
+        pool_sets.add(frozenset(leg["pool"] for leg in route["legs"]))
         selected.append(i)
         if len(selected)>=MAX_DISTINCT_ROUTES:
             break
@@ -112,7 +114,10 @@ def main():
         except (ValueError,KeyError,TypeError,OSError,TimeoutError) as exc:
             reports.append({"status":"THREE_HOP_EXPORT_BLOCKED","route_index":index,
                             "reason":str(exc)[:240],"broadcast":False})
-    print(json.dumps({"routes_selected":len(selected),"exports":reports,
+    print(json.dumps({"routes_selected":len(selected),
+                      "unique_pool_sets_selected":len(pool_sets),
+                      "distinct_directional_routes_selected":len(selected),
+                      "exports":reports,
                       "broadcast":False},indent=2))
 
 if __name__=="__main__":
