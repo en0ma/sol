@@ -346,6 +346,20 @@ jobs:
           path: ${{ runner.temp }}/token-cycle-readiness.json
           if-no-files-found: ignore
 
+      - name: Preflight directional Orca cycle tick arrays
+        env:
+          TOKEN_GRAPH_VERIFICATION_REPORT: ${{ runner.temp }}/token-cycle-verified.json
+          TOKEN_CYCLE_TICK_PREFLIGHT_REPORT: ${{ runner.temp }}/token-cycle-tick-preflight.json
+        run: python3 -m arb.token_cycle_tick_preflight
+
+      - name: Upload directional Orca cycle preflight
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: token-cycle-tick-preflight
+          path: ${{ runner.temp }}/token-cycle-tick-preflight.json
+          if-no-files-found: ignore
+
       - name: Discover and simulate bounded cross-venue pool combinations
         env:
           CROSS_VENUE_INDEX_ENABLED: "1"
