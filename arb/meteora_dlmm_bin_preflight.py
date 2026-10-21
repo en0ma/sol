@@ -13,6 +13,7 @@ from arb.orca_swap_v2_local_token_accounts import require_loopback_rpc
 
 BIN_ARRAY_SIZE=70
 BIN_ARRAY_DISC=hashlib.sha256(b"account:BinArray").digest()[:8]
+ORACLE_DISC=bytes([139,194,131,179,140,179,229,244])
 
 def active_bin_array_index(active_id):
     if type(active_id) is not int or not -(1<<31)<=active_id<(1<<31):
@@ -59,6 +60,27 @@ def inspect_adjacent_bin_arrays(rpc, pool, active_index):
         evidence.append(row)
     return evidence
 
+def verify_pool_oracle(rpc, oracle):
+    """Authenticate the oracle account linked by an on-chain DLMM LbPair."""
+    require_loopback_rpc(rpc)
+    Pubkey.from_string(oracle)
+    info=call(rpc,"getAccountInfo",[
+        oracle,{"encoding":"base64","commitment":"confirmed"}])["value"]
+    if not info or info.get("owner")!=PROGRAM or info.get("executable"):
+        raise ValueError("DLMM oracle missing or owner mismatch")
+    raw=base64.b64decode(info["data"][0],validate=True)
+    if len(raw)<32 or raw[:8]!=ORACLE_DISC:
+        raise ValueError("DLMM oracle discriminator/size mismatch")
+    idx=int.from_bytes(raw[8:16],"little")
+    active_size=int.from_bytes(raw[16:24],"little")
+    length=int.from_bytes(raw[24:32],"little")
+    if length==0 or active_size>length or idx>=length:
+        raise ValueError("DLMM oracle observation bounds invalid")
+    return {"oracle":oracle,"authenticated":True,
+            "account_size_bytes":len(raw),
+            "observation_index":idx,"active_observation_size":active_size,
+            "observation_capacity":length}
+
 def check_active_bin_array(rpc,pool):
     require_loopback_rpc(rpc)
     account=call(rpc,"getAccountInfo",[pool,{"encoding":"base64","commitment":"confirmed"}])["value"]
@@ -85,11 +107,13 @@ def check_active_bin_array(rpc,pool):
     actual_pair=str(Pubkey.from_bytes(raw[24:56]))
     if actual_index!=idx or actual_pair!=pool:
         raise ValueError("active bin array index or parent pool mismatch")
+    oracle=verify_pool_oracle(rpc,state["oracle"])
     neighboring=inspect_adjacent_bin_arrays(rpc,pool,idx)
     if neighboring[1].get("authenticated") is not True:
         raise ValueError("active array changed during adjacent read")
     return dict(report,status="ACTIVE_BIN_ARRAY_AUTHENTICATED",
                 active_bin_array_byte_length=len(raw),
+                oracle_evidence=oracle,
                 neighboring_bin_arrays=neighboring,
                 neighboring_arrays_checked=True,
                 executable_liquidity_or_quote_verified=False)
