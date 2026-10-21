@@ -30,6 +30,76 @@ def offline_gate(rpc):
     if os.environ.get("SURFPOOL_EXPLICITLY_OFFLINE") != "1":
         raise ValueError("offline fixture writes prohibited without explicit offline opt-in")
 
+def quote_hops_offline(rpc, route, states, oracles, user_accounts, signer):
+    """Probe exact-input quantities, funding only disposable offline token accounts.
+
+    Each hop is simulated against its own authenticated pool snapshot. These
+    probes are NOT an atomic quote: the final three-swap simulation remains
+    authoritative, and residual output is fail-closed.
+    """
+    from arb.whirlpool_swap import build_swap
+    offline_gate(rpc)
+    legs, tokens = route["legs"], route["tokens"]
+    amounts = []
+    current_amount = INITIAL_WSOL
+    probes = []
+    for i, leg in enumerate(legs):
+        if current_amount <= 0:
+            raise ValueError("intermediate hop quote yielded zero input")
+        mint = tokens[i]
+        account = user_accounts[mint]
+        if i:
+            # This mutates only the isolated offline synthetic account.
+            # Never populate an intermediate account in the final atomic
+            # starting state; it must start with zero.
+            call(rpc, "surfnet_setAccount", [account, {
+                "lamports": 2039280,
+                "data": token_account_bytes(mint, str(signer.pubkey()), current_amount).hex(),
+                "owner": TOKEN_PROGRAM, "executable": False}])
+        pool = leg["pool"]
+        state = states[pool]
+        a_to_b = mint == state["token_mint_a"]
+        instruction = build_swap(pool,state,str(signer.pubkey()),
+            user_accounts[state["token_mint_a"]],
+            user_accounts[state["token_mint_b"]],oracles[pool],
+            current_amount,1,a_to_b=a_to_b)
+        bh=call(rpc,"getLatestBlockhash")["value"]["blockhash"]
+        tx=Transaction.new_signed_with_payer(
+            [instruction],signer.pubkey(),[signer],Hash.from_string(bh))
+        before = call(rpc,"getAccountInfo",[user_accounts[tokens[i+1]],{"encoding":"base64"}])["value"]
+        initial_out = 0
+        if before:
+            initial_out = decode_token_account(
+                base64.b64decode(before["data"][0],validate=True))["amount_base_units"]
+        response=call(rpc,"simulateTransaction",[base64.b64encode(bytes(tx)).decode(),{
+            "encoding":"base64","sigVerify":True,
+            "accounts":{"encoding":"base64","addresses":[user_accounts[tokens[i+1]]]}}])
+        value=response.get("value",{})
+        if value.get("err") is not None:
+            raise ValueError("hop "+str(i+1)+" quote simulation failed: "+str(value["err"]))
+        after=value.get("accounts")
+        if not isinstance(after,list) or len(after)!=1 or not after[0]:
+            raise ValueError("missing hop output account in quote simulation")
+        output=decode_token_account(
+            base64.b64decode(after[0]["data"][0],validate=True))
+        if output["mint"]!=tokens[i+1] or output["authority"]!=str(signer.pubkey()):
+            raise ValueError("quote returned wrong token or signer")
+        received=output["amount_base_units"]-initial_out
+        if received<=0:
+            raise ValueError("hop "+str(i+1)+" yielded no output")
+        amounts.append(current_amount)
+        probes.append({"hop":i+1,"input_base_units":current_amount,
+                       "quoted_output_base_units":received,
+                       "compute_units":value.get("unitsConsumed")})
+        current_amount=received
+    # Restore intermediate accounts to empty before atomic simulation.
+    for mint in tokens[1:-1]:
+        call(rpc,"surfnet_setAccount",[user_accounts[mint],{
+            "lamports":2039280,
+            "data":token_account_bytes(mint,str(signer.pubkey()),0).hex(),
+            "owner":TOKEN_PROGRAM,"executable":False}])
+    return amounts, probes
+
 def hydrate_and_simulate(rpc, fixture):
     offline_gate(rpc)
     if fixture.get("source") != "READ_ONLY_MAINNET_BACKED_SURFPOOL":
@@ -99,12 +169,20 @@ def hydrate_and_simulate(rpc, fixture):
         states[pool]=state
         oracles[pool]=verify_oracle(rpc,pool,
             adaptive_fee=state["tick_spacing"]!=state["fee_tier_index_seed"])
+    try:
+        quoted_amounts, quote_probes = quote_hops_offline(
+            rpc,route,states,oracles,user_accounts,signer)
+    except ValueError as exc:
+        return {"status":"CHAINED_QUOTE_BLOCKED","reason":str(exc)[:500],
+                "fixture_hydrated":True,"signed_simulation_requested":False,
+                "actionable":False,"live_execution_approved":False,"broadcast":False}
     swaps=assemble_orca_cycle(route,states,oracles,user_accounts,
-                              str(signer.pubkey()),[INITIAL_WSOL,1,1],[1,1,1])
+                              str(signer.pubkey()),quoted_amounts,[1,1,1])
     bh=call(rpc,"getLatestBlockhash")["value"]["blockhash"]
     tx=Transaction.new_signed_with_payer(swaps,signer.pubkey(),[signer],Hash.from_string(bh))
     wire=bytes(tx)
     result={"status":"SIMULATION_NOT_ATTEMPTED","route":tokens,
+            "independent_hop_quote_probes":quote_probes,
             "transaction_bytes":len(wire),"fixture_hydrated":True,
             "signed_simulation_requested":False,"actionable":False,
             "live_execution_approved":False,"broadcast":False}
