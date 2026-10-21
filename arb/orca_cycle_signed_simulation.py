@@ -7,7 +7,7 @@ import base64
 import json
 import os
 import time
-from arb.rpc import call
+from arb.rpc import call, RPCError
 from arb.orca_whirlpool import SOL, fetch_pool
 from arb.whirlpool_preflight import verify_oracle
 from arb.whirlpool_swap import inspect_swap_requirements
@@ -17,6 +17,7 @@ from arb.orca_swap_v2_local_token_accounts import require_loopback_rpc
 from arb.token_vaults import TOKEN_PROGRAM, decode_token_account
 
 MAX_LEGS = 3
+MAX_TRANSACTION_BYTES = 1232
 INITIAL_WSOL = 1000000
 # Small, conservative exploratory intermediate amounts, NOT a chained quote.
 TEST_INPUTS = (INITIAL_WSOL, 1, 1)
@@ -84,7 +85,18 @@ def simulate_cycle(rpc, route):
     bh=call(rpc,"getLatestBlockhash")["value"]["blockhash"]
     tx=Transaction.new_signed_with_payer(
         setup+swaps,payer.pubkey(),[payer,*accounts.values()],Hash.from_string(bh))
-    encoded=base64.b64encode(bytes(tx)).decode()
+    wire = bytes(tx)
+    if len(wire) > MAX_TRANSACTION_BYTES:
+        return {
+            "status": "BLOCKED_TRANSACTION_SIZE",
+            "transaction_bytes": len(wire),
+            "maximum_transaction_bytes": MAX_TRANSACTION_BYTES,
+            "bytes_over_limit": len(wire) - MAX_TRANSACTION_BYTES,
+            "reason": "Three token-account creations and three Whirlpool swaps exceed Solana wire limit; requires a compact, separately prepared offline fixture or a verified ALT",
+            "signed_simulation_requested": False,
+            "actionable": False, "live_execution_approved": False, "broadcast": False
+        }
+    encoded=base64.b64encode(wire).decode()
     ephemeral_addresses=[str(accounts[m].pubkey()) for m in tokens[:-1]]
     def assert_accounts_absent():
         found=call(rpc,"getMultipleAccounts",[ephemeral_addresses,{"encoding":"base64"}])
@@ -97,6 +109,10 @@ def simulate_cycle(rpc, route):
         "accounts":{"encoding":"base64","addresses":[str(accounts[m].pubkey()) for m in tokens[:-1]]}}])
     assert_accounts_absent()
     result["simulation_did_not_persist"]=True
+    if "error" in response:
+        result["status"]="SIMULATION_RPC_REJECTED"
+        result["reason"]=str(response["error"])[:400]
+        return result
     value=response["value"]
     result["signed_simulation_requested"]=True
     result["simulation_error"]=value.get("err")
@@ -136,7 +152,7 @@ def main():
         try:
             report=simulate_cycle(os.environ.get("SOLANA_RPC_URL","http://127.0.0.1:8899"),
                                   matching[0])
-        except (ValueError,KeyError,TypeError,OSError,TimeoutError) as exc:
+        except (RPCError,ValueError,KeyError,TypeError,OSError,TimeoutError) as exc:
             report={"status":"SIMULATION_BLOCKED","reason":str(exc)[:400],
                     "broadcast":False,"actionable":False,"live_execution_approved":False}
     with open(os.environ["TOKEN_CYCLE_SIGNED_SIM_REPORT"],"w") as f:
