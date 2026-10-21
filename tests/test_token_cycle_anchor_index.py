@@ -16,6 +16,7 @@ class Response:
 
 def pair(address,dex,mint_a,mint_b):
     return {"chainId":"solana","pairAddress":address,"dexId":dex,
+            "liquidity":{"usd":100000},
             "baseToken":{"address":mint_a},"quoteToken":{"address":mint_b}}
 
 class AnchorIndexTests(unittest.TestCase):
