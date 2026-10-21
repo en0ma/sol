@@ -15,6 +15,10 @@ def assess_mixed_routes(verified):
         raise ValueError("verified cycles list required")
     counts=Counter()
     routes=[]
+    missing_venue_counts=Counter()
+    missing_venue_sets=Counter()
+    supported_venue_sets=Counter()
+    prioritized=[]
     for cycle in cycles:
         if not cycle.get("all_pools_onchain_verified"):
             continue
@@ -26,18 +30,29 @@ def assess_mixed_routes(verified):
         if len(venues)<2:
             continue
         counts["verified_cross_venue"]+=1
-        executable=venues<=SUPPORTED_BUILDERS
+        missing=venues-SUPPORTED_BUILDERS
+        missing_venue_sets[tuple(sorted(missing))]+=1
+        supported_venue_sets[tuple(sorted(venues & SUPPORTED_BUILDERS))]+=1
+        for v in missing:
+            missing_venue_counts[v]+=1
+        executable=not missing
         if executable:
             counts["available_builder_types"]+=1
         else:
             counts["unsupported_builder_types"]+=1
+        if len(prioritized)<MAX_REPORT_ROUTES and missing:
+            prioritized.append({"tokens":tokens,"legs":legs,
+                                "missing_venues":sorted(missing),
+                                "missing_venue_count":len(missing),
+                                "actionable":False,"broadcast":False})
         if len(routes)<MAX_REPORT_ROUTES:
             routes.append({"tokens":tokens,"legs":legs,
                            "builder_types_available":executable,
                            "unsupported_venues":sorted(venues-SUPPORTED_BUILDERS),
                            "signed_atomic_simulation_verified":False,
                            "actionable":False,"broadcast":False})
-    return {"status":"MIXED_ROUTE_BUILDER_READINESS_ONLY",
+    prioritized.sort(key=lambda item:(item["missing_venue_count"],\n                                        tuple(item["missing_venues"]),\n                                        tuple(item["tokens"])))
+    return {"status":"MIXED_ROUTE_BUILDER_READINESS_ONLY",\n            "missing_venue_counts":dict(sorted(missing_venue_counts.items())),\n            "missing_venue_combinations":[{"venues":list(k),"count":v}\n                for k,v in sorted(missing_venue_sets.items(),key=lambda x:(-x[1],x[0]))],\n            "supported_venue_combinations":[{"venues":list(k),"count":v}\n                for k,v in sorted(supported_venue_sets.items(),key=lambda x:(-x[1],x[0]))],\n            "candidate_routes_by_fewest_missing_builders":prioritized,
             "verified_cross_venue_cycles":counts["verified_cross_venue"],
             "verified_cross_venue_with_builder_types":counts["available_builder_types"],
             "verified_cross_venue_missing_builder_types":counts["unsupported_builder_types"],
