@@ -22,6 +22,17 @@ INITIAL_WSOL = 1000000
 # Small, conservative exploratory intermediate amounts, NOT a chained quote.
 TEST_INPUTS = (INITIAL_WSOL, 1, 1)
 
+def transaction_size_block(size):
+    if type(size) is not int or size < 0:
+        raise ValueError("invalid wire size")
+    if size <= MAX_TRANSACTION_BYTES:
+        return None
+    return {"status": "BLOCKED_TRANSACTION_SIZE", "transaction_bytes": size,
+            "maximum_transaction_bytes": MAX_TRANSACTION_BYTES,
+            "bytes_over_limit": size - MAX_TRANSACTION_BYTES,
+            "signed_simulation_requested": False,
+            "actionable": False, "live_execution_approved": False, "broadcast": False}
+
 def simulate_cycle(rpc, route):
     require_loopback_rpc(rpc)
     from solders.keypair import Keypair
@@ -86,16 +97,9 @@ def simulate_cycle(rpc, route):
     tx=Transaction.new_signed_with_payer(
         setup+swaps,payer.pubkey(),[payer,*accounts.values()],Hash.from_string(bh))
     wire = bytes(tx)
-    if len(wire) > MAX_TRANSACTION_BYTES:
-        return {
-            "status": "BLOCKED_TRANSACTION_SIZE",
-            "transaction_bytes": len(wire),
-            "maximum_transaction_bytes": MAX_TRANSACTION_BYTES,
-            "bytes_over_limit": len(wire) - MAX_TRANSACTION_BYTES,
-            "reason": "Three token-account creations and three Whirlpool swaps exceed Solana wire limit; requires a compact, separately prepared offline fixture or a verified ALT",
-            "signed_simulation_requested": False,
-            "actionable": False, "live_execution_approved": False, "broadcast": False
-        }
+    oversized = transaction_size_block(len(wire))
+    if oversized is not None:
+        return oversized
     encoded=base64.b64encode(wire).decode()
     ephemeral_addresses=[str(accounts[m].pubkey()) for m in tokens[:-1]]
     def assert_accounts_absent():
