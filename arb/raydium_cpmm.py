@@ -53,8 +53,16 @@ def candidates(rpc,max_candidates=12):
             output[item["pubkey"]]=state
     return output
 
-def verify_vaults(rpc,pool_address,state):
-    if {state["token_0_mint"],state["token_1_mint"]}!={SOL,USDC}:
+def verify_vaults(rpc,pool_address,state,*,expected_mints=(SOL,USDC)):
+    """Verify classic-SPL CPMM pool and reserves.
+
+    Existing WSOL/USDC callers retain the exact-pair default. A graph verifier
+    may pass expected_mints=None and independently match the route's mint hints.
+    """
+    actual = (state["token_0_mint"], state["token_1_mint"])
+    if len(set(actual)) != 2:
+        raise ValueError("identical CPMM token mints")
+    if expected_mints is not None and set(actual) != set(expected_mints):
         raise ValueError("unexpected CPMM token pair")
     if not state["swap_enabled"]:
         raise ValueError("CPMM swaps disabled")
