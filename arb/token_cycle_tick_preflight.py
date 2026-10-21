@@ -18,12 +18,20 @@ def preflight(rpc, verified):
     result = {"status": "READ_ONLY_ORCA_CYCLE_PREFLIGHT",
               "routes": [], "actionable": False, "broadcast": False,
               "live_execution_approved": False}
-    for cycle in verified.get("cycles", [])[:MAX_ROUTES]:
+    eligible = []
+    for cycle in verified.get("cycles", []):
         if not cycle.get("all_pools_onchain_verified"):
             continue
         legs, tokens = cycle["legs"], cycle["tokens"]
-        if tokens[0] != tokens[-1] or any(l["venue"] != "orca" for l in legs):
+        if (len(legs) not in (2, 3) or len(tokens) != len(legs) + 1 or
+                tokens[0] != tokens[-1] or
+                any(l.get("venue") != "orca" for l in legs)):
             continue
+        eligible.append(cycle)
+    result["eligible_orca_cycles_before_cap"] = len(eligible)
+    result["eligible_orca_cycles_skipped_cap"] = max(0, len(eligible) - MAX_ROUTES)
+    for cycle in eligible[:MAX_ROUTES]:
+        legs, tokens = cycle["legs"], cycle["tokens"]
         checks = []
         for leg in legs:
             try:
