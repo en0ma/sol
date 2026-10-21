@@ -40,7 +40,7 @@ def assess_mixed_routes(verified):
             counts["available_builder_types"]+=1
         else:
             counts["unsupported_builder_types"]+=1
-        if len(prioritized)<MAX_REPORT_ROUTES and missing:
+        if missing:
             prioritized.append({"tokens":tokens,"legs":legs,
                                 "missing_venues":sorted(missing),
                                 "missing_venue_count":len(missing),
@@ -54,7 +54,11 @@ def assess_mixed_routes(verified):
     prioritized.sort(key=lambda item:(item["missing_venue_count"],
                                         tuple(item["missing_venues"]),
                                         tuple(item["tokens"])))
+    prioritized_total=len(prioritized)
+    prioritized=prioritized[:MAX_REPORT_ROUTES]
     return {"status":"MIXED_ROUTE_BUILDER_READINESS_ONLY",
+            "prioritized_candidate_total":prioritized_total,
+            "prioritized_candidates_truncated":prioritized_total>MAX_REPORT_ROUTES,
             "missing_venue_counts":dict(sorted(missing_venue_counts.items())),
             "missing_venue_combinations":[{"venues":list(k),"count":v}
                 for k,v in sorted(missing_venue_sets.items(),key=lambda x:(-x[1],x[0]))],
