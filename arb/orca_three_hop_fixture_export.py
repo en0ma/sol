@@ -29,6 +29,7 @@ def export_cycle(rpc, preflight, output):
         return {"status": "NO_VERIFIED_THREE_HOP_ORCA_FIXTURE", "broadcast": False}
     route = eligible[0]
     accounts_to_read = [PROGRAM]
+    optional_oracles = set()
     for i, leg in enumerate(route["legs"]):
         if leg["venue"] != "orca" or leg["from"] != route["tokens"][i] or leg["to"] != route["tokens"][i+1]:
             raise ValueError("unverified disconnected or non-Orca route")
@@ -42,6 +43,7 @@ def export_cycle(rpc, preflight, output):
             raise ValueError("onchain mint mismatch")
         oracle = verify_oracle(rpc, leg["pool"],
              adaptive_fee=state["tick_spacing"] != state["fee_tier_index_seed"])
+        optional_oracles.add(oracle)
         accounts_to_read.extend([leg["pool"],state["token_vault_a"],
                                  state["token_vault_b"],a,b,oracle])
         accounts_to_read.extend(select_tick_arrays(
@@ -53,8 +55,7 @@ def export_cycle(rpc, preflight, output):
     for address in accounts_to_read:
         info = accounts.get(address)
         # An absent non-adaptive oracle PDA is explicitly allowed by Orca.
-        if info is None and address in [verify_oracle(rpc,l["pool"],adaptive_fee=False)
-                                        for l in route["legs"]]:
+        if info is None and address in optional_oracles:
             continue
         if not isinstance(info, dict):
             raise ValueError("missing verified fixture account: " + address)
@@ -70,7 +71,7 @@ def export_cycle(rpc, preflight, output):
     if not isinstance(pd, dict) or pd.get("owner") != LOADER:
         raise ValueError("missing authenticated Whirlpool programdata")
     program_bytes = base64.b64decode(pd["data"][0], validate=True)
-    if len(program_bytes) < 49 or program_bytes[:4] != bytes([3,0,0,0]) or program_bytes[45:49] != b"\\x7fELF":
+    if len(program_bytes) < 49 or program_bytes[:4] != bytes([3,0,0,0]) or program_bytes[45:49] != bytes([127])+b"ELF":
         raise ValueError("Whirlpool programdata lacks expected ELF")
     payload = {"source":"READ_ONLY_MAINNET_BACKED_SURFPOOL",
                "route":route,"accounts":accounts,
