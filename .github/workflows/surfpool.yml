@@ -348,6 +348,20 @@ jobs:
           path: ${{ runner.temp }}/token-cycle-readiness.json
           if-no-files-found: ignore
 
+      - name: Assess verified mixed-venue cycle builder readiness
+        env:
+          TOKEN_GRAPH_VERIFICATION_REPORT: ${{ runner.temp }}/token-cycle-verified.json
+          TOKEN_MIXED_READINESS_REPORT: ${{ runner.temp }}/mixed-cycle-readiness.json
+        run: python3 -m arb.mixed_cycle_readiness
+
+      - name: Upload mixed-venue route readiness
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mixed-cycle-builder-readiness
+          path: ${{ runner.temp }}/mixed-cycle-readiness.json
+          if-no-files-found: ignore
+
       - name: Preflight directional Orca cycle tick arrays
         env:
           TOKEN_GRAPH_VERIFICATION_REPORT: ${{ runner.temp }}/token-cycle-verified.json
