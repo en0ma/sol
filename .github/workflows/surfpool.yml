@@ -361,6 +361,20 @@ jobs:
           path: ${{ runner.temp }}/token-cycle-tick-preflight.json
           if-no-files-found: ignore
 
+      - name: Attempt signed three-hop Orca cycle simulation
+        env:
+          TOKEN_CYCLE_TICK_PREFLIGHT_REPORT: ${{ runner.temp }}/token-cycle-tick-preflight.json
+          TOKEN_CYCLE_SIGNED_SIM_REPORT: ${{ runner.temp }}/token-cycle-signed-sim.json
+        run: python3 -m arb.orca_cycle_signed_simulation
+
+      - name: Upload signed Orca cycle attempt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orca-three-hop-signed-simulation
+          path: ${{ runner.temp }}/token-cycle-signed-sim.json
+          if-no-files-found: ignore
+
       - name: Discover and simulate bounded cross-venue pool combinations
         env:
           CROSS_VENUE_INDEX_ENABLED: "1"
