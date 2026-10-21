@@ -1167,7 +1167,6 @@ jobs:
       - name: Install simulation dependency
         run: python3 -m pip install --disable-pip-version-check solders==0.26.0
       - name: Install Surfpool for disposable offline instance
-        if: ${{ hashFiles(format('{0}/orca-three-hop-export/orca-three-hop-fixture.json', runner.temp)) != '' }}
         shell: bash
         run: |
           set -euo pipefail
