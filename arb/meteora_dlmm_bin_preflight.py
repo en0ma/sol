@@ -27,6 +27,38 @@ def bin_array_pda(pool, index):
     return str(Pubkey.find_program_address([
         b"bin_array",bytes(pair),index.to_bytes(8,"little",signed=True)],program)[0])
 
+def inspect_adjacent_bin_arrays(rpc, pool, active_index):
+    """Read-only authentication for nearby arrays; presence is not a quote."""
+    require_loopback_rpc(rpc)
+    if type(active_index) is not int or not -(1<<63)+1 <= active_index < (1<<63)-1:
+        raise ValueError("active array index outside safe neighbor range")
+    indexes=(active_index-1, active_index, active_index+1)
+    addresses=[bin_array_pda(pool,i) for i in indexes]
+    response=call(rpc,"getMultipleAccounts",[
+        addresses,{"encoding":"base64","commitment":"confirmed"}])
+    values=response.get("value")
+    if not isinstance(values,list) or len(values)!=3:
+        raise ValueError("incomplete neighboring bin array read")
+    evidence=[]
+    for idx,address,account in zip(indexes,addresses,values):
+        row={"index":idx,"pda":address,"present":account is not None}
+        if account is None:
+            evidence.append(row)
+            continue
+        if account.get("owner")!=PROGRAM or account.get("executable"):
+            raise ValueError("neighboring bin array owner/executable mismatch")
+        raw=base64.b64decode(account["data"][0],validate=True)
+        if len(raw)<56 or raw[:8]!=BIN_ARRAY_DISC:
+            raise ValueError("neighboring bin array discriminator mismatch")
+        if int.from_bytes(raw[8:16],"little",signed=True)!=idx or (
+            str(Pubkey.from_bytes(raw[24:56]))!=pool):
+            raise ValueError("neighboring bin array index/parent mismatch")
+        if raw[16] not in (0,1,2):
+            raise ValueError("unsupported neighboring array layout version")
+        row.update(authenticated=True,byte_length=len(raw))
+        evidence.append(row)
+    return evidence
+
 def check_active_bin_array(rpc,pool):
     require_loopback_rpc(rpc)
     account=call(rpc,"getAccountInfo",[pool,{"encoding":"base64","commitment":"confirmed"}])["value"]
@@ -53,8 +85,14 @@ def check_active_bin_array(rpc,pool):
     actual_pair=str(Pubkey.from_bytes(raw[24:56]))
     if actual_index!=idx or actual_pair!=pool:
         raise ValueError("active bin array index or parent pool mismatch")
+    neighboring=inspect_adjacent_bin_arrays(rpc,pool,idx)
+    if neighboring[1].get("authenticated") is not True:
+        raise ValueError("active array changed during adjacent read")
     return dict(report,status="ACTIVE_BIN_ARRAY_AUTHENTICATED",
-                active_bin_array_byte_length=len(raw))
+                active_bin_array_byte_length=len(raw),
+                neighboring_bin_arrays=neighboring,
+                neighboring_arrays_checked=True,
+                executable_liquidity_or_quote_verified=False)
 
 def main():
     import json
