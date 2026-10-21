@@ -1147,3 +1147,60 @@ jobs:
             ${{ runner.temp }}/orca-isolated-attempt.json
             ${{ runner.temp }}/orca-isolated-offline.log
           if-no-files-found: ignore
+
+  orca-three-hop-offline:
+    needs: mainnet-fork-probe
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SOLANA_RPC_URL: http://127.0.0.1:8899
+      SURFPOOL_EXPLICITLY_OFFLINE: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download read-only fixture from mainnet-backed job
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: orca-three-hop-readonly-fixture
+          path: ${{ runner.temp }}/orca-three-hop-export
+      - name: Install simulation dependency
+        run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Install Surfpool for disposable offline instance
+        if: ${{ hashFiles(format('{0}/orca-three-hop-export/orca-three-hop-fixture.json', runner.temp)) != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --show-error --silent --location --retry 5 --retry-all-errors --retry-delay 3 https://run.surfpool.run/ -o /tmp/install-surfpool.sh
+          for attempt in 1 2 3; do
+            if bash /tmp/install-surfpool.sh; then break; fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            sleep 5
+          done
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - name: Start explicitly offline validator and attempt atomic three-hop cycle
+        shell: bash
+        run: |
+          set -euo pipefail
+          fixture="$RUNNER_TEMP/orca-three-hop-export/orca-three-hop-fixture.json"
+          output="$RUNNER_TEMP/orca-three-hop-offline-report.json"
+          if [ ! -s "$fixture" ]; then
+            echo '{"status":"READ_ONLY_FIXTURE_MISSING","broadcast":false,"actionable":false}' > "$output"
+            exit 0
+          fi
+          nohup surfpool start --ci --offline > "$RUNNER_TEMP/orca-three-hop-offline.log" 2>&1 < /dev/null &
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent -H 'Content-Type: application/json' --data '{"jsonrpc":"2.0","id":1,"method":"getLatestBlockhash"}' "$SOLANA_RPC_URL" | grep -q blockhash; then break; fi
+            sleep 2
+          done
+          python3 -m arb.orca_three_hop_offline_simulation "$fixture" "$output"
+      - name: Upload offline signed three-hop simulation result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orca-three-hop-isolated-offline-simulation
+          path: |
+            ${{ runner.temp }}/orca-three-hop-offline-report.json
+            ${{ runner.temp }}/orca-three-hop-offline.log
+          if-no-files-found: ignore
