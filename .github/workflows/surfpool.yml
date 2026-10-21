@@ -373,7 +373,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: orca-three-hop-readonly-fixture
-          path: ${{ runner.temp }}/orca-three-hop-fixture.json
+          path: ${{ runner.temp }}/orca-three-hop-fixture*.json
           if-no-files-found: ignore
 
       - name: Attempt signed three-hop Orca cycle simulation
@@ -1205,12 +1205,20 @@ jobs:
             sleep 2
           done
           python3 -m arb.orca_three_hop_offline_simulation "$fixture" "$output"
+          for extra in "$RUNNER_TEMP"/orca-three-hop-export/orca-three-hop-fixture-[0-9]*.json; do
+            if [ -s "$extra" ]; then
+              suffix="${extra##*-}"
+              suffix="${suffix%.json}"
+              python3 -m arb.orca_three_hop_offline_simulation "$extra" \
+                "$RUNNER_TEMP/orca-three-hop-offline-report-$suffix.json"
+            fi
+          done
       - name: Upload offline signed three-hop simulation result
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: orca-three-hop-isolated-offline-simulation
           path: |
-            ${{ runner.temp }}/orca-three-hop-offline-report.json
+            ${{ runner.temp }}/orca-three-hop-offline-report*.json
             ${{ runner.temp }}/orca-three-hop-offline.log
           if-no-files-found: ignore
