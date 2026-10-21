@@ -25,6 +25,26 @@ SYSTEM = "11111111111111111111111111111111"
 MAX_BYTES = 1232
 INITIAL_WSOL = 1000000
 
+def assess_cycle_economics(initial_lamports, final_lamports, network_fee):
+    """Pure, conservative WSOL-denominated accounting; never approves execution."""
+    if any(type(v) is not int or v < 0 for v in (initial_lamports, final_lamports)):
+        raise ValueError("invalid nonnegative lamport balance")
+    if initial_lamports == 0:
+        raise ValueError("starting WSOL balance required")
+    if network_fee is not None and (type(network_fee) is not int or network_fee < 0):
+        raise ValueError("invalid fee estimate")
+    gross = final_lamports - initial_lamports
+    net = gross - network_fee if network_fee is not None else None
+    return {"gross_wsol_change_lamports": gross,
+            "estimated_network_fee_lamports": network_fee,
+            "net_after_estimated_network_fee_lamports": net,
+            "gross_return_bps": gross * 10000 / initial_lamports,
+            "profitable_after_estimated_fee": net > 0 if net is not None else False,
+            "status": "SIMULATED_LOSS" if gross <= 0 or (net is not None and net <= 0)
+                      else "UNVERIFIED_NET_PROFIT" if net is None
+                      else "SIMULATED_POSITIVE_NOT_ACTIONABLE",
+            "actionable": False, "live_execution_approved": False, "broadcast": False}
+
 def offline_gate(rpc):
     require_loopback_rpc(rpc)
     if os.environ.get("SURFPOOL_EXPLICITLY_OFFLINE") != "1":
@@ -249,6 +269,16 @@ def hydrate_and_simulate(rpc, fixture):
     else:
         result["status"]="ATOMIC_SWAP_SIMULATED_NOT_PROFIT_VALIDATED"
         result["net_wsol_before_fees"]=final[SOL]-INITIAL_WSOL
+        try:
+            fee_response=call(rpc,"getFeeForMessage",[
+                base64.b64encode(bytes(tx.message)).decode()])
+            fee=fee_response.get("value")
+            if type(fee) is not int or fee < 0:
+                fee=None
+        except (RPCError,ValueError,KeyError,TypeError,OSError,TimeoutError):
+            fee=None
+        result["economics"]=assess_cycle_economics(INITIAL_WSOL,final[SOL],fee)
+        result["status"]=result["economics"]["status"]
     return result
 
 def main():
