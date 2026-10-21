@@ -85,27 +85,36 @@ def export_cycle(rpc, preflight, output, route_index=0):
             "account_count":len(accounts),"route":route["tokens"],
             "fixture_hydrated":False,"broadcast":False}
 
+def select_directional_routes(preflight, max_routes=MAX_DISTINCT_ROUTES):
+    """Select unique directed, ready SOL triangles; preserve reverse trading paths."""
+    if type(max_routes) is not int or not 1 <= max_routes <= MAX_DISTINCT_ROUTES:
+        raise ValueError("invalid directional route cap")
+    selected, seen = [], set()
+    pool_sets = set()
+    for index, route in enumerate(preflight.get("routes", [])):
+        tokens = route.get("tokens", [])
+        legs = route.get("legs", [])
+        if (not route.get("all_directional_tick_arrays_ready") or
+                len(legs) != 3 or len(tokens) != 4 or
+                tokens[0] != SOL or tokens[-1] != SOL or
+                any(leg.get("venue") != "orca" for leg in legs)):
+            continue
+        key=tuple((leg["pool"],leg["from"],leg["to"]) for leg in legs)
+        if key in seen:
+            continue
+        seen.add(key)
+        pool_sets.add(frozenset(leg["pool"] for leg in legs))
+        selected.append(index)
+        if len(selected) >= max_routes:
+            break
+    return selected, len(pool_sets)
+
 def main():
     with open(os.environ["TOKEN_CYCLE_TICK_PREFLIGHT_REPORT"]) as stream:
         ready=json.load(stream)
     target=os.environ["TOKEN_CYCLE_FIXTURE_EXPORT_REPORT"]
     rpc=os.environ.get("SOLANA_RPC_URL","http://127.0.0.1:8899")
-    eligible=[r for r in ready.get("routes",[]) if r.get("all_directional_tick_arrays_ready")
-              and len(r.get("legs",[]))==3 and r.get("tokens",[None])[0]==SOL
-              and r["tokens"][-1]==SOL]
-    selected=[]
-    distinct=set()
-    pool_sets=set()
-    # Distinct directed paths are economically different even when reversing\n    # the same three pools; report pool-set diversity separately.
-    for i,route in enumerate(eligible):
-        key=tuple((leg["pool"],leg["from"],leg["to"]) for leg in route["legs"])
-        if key in distinct:
-            continue
-        distinct.add(key)
-        pool_sets.add(frozenset(leg["pool"] for leg in route["legs"]))
-        selected.append(i)
-        if len(selected)>=MAX_DISTINCT_ROUTES:
-            break
+    selected, unique_pool_sets = select_directional_routes(ready)
     reports=[]
     for number,index in enumerate(selected):
         destination=target if number==0 else target.removesuffix(".json")+"-"+str(number)+".json"
@@ -115,7 +124,7 @@ def main():
             reports.append({"status":"THREE_HOP_EXPORT_BLOCKED","route_index":index,
                             "reason":str(exc)[:240],"broadcast":False})
     print(json.dumps({"routes_selected":len(selected),
-                      "unique_pool_sets_selected":len(pool_sets),
+                      "unique_pool_sets_selected":unique_pool_sets,
                       "distinct_directional_routes_selected":len(selected),
                       "exports":reports,
                       "broadcast":False},indent=2))
