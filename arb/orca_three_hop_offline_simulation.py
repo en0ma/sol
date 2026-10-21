@@ -12,7 +12,7 @@ from solders.keypair import Keypair
 from solders.pubkey import Pubkey
 from solders.hash import Hash
 from solders.transaction import Transaction
-from arb.rpc import call
+from arb.rpc import call, RPCError
 from arb.orca_whirlpool import PROGRAM, SOL, fetch_pool
 from arb.whirlpool_preflight import verify_oracle
 from arb.orca_cycle_assembler import assemble_orca_cycle
@@ -136,9 +136,15 @@ def hydrate_and_simulate(rpc, fixture):
     value=resp["value"]
     result["simulation_error"]=value.get("err")
     result["units_consumed"]=value.get("unitsConsumed")
-    result["logs_tail"]=(value.get("logs") or [])[-18:]
+    logs=value.get("logs") or []
+    result["logs_tail"]=logs[-18:]
+    result["whirlpool_invocations"]=sum(("Program "+PROGRAM+" invoke") in line for line in logs)
+    result["whirlpool_successes"]=sum(("Program "+PROGRAM+" success") in line for line in logs)
     if value.get("err") is not None:
         result["status"]="ATOMIC_SIMULATION_FAILED"
+        return result
+    if result["whirlpool_invocations"] != 3 or result["whirlpool_successes"] != 3:
+        result["status"]="MISSING_THREE_SUCCESSFUL_WHIRLPOOL_INVOCATIONS"
         return result
     post=value.get("accounts")
     if not isinstance(post,list) or len(post)!=3:
@@ -166,7 +172,7 @@ def main():
         offline_gate(os.environ.get("SOLANA_RPC_URL","http://127.0.0.1:8899"))
         report=hydrate_and_simulate(os.environ.get("SOLANA_RPC_URL","http://127.0.0.1:8899"),
                                    json.loads(Path(sys.argv[1]).read_text()))
-    except (ValueError,KeyError,TypeError,OSError,TimeoutError) as exc:
+    except (RPCError,ValueError,KeyError,TypeError,OSError,TimeoutError) as exc:
         report={"status":"OFFLINE_SIMULATION_BLOCKED","reason":str(exc)[:500],
                 "broadcast":False,"actionable":False,"live_execution_approved":False}
     Path(sys.argv[2]).write_text(json.dumps(report,indent=2))
