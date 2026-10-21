@@ -362,6 +362,20 @@ jobs:
           path: ${{ runner.temp }}/mixed-cycle-readiness.json
           if-no-files-found: ignore
 
+      - name: Verify active Meteora bin array for selected mixed route
+        env:
+          TOKEN_MIXED_READINESS_REPORT: ${{ runner.temp }}/mixed-cycle-readiness.json
+          TOKEN_DLMM_BIN_PREFLIGHT_REPORT: ${{ runner.temp }}/dlmm-bin-preflight.json
+        run: python3 -m arb.meteora_dlmm_bin_preflight
+
+      - name: Upload read-only Meteora bin evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: meteora-dlmm-active-bin-preflight
+          path: ${{ runner.temp }}/dlmm-bin-preflight.json
+          if-no-files-found: ignore
+
       - name: Preflight directional Orca cycle tick arrays
         env:
           TOKEN_GRAPH_VERIFICATION_REPORT: ${{ runner.temp }}/token-cycle-verified.json
