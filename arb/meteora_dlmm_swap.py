@@ -22,6 +22,9 @@ def build_swap(pool,state,authority,user_input,user_output,oracle,
         raise ValueError("DLMM exact-input amount and nonzero threshold required")
     if state.get("status")!=0 or state.get("token_mint_x_program_flag")!=0 or state.get("token_mint_y_program_flag")!=0:
         raise ValueError("DLMM pool disabled or nonclassic token mint")
+    if (state.get("input_mint") != (state["token_x_mint"] if input_is_x else state["token_y_mint"]) or
+            state.get("output_mint") != (state["token_y_mint"] if input_is_x else state["token_x_mint"])):
+        raise ValueError("DLMM input/output mint direction not verified")
     if len({state["token_x_mint"],state["token_y_mint"],state["reserve_x"],state["reserve_y"]})!=4:
         raise ValueError("DLMM pool mint or reserve duplicates")
     if not isinstance(bin_arrays,(tuple,list)) or not 1<=len(bin_arrays)<=3:
