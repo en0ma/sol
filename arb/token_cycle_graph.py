@@ -98,6 +98,7 @@ def candidate_cycles(entries, *, starts=(SOL, USDC), max_cycles=MAX_CYCLES):
         neighbors.sort(key=lambda e: (e[0], e[1]["venue"], e[1]["address"]))
     cycles = []
     identities = set()
+    first_token_counts = defaultdict(int)
     unique_starts = list(dict.fromkeys(starts))
     for start_index, start in enumerate(unique_starts):
         # Reserve an equal bounded candidate budget per starting asset.
@@ -110,8 +111,12 @@ def candidate_cycles(entries, *, starts=(SOL, USDC), max_cycles=MAX_CYCLES):
             if len(legs) >= 2 and token == start:
                 sig = (start, tuple((leg["pool"], leg["from"], leg["to"])
                                     for leg in legs))
-                if sig not in identities:
+                # Limit concentration in one intermediate token, even if it has many pools.
+                first = path_tokens[1]
+                cap = max(2, max_cycles // 20)
+                if sig not in identities and first_token_counts[(start, first)] < cap:
                     identities.add(sig)
+                    first_token_counts[(start, first)] += 1
                     cycles.append({
                         "tokens": path_tokens[:],
                         "legs": legs[:],
@@ -148,6 +153,9 @@ def candidate_cycles(entries, *, starts=(SOL, USDC), max_cycles=MAX_CYCLES):
         "pool_hints_with_mints": len(seen),
         "rejected_hints": rejected,
         "cycles_returned": len(cycles),
+        "distinct_intermediates_by_anchor": {
+            anchor: len({cycle["tokens"][1] for cycle in cycles if cycle["tokens"][0] == anchor})
+            for anchor in unique_starts},
         "truncated": len(cycles) == max_cycles,
         "cycles_by_start": {start: sum(c["tokens"][0] == start for c in cycles)
                             for start in unique_starts},
