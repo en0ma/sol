@@ -45,10 +45,12 @@ def check_active_bin_array(rpc,pool):
     if candidate.get("owner")!=PROGRAM or candidate.get("executable"):
         raise ValueError("active bin array owner/executable mismatch")
     raw=base64.b64decode(candidate["data"][0],validate=True)
-    if len(raw)<48 or raw[:8]!=BIN_ARRAY_DISC:
+    if len(raw)<56 or raw[:8]!=BIN_ARRAY_DISC:
         raise ValueError("active bin array discriminator/length mismatch")
     actual_index=int.from_bytes(raw[8:16],"little",signed=True)
-    actual_pair=str(Pubkey.from_bytes(raw[16:48]))
+    if raw[16] not in (0,1,2):
+        raise ValueError("unsupported bin array layout version")
+    actual_pair=str(Pubkey.from_bytes(raw[24:56]))
     if actual_index!=idx or actual_pair!=pool:
         raise ValueError("active bin array index or parent pool mismatch")
     return dict(report,status="ACTIVE_BIN_ARRAY_AUTHENTICATED",
