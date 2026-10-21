@@ -4,6 +4,7 @@ from arb.raydium_cpmm import PROGRAM,decode,verify_vaults
 from arb.orca_whirlpool import SOL,USDC
 from arb.rpc import call
 from arb.whirlpool_simulation import TOKEN_SPACE,prepare_token_accounts,extract_balances
+from arb.token_vaults import TOKEN_PROGRAM
 DISCRIMINATOR=hashlib.sha256(b"global:swap_base_input").digest()[:8]
 OUTPUT_DISCRIMINATOR=hashlib.sha256(b"global:swap_base_output").digest()[:8]
 AUTH_SEED=b"vault_and_lp_mint_auth_seed"
@@ -18,15 +19,23 @@ def encode_exact_output(max_input,amount_out):
         raise ValueError("invalid CPMM exact-output amount")
     return OUTPUT_DISCRIMINATOR+max_input.to_bytes(8,"little")+amount_out.to_bytes(8,"little")
 
-def instruction(pool,state,authority,user_a,user_b,amount_in,min_output,input_is_token_0=True,exact_output=False):
+def instruction(pool,state,authority,user_a,user_b,amount_in,min_output,input_is_token_0=True,exact_output=False,*,expected_mints=(SOL,USDC)):
     from solders.pubkey import Pubkey
     from solders.instruction import Instruction,AccountMeta
     program=Pubkey.from_string(PROGRAM)
     auth,bump=Pubkey.find_program_address([AUTH_SEED],program)
     if bump!=state["auth_bump"]: raise ValueError("Raydium pool authority bump mismatch")
-    if {state["token_0_mint"],state["token_1_mint"]}!={SOL,USDC}:raise ValueError("unexpected token pair")
-    if (state["token_0_mint"],state["token_1_mint"])!=(SOL,USDC):raise ValueError("requires WSOL token0 and USDC token1")
-    if state["token_0_program"]!=state["token_1_program"]:raise ValueError("unsupported mixed SPL token programs")
+    actual=(state["token_0_mint"],state["token_1_mint"])
+    if len(set(actual))!=2:
+        raise ValueError("duplicate Raydium token mint")
+    if expected_mints is not None and set(actual)!=set(expected_mints):
+        raise ValueError("unexpected token pair")
+    if state["token_0_program"]!=TOKEN_PROGRAM or state["token_1_program"]!=TOKEN_PROGRAM:
+        raise ValueError("only classic SPL token programs supported")
+    if state.get("swap_enabled") is not True:
+        raise ValueError("Raydium CPMM swaps disabled")
+    if type(input_is_token_0) is not bool or type(exact_output) is not bool:
+        raise ValueError("invalid swap direction or amount mode")
     input_vault=state["token_0_vault"] if input_is_token_0 else state["token_1_vault"]
     output_vault=state["token_1_vault"] if input_is_token_0 else state["token_0_vault"]
     input_mint=state["token_0_mint"] if input_is_token_0 else state["token_1_mint"]
