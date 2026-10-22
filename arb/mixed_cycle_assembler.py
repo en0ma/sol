@@ -1,4 +1,4 @@
-"""Fail-closed atomic instruction assembly for Orca Whirlpool and Raydium CPMM.
+"""Fail-closed atomic instruction assembly for four verified swap-builder venues.
 
 Assembly only: independently verified account states, SPL user accounts,
 per-hop exact-input amounts, oracles and onchain quotes remain caller duties.
@@ -9,6 +9,7 @@ from arb.whirlpool_swap import build_swap
 from arb.raydium_swap import instruction as build_cpmm
 from arb.token_vaults import TOKEN_PROGRAM
 from arb.meteora_dlmm_swap import build_swap as build_dlmm
+from arb.raydium_clmm_swap import build as build_clmm
 
 MAX_HOPS=3
 
@@ -56,6 +57,25 @@ def assemble_mixed_cycle(route, pool_states, oracles, user_accounts,
                 leg["pool"],state,authority,user_accounts[source],user_accounts[target],
                 amount,threshold,input_is_token_0=source==a,exact_output=False,
                 expected_mints=None))
+        elif venue=="raydium_clmm":
+            a,b=state["token_mint_0"],state["token_mint_1"]
+            if (source,target) not in ((a,b),(b,a)):
+                raise ValueError("CLMM onchain pool mints disagree")
+            arrays=state.get("authenticated_tick_arrays")
+            if not isinstance(arrays,(list,tuple)) or not 1<=len(arrays)<=5:
+                raise ValueError("authenticated CLMM tick arrays required")
+            if len(set(arrays))!=len(arrays) or any(
+                    not isinstance(x,str) or not x for x in arrays):
+                raise ValueError("invalid authenticated CLMM tick arrays")
+            if oracles.get(leg["pool"])!=state.get("observation_key"):
+                raise ValueError("authenticated CLMM observation mismatch")
+            if state.get("token_program_0",TOKEN_PROGRAM)!=TOKEN_PROGRAM or state.get(
+                    "token_program_1",TOKEN_PROGRAM)!=TOKEN_PROGRAM:
+                raise ValueError("unsupported CLMM token program")
+            instructions.append(build_clmm(
+                leg["pool"],state,authority,user_accounts[source],user_accounts[target],
+                amount,threshold,arrays,input_is_token_0=source==a,
+                is_base_input=True))
         elif venue=="meteora_dlmm":
             x,y=state["token_x_mint"],state["token_y_mint"]
             if (source,target) not in ((x,y),(y,x)):
