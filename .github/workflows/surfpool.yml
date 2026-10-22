@@ -390,6 +390,20 @@ jobs:
           path: ${{ runner.temp }}/meteora-dlmm-fixture.json
           if-no-files-found: ignore
 
+      - name: Export authenticated Orca and Meteora two-leg fixture
+        env:
+          TOKEN_MIXED_READINESS_REPORT: ${{ runner.temp }}/mixed-cycle-readiness.json
+          TOKEN_MIXED_FIXTURE_EXPORT_PATH: ${{ runner.temp }}/orca-dlmm-mixed-fixture.json
+        run: python3 -m arb.orca_dlmm_mixed_fixture_export
+
+      - name: Upload read-only Orca-Meteora dual-program fixture
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orca-meteora-mixed-readonly-fixture
+          path: ${{ runner.temp }}/orca-dlmm-mixed-fixture.json
+          if-no-files-found: ignore
+
       - name: Preflight directional Orca cycle tick arrays
         env:
           TOKEN_GRAPH_VERIFICATION_REPORT: ${{ runner.temp }}/token-cycle-verified.json
