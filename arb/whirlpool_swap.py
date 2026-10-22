@@ -39,10 +39,12 @@ def select_tick_arrays(pool_address, current_tick, spacing, a_to_b):
 
 def build_swap(pool_address, state, user_authority, user_account_a,
                user_account_b, oracle, amount, min_output, a_to_b=True,
-               sqrt_price_limit=None, amount_specified_is_input=True):
+               sqrt_price_limit=None, amount_specified_is_input=True, oracle_writable=False):
     """Return solders Instruction; caller must prepare user token accounts."""
     from solders.instruction import AccountMeta, Instruction
     from solders.pubkey import Pubkey
+    if type(oracle_writable) is not bool:
+        raise ValueError("oracle mutability flag must be boolean")
     if sqrt_price_limit is None:
         sqrt_price_limit = MIN_SQRT if a_to_b else MAX_SQRT
     current = int(state["sqrt_price_x64"])
@@ -59,7 +61,7 @@ def build_swap(pool_address, state, user_authority, user_account_a,
             meta(user_account_b,writable=True),
             meta(state["token_vault_b"],writable=True),
             *(meta(k,writable=True) for k in tick_arrays),
-            meta(oracle)]
+            meta(oracle,writable=oracle_writable)]
     payload = encode_swap(amount,min_output,sqrt_price_limit,amount_specified_is_input,a_to_b)
     return Instruction(Pubkey.from_string(PROGRAM),payload,keys)
 
