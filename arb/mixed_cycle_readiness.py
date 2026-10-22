@@ -7,7 +7,7 @@ import os
 from collections import Counter
 from arb.orca_whirlpool import SOL, USDC
 
-SUPPORTED_BUILDERS = frozenset(("orca", "raydium_cpmm"))
+from arb.venue_capabilities import SWAP_BUILDERS as SUPPORTED_BUILDERS
 MAX_REPORT_ROUTES = 50
 
 def assess_mixed_routes(verified):
@@ -66,6 +66,7 @@ def assess_mixed_routes(verified):
     return {"status":"MIXED_ROUTE_BUILDER_READINESS_ONLY",
             "prioritized_candidate_total":prioritized_total,
             "first_dlmm_only_offline_target":priority_target,
+            "builder_support_not_atomic_proof":True,
             "prioritized_candidates_truncated":prioritized_total>MAX_REPORT_ROUTES,
             "missing_venue_counts":dict(sorted(missing_venue_counts.items())),
             "missing_venue_combinations":[{"venues":list(k),"count":v}
