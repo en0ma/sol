@@ -25,3 +25,15 @@ class MissingPairInventoryTests(unittest.TestCase):
     def test_missing_cycles_rejected(self):
         with self.assertRaises(ValueError):
             find_unverified_pairs({})
+
+    def test_longer_cycle_is_inventory_only_not_executable(self):
+        tokens=[SOL,"token1","token2","token3",SOL]
+        venues=["raydium_clmm","meteora_dlmm","raydium_clmm","meteora_dlmm"]
+        cycle={"all_pools_onchain_verified":True,"tokens":tokens,
+            "legs":[{"venue":v,"pool":"pool"+str(i),
+                     "from":tokens[i],"to":tokens[i+1]}
+                    for i,v in enumerate(venues)]}
+        out=find_unverified_pairs({"cycles":[cycle]})
+        self.assertEqual(out["pairings_with_verified_closed_route_candidates"],1)
+        self.assertFalse(out["candidates"][0]["selected_route"]["current_assembler_hop_limit_satisfied"])
+        self.assertEqual(out["graph_cycle_diagnostics"]["unevidenced_pair_routes"],1)
