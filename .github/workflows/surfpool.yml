@@ -80,6 +80,9 @@ jobs:
       - name: Install Python Solana PDA dependency for offline tests
         run: python3 -m pip install --disable-pip-version-check solders==0.26.0
 
+      - name: Test authenticated token-cycle venue canonicalization
+        run: python3 -m unittest discover -s tests -p test_token_cycle_verify.py -v
+
       - name: Probe ephemeral signer token accounts on offline Surfpool (read-only)
         run: python3 -m arb.orca_swap_v2_offline_probe
 
