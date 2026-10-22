@@ -44,12 +44,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl --fail --show-error --silent --location --retry 5 --retry-all-errors --retry-delay 3 https://run.surfpool.run/ -o /tmp/install-surfpool.sh
-          for attempt in 1 2 3; do
-            if bash /tmp/install-surfpool.sh; then break; fi
-            if [ "$attempt" -eq 3 ]; then exit 1; fi
-            sleep 5
-          done
+          bash ci/install_surfpool.sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
@@ -303,12 +298,7 @@ jobs:
       - name: Install Surfpool
         run: |
           set -euo pipefail
-          curl --fail --show-error --silent --location --retry 5 --retry-all-errors --retry-delay 3 https://run.surfpool.run/ -o /tmp/install-surfpool.sh
-          for attempt in 1 2 3; do
-            if bash /tmp/install-surfpool.sh; then break; fi
-            if [ "$attempt" -eq 3 ]; then exit 1; fi
-            sleep 5
-          done
+          bash ci/install_surfpool.sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
       - name: Start Surfpool mainnet fork
@@ -1152,12 +1142,7 @@ jobs:
       - name: Install Surfpool
         run: |
           set -euo pipefail
-          curl --fail --show-error --silent --location --retry 5 --retry-all-errors --retry-delay 3 https://run.surfpool.run/ -o /tmp/install-surfpool.sh
-          for attempt in 1 2 3; do
-            if bash /tmp/install-surfpool.sh; then break; fi
-            if [ "$attempt" -eq 3 ]; then exit 1; fi
-            sleep 5
-          done
+          bash ci/install_surfpool.sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
       - name: Install transaction dependency
@@ -1279,12 +1264,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl --fail --show-error --silent --location --retry 5 --retry-all-errors --retry-delay 3 https://run.surfpool.run/ -o /tmp/install-surfpool.sh
-          for attempt in 1 2 3; do
-            if bash /tmp/install-surfpool.sh; then break; fi
-            if [ "$attempt" -eq 3 ]; then exit 1; fi
-            sleep 5
-          done
+          bash ci/install_surfpool.sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
       - name: Attempt signed standalone DLMM swap on offline Surfpool
@@ -1345,12 +1325,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl --fail --show-error --silent --location --retry 5 --retry-all-errors --retry-delay 3 https://run.surfpool.run/ -o /tmp/install-surfpool.sh
-          for attempt in 1 2 3; do
-            if bash /tmp/install-surfpool.sh; then break; fi
-            if [ "$attempt" -eq 3 ]; then exit 1; fi
-            sleep 5
-          done
+          bash ci/install_surfpool.sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
       - name: Attempt atomic signed Orca-Meteora cycle offline
@@ -1407,12 +1382,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl --fail --show-error --silent --location --retry 5 --retry-all-errors --retry-delay 3 https://run.surfpool.run/ -o /tmp/install-surfpool.sh
-          for attempt in 1 2 3; do
-            if bash /tmp/install-surfpool.sh; then break; fi
-            if [ "$attempt" -eq 3 ]; then exit 1; fi
-            sleep 5
-          done
+          bash ci/install_surfpool.sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
       - name: Start explicitly offline validator and attempt atomic three-hop cycle
