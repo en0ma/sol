@@ -413,6 +413,19 @@ jobs:
           path: ${{ runner.temp }}/meteora-dlmm-fixture.json
           if-no-files-found: ignore
 
+      - name: Inventory verified routes for missing atomic venue pairs
+        env:
+          TOKEN_GRAPH_VERIFICATION_REPORT: ${{ runner.temp }}/token-cycle-verified.json
+          TOKEN_MISSING_PAIR_ROUTE_REPORT: ${{ runner.temp }}/missing-atomic-pair-routes.json
+        run: python3 -m arb.missing_pair_route_inventory
+      - name: Upload missing-pair verified route inventory
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: missing-atomic-pair-verified-routes
+          path: ${{ runner.temp }}/missing-atomic-pair-routes.json
+          if-no-files-found: ignore
+
       - name: Export authenticated Orca and Meteora two-leg fixture
         env:
           TOKEN_MIXED_READINESS_REPORT: ${{ runner.temp }}/mixed-cycle-readiness.json
