@@ -30,3 +30,41 @@ def atomic_pair_matrix():
                  if frozenset(k)==pair]}
             for pair,source in sorted(ATOMIC_PAIR_EVIDENCE.items(),
                                     key=lambda entry:tuple(sorted(entry[0])))]
+
+def complete_pair_matrix(venues=None):
+    """Report each unordered pair, with explicit historical-evidence boundaries."""
+    selected=tuple(sorted(venues if venues is not None else SWAP_BUILDERS))
+    rows=[]
+    for i,left in enumerate(selected):
+        for right in selected[i+1:]:
+            pair=frozenset((left,right))
+            evidence=ATOMIC_PAIR_EVIDENCE.get(pair)
+            closed=[{"order":list(order),"artifact_name":source}
+                    for order,source in sorted(CLOSED_CYCLE_EVIDENCE.items())
+                    if frozenset(order)==pair]
+            rows.append({"venues":[left,right],
+                "both_builders_available":left in SWAP_BUILDERS and right in SWAP_BUILDERS,
+                "historical_signed_atomic_pair_verified":evidence is not None,
+                "historical_atomic_evidence_artifact":evidence,
+                "closed_cycle_orders_verified":closed,
+                "current_ci_run_pair_simulated":False,
+                "arbitrary_pairing_approved":False,"actionable":False,"broadcast":False})
+    return {"status":"HISTORICAL_PAIRWISE_ATOMIC_EVIDENCE",
+        "venue_count":len(selected),"pairs":rows,
+        "historical_verified_pairs":sum(bool(row["historical_signed_atomic_pair_verified"]) for row in rows),
+        "current_ci_run_pair_simulated":False,
+        "profitable_live_execution_verified":False,"actionable":False,"broadcast":False}
+
+def main():
+    import argparse,json
+    from pathlib import Path
+    parser=argparse.ArgumentParser()
+    parser.add_argument("--output",required=True)
+    args=parser.parse_args()
+    report=complete_pair_matrix()
+    Path(args.output).write_text(json.dumps(report,indent=2))
+    print(json.dumps({"status":report["status"],"pairs":len(report["pairs"]),
+        "historical_verified_pairs":report["historical_verified_pairs"],
+        "current_ci_run_pair_simulated":False,"broadcast":False}))
+if __name__=="__main__":
+    main()
