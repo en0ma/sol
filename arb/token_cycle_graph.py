@@ -76,9 +76,11 @@ def fetch_anchor_pool_hints(*, anchors=(SOL, USDC)):
             errors.append({"anchor": anchor, "error": str(exc)[:200]})
     return pools, errors
 
-def candidate_cycles(entries, *, starts=(SOL, USDC), max_cycles=MAX_CYCLES):
+def candidate_cycles(entries, *, starts=(SOL, USDC), max_cycles=MAX_CYCLES, max_hops=3):
     if type(max_cycles) is not int or not 1 <= max_cycles <= MAX_CYCLES:
         raise ValueError("cycle limit must be bounded")
+    if type(max_hops) is not int or not 2 <= max_hops <= 8:
+        raise ValueError("cycle hops must be bounded 2-8")
     if len(entries) > MAX_POOLS:
         raise ValueError("pool registry exceeds bounded graph")
     adjacency = defaultdict(list)
@@ -140,7 +142,7 @@ def candidate_cycles(entries, *, starts=(SOL, USDC), max_cycles=MAX_CYCLES):
                         "broadcast": False,
                     })
                 return
-            if len(legs) >= 3 or (token in path_tokens[:-1]):
+            if len(legs) >= max_hops or (token in path_tokens[:-1]):
                 return
             for destination, pool in adjacency[token]:
                 if len(cycles) >= start_limit:
@@ -203,7 +205,9 @@ def main():
             continue
         seen.add(identity)
         combined.append(pool)
-    report = candidate_cycles(combined[:MAX_POOLS])
+    max_hops=int(os.environ.get("TOKEN_GRAPH_MAX_HOPS","3"))
+    report = candidate_cycles(combined[:MAX_POOLS],max_hops=max_hops)
+    report["configured_max_hops"]=max_hops
     report["registry_entries"] = len(entries)
     report["public_index_hints"] = len(index_hints)
     report["gecko_index_hints"] = len(gecko_hints)
