@@ -37,3 +37,41 @@ class MissingPairInventoryTests(unittest.TestCase):
         self.assertEqual(out["pairings_with_verified_closed_route_candidates"],1)
         self.assertFalse(out["candidates"][0]["selected_route"]["current_assembler_hop_limit_satisfied"])
         self.assertEqual(out["graph_cycle_diagnostics"]["unevidenced_pair_routes"],1)
+
+    def test_authenticated_canonical_venue_reaches_missing_pair_inventory(self):
+        """A verified unclassified Raydium owner becomes a builder-ready pair."""
+        import base64
+        from unittest.mock import patch
+        from arb.token_cycle_verify import verify_graph, RAYDIUM_PROGRAM
+        from arb.orca_whirlpool import USDC
+
+        graph={"cycles":[{"tokens":[SOL,USDC,SOL],"legs":[
+            {"venue":"raydium_unclassified","pool":"cpmm-pool",
+             "from":SOL,"to":USDC},
+            {"venue":"meteora_unclassified","pool":"dlmm-pool",
+             "from":USDC,"to":SOL}]}]}
+        from arb import meteora_dlmm
+        def account_info(url,method,params):
+            owner=(RAYDIUM_PROGRAM if params[0]=="cpmm-pool"
+                   else meteora_dlmm.PROGRAM)
+            return {"value":{"owner":owner,"executable":False,
+                    "data":[base64.b64encode(b"pool").decode(),"base64"]}}
+        with patch("arb.token_cycle_verify.call",side_effect=account_info), \
+             patch("arb.token_cycle_verify.decode",
+                   return_value={"token_0_mint":SOL,"token_1_mint":USDC}), \
+             patch("arb.token_cycle_verify.verify_vaults",
+                   return_value={"verified":True}), \
+             patch("arb.token_cycle_verify.meteora_dlmm.decode",
+                   return_value={"token_x_mint":SOL,"token_y_mint":USDC}), \
+             patch("arb.token_cycle_verify.meteora_dlmm.verify"):
+            verified=verify_graph("http://127.0.0.1:8899",graph)
+        self.assertTrue(verified["cycles"][0]["all_pools_onchain_verified"])
+        result=find_unverified_pairs(verified)
+        self.assertEqual(result["pairings_with_verified_closed_route_candidates"],1)
+        self.assertEqual(result["candidates"][0]["pair"],
+                         ["meteora_dlmm","raydium_cpmm"])
+        self.assertEqual(result["candidates"][0]["selected_route"]["legs"][0]
+                         ["original_venue_hint"],"raydium_unclassified")
+        self.assertFalse(result["candidates"][0]["atomic_signed_simulation_verified"])
+        self.assertFalse(result["actionable"])
+        self.assertFalse(result["broadcast"])
