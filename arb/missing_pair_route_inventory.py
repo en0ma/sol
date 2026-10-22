@@ -14,26 +14,35 @@ def find_unverified_pairs(report):
         raise ValueError("on-chain verified graph cycles required")
     candidates={}
     scanned=Counter()
+    diagnostics=Counter()
     for cycle in cycles:
+        diagnostics["total_graph_cycles"]+=1
         if cycle.get("all_pools_onchain_verified") is not True:
+            diagnostics["unverified_pool_cycles"]+=1
             continue
         legs=cycle.get("legs",[])
         tokens=cycle.get("tokens",[])
-        if (not 2<=len(legs)<=3 or len(tokens)!=len(legs)+1
+        if (not 2<=len(legs)<=8 or len(tokens)!=len(legs)+1
                 or tokens[0]!=tokens[-1] or tokens[0] not in (SOL,USDC)
                 or any(l.get("from")!=tokens[i] or l.get("to")!=tokens[i+1]
                        for i,l in enumerate(legs))):
+            diagnostics["not_closed_or_disconnected"]+=1
             continue
+        diagnostics["verified_closed_cycles"]+=1
         venues=frozenset(l.get("venue") for l in legs)
         if len(venues)!=2 or not venues.issubset(SWAP_BUILDERS):
+            diagnostics["not_two_builder_venues"]+=1
             continue
         if venues in ATOMIC_PAIR_EVIDENCE:
+            diagnostics["already_evidenced_pairing"]+=1
             continue
+        diagnostics["unevidenced_pair_routes"]+=1
         pair=tuple(sorted(venues))
         scanned[pair]+=1
         item={"tokens":tokens,"legs":legs,"venue_pair":list(pair),
               "all_pools_onchain_verified":True,
               "atomic_signed_simulation_verified":False,
+              "current_assembler_hop_limit_satisfied":len(legs)<=3,
               "actionable":False,"broadcast":False}
         key=(len(legs),0 if tokens[0]==SOL else 1,
              tuple((l["venue"],l["pool"]) for l in legs))
@@ -50,6 +59,8 @@ def find_unverified_pairs(report):
             "missing_historical_pairings":missing,
             "pairings_with_verified_closed_route_candidates":len(result),
             "candidates":result,
+            "graph_cycle_diagnostics":dict(diagnostics),
+            "candidate_route_does_not_imply_fixtures_ready":True,
             "no_candidate_does_not_imply_unsupported":True,
             "actionable":False,"live_execution_approved":False,"broadcast":False}
 
