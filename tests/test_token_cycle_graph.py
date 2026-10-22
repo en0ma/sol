@@ -26,6 +26,21 @@ class CycleGraphTests(unittest.TestCase):
             self.assertFalse(cycle["simulation_verified"])
             self.assertFalse(cycle["broadcast"])
 
+    def test_four_hop_unverified_candidate_never_claims_execution(self):
+        a,b,c="mint-A","mint-B","mint-C"
+        entries=[pool("a","orca",S,a),pool("b","raydium_cpmm",a,b),
+                 pool("c","raydium_clmm",b,c),
+                 pool("d","meteora_dlmm",c,S)]
+        self.assertFalse(any(x["hops"]==4 for x in
+            candidate_cycles(entries,starts=(S,))["cycles"]))
+        out=candidate_cycles(entries,starts=(S,),max_hops=4)
+        four=[x for x in out["cycles"] if x["hops"]==4]
+        self.assertEqual(len(four),2)
+        self.assertTrue(all(x["tokens"][0]==x["tokens"][-1] and
+            not x["simulation_verified"] and not x["actionable"] for x in four))
+        with self.assertRaises(ValueError):
+            candidate_cycles(entries,max_hops=9)
+
     def test_unconnected_and_missing_mint_hints_do_not_invent_cycles(self):
         report=candidate_cycles([pool("a","orca",S,U),
                                   pool("b","raydium",U,R),
