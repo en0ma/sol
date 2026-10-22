@@ -16,7 +16,7 @@ PROGRAM_VENUES={
   "Orca Whirlpools":"orca",
 }
 POOL_DECODERS={"orca","raydium_cpmm","raydium_clmm","meteora_dlmm","meteora_damm_v2"}
-EXECUTABLE={"orca","raydium_cpmm"}
+from arb.venue_capabilities import SWAP_BUILDERS, SIGNED_SWAP_VENUES
 
 def probe(rpc):
     results={}
@@ -27,7 +27,8 @@ def probe(rpc):
         venue=PROGRAM_VENUES[name]
         results[venue]={"program":address,"program_verified":available,
              "pool_decoder_available":venue in POOL_DECODERS,
-             "swap_simulator_available":venue in EXECUTABLE,
+             "swap_simulator_available":venue in SIGNED_SWAP_VENUES,
+             "swap_instruction_builder_available":venue in SWAP_BUILDERS,
              "pool_verified":False,
              "status":("READY_FOR_POOL_VALIDATION" if available and venue in POOL_DECODERS
                 else "PROGRAM_ONLY" if available else "PROGRAM_UNAVAILABLE")}
