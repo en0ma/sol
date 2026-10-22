@@ -10,10 +10,10 @@ ROUTE={"tokens":[SOL,RAY,USDC,SOL],"legs":[
     {"venue":"raydium_cpmm","pool":"r","from":RAY,"to":USDC},
     {"venue":"orca","pool":"o2","from":USDC,"to":SOL}]}
 STATES={
-    "o":{"token_mint_a":SOL,"token_mint_b":RAY},
+    "o":{"token_mint_a":SOL,"token_mint_b":RAY,"tick_spacing":64,"fee_tier_index_seed":64},
     "r":{"token_0_mint":USDC,"token_1_mint":RAY,
          "token_0_program":TOKEN_PROGRAM,"token_1_program":TOKEN_PROGRAM},
-    "o2":{"token_mint_a":SOL,"token_mint_b":USDC}}
+    "o2":{"token_mint_a":SOL,"token_mint_b":USDC,"tick_spacing":64,"fee_tier_index_seed":64}}
 ACCOUNTS={SOL:"acct-sol",RAY:"acct-ray",USDC:"acct-usdc"}
 
 class MixedRouteAssemblyTests(unittest.TestCase):
@@ -65,3 +65,13 @@ class MeteoraMixedAssemblyTests(unittest.TestCase):
                 assemble_mixed_cycle(route,{"o":STATES["o"],"m":m},
                     {"o":"orca-oracle","m":"verified-oracle"},ACCOUNTS,"signer",[100,90],[1,1])
             dlmm.assert_not_called()
+
+class AdaptiveOrcaOracleMutabilityTests(unittest.TestCase):
+    @patch("arb.mixed_cycle_assembler.build_cpmm",return_value="cpmm")
+    @patch("arb.mixed_cycle_assembler.build_swap",return_value="orca")
+    def test_orca_adaptive_fee_requests_writable_oracle(self,orca,cpmm):
+        states={**STATES,"o":{**STATES["o"],"tick_spacing":128,"fee_tier_index_seed":64}}
+        assemble_mixed_cycle(ROUTE,states,{"o":"oracle1","o2":"oracle2"},
+                             ACCOUNTS,"signer",[100,90,80],[1,1,1])
+        self.assertTrue(orca.call_args_list[0].kwargs["oracle_writable"])
+        self.assertFalse(orca.call_args_list[1].kwargs["oracle_writable"])
