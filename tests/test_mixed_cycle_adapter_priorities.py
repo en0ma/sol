@@ -16,9 +16,8 @@ class AdapterPrioritiesTests(unittest.TestCase):
             cycle(["orca","raydium_clmm","meteora_dlmm"]),
             cycle(["orca","raydium_clmm","meteora_dlmm"]),
             cycle(["orca","raydium_cpmm","meteora_dlmm"])]})
-        self.assertEqual(r["missing_venue_counts"],{"meteora_dlmm":3,"raydium_clmm":2})
-        self.assertEqual(r["verified_cross_venue_with_builder_types"],0)
-        self.assertEqual(r["candidate_routes_by_fewest_missing_builders"][0]["missing_venue_count"],1)
-        self.assertFalse(r["candidate_routes_by_fewest_missing_builders"][0]["actionable"])
-        self.assertEqual(r["missing_venue_combinations"][0],
-                         {"venues":["meteora_dlmm","raydium_clmm"],"count":2})
+        self.assertEqual(r["missing_venue_counts"],{})
+        self.assertEqual(r["verified_cross_venue_with_builder_types"],3)
+        self.assertEqual(r["prioritized_candidate_total"],0)
+        self.assertFalse(r["routes"][0]["signed_atomic_simulation_verified"])
+        self.assertFalse(r["actionable"])
