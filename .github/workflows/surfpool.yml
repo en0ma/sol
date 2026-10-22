@@ -376,6 +376,20 @@ jobs:
           path: ${{ runner.temp }}/dlmm-bin-preflight.json
           if-no-files-found: ignore
 
+      - name: Export read-only authenticated DLMM offline fixture
+        env:
+          TOKEN_DLMM_BIN_PREFLIGHT_REPORT: ${{ runner.temp }}/dlmm-bin-preflight.json
+          TOKEN_DLMM_FIXTURE_EXPORT_PATH: ${{ runner.temp }}/meteora-dlmm-fixture.json
+        run: python3 -m arb.meteora_dlmm_fixture_export
+
+      - name: Upload authenticated DLMM fixture
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: meteora-dlmm-readonly-offline-fixture
+          path: ${{ runner.temp }}/meteora-dlmm-fixture.json
+          if-no-files-found: ignore
+
       - name: Preflight directional Orca cycle tick arrays
         env:
           TOKEN_GRAPH_VERIFICATION_REPORT: ${{ runner.temp }}/token-cycle-verified.json
