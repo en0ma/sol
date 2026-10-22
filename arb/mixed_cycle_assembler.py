@@ -43,7 +43,8 @@ def assemble_mixed_cycle(route, pool_states, oracles, user_accounts,
             instructions.append(build_swap(
                 leg["pool"],state,authority,user_accounts[a],user_accounts[b],
                 oracles[leg["pool"]],amount,threshold,
-                a_to_b=source==a,amount_specified_is_input=True))
+                a_to_b=source==a,amount_specified_is_input=True,
+                oracle_writable=state["tick_spacing"]!=state["fee_tier_index_seed"]))
         elif venue=="raydium_cpmm":
             a,b=state["token_0_mint"],state["token_1_mint"]
             if (source,target)!=(a,b) and (source,target)!=(b,a):
