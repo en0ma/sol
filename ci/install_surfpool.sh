@@ -2,6 +2,7 @@
 # CI-only Surfpool installer: fail closed on corrupt release downloads.
 set -euo pipefail
 mkdir -p "$HOME/.local/bin"
+export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
 if curl --fail --show-error --silent --location --retry 3 --retry-all-errors --retry-delay 3 \
     https://run.surfpool.run/ -o /tmp/install-surfpool.sh; then
   for attempt in 1 2; do
