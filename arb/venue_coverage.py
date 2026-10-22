@@ -6,7 +6,8 @@ from arb.pool_registry import refresh
 from arb.rpc import call
 
 # Only adapters with demonstrated signed atomic simulation, not guessed availability.
-SIMULATED_SWAP_VENUES={"orca","raydium_cpmm","raydium_clmm"}
+from arb.venue_capabilities import SWAP_BUILDERS, SIGNED_SWAP_VENUES
+SIMULATED_SWAP_VENUES=SIGNED_SWAP_VENUES
 # Amount-aware quote support is not assumed from a pool decoder or swap builder.
 NATIVE_AMOUNT_QUOTE_VENUES=set()
 
@@ -19,6 +20,7 @@ def summarize(verified_pools):
         by_venue[venue]={"validated_pools":len(addresses),
                          "decoder":True,
                          "signed_swap_simulated":venue in SIMULATED_SWAP_VENUES,
+                         "swap_instruction_builder":venue in SWAP_BUILDERS,
                          "amount_aware_native_quote":venue in NATIVE_AMOUNT_QUOTE_VENUES}
     for venue in sorted(set(RECOGNIZED_UNSUPPORTED.values())):
         by_venue[venue]={"validated_pools":0,"decoder":False,
