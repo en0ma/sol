@@ -31,6 +31,37 @@ class MixedRouteAssemblyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"close"):
             assemble_mixed_cycle(bad,STATES,{},ACCOUNTS,"signer",[1,1,1],[1,1,1])
     def test_unsupported_venue_rejected(self):
-        bad={**ROUTE,"legs":[dict(ROUTE["legs"][0],venue="meteora_dlmm"),*ROUTE["legs"][1:]]}
+        bad={**ROUTE,"legs":[dict(ROUTE["legs"][0],venue="pumpswap"),*ROUTE["legs"][1:]]}
         with self.assertRaisesRegex(ValueError,"unsupported"):
             assemble_mixed_cycle(bad,STATES,{},ACCOUNTS,"signer",[1,1,1],[1,1,1])
+
+class MeteoraMixedAssemblyTests(unittest.TestCase):
+    @patch("arb.mixed_cycle_assembler.build_dlmm",return_value="meteora")
+    @patch("arb.mixed_cycle_assembler.build_swap",return_value="orca")
+    def test_official_dlmm_leg_uses_verified_directional_mints(self,orca,dlmm):
+        route={"tokens":[SOL,RAY,SOL],"legs":[
+            {"venue":"orca","pool":"o","from":SOL,"to":RAY},
+            {"venue":"meteora_dlmm","pool":"m","from":RAY,"to":SOL}]}
+        state=dict(STATES["o"])
+        m={"token_x_mint":SOL,"token_y_mint":RAY,"oracle":"verified-oracle",
+           "authenticated_bin_arrays":["authenticated-array"],
+           "active_bin_array_index":10}
+        assembled=assemble_mixed_cycle(
+            route,{"o":state,"m":m},{"o":"orca-oracle","m":"verified-oracle"},
+            ACCOUNTS,"signer",[100,90],[1,1])
+        self.assertEqual(assembled,["orca","meteora"])
+        self.assertFalse(dlmm.call_args.kwargs["input_is_x"])
+        self.assertEqual(dlmm.call_args.args[3:5],("acct-ray","acct-sol"))
+        self.assertFalse(dlmm.call_args.args[1]["input_mint"]==SOL)
+
+    def test_missing_authenticated_bin_arrays_rejected_before_build(self):
+        route={"tokens":[SOL,RAY,SOL],"legs":[
+            {"venue":"orca","pool":"o","from":SOL,"to":RAY},
+            {"venue":"meteora_dlmm","pool":"m","from":RAY,"to":SOL}]}
+        m={"token_x_mint":SOL,"token_y_mint":RAY,"oracle":"verified-oracle"}
+        with patch("arb.mixed_cycle_assembler.build_swap",return_value="orca"), patch(
+            "arb.mixed_cycle_assembler.build_dlmm") as dlmm:
+            with self.assertRaisesRegex(ValueError,"authenticated DLMM bin"):
+                assemble_mixed_cycle(route,{"o":STATES["o"],"m":m},
+                    {"o":"orca-oracle","m":"verified-oracle"},ACCOUNTS,"signer",[100,90],[1,1])
+            dlmm.assert_not_called()
