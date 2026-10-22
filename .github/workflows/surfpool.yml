@@ -15,6 +15,20 @@ permissions:
   actions: read
 
 jobs:
+  pairwise-capability-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unit-test pairwise execution evidence
+        run: python3 -m unittest discover -s tests -p test_atomic_pair_evidence_matrix.py -v
+      - name: Generate all historical pairwise venue evidence
+        run: python3 -m arb.venue_capabilities --output "$RUNNER_TEMP/atomic-venue-pair-matrix.json"
+      - name: Upload independently generated pairwise evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: independent-atomic-pairwise-matrix
+          path: ${{ runner.temp }}/atomic-venue-pair-matrix.json
   surfpool-smoke-test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
