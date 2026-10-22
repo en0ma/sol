@@ -119,6 +119,15 @@ jobs:
 
       - name: Enforce arbitrage mission and development priorities
         run: python3 -m arb.arbitrage_mission
+      - name: Generate historical pairwise atomic execution evidence matrix
+        run: python3 -m arb.venue_capabilities --output "$RUNNER_TEMP/atomic-venue-pair-matrix.json"
+      - name: Upload pairwise atomic evidence matrix
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atomic-venue-pair-evidence-matrix
+          path: ${{ runner.temp }}/atomic-venue-pair-matrix.json
+          if-no-files-found: ignore
       - name: Test honest venue-coverage capability accounting
         run: python3 -m unittest discover -s tests -p test_venue_coverage.py -v
       - name: Test missing-quote venue prioritization across discovered routes
