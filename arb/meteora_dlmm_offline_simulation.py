@@ -82,9 +82,30 @@ def attempt(rpc,fixture):
             "actionable":False,"live_execution_approved":False,"broadcast":False}
     if len(wire)>MAX_TX_BYTES:
         return dict(report,status="DLMM_TRANSACTION_OVER_PACKET_LIMIT")
+    def persistent_balances():
+        response=call(rpc,"getMultipleAccounts",[[user_in,user_out],{"encoding":"base64"}])
+        values=response.get("value")
+        if not isinstance(values,list) or len(values)!=2:
+            raise ValueError("missing persistent DLMM accounts")
+        result=[]
+        for account,mint in zip(values,(mint_in,mint_out)):
+            if not account or account.get("owner")!=TOKEN_PROGRAM:
+                raise ValueError("DLMM persistent token owner mismatch")
+            dec=decode_token_account(base64.b64decode(account["data"][0],validate=True))
+            if dec["mint"]!=mint or dec["authority"]!=authority:
+                raise ValueError("DLMM persistent token mint/authority mismatch")
+            result.append(dec["amount_base_units"])
+        return result
+    before=persistent_balances()
+    if before!=[AMOUNT_IN,0]:
+        raise ValueError("offline DLMM starting account balances invalid")
     result=call(rpc,"simulateTransaction",[base64.b64encode(wire).decode(),{
         "encoding":"base64","sigVerify":True,
         "accounts":{"encoding":"base64","addresses":[user_in,user_out]}}])
+    after=persistent_balances()
+    report["simulation_did_not_persist"]=after==before
+    if after!=before:
+        raise ValueError("DLMM signed simulation changed persistent token balances")
     report["signed_simulation_requested"]=True
     value=result.get("value")
     if not isinstance(value,dict):
@@ -102,7 +123,13 @@ def attempt(rpc,fixture):
     decoded=[decode_token_account(base64.b64decode(x["data"][0],validate=True)) for x in returned]
     if decoded[0]["mint"]!=mint_in or decoded[1]["mint"]!=mint_out or any(x["authority"]!=authority for x in decoded):
         raise ValueError("DLMM simulated output account mismatch")
+    report["simulated_input_remaining_base_units"]=decoded[0]["amount_base_units"]
+    report["simulated_input_spent_base_units"]=before[0]-decoded[0]["amount_base_units"]
     report["simulated_output_base_units"]=decoded[1]["amount_base_units"]
+    if (decoded[0]["amount_base_units"]>=AMOUNT_IN or
+            decoded[1]["amount_base_units"]<=0 or
+            decoded[0]["amount_base_units"]<0):
+        return dict(report,status="DLMM_TOKEN_BALANCE_CHANGE_INVALID")
     report["status"]="SIGNED_DLMM_STANDALONE_SIMULATED"
     return report
 
