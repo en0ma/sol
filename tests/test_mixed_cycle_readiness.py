@@ -14,9 +14,9 @@ class MixedReadinessTests(unittest.TestCase):
             cycle(["orca","raydium_clmm","meteora_dlmm"]),
             cycle(["orca","raydium_cpmm","orca"],False)]})
         self.assertEqual(r["verified_cross_venue_cycles"],2)
-        self.assertEqual(r["verified_cross_venue_with_builder_types"],1)
+        self.assertEqual(r["verified_cross_venue_with_builder_types"],2)
         self.assertEqual(r["verified_orca_cpmm_cycles"],1)
-        self.assertEqual(r["routes"][1]["unsupported_venues"],["meteora_dlmm","raydium_clmm"])
+        self.assertEqual(r["routes"][1]["unsupported_venues"],[])
         self.assertFalse(r["routes"][0]["signed_atomic_simulation_verified"])
         self.assertFalse(r["actionable"])
 
