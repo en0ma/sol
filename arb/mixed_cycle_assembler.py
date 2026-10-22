@@ -8,6 +8,7 @@ from arb.orca_whirlpool import SOL, USDC
 from arb.whirlpool_swap import build_swap
 from arb.raydium_swap import instruction as build_cpmm
 from arb.token_vaults import TOKEN_PROGRAM
+from arb.meteora_dlmm_swap import build_swap as build_dlmm
 
 MAX_HOPS=3
 
@@ -54,6 +55,22 @@ def assemble_mixed_cycle(route, pool_states, oracles, user_accounts,
                 leg["pool"],state,authority,user_accounts[source],user_accounts[target],
                 amount,threshold,input_is_token_0=source==a,exact_output=False,
                 expected_mints=None))
+        elif venue=="meteora_dlmm":
+            x,y=state["token_x_mint"],state["token_y_mint"]
+            if (source,target) not in ((x,y),(y,x)):
+                raise ValueError("DLMM onchain pool mints disagree")
+            oracle=oracles.get(leg["pool"])
+            if not isinstance(oracle,str) or oracle!=state.get("oracle"):
+                raise ValueError("authenticated DLMM oracle mismatch")
+            arrays=state.get("authenticated_bin_arrays")
+            if not isinstance(arrays,(list,tuple)) or not arrays:
+                raise ValueError("authenticated DLMM bin arrays required")
+            enriched=dict(state,input_mint=source,output_mint=target)
+            instructions.append(build_dlmm(
+                leg["pool"],enriched,authority,user_accounts[source],
+                user_accounts[target],oracle,arrays,amount,threshold,
+                input_is_x=source==x,
+                bitmap_extension=state.get("bitmap_extension")))
         else:
             raise ValueError("unsupported executable venue: "+str(venue))
     return instructions
