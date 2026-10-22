@@ -325,6 +325,7 @@ jobs:
         env:
           TOKEN_GRAPH_INDEX_ENABLED: "1"
           TOKEN_GRAPH_GECKO_ENABLED: "1"
+          TOKEN_GRAPH_MAX_HOPS: "4"
         run: python3 -m arb.token_cycle_graph > "${{ runner.temp }}/token-cycle-graph.json"
 
       - name: Upload unverified token graph candidates
