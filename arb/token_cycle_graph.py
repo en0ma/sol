@@ -9,6 +9,7 @@ import os
 from urllib.request import Request, urlopen
 from solders.pubkey import Pubkey
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 MAX_POOLS = 500
@@ -178,11 +179,22 @@ def main():
         entries = json.load(stream)["pools"]
     index_hints, index_errors = ([], [])
     gecko_hints, gecko_errors = ([], [])
-    if os.environ.get("TOKEN_GRAPH_INDEX_ENABLED") == "1":
-        index_hints, index_errors = fetch_anchor_pool_hints()
-    if os.environ.get("TOKEN_GRAPH_GECKO_ENABLED") == "1":
-        from arb.gecko_anchor_index import fetch_gecko_anchor_hints
-        gecko_hints, gecko_errors = fetch_gecko_anchor_hints()
+    index_enabled=os.environ.get("TOKEN_GRAPH_INDEX_ENABLED") == "1"
+    gecko_enabled=os.environ.get("TOKEN_GRAPH_GECKO_ENABLED") == "1"
+    # Independent public-index reads overlap; their results remain untrusted
+    # hints, and on-chain validation still happens separately and sequentially.
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        index_future=(executor.submit(fetch_anchor_pool_hints)
+                      if index_enabled else None)
+        if gecko_enabled:
+            from arb.gecko_anchor_index import fetch_gecko_anchor_hints
+            gecko_future=executor.submit(fetch_gecko_anchor_hints)
+        else:
+            gecko_future=None
+        if index_future:
+            index_hints,index_errors=index_future.result()
+        if gecko_future:
+            gecko_hints,gecko_errors=gecko_future.result()
     # Deduplicate by venue+address before the 500-pool graph limit.
     combined, seen = [], set()
     for pool in entries + index_hints + gecko_hints:
