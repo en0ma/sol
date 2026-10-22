@@ -20,6 +20,7 @@ def assess_mixed_routes(verified):
     missing_venue_sets=Counter()
     supported_venue_sets=Counter()
     prioritized=[]
+    dlmm_targets=[]
     for cycle in cycles:
         if not cycle.get("all_pools_onchain_verified"):
             continue
@@ -41,6 +42,11 @@ def assess_mixed_routes(verified):
             counts["available_builder_types"]+=1
         else:
             counts["unsupported_builder_types"]+=1
+        if (venues=={"orca","meteora_dlmm"} and len(legs)==2
+                and tokens[0] in (SOL,USDC)):
+            dlmm_targets.append({"tokens":tokens,"legs":legs,
+                                 "missing_venues":[],"missing_venue_count":0,
+                                 "actionable":False,"broadcast":False})
         if missing:
             prioritized.append({"tokens":tokens,"legs":legs,
                                 "missing_venues":sorted(missing),
@@ -58,9 +64,10 @@ def assess_mixed_routes(verified):
         len(item["legs"]),
         tuple(item["missing_venues"]),
         tuple((leg["venue"],leg["pool"]) for leg in item["legs"])))
-    priority_target = next((item for item in prioritized
-        if item["missing_venues"] == ["meteora_dlmm"]
-        and item["tokens"][0] in (SOL,USDC)), None)
+    dlmm_targets.sort(key=lambda item:(0 if item["tokens"][0]==SOL else 1,
+        tuple((leg["venue"],leg["pool"]) for leg in item["legs"])))
+    priority_target = next((item for item in dlmm_targets
+        if item["legs"][0]["venue"]=="meteora_dlmm"), None)
     prioritized_total=len(prioritized)
     prioritized=prioritized[:MAX_REPORT_ROUTES]
     return {"status":"MIXED_ROUTE_BUILDER_READINESS_ONLY",
