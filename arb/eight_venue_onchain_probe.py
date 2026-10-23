@@ -40,12 +40,13 @@ def verify_legacy(rpc,venue,address):
     if not pool or pool.get("owner")!=program or pool.get("executable") is not False:
         raise ValueError("legacy pool program owner mismatch")
     state=decoder(base64.b64decode(pool["data"][0],validate=True))
+    extra=[state["market_id"]] if venue=="raydium_amm_v4" else []
     vault_response=call(rpc,"getMultipleAccounts",[
-        [address,state[vault_a],state[vault_b]],
+        [address,state[vault_a],state[vault_b],*extra],
         {"encoding":"base64","commitment":"confirmed","minContextSlot":slot}])
     values=vault_response.get("value")
     next_slot=vault_response.get("context",{}).get("slot")
-    if type(next_slot)is not int or next_slot<slot or not isinstance(values,list) or len(values)!=3:
+    if type(next_slot)is not int or next_slot<slot or not isinstance(values,list) or len(values)!=3+len(extra):
         raise ValueError("incomplete legacy pool/vault snapshot")
     if not values[0] or values[0].get("owner")!=program or values[0].get("executable") is not False:
         raise ValueError("legacy pool owner changed")
@@ -61,6 +62,20 @@ def verify_legacy(rpc,venue,address):
             raise ValueError("legacy pool vault mint or reserve mismatch")
         amounts.append(token["amount_base_units"])
         authorities.append(token["authority"])
+    if venue=="raydium_amm_v4":
+        # OpenBook/Serum v3 MarketState is padded by five bytes on each
+        # side; mint fields are at offsets 53 and 85 in raw account data.
+        market=values[3]
+        if (not market or market.get("owner")!=state["market_program"]
+                or market.get("executable") is not False):
+            raise ValueError("Raydium market owner mismatch")
+        raw=base64.b64decode(market["data"][0],validate=True)
+        if len(raw)<117 or raw[:5]!=b"serum":
+            raise ValueError("unsupported Raydium OpenBook market layout")
+        from arb.orca_whirlpool import b58
+        if (b58(raw[53:85])!=state["base_mint"]
+                or b58(raw[85:117])!=state["quote_mint"]):
+            raise ValueError("Raydium market token mint mismatch")
     if venue=="orca_token_swap_v1":
         from solders.pubkey import Pubkey
         expected=str(Pubkey.create_program_address([
