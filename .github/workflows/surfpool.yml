@@ -37,6 +37,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_damm_v2_signed_preflight.py -v
       - name: Test authenticated DAMM v2 signed standalone simulation runner
         run: python3 -m unittest discover -s tests -p test_meteora_damm_v2_signed_runner.py -v
+      - name: Test opt-in DAMM v2 real-fork signed execution harness
+        run: python3 -m unittest discover -s tests -p test_damm_v2_fork_execution.py -v
       - name: Test cryptographically signed standalone swap post-state verifier
         run: python3 -m unittest discover -s tests -p test_signed_standalone_swap_verifier.py -v
       - name: Test signed atomic instruction order and intermediate account preflight
