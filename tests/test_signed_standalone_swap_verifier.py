@@ -9,6 +9,7 @@ try:
     from solders.hash import Hash
     from solders.transaction import Transaction
     from solders.instruction import Instruction
+    from solders.pubkey import Pubkey
     HAVE_SOLDERS=True
 except ImportError:
     HAVE_SOLDERS=False
@@ -23,8 +24,7 @@ class SignedStandaloneSwapVerifierTests(unittest.TestCase):
         self.mint_in=str(Keypair().pubkey())
         self.mint_out=str(Keypair().pubkey())
         self.wire=bytes(Transaction.new_signed_with_payer(
-            [Instruction(Keypair.from_bytes(bytes(self.payer)).pubkey(),b"ignored",[]),
-             Instruction(__import__("solders.pubkey",fromlist=["Pubkey"]).Pubkey.from_string(self.program),b"swap",[])],
+            [Instruction(Pubkey.from_string(self.program),b"swap",[])],
             self.payer.pubkey(),[self.payer],Hash.default()))
 
     def args(self):
