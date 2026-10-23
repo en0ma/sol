@@ -43,12 +43,19 @@ def verify_signed_atomic(rpc,signed_bytes,*,first_program,second_program,
     logs=value.get("logs")
     if not isinstance(logs,list):
         raise ValueError("missing atomic execution logs")
-    # Explicit invocation and successful exit required for each venue program.
-    for program in (first_program,second_program):
-        if not any(line.startswith("Program "+program+" invoke [") for line in logs):
-            raise ValueError("missing venue program invocation: "+program)
-        if not any(line=="Program "+program+" success" for line in logs):
-            raise ValueError("venue program success absent: "+program)
+    # Program invocations must appear in the requested order. A pair of
+    # unrelated successful invocations is not sufficient to prove token flow.
+    events=[]
+    for line in logs:
+        for program in (first_program,second_program):
+            if line.startswith("Program "+program+" invoke ["):
+                events.append((program,"invoke"))
+            elif line=="Program "+program+" success":
+                events.append((program,"success"))
+    expected=[(first_program,"invoke"),(first_program,"success"),
+              (second_program,"invoke"),(second_program,"success")]
+    if events!=expected:
+        raise ValueError("venue invocation/success order mismatch or duplicate execution")
     post=value.get("accounts")
     if not isinstance(post,list) or len(post)!=3:
         raise ValueError("missing three-account atomic post-state")
@@ -67,9 +74,10 @@ def verify_signed_atomic(rpc,signed_bytes,*,first_program,second_program,
     gained=final[2]-initial_output
     if not 0<spent<=max_input or gained<minimum_output:
         raise ValueError("atomic swap did not meet input/output balance constraints")
-    if final[1]<initial_intermediate:
-        raise ValueError("intermediate token account was depleted beyond initial balance")
-    return {"signed_atomic_simulation_verified":True,
+    if final[1]!=initial_intermediate:
+        raise ValueError("intermediate token account final balance differs from initial balance")
+    return {"signed_atomic_simulation_verified":False,
+            "two_venue_invocations_and_terminal_balances_verified":True,
             "first_program":first_program,"second_program":second_program,
             "spent_input_base_units":spent,"received_output_base_units":gained,
             "intermediate_post_balance":final[1],
