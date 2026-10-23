@@ -14,6 +14,8 @@ def main():
     parser.add_argument("--dex-id",default=None,
                         help="explicit GeckoTerminal Solana DEX ID (never guessed)")
     parser.add_argument("--min-liquidity-usd",type=float,default=10000)
+    parser.add_argument("--max-matches",type=int,default=64)
+    parser.add_argument("--max-pages",type=int,default=8)
     args=parser.parse_args()
     candidates=[]
     result={"source":"GeckoTerminal Solana DEX pool index",
@@ -28,7 +30,8 @@ def main():
             if "orca" not in ((catalog[args.dex_id] or "")+" "+args.dex_id).lower():
                 raise ValueError("selected DEX does not have an Orca label")
             candidates=discover(dex_id=args.dex_id,
-                                min_liquidity_usd=args.min_liquidity_usd)
+                                min_liquidity_usd=args.min_liquidity_usd,
+                                max_matches=args.max_matches,max_pages=args.max_pages)
             result["status"]="CANDIDATES_UNVERIFIED"
         else:
             result["status"]="DEX_SELECTION_REQUIRED"
