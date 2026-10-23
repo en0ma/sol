@@ -4,6 +4,7 @@ Separate pool decoding, instruction building, signed standalone simulation,
 and ordered cross-venue atomic simulation. Never infer one gate from another.
 """
 from itertools import permutations
+import importlib
 import json
 
 TARGET_VENUES=(
@@ -13,17 +14,28 @@ TARGET_VENUES=(
 )
 
 def execution_matrix():
+    from arb.eight_venue_onchain_probe import BUILDERS, LEGACY
     from arb.onchain_pool_discovery import VENUES
-    from arb.venue_capabilities import SWAP_BUILDERS, SIGNED_SWAP_VENUES, ATOMIC_PAIR_EVIDENCE
+    from arb.venue_capabilities import SIGNED_SWAP_VENUES, ATOMIC_PAIR_EVIDENCE
     from arb.venue_watchlist import RECOGNIZED_UNSUPPORTED
 
     recognized=set(VENUES)|set(RECOGNIZED_UNSUPPORTED.values())
     if set(TARGET_VENUES)!=recognized:
         raise ValueError("execution target and recognized venue registry disagree")
+    # Code inventory and on-chain/execution proofs are distinct gates.
+    decoder_present={venue:(venue in VENUES or
+        callable(getattr(importlib.import_module(LEGACY[venue][0]),"decode",None)))
+        for venue in TARGET_VENUES}
+    builder_present={}
+    for venue in TARGET_VENUES:
+        module=importlib.import_module(BUILDERS[venue])
+        builder_present[venue]=any(callable(getattr(module,name,None))
+            for name in ("build","instruction","build_swap","build_swap2",
+                         "build_swap_v2","build_instruction"))
     rows=[]
     for venue in TARGET_VENUES:
-        decoder=venue in VENUES
-        builder=venue in SWAP_BUILDERS
+        decoder=decoder_present[venue]
+        builder=builder_present[venue]
         historical=venue in SIGNED_SWAP_VENUES
         rows.append({
             "venue":venue,
@@ -38,8 +50,8 @@ def execution_matrix():
         historical_pair=ATOMIC_PAIR_EVIDENCE.get(frozenset((first,second)))
         ordered.append({
             "first_venue":first,"second_venue":second,
-            "both_decoders_implemented":first in VENUES and second in VENUES,
-            "both_builders_implemented":first in SWAP_BUILDERS and second in SWAP_BUILDERS,
+            "both_decoders_implemented":decoder_present[first] and decoder_present[second],
+            "both_builders_implemented":builder_present[first] and builder_present[second],
             "unordered_historical_pair_evidence":historical_pair,
             "this_execution_order_verified":False,
             "current_run_atomic_execution_verified":False,
