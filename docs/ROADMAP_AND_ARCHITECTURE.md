@@ -4,13 +4,23 @@
 **Last consolidated:** 2026-10-23.  
 **Applies to:** all subsequent contributors, coding agents and conversations. Read with root [AGENTS.md](../AGENTS.md).
 
+## Scope decision — 2026-10-23 (supersedes earlier eight-venue requirements)
+
+**User-approved active scope: seven venues.** Orca deprecated its original Token Swap v1/standard pools and migrated its supported liquidity focus to Whirlpools. Retire `orca_token_swap_v1` from mandatory discovery, fork authentication, standalone signed execution, and atomic pair acceptance. Preserve its existing adapter and optional legacy tests for reference, but **do not count it as an active eighth venue** or spend active CI/API budget seeking v1 pools. Deprecation does not establish that no old onchain pools exist.
+
+**Active set:** `orca` (Whirlpool), `raydium_cpmm`, `raydium_clmm`, `meteora_dlmm`, `meteora_damm_v2`, `pumpswap`, `raydium_amm_v4`.
+
+**Revised acceptance:** 7 pool decoder and builder implementations, seven onchain-authenticated venue snapshots, seven signed standalone local-fork swap proofs, and **42 ordered cross-venue atomic directions** (21 unordered pairs), each subject to shared-token route feasibility, successful X→Y→Z evidence, and negative rollback tests. Missing compatible routes must be reported distinctly from broken adapters. Do not upgrade historical success or mocked unit-test gates.
+
+Earlier sections below describing **eight** venues, **56** ordered pairs, or Orca v1 mandatory discovery are **historical superseded requirements**. The source of truth for active targets is `arb/execution_target_matrix.py`. All work stays simulation-only with `actionable=false`, `live_execution_approved=false`, `broadcast=false`.
+
 ## 1. Mission and non-goals
 
 Build a Solana **simulation-only** research and verification system capable of discovering pools across eight DEX venue implementations, authenticating their on-chain state, decoding them, constructing valid swap instructions, verifying each venue's signed standalone swap simulation, and proving **atomic, ordered, two-venue swaps** on a local Surfpool mainnet fork. Eventually use fresh pool coverage to study arbitrage opportunities, but **profitable discovery, trade execution, and live broadcasting are not acceptance criteria for the current implementation phase**.
 
 Do not broadcast real transactions, use funded execution wallets, or treat simulated profitability as live-trading approval. All output defaults: `actionable=false`, `live_execution_approved=false`, `broadcast=false`. Explicit future authorization and a separate risk/security review would be required to change that boundary.
 
-## 2. Eight target venues
+## 2. Original eight-venue scope (historical; superseded by seven-venue decision above)
 
 The eight distinct protocol adapters are:
 
