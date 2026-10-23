@@ -8,14 +8,16 @@ from pathlib import Path
 from arb.execution_target_matrix import TARGET_VENUES
 
 def validate(report):
-    if not isinstance(report,dict) or report.get("status")!="EIGHT_VENUE_ONCHAIN_READONLY_PROBE":
-        raise ValueError("wrong eight-venue probe status")
+    if not isinstance(report,dict) or report.get("status")!="SEVEN_VENUE_ONCHAIN_READONLY_PROBE":
+        raise ValueError("wrong seven-venue probe status")
     for flag in ("actionable","live_execution_approved","broadcast"):
         if report.get(flag) is not False:
             raise ValueError(flag+" must be false")
+    if report.get("archived_optional_venues")!=["orca_token_swap_v1"]:
+        raise ValueError("archived venue declaration missing")
     rows=report.get("venues")
     if not isinstance(rows,list) or len(rows)!=len(TARGET_VENUES):
-        raise ValueError("expected eight venue rows")
+        raise ValueError("expected seven active venue rows")
     if tuple(row.get("venue") for row in rows if isinstance(row,dict))!=TARGET_VENUES:
         raise ValueError("venue identities/order do not match target")
     decoder=builder=0
