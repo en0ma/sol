@@ -2,17 +2,19 @@ import unittest
 from arb.execution_target_matrix import execution_matrix, TARGET_VENUES
 
 class ExecutionTargetMatrixTests(unittest.TestCase):
-    def test_all_eight_venues_and_all_56_orders_included(self):
+    def test_all_seven_active_venues_and_all_42_orders_included(self):
         report=execution_matrix()
-        self.assertEqual(report["venue_target"],8)
-        self.assertEqual(len(report["venues"]),8)
-        self.assertEqual(report["decoder_implemented"],8)
-        self.assertEqual(report["builder_implemented"],8)
-        self.assertEqual(report["unordered_pair_target"],28)
-        self.assertEqual(report["ordered_pair_target"],56)
+        self.assertEqual(report["venue_target"],7)
+        self.assertEqual(len(report["venues"]),7)
+        self.assertEqual(report["decoder_implemented"],7)
+        self.assertEqual(report["builder_implemented"],7)
+        self.assertEqual(report["unordered_pair_target"],21)
+        self.assertEqual(report["ordered_pair_target"],42)
         self.assertEqual(len({(p["first_venue"],p["second_venue"])
-                              for p in report["ordered_pairs"]}),56)
+                              for p in report["ordered_pairs"]}),42)
         self.assertEqual({r["venue"] for r in report["venues"]},set(TARGET_VENUES))
+        self.assertEqual(report["archived_optional_venues"],["orca_token_swap_v1"])
+        self.assertNotIn("orca_token_swap_v1",TARGET_VENUES)
 
     def test_builder_not_equivalent_to_current_execution(self):
         report=execution_matrix()
@@ -35,7 +37,7 @@ class ExecutionTargetMatrixTests(unittest.TestCase):
         self.assertIsNotNone(pair["unordered_historical_pair_evidence"])
         self.assertFalse(pair["this_execution_order_verified"])
 
-    def test_all_eight_modules_present_but_no_new_execution_claim(self):
+    def test_all_seven_active_modules_present_but_no_new_execution_claim(self):
         report=execution_matrix()
         venues={v["venue"]:v for v in report["venues"]}
         for name in TARGET_VENUES:
