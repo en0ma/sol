@@ -14,6 +14,7 @@ def find_unverified_pairs(report):
         raise ValueError("on-chain verified graph cycles required")
     candidates={}
     scanned=Counter()
+    hop_counts={}
     diagnostics=Counter()
     for cycle in cycles:
         diagnostics["total_graph_cycles"]+=1
@@ -39,6 +40,7 @@ def find_unverified_pairs(report):
         diagnostics["unevidenced_pair_routes"]+=1
         pair=tuple(sorted(venues))
         scanned[pair]+=1
+        hop_counts.setdefault(pair,Counter())[len(legs)]+=1
         item={"tokens":tokens,"legs":legs,"venue_pair":list(pair),
               "all_pools_onchain_verified":True,
               "atomic_signed_simulation_verified":False,
@@ -49,6 +51,9 @@ def find_unverified_pairs(report):
         if pair not in candidates or key<candidates[pair][0]:
             candidates[pair]=(key,item)
     result=[{"pair":list(pair),"verified_candidate_routes":scanned[pair],
+             "verified_route_hop_counts":{str(n):count for n,count in sorted(hop_counts[pair].items())},
+             "assembler_compatible_verified_routes":sum(count for n,count in hop_counts[pair].items() if n<=3),
+             "shortest_verified_route_hops":min(hop_counts[pair]),
              "selected_route":candidates[pair][1],
              "atomic_signed_simulation_verified":False}
             for pair in sorted(candidates)]
