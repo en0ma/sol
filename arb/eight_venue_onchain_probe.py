@@ -20,7 +20,7 @@ LEGACY={
                           "token_a_mint","token_b_mint","token_a_vault","token_b_vault"),
 }
 BUILDERS={
-    "orca":"arb.orca_swap","raydium_cpmm":"arb.raydium_swap",
+    "orca":"arb.whirlpool_swap","raydium_cpmm":"arb.raydium_swap",
     "raydium_clmm":"arb.raydium_clmm_swap","meteora_dlmm":"arb.meteora_dlmm_swap",
     "meteora_damm_v2":"arb.meteora_damm_v2_swap",
     "pumpswap":"arb.pumpswap_swap","raydium_amm_v4":"arb.raydium_amm_v4_swap",
@@ -90,7 +90,7 @@ def probe(rpc,registry):
         module=BUILDERS[venue]
         builder_module=importlib.import_module(module)
         builder_implemented=any(callable(getattr(builder_module,name,None))
-                                for name in ("build","build_swap","build_swap2",
+                                for name in ("build","instruction","build_swap","build_swap2",
                                              "build_swap_v2","build_instruction"))
         candidates=[entry["address"] for entry in entries if entry.get("venue")==venue]
         evidence=None
