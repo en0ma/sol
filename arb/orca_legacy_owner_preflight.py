@@ -36,6 +36,7 @@ def preflight(rpc,addresses):
         accounts.extend(values)
     matching=[]
     mismatch=missing=0
+    owners={}
     for address,account in zip(unique,accounts):
         if account is None:
             missing+=1
@@ -43,12 +44,17 @@ def preflight(rpc,addresses):
             raise ValueError("malformed Orca index account")
         elif account.get("owner")==ORCA_TOKEN_SWAP_V1 and account.get("executable") is False:
             matching.append(address)
+            owners[ORCA_TOKEN_SWAP_V1]=owners.get(ORCA_TOKEN_SWAP_V1,0)+1
         else:
             mismatch+=1
+            owner=account.get("owner")
+            owner=owner if isinstance(owner,str) and 1<=len(owner)<=64 else "INVALID_OWNER"
+            owners[owner]=owners.get(owner,0)+1
     return {"status":"PROGRAM_OWNER_CANDIDATES_ONLY",
             "matching_program":matching[:MAX_OUTPUT],
             "matching_program_total":len(matching),
             "checked":len(unique),"mismatched_owner":mismatch,"missing":missing,
+            "owners_by_program":dict(sorted(owners.items())),
             "truncated":len(matching)>MAX_OUTPUT,
             "onchain_pool_decoder_verified":False,
             "actionable":False,"live_execution_approved":False,"broadcast":False}
