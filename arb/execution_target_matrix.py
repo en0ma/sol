@@ -4,8 +4,9 @@ Separate pool decoding, instruction building, signed standalone simulation,
 and ordered cross-venue atomic simulation. Never infer one gate from another.
 """
 from itertools import permutations
-import importlib
+import ast
 import json
+from pathlib import Path
 
 TARGET_VENUES=(
     "orca", "raydium_cpmm", "raydium_clmm", "meteora_dlmm",
@@ -22,16 +23,23 @@ def execution_matrix():
     recognized=set(VENUES)|set(RECOGNIZED_UNSUPPORTED.values())
     if set(TARGET_VENUES)!=recognized:
         raise ValueError("execution target and recognized venue registry disagree")
-    # Code inventory and on-chain/execution proofs are distinct gates.
+    # Parse source instead of importing runtime modules: offline CI does not
+    # install solders. Syntax-level inventory is NOT execution proof.
+    def has_function(module,names):
+        path=Path(__file__).resolve().parents[1].joinpath(*module.split(".")).with_suffix(".py")
+        if not path.is_file():
+            return False
+        tree=ast.parse(path.read_text())
+        defined={node.name for node in tree.body
+                 if isinstance(node,(ast.FunctionDef,ast.AsyncFunctionDef))}
+        return bool(defined.intersection(names))
     decoder_present={venue:(venue in VENUES or
-        callable(getattr(importlib.import_module(LEGACY[venue][0]),"decode",None)))
+        has_function(LEGACY[venue][0],{"decode"}))
         for venue in TARGET_VENUES}
-    builder_present={}
-    for venue in TARGET_VENUES:
-        module=importlib.import_module(BUILDERS[venue])
-        builder_present[venue]=any(callable(getattr(module,name,None))
-            for name in ("build","instruction","build_swap","build_swap2",
-                         "build_swap_v2","build_instruction"))
+    builder_names={"build","instruction","build_swap","build_swap2",
+                   "build_swap_v2","build_instruction"}
+    builder_present={venue:has_function(BUILDERS[venue],builder_names)
+                     for venue in TARGET_VENUES}
     rows=[]
     for venue in TARGET_VENUES:
         decoder=decoder_present[venue]
