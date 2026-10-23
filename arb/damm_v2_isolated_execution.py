@@ -58,7 +58,7 @@ def export(rpc, output, pool=POOL):
     accounts.update(extra)
     pd = accounts[programdata]
     pd_bytes = base64.b64decode(pd["data"][0], validate=True)
-    if pd.get("owner") != LOADER or len(pd_bytes) < 49 or pd_bytes[:4] != bytes([3, 0, 0, 0]) or pd_bytes[45:49] != b"\\x7fELF":
+    if pd.get("owner") != LOADER or len(pd_bytes) < 49 or pd_bytes[:4] != bytes([3, 0, 0, 0]) or pd_bytes[45:49] != bytes([127, 69, 76, 70]):
         raise ValueError("DAMM executable programdata unavailable")
     payload = {"source": "READ_ONLY_MAINNET_BACKED_SURFPOOL",
                "pool": pool, "slot": evidence["slot"], "accounts": accounts,
@@ -87,7 +87,7 @@ def offline(rpc, fixture, output, *, amount_in=1000, min_amount_out=1, input_is_
         programdata = str(Pubkey.from_bytes(raw[4:36]))
         pd = accounts[programdata]
         elf = base64.b64decode(pd["data"][0], validate=True)
-        if pd.get("owner") != LOADER or elf[:4] != bytes([3, 0, 0, 0]) or elf[45:49] != b"\\x7fELF":
+        if pd.get("owner") != LOADER or elf[:4] != bytes([3, 0, 0, 0]) or elf[45:49] != bytes([127, 69, 76, 70]):
             raise ValueError("invalid captured DAMM executable")
         # Only the dedicated offline process may receive synthetic account writes.
         for address, entry in accounts.items():
