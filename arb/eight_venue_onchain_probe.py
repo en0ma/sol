@@ -93,7 +93,8 @@ def verify_legacy(rpc,venue,address):
             "slot":next_slot,"mints":[state[mint_a],state[mint_b]],
             "vault_base_units":amounts,"signed_swap_simulated":False}
 
-def probe(rpc,registry,*,discover_legacy=False,public_raydium_candidates=()):
+def probe(rpc,registry,*,discover_legacy=False,public_raydium_candidates=(),
+          public_orca_legacy_candidates=()):
     from arb.pumpswap_local_simulation import local_rpc_only
     # Allow only local fork RPC. This probe never queries public RPC directly.
     local_rpc_only(rpc)
@@ -115,6 +116,8 @@ def probe(rpc,registry,*,discover_legacy=False,public_raydium_candidates=()):
                     and isinstance(entry.get("address"),str)]
         if venue=="raydium_amm_v4":
             candidates=list(dict.fromkeys(candidates+list(public_raydium_candidates)))
+        elif venue=="orca_token_swap_v1":
+            candidates=list(dict.fromkeys(candidates+list(public_orca_legacy_candidates)))
         evidence=None
         errors=[]
         discovered=[]
@@ -161,6 +164,8 @@ def main():
     parser.add_argument("--discover-legacy",action="store_true")
     parser.add_argument("--public-raydium-candidates",default=None,
                         help="JSON array of untrusted API-discovered Raydium AMM v4 addresses")
+    parser.add_argument("--public-orca-legacy-candidates",default=None,
+                        help="JSON array of untrusted indexed Orca Token Swap v1 pool addresses")
     parser.add_argument("--output",required=True)
     args=parser.parse_args()
     public_candidates=[]
@@ -170,9 +175,17 @@ def main():
                 not isinstance(address,str) or not 32<=len(address)<=44
                 for address in public_candidates):
             raise ValueError("invalid public Raydium candidate list")
+    orca_candidates=[]
+    if args.public_orca_legacy_candidates:
+        orca_candidates=json.loads(Path(args.public_orca_legacy_candidates).read_text())
+        if not isinstance(orca_candidates,list) or len(orca_candidates)>16 or any(
+                not isinstance(address,str) or not 32<=len(address)<=44
+                for address in orca_candidates):
+            raise ValueError("invalid public Orca legacy candidate list")
     result=probe(args.rpc,json.loads(Path(args.registry).read_text()),
                  discover_legacy=args.discover_legacy,
-                 public_raydium_candidates=public_candidates)
+                 public_raydium_candidates=public_candidates,
+                 public_orca_legacy_candidates=orca_candidates)
     Path(args.output).write_text(json.dumps(result,indent=2)+"\n")
     print(json.dumps({k:result[k] for k in (
         "status","decoder_verified_count","builder_code_count",
