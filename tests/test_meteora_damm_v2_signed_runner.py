@@ -39,14 +39,19 @@ class DammV2SignedRunnerTests(unittest.TestCase):
     def test_local_signed_runner_wires_authenticated_pool_and_output_floor(self):
         from arb.meteora_damm_v2 import PROGRAM
         ix=Instruction(Pubkey.from_string(PROGRAM),b"swap",[])
-        with patch("arb.meteora_damm_v2_signed_runner.verify_user_accounts") as account_check:
-            with patch("arb.meteora_damm_v2_signed_runner.build_swap2",
-                       return_value=ix) as builder:
-                with patch("arb.rpc.call",return_value={
-                        "value":{"blockhash":str(Hash.default())}}):
-                    with patch("arb.meteora_damm_v2_signed_runner.verify_signed_swap",
-                               return_value={"signed_standalone_simulation_verified":True}) as verify:
-                        result=sign_and_simulate("http://localhost:8899",**self.kwargs())
+        with patch("arb.meteora_damm_v2_signed_runner.authenticate_pool",
+                   return_value={"pool_reauthenticated":True,
+                                 "authenticated_slot":102}) as authenticate:
+            with patch("arb.meteora_damm_v2_signed_runner.verify_user_accounts") as account_check:
+                with patch("arb.meteora_damm_v2_signed_runner.build_swap2",
+                           return_value=ix) as builder:
+                    with patch("arb.rpc.call",return_value={
+                            "value":{"blockhash":str(Hash.default())}}):
+                        with patch("arb.meteora_damm_v2_signed_runner.verify_signed_swap",
+                                   return_value={"signed_standalone_simulation_verified":True}) as verify:
+                            result=sign_and_simulate("http://localhost:8899",**self.kwargs())
+        self.assertEqual(authenticate.call_count,1)
+        self.assertTrue(result["pool_reauthenticated"])
         self.assertEqual(account_check.call_count,1)
         self.assertTrue(builder.call_args.kwargs["input_is_a"])
         self.assertEqual(verify.call_args.kwargs["max_input"],30)
