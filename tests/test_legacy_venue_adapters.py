@@ -5,6 +5,7 @@ from arb.token_vaults import TOKEN_PROGRAM
 from arb.raydium_amm_v4 import decode as decode_amm
 from arb.orca_token_swap_v1 import decode as decode_orca
 from arb.orca_token_swap_v1_swap import build_swap
+from arb.raydium_amm_v4_swap import build_swap as build_raydium_swap
 
 def key(n):
     return b58(bytes([n])*32)
@@ -55,3 +56,20 @@ class LegacyVenueAdapterTests(unittest.TestCase):
         self.assertTrue(ix.accounts[2].is_signer)
         with self.assertRaises(ValueError):
             build_swap(*accounts,amount_in=0,min_amount_out=1)
+
+    @unittest.skipUnless(importlib.util.find_spec('solders'), 'solders required for instruction construction')
+    def test_raydium_amm_v4_instruction_encoding(self):
+        state={"status":6,"open_orders":key(3),"target_orders":key(4),
+               "base_vault":key(5),"quote_vault":key(6),
+               "market_program":key(7),"market_id":key(8)}
+        ix=build_raydium_swap(key(1),state,key(2),
+            key(9),key(10),key(11),key(12),key(13),key(14),
+            key(15),key(16),key(17),250,2,input_is_base=True)
+        self.assertEqual(bytes(ix.data),bytes([9])+
+            (250).to_bytes(8,"little")+(2).to_bytes(8,"little"))
+        self.assertEqual(len(ix.accounts),18)
+        self.assertTrue(ix.accounts[-1].is_signer)
+        with self.assertRaises(ValueError):
+            build_raydium_swap(key(1),state,key(2),
+                key(9),key(10),key(11),key(12),key(13),key(14),
+                key(15),key(16),key(17),0,2,input_is_base=True)
