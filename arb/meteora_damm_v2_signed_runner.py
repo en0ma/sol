@@ -35,6 +35,14 @@ def sign_and_simulate(rpc,*,pool,state,evidence,payer,user_input,user_output,
         input_mint=mint_in,output_mint=mint_out,
         initial_input=initial_input,initial_output=initial_output,
         max_input=amount_in,min_output=min_amount_out)
+    if result.get("signed_standalone_simulation_verified") is not True:
+        raise ValueError("DAMM v2 signed simulator did not verify execution")
     return {**result,**authentication,"venue":"meteora_damm_v2","local_only":True,
             "transaction_bytes":len(bytes(signed)),
+            "transaction_signature":str(signed.signatures[0]),
+            "pool":pool,"program":PROGRAM,
+            "input_mint":mint_in,"output_mint":mint_out,
+            "input_account":user_input,"output_account":user_output,
+            "requested_input_base_units":amount_in,
+            "requested_min_output_base_units":min_amount_out,
             "actionable":False,"live_execution_approved":False,"broadcast":False}
