@@ -1,4 +1,4 @@
-"""Eight-venue execution target; historical evidence is not a CI execution pass.
+"""Seven-active-venue execution target; historical evidence is not a CI execution pass.
 
 Separate pool decoding, instruction building, signed standalone simulation,
 and ordered cross-venue atomic simulation. Never infer one gate from another.
@@ -11,7 +11,6 @@ from pathlib import Path
 TARGET_VENUES=(
     "orca", "raydium_cpmm", "raydium_clmm", "meteora_dlmm",
     "meteora_damm_v2", "pumpswap", "raydium_amm_v4",
-    "orca_token_swap_v1",
 )
 
 def execution_matrix():
@@ -19,9 +18,10 @@ def execution_matrix():
     from arb.onchain_pool_discovery import VENUES
     from arb.venue_capabilities import SIGNED_SWAP_VENUES, ATOMIC_PAIR_EVIDENCE
     from arb.venue_watchlist import RECOGNIZED_UNSUPPORTED
+    ARCHIVED_VENUES=frozenset({"orca_token_swap_v1"})
 
     recognized=set(VENUES)|set(RECOGNIZED_UNSUPPORTED.values())
-    if set(TARGET_VENUES)!=recognized:
+    if set(TARGET_VENUES)!=(recognized-ARCHIVED_VENUES):
         raise ValueError("execution target and recognized venue registry disagree")
     # Parse source instead of importing runtime modules: offline CI does not
     # install solders. Syntax-level inventory is NOT execution proof.
@@ -67,8 +67,9 @@ def execution_matrix():
             "rollback_verified":False,
         })
     return {
-        "status":"EIGHT_VENUE_EXECUTION_TARGET_GAP_REPORT",
+        "status":"SEVEN_VENUE_EXECUTION_TARGET_GAP_REPORT",
         "venue_target":len(TARGET_VENUES),
+        "archived_optional_venues":sorted(ARCHIVED_VENUES),
         "decoder_implemented":sum(r["pool_decoder_implemented"] for r in rows),
         "builder_implemented":sum(r["signed_swap_builder_implemented"] for r in rows),
         "historical_standalone_evidence":sum(r["historical_standalone_signed_simulation_evidence"] for r in rows),
