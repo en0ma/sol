@@ -24,7 +24,7 @@ def inspect_signed_legacy_order(signed_bytes,first_program,second_program,
         keys=message.account_keys
         instructions=message.instructions
         programs=[str(keys[ix.program_id_index]) for ix in instructions]
-    except (ValueError,TypeError,IndexError,AttributeError,Exception) as exc:
+    except Exception as exc:
         raise ValueError("malformed or unsupported signed legacy transaction") from exc
     if programs.count(first_program)!=1 or programs.count(second_program)!=1:
         raise ValueError("expected exactly one instruction for each venue")
