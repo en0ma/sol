@@ -342,6 +342,16 @@ jobs:
           PY
       - name: Install transaction serialization dependency
         run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Probe all eight pool decoders and builder availability against mainnet fork
+        continue-on-error: true
+        run: python3 -m arb.eight_venue_onchain_probe --rpc "$SOLANA_RPC_URL" --output "$RUNNER_TEMP/eight-venue-onchain-probe.json"
+      - name: Upload eight-venue onchain verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eight-venue-onchain-verification
+          path: ${{ runner.temp }}/eight-venue-onchain-probe.json
+          if-no-files-found: ignore
       - name: Enumerate multi-pair token graph cycles
         env:
           TOKEN_GRAPH_INDEX_ENABLED: "1"
