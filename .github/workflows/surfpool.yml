@@ -362,7 +362,14 @@ jobs:
           path: ${{ runner.temp }}/raydium-public-candidates.json
           if-no-files-found: ignore
       - name: Discover indexed Orca DEX candidates without fixed token pairs
-        run: python3 -m arb.orca_legacy_public_candidates --output "$RUNNER_TEMP/orca-legacy-index-candidates.json"
+        env:
+          ORCA_LEGACY_GECKO_DEX_ID: ${{ vars.ORCA_LEGACY_GECKO_DEX_ID }}
+        run: |
+          if [ -n "$ORCA_LEGACY_GECKO_DEX_ID" ]; then
+            python3 -m arb.orca_legacy_public_candidates --dex-id "$ORCA_LEGACY_GECKO_DEX_ID" --output "$RUNNER_TEMP/orca-legacy-index-candidates.json"
+          else
+            python3 -m arb.orca_legacy_public_candidates --output "$RUNNER_TEMP/orca-legacy-index-candidates.json"
+          fi
       - name: Upload Orca legacy index discovery diagnostics
         if: always()
         uses: actions/upload-artifact@v4
