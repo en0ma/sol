@@ -23,6 +23,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_atomic_pair_evidence_matrix.py -v
       - name: Test Raydium AMM v4 market owner authentication
         run: python3 -m unittest discover -s tests -p test_raydium_v4_market_preflight.py -v
+      - name: Test token-agnostic Orca public DEX index adapter
+        run: python3 -m unittest discover -s tests -p test_orca_legacy_public_index.py -v
       - name: Test untrusted Orca legacy pool candidate authentication
         run: python3 -m unittest discover -s tests -p test_orca_legacy_public_candidates.py -v
       - name: Test public Raydium pool discovery and onchain authentication boundary
