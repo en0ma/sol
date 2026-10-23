@@ -27,6 +27,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_raydium_public_pool_discovery.py -v
       - name: Test bounded legacy pool discovery
         run: python3 -m unittest discover -s tests -p test_legacy_pool_discovery.py -v
+      - name: Test eight-venue evidence validation contract
+        run: python3 -m unittest discover -s tests -p test_validate_eight_venue_probe.py -v
       - name: Test eight-venue onchain validation probe
         run: python3 -m unittest discover -s tests -p test_eight_venue_onchain_probe.py -v
       - name: Test local-only signed cross-venue atomic verifier
