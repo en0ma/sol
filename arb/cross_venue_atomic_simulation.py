@@ -56,6 +56,13 @@ def verify_signed_atomic(rpc,signed_bytes,*,first_program,second_program,
               (second_program,"invoke"),(second_program,"success")]
     if events!=expected:
         raise ValueError("venue invocation/success order mismatch or duplicate execution")
+    # Execution logs alone cannot establish signed instruction structure.
+    # Only a cryptographically verified legacy transaction with both venue
+    # instructions sharing the expected intermediate account is accepted.
+    from arb.signed_atomic_instruction_preflight import inspect_signed_legacy_order
+    structure=inspect_signed_legacy_order(
+        signed_bytes,first_program,second_program,
+        intermediate_account=intermediate_account)
     post=value.get("accounts")
     if not isinstance(post,list) or len(post)!=3:
         raise ValueError("missing three-account atomic post-state")
@@ -82,6 +89,6 @@ def verify_signed_atomic(rpc,signed_bytes,*,first_program,second_program,
             "spent_input_base_units":spent,"received_output_base_units":gained,
             "intermediate_post_balance":final[1],
             "intermediate_intra_transaction_consumption_verified":False,
-            "instruction_order_verified":False,
+            "instruction_order_verified":structure["instruction_order_verified"],
             "rollback_failure_case_verified":False,
             "actionable":False,"live_execution_approved":False,"broadcast":False}
