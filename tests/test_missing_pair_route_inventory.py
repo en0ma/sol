@@ -38,6 +38,42 @@ class MissingPairInventoryTests(unittest.TestCase):
         self.assertFalse(out["candidates"][0]["selected_route"]["current_assembler_hop_limit_satisfied"])
         self.assertEqual(out["graph_cycle_diagnostics"]["unevidenced_pair_routes"],1)
 
+    def test_hop_counts_and_assembler_compatible_routes(self):
+        def route(venues):
+            tokens=[SOL]+["token"+str(i) for i in range(1,len(venues))]+[SOL]
+            return {"all_pools_onchain_verified":True,"tokens":tokens,
+                "legs":[{"venue":v,"pool":"pool"+str(i),
+                         "from":tokens[i],"to":tokens[i+1]}
+                        for i,v in enumerate(venues)]}
+        pair=["raydium_clmm","meteora_dlmm"]
+        cycles=[route(pair),route(pair+pair[:1]),route(pair+pair),
+                route(pair+pair)]
+        out=find_unverified_pairs({"cycles":cycles})
+        row=out["candidates"][0]
+        self.assertEqual(row["verified_candidate_routes"],4)
+        self.assertEqual(row["verified_route_hop_counts"],{"2":1,"3":1,"4":2})
+        self.assertEqual(row["assembler_compatible_verified_routes"],2)
+        self.assertEqual(row["shortest_verified_route_hops"],2)
+        self.assertTrue(row["selected_route"]["current_assembler_hop_limit_satisfied"])
+        self.assertFalse(out["actionable"])
+        self.assertFalse(out["live_execution_approved"])
+        self.assertFalse(out["broadcast"])
+
+    def test_four_hop_only_pair_has_no_compatible_routes(self):
+        tokens=[SOL,"A","B","C",SOL]
+        venues=["orca","raydium_clmm","orca","orca"]
+        legs=[{"venue":venue,"pool":"unique"+str(i),
+               "from":tokens[i],"to":tokens[i+1]}
+              for i,venue in enumerate(venues)]
+        out=find_unverified_pairs({"cycles":[{"all_pools_onchain_verified":True,
+                                            "tokens":tokens,"legs":legs}]})
+        row=out["candidates"][0]
+        self.assertEqual(row["pair"],["orca","raydium_clmm"])
+        self.assertEqual(row["verified_route_hop_counts"],{"4":1})
+        self.assertEqual(row["assembler_compatible_verified_routes"],0)
+        self.assertEqual(row["shortest_verified_route_hops"],4)
+        self.assertFalse(row["selected_route"]["current_assembler_hop_limit_satisfied"])
+
     def test_authenticated_canonical_venue_reaches_missing_pair_inventory(self):
         """A verified unclassified Raydium owner becomes a builder-ready pair."""
         import base64
