@@ -88,10 +88,13 @@ def probe(rpc,registry):
     rows=[]
     for venue in TARGET_VENUES:
         module=BUILDERS[venue]
-        builder_module=importlib.import_module(module)
-        builder_implemented=any(callable(getattr(builder_module,name,None))
-                                for name in ("build","instruction","build_swap","build_swap2",
-                                             "build_swap_v2","build_instruction"))
+        try:
+            builder_module=importlib.import_module(module)
+            builder_implemented=any(callable(getattr(builder_module,name,None))
+                                    for name in ("build","instruction","build_swap","build_swap2",
+                                                 "build_swap_v2","build_instruction"))
+        except ImportError:
+            builder_implemented=False
         candidates=[entry["address"] for entry in entries if entry.get("venue")==venue]
         evidence=None
         errors=[]
