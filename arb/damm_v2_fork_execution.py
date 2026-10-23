@@ -111,6 +111,8 @@ def execute(rpc, *, pool, signer, input_account, output_account,
         rpc, pool=pool, state=state, signer=signer,
         input_account=input_account, output_account=output_account,
         amount_in=amount_in, input_is_a=input_is_a)
+    if negative.get("negative_slippage_failure_observed") is not True:
+        raise ValueError("negative slippage failure not proven")
     return {**positive, **negative, "user_snapshot_slot": user_slot,
             "positive_and_negative_controls_verified": True, **SAFETY}
 
