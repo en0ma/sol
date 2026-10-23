@@ -95,7 +95,7 @@ def probe(rpc,registry):
                                                  "build_swap_v2","build_instruction"))
         except ImportError:
             builder_implemented=False
-        candidates=[entry["address"] for entry in entries if entry.get("venue")==venue]
+        candidates=[entry["address"] for entry in entries if entry.get("venue")==venue and isinstance(entry.get("address"),str)]
         evidence=None
         errors=[]
         for address in candidates[:8]:
@@ -112,7 +112,7 @@ def probe(rpc,registry):
                     state=decoder(base64.b64decode(value["data"][0],validate=True))
                     evidence=verify_pool(rpc,venue,address,state)
                 break
-            except (ValueError,KeyError,TypeError,IndexError) as exc:
+            except (ValueError,KeyError,TypeError,IndexError,ImportError) as exc:
                 errors.append(str(exc))
         rows.append({"venue":venue,"candidates_checked":min(len(candidates),8),
                      "decoder_onchain_verified":evidence is not None,
