@@ -1,10 +1,8 @@
 name: Surfpool CI
 
 on:
-  workflow_dispatch:
   push:
-    branches:
-      - main
+  workflow_dispatch:
 
 # Avoid competing Surfpool forks against the same free-tier Alchemy account.
 concurrency:
