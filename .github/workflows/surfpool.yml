@@ -163,6 +163,25 @@ jobs:
           path: ${{ runner.temp }}/orca-initialized-mint-runtime.json
           if-no-files-found: ignore
 
+      - name: Exercise DAMM v2 authenticated signed fork path (fail-closed diagnostic)
+        continue-on-error: true
+        env:
+          SURFPOOL_EXPLICITLY_OFFLINE: "1"
+        run: |
+          python3 -m arb.damm_v2_fork_execution \
+            --rpc http://127.0.0.1:8899 \
+            --pool 8Pm2kZpnxD3hoMmt4bjStX2Pw2Z9abpbHzZxMPqxPmie \
+            --provision-offline-user --input-is-a \
+            --amount-in 1000 --min-amount-out 1 \
+            --output "$RUNNER_TEMP/damm-v2-fork-execution.json"
+      - name: Upload DAMM v2 signed execution and negative-control evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: damm-v2-signed-fork-execution
+          path: ${{ runner.temp }}/damm-v2-fork-execution.json
+          if-no-files-found: error
+
       - name: Validate signed transaction simulation transport on offline Surfpool
         env:
           SURFPOOL_EXPLICITLY_OFFLINE: "1"
