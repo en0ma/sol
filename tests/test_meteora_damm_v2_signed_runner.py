@@ -60,6 +60,31 @@ class DammV2SignedRunnerTests(unittest.TestCase):
         self.assertFalse(result["broadcast"])
         self.assertFalse(result["actionable"])
 
+    def test_real_swap2_builder_serializes_signed_venue_instruction(self):
+        from solders.transaction import Transaction
+        from arb.meteora_damm_v2 import PROGRAM
+        from arb.meteora_damm_v2_swap import SWAP2_DISCRIMINATOR
+        with patch("arb.meteora_damm_v2_signed_runner.authenticate_pool",
+                   return_value={"pool_reauthenticated":True,"authenticated_slot":103}):
+            with patch("arb.meteora_damm_v2_signed_runner.verify_user_accounts"):
+                with patch("arb.rpc.call",return_value={
+                        "value":{"blockhash":str(Hash.default())}}):
+                    with patch("arb.meteora_damm_v2_signed_runner.verify_signed_swap",
+                               return_value={"signed_standalone_simulation_verified":True}) as verify:
+                        result=sign_and_simulate("http://localhost:8899",**self.kwargs())
+        wire=verify.call_args.args[1]
+        tx=Transaction.from_bytes(wire)
+        tx.verify()
+        self.assertEqual(len(tx.message.instructions),1)
+        ix=tx.message.instructions[0]
+        self.assertEqual(str(tx.message.account_keys[ix.program_id_index]),PROGRAM)
+        self.assertEqual(bytes(ix.data[:8]),SWAP2_DISCRIMINATOR)
+        self.assertEqual(int.from_bytes(ix.data[8:16],"little"),30)
+        self.assertEqual(int.from_bytes(ix.data[16:24],"little"),7)
+        self.assertEqual(len(ix.accounts),14)
+        self.assertTrue(result["pool_reauthenticated"])
+        self.assertFalse(result["broadcast"])
+
     def test_unverified_pool_rejected_without_any_rpc(self):
         kwargs=self.kwargs()
         kwargs["evidence"]={**self.evidence,"address":str(Keypair().pubkey())}
