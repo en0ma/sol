@@ -85,6 +85,48 @@ class DammV2SignedRunnerTests(unittest.TestCase):
         self.assertTrue(result["pool_reauthenticated"])
         self.assertFalse(result["broadcast"])
 
+    def test_result_retains_signed_identity_and_fork_evidence(self):
+        from solders.transaction import Transaction
+        from arb.meteora_damm_v2 import PROGRAM
+        with patch("arb.meteora_damm_v2_signed_runner.authenticate_pool",
+                   return_value={"pool_reauthenticated":True,
+                                 "authenticated_slot":103,
+                                 "actionable":False,"live_execution_approved":False,
+                                 "broadcast":False}):
+            with patch("arb.meteora_damm_v2_signed_runner.verify_user_accounts"):
+                with patch("arb.rpc.call",return_value={
+                        "value":{"blockhash":str(Hash.default())}}):
+                    with patch("arb.meteora_damm_v2_signed_runner.verify_signed_swap",
+                               return_value={"signed_standalone_simulation_verified":True,
+                                             "spent_input_base_units":30,
+                                             "received_output_base_units":10}) as verify:
+                        result=sign_and_simulate("http://localhost:8899",**self.kwargs())
+        signed=Transaction.from_bytes(verify.call_args.args[1])
+        self.assertEqual(result["transaction_signature"],str(signed.signatures[0]))
+        self.assertEqual(result["pool"],self.pool)
+        self.assertEqual(result["program"],PROGRAM)
+        self.assertEqual(result["input_mint"],self.mint_a)
+        self.assertEqual(result["output_mint"],self.mint_b)
+        self.assertEqual(result["input_account"],self.user_a)
+        self.assertEqual(result["output_account"],self.user_b)
+        self.assertEqual(result["requested_input_base_units"],30)
+        self.assertEqual(result["requested_min_output_base_units"],7)
+        self.assertEqual(result["authenticated_slot"],103)
+        self.assertFalse(result["actionable"])
+        self.assertFalse(result["live_execution_approved"])
+        self.assertFalse(result["broadcast"])
+
+    def test_unverified_simulation_cannot_return_successful_runner_result(self):
+        with patch("arb.meteora_damm_v2_signed_runner.authenticate_pool",
+                   return_value={"pool_reauthenticated":True,"authenticated_slot":103}):
+            with patch("arb.meteora_damm_v2_signed_runner.verify_user_accounts"):
+                with patch("arb.rpc.call",return_value={
+                        "value":{"blockhash":str(Hash.default())}}):
+                    with patch("arb.meteora_damm_v2_signed_runner.verify_signed_swap",
+                               return_value={"signed_standalone_simulation_verified":False}):
+                        with self.assertRaisesRegex(ValueError,"did not verify execution"):
+                            sign_and_simulate("http://localhost:8899",**self.kwargs())
+
     def test_unverified_pool_rejected_without_any_rpc(self):
         kwargs=self.kwargs()
         kwargs["evidence"]={**self.evidence,"address":str(Keypair().pubkey())}
