@@ -41,4 +41,5 @@ def sign_and_simulate(rpc, pool, payer, direction, addresses, amount_in, min_out
                            initial_input,initial_output,amount_in,
                            min_amount_out=min_out)
     return {**result,"transaction_bytes":len(wire),"local_only":True,
-            "fee_mode_verified":False,"quote_reconciled":False}
+            "fee_mode_verified":False,"quote_reconciled":False,
+            "actionable":False,"live_execution_approved":False,"broadcast":False}
