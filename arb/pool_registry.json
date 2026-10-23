@@ -504,6 +504,14 @@
         "SATqS9DYpLQsM2z51P4QCoqJRHa5wboV4qjJerJRUSH",
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ]
+    },
+    {
+      "venue": "raydium_amm_v4",
+      "address": "58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUWBkwMihLYQo2",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ]
     }
   ]
 }
