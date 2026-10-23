@@ -1,4 +1,4 @@
-"""Read-only eight-venue decoder verification against synchronized RPC accounts.
+"""Read-only active-venue decoder verification against synchronized RPC accounts.
 
 A builder being importable is not evidence of a successful swap. This probe
 reports those gates separately and never broadcasts transactions.
@@ -151,7 +151,8 @@ def probe(rpc,registry,*,discover_legacy=False,public_raydium_candidates=(),
                      "builder_onchain_execution_verified":False,
                      "pool_evidence":evidence,
                      "errors":errors[:8]})
-    return {"status":"EIGHT_VENUE_ONCHAIN_READONLY_PROBE",
+    return {"status":"SEVEN_VENUE_ONCHAIN_READONLY_PROBE",
+            "archived_optional_venues":["orca_token_swap_v1"],
             "decoder_verified_count":sum(r["decoder_onchain_verified"] for r in rows),
             "builder_code_count":sum(r["builder_code_present"] for r in rows),
             "builder_execution_verified_count":0,"venues":rows,
