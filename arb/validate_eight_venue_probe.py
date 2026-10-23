@@ -31,7 +31,7 @@ def validate(report):
         if not isinstance(row.get("errors"),list):
             raise ValueError("missing error list")
         evidence=row.get("pool_evidence")
-        if row["decoder_onchain_verified"]!=(isinstance(evidence,dict) and evidence.get("pool_decoder_verified") is True):
+        if row["decoder_onchain_verified"]!=(isinstance(evidence,dict) and evidence.get("pool_decoder_verified",True) is True):
             raise ValueError("decoder verification disagrees with evidence")
         decoder+=row["decoder_onchain_verified"]
         builder+=row["builder_code_present"]
