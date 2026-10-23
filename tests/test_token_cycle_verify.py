@@ -121,7 +121,7 @@ class GraphVerifyTests(unittest.TestCase):
         result = verify_graph("http://127.0.0.1:8899",
             {"cycles": [cycle("orca", "raydium_unclassified")]})["cycles"][0]
         self.assertFalse(result["all_pools_onchain_verified"])
-        self.assertIn("on-chain token mints disagree", result["rejection_reasons"])
+        self.assertIn("on-chain token mints disagree with graph hint", result["rejection_reasons"])
         self.assertEqual(result["legs"][1]["venue"], "raydium_unclassified")
 
     @patch("arb.token_cycle_verify.verify_vaults")
