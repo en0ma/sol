@@ -64,7 +64,7 @@ class PumpSwapSignedRunnerTests(unittest.TestCase):
         self.assertEqual(builder.call_count,1)
         self.assertEqual(simulate.call_count,1)
         self.assertEqual(simulate.call_args.kwargs["min_amount_out"],22)
-        self.assertEqual(simulate.call_args.args[7:10],(200,0,100))
+        self.assertEqual(simulate.call_args.args[6:9],(200,0,100))
         self.assertTrue(result["local_only"])
         self.assertFalse(result["quote_reconciled"])
         self.assertFalse(result["fee_mode_verified"])
