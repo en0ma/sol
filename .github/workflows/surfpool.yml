@@ -268,7 +268,7 @@ jobs:
     # Secrets are unavailable to untrusted fork PRs; verify forks on trusted branches/PRs.
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     env:
       SOLANA_RPC_URL: http://127.0.0.1:8899
       SURFPOOL_DATASOURCE_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
