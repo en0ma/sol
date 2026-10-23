@@ -95,6 +95,26 @@ class DammV2ForkExecutionTests(unittest.TestCase):
                 self.assertEqual(rpc.call_args.args[1], "getAccountInfo")
 
 
+    def test_negative_control_rejects_unrelated_runtime_failure(self):
+        from arb.damm_v2_fork_execution import _signed_negative_control
+        from solders.hash import Hash
+        with patch("arb.damm_v2_fork_execution.build_swap2") as builder:
+            from solders.instruction import Instruction
+            from solders.pubkey import Pubkey
+            from arb.meteora_damm_v2 import PROGRAM
+            builder.return_value = Instruction(Pubkey.from_string(PROGRAM), b"swap", [])
+            with patch("arb.rpc.call", side_effect=[
+                    {"value": {"blockhash": str(Hash.default())}},
+                    {"value": {"err": "BlockhashNotFound", "logs": []}}]):
+                with self.assertRaisesRegex(ValueError, "does not establish"):
+                    _signed_negative_control("http://localhost:8899", pool="pool",
+                        state={}, signer=self.signer, input_account="input",
+                        output_account="output", amount_in=25, input_is_a=True)
+
+    def test_negative_proof_must_explicitly_be_true(self):
+        with self.assertRaisesRegex(ValueError, "negative slippage"):
+            self._execute(negative=False)
+
     def test_fails_closed_on_stale_pool_snapshot(self):
         with patch("arb.damm_v2_fork_execution.call",
                    return_value={"context": {"slot": 100}, "value": None}):
