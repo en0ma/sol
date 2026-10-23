@@ -2,8 +2,6 @@
 
 Does not approve execution or bypass on-chain pool/vault authentication.
 """
-from solders.pubkey import Pubkey
-from solders.instruction import Instruction,AccountMeta
 from arb.token_vaults import TOKEN_PROGRAM
 
 SWAP_TAG=1
@@ -11,6 +9,8 @@ SWAP_TAG=1
 def build_swap(program,pool,pool_authority,transfer_authority,
                user_source,pool_source,pool_destination,user_destination,
                pool_mint,pool_fee_account,amount_in,min_amount_out):
+    from solders.pubkey import Pubkey
+    from solders.instruction import Instruction,AccountMeta
     if any(type(x)is not int or not 0<x<(1<<64) for x in (amount_in,min_amount_out)):
         raise ValueError("nonzero u64 input and output threshold required")
     addresses=(program,pool,pool_authority,transfer_authority,user_source,
