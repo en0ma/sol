@@ -30,6 +30,15 @@ def verify_signed_swap(rpc,signed_bytes,*,program,input_account,output_account,
         invoked=[str(keys[ix.program_id_index]) for ix in tx.message.instructions]
         if invoked.count(program)!=1:
             raise ValueError("expected exactly one signed venue instruction")
+        from solders.pubkey import Pubkey
+        key_in=Pubkey.from_string(input_account)
+        key_out=Pubkey.from_string(output_account)
+        if key_in not in keys or key_out not in keys:
+            raise ValueError("signed swap user token account absent from transaction")
+        venue_ix=tx.message.instructions[invoked.index(program)]
+        if (keys.index(key_in) not in venue_ix.accounts
+                or keys.index(key_out) not in venue_ix.accounts):
+            raise ValueError("signed venue instruction must reference both user token accounts")
     except Exception as exc:
         raise ValueError("invalid signed standalone swap instruction or signature") from exc
     response=call(rpc,"simulateTransaction",[
