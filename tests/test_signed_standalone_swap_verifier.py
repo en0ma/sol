@@ -87,6 +87,29 @@ class SignedStandaloneSwapVerifierTests(unittest.TestCase):
                 verify_signed_swap("http://localhost:8899",wire,**self.args())
             rpc.assert_not_called()
 
+    def test_signed_user_accounts_must_be_writable(self):
+        wire=bytes(Transaction.new_signed_with_payer(
+            [Instruction(Pubkey.from_string(self.program),b"swap",[
+                AccountMeta(Pubkey.from_string(self.input),False,False),
+                AccountMeta(Pubkey.from_string(self.output),False,False)])],
+            self.payer.pubkey(),[self.payer],Hash.default()))
+        with patch("arb.signed_standalone_swap_verifier.call") as rpc:
+            with self.assertRaisesRegex(ValueError,"instruction or signature"):
+                verify_signed_swap("http://localhost:8899",wire,**self.args())
+            rpc.assert_not_called()
+
+    def test_extra_signed_instruction_rejected_before_rpc(self):
+        wire=bytes(Transaction.new_signed_with_payer(
+            [Instruction(Pubkey.from_string(self.program),b"swap",[
+                AccountMeta(Pubkey.from_string(self.input),False,True),
+                AccountMeta(Pubkey.from_string(self.output),False,True)]),
+             Instruction(Pubkey.from_string(self.program),b"duplicate",[])],
+            self.payer.pubkey(),[self.payer],Hash.default()))
+        with patch("arb.signed_standalone_swap_verifier.call") as rpc:
+            with self.assertRaisesRegex(ValueError,"instruction or signature"):
+                verify_signed_swap("http://localhost:8899",wire,**self.args())
+            rpc.assert_not_called()
+
     def test_wrong_program_rejected_before_rpc(self):
         args=self.args()
         args["program"]=str(Keypair().pubkey())
