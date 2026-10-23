@@ -209,11 +209,11 @@ def main():
                 raise ValueError("invalid local signer file")
             signer = Keypair.from_bytes(bytes(secret))
             input_account, output_account = args.input_account, args.output_account
-            report = execute(
-                args.rpc, pool=args.pool, signer=signer,
-                input_account=input_account, output_account=output_account,
-                amount_in=args.amount_in, min_amount_out=args.min_amount_out,
-                input_is_a=args.input_is_a)
+        report = execute(
+            args.rpc, pool=args.pool, signer=signer,
+            input_account=input_account, output_account=output_account,
+            amount_in=args.amount_in, min_amount_out=args.min_amount_out,
+            input_is_a=args.input_is_a)
     except Exception as exc:
         report = {"status": "UNVERIFIED", "reason": type(exc).__name__,
                   "diagnostic": str(exc)[:400],
