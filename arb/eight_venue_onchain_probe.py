@@ -78,7 +78,7 @@ def verify_legacy(rpc,venue,address):
             "slot":next_slot,"mints":[state[mint_a],state[mint_b]],
             "vault_base_units":amounts,"signed_swap_simulated":False}
 
-def probe(rpc,registry):
+def probe(rpc,registry,*,discover_legacy=False):
     from arb.pumpswap_local_simulation import local_rpc_only
     # Allow only local fork RPC. This probe never queries public RPC directly.
     local_rpc_only(rpc)
@@ -98,7 +98,15 @@ def probe(rpc,registry):
         candidates=[entry["address"] for entry in entries if entry.get("venue")==venue and isinstance(entry.get("address"),str)]
         evidence=None
         errors=[]
-        for address in candidates[:8]:
+        discovered=[]
+        if discover_legacy and venue in LEGACY and not candidates:
+            try:
+                from arb.legacy_pool_discovery import discover
+                discovered=discover(rpc,venue)
+            except (ValueError,KeyError,TypeError,TimeoutError) as exc:
+                errors.append("legacy discovery: "+str(exc))
+        candidates=(candidates+discovered)[:8]
+        for address in candidates:
             try:
                 if venue in LEGACY:
                     evidence=verify_legacy(rpc,venue,address)
@@ -114,7 +122,8 @@ def probe(rpc,registry):
                 break
             except (ValueError,KeyError,TypeError,IndexError,ImportError) as exc:
                 errors.append(str(exc))
-        rows.append({"venue":venue,"candidates_checked":min(len(candidates),8),
+        rows.append({"venue":venue,"candidates_checked":len(candidates),
+                     "discovered_candidate_addresses":discovered,
                      "decoder_onchain_verified":evidence is not None,
                      "builder_code_present":builder_implemented,
                      "builder_onchain_execution_verified":False,
@@ -130,9 +139,11 @@ def main():
     parser=argparse.ArgumentParser()
     parser.add_argument("--rpc",default="http://127.0.0.1:8899")
     parser.add_argument("--registry",default="arb/pool_registry.json")
+    parser.add_argument("--discover-legacy",action="store_true")
     parser.add_argument("--output",required=True)
     args=parser.parse_args()
-    result=probe(args.rpc,json.loads(Path(args.registry).read_text()))
+    result=probe(args.rpc,json.loads(Path(args.registry).read_text()),
+                 discover_legacy=args.discover_legacy)
     Path(args.output).write_text(json.dumps(result,indent=2)+"\n")
     print(json.dumps({k:result[k] for k in (
         "status","decoder_verified_count","builder_code_count",
