@@ -32,3 +32,16 @@ class EightVenueOnchainProbeTests(unittest.TestCase):
         self.assertEqual(report["decoder_verified_count"],2)
         self.assertEqual(report["builder_execution_verified_count"],0)
         self.assertFalse(report["live_execution_approved"])
+
+    def test_rate_limited_legacy_discovery_preserves_evidence_report(self):
+        from arb.rpc import RPCError
+        with patch("arb.legacy_pool_discovery.discover",
+                   side_effect=RPCError("429 Too Many Requests")):
+            report=probe("http://127.0.0.1:8899",{"pools":[]},
+                         discover_legacy=True)
+        self.assertEqual(len(report["venues"]),8)
+        self.assertEqual(report["decoder_verified_count"],0)
+        self.assertEqual(report["builder_execution_verified_count"],0)
+        for row in report["venues"]:
+            if row["venue"] in LEGACY:
+                self.assertIn("429",row["errors"][0])
