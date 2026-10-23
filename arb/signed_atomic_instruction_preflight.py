@@ -18,11 +18,13 @@ def inspect_signed_legacy_order(signed_bytes,first_program,second_program,
     from solders.pubkey import Pubkey
     try:
         tx=Transaction.from_bytes(signed_bytes)
+        # Reject transactions with invalid signatures, not merely parseable bytes.
+        tx.verify()
         message=tx.message
         keys=message.account_keys
         instructions=message.instructions
         programs=[str(keys[ix.program_id_index]) for ix in instructions]
-    except (ValueError,TypeError,IndexError,AttributeError) as exc:
+    except (ValueError,TypeError,IndexError,AttributeError,Exception) as exc:
         raise ValueError("malformed or unsupported signed legacy transaction") from exc
     if programs.count(first_program)!=1 or programs.count(second_program)!=1:
         raise ValueError("expected exactly one instruction for each venue")
