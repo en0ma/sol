@@ -69,6 +69,14 @@ class SignedAtomicInstructionPreflightTests(unittest.TestCase):
             inspect_signed_legacy_order(self.wire(),str(Keypair().pubkey()),self.second,
                                         intermediate_account=self.middle)
 
+    def test_tampered_signed_transaction_rejected(self):
+        wire=bytearray(self.wire())
+        # Signature bytes follow the leading short-vector signature count.
+        wire[1]^=1
+        with self.assertRaisesRegex(ValueError,"malformed or unsupported"):
+            inspect_signed_legacy_order(bytes(wire),self.first,self.second,
+                                        intermediate_account=self.middle)
+
     def test_invalid_transaction_bytes_rejected(self):
         with self.assertRaises(ValueError):
             inspect_signed_legacy_order(b"not-a-transaction",self.first,self.second)
