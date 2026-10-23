@@ -2,8 +2,8 @@
 
 Research and simulation only. No live wallet signing or order execution.
 
-## RPC-only policy
-All DEX pool state must be read from **Solana programs via Surfpool**. No Raydium, Orca, Jupiter or other DEX web APIs are used by current code. The prior Raydium and Jupiter HTTP scanners were removed in this PR.
+## Discovery and verification policy
+Venue-wide public APIs and indexes can supply candidate pools without hardcoded token pairs. Candidate liquidity and program IDs are screened, but public API metadata is never trusted as pool authentication or execution proof. Pool account validation and signed swap simulation use the local Surfpool fork. Broad on-chain program scans are deferred until the planned RPC upgrade. See [AGENTS.md](AGENTS.md) and [the architecture roadmap](docs/ROADMAP_AND_ARCHITECTURE.md).
 
 ## CI
 - Offline Surfpool RPC smoke tests and Python unit tests on pushes and PRs.
