@@ -14,6 +14,11 @@ This project is **simulation and verification only**. Do not send, sign-and-broa
 - Do not require a closed X→Y→X arbitrage cycle for the two-venue atomic acceptance test: X→Y on venue A then Y→Z on venue B is sufficient when token continuity and atomic execution are proved.
 - Test **both execution directions** for each active venue pair (7 venues = 21 unordered, 42 ordered). Begin testing ready pairs without waiting for all seven venues. Orca Token Swap v1 is deprecated and archived as optional legacy code; do not make it an execution acceptance gate or run its legacy discovery in active CI.
 
+## CI efficiency
+- Deliver coherent multi-file batches, test locally first, and push once per batch to avoid repeated expensive Surfpool CI and cancellation.
+- Keep deprecated Orca Token Swap v1 discovery out of mandatory CI while preserving its code and isolated tests.
+- Prioritize actual local-fork signed execution and atomic rollback artifacts over narrow harness-only changes.
+
 ## Source of truth
 - Roadmap: `docs/ROADMAP_AND_ARCHITECTURE.md`
 - Active seven-venue target matrix: `arb/execution_target_matrix.py`

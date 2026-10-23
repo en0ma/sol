@@ -51,7 +51,7 @@ class ValidateProbeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"identities"):
             validate(data)
         data=report()
-        data["builder_code_count"]=7
+        data["builder_code_count"]=6
         with self.assertRaisesRegex(ValueError,"counts"):
             validate(data)
 

@@ -47,7 +47,7 @@ class EightVenueOnchainProbeTests(unittest.TestCase):
                    side_effect=RPCError("429 Too Many Requests")):
             report=probe("http://127.0.0.1:8899",{"pools":[]},
                          discover_legacy=True)
-        self.assertEqual(len(report["venues"]),8)
+        self.assertEqual(len(report["venues"]),7)
         self.assertEqual(report["decoder_verified_count"],0)
         self.assertEqual(report["builder_execution_verified_count"],0)
         for row in report["venues"]:
@@ -63,7 +63,7 @@ class EightVenueOnchainProbeTests(unittest.TestCase):
                                      "vaults_verified":True,"slot":123}) as verify:
                 report=probe("http://127.0.0.1:8899",registry,discover_legacy=True)
         self.assertEqual(verify.call_count,1)
-        self.assertEqual(discover.call_count,1)
+        self.assertEqual(discover.call_count,0)
         ray=next(x for x in report["venues"] if x["venue"]=="raydium_amm_v4")
         self.assertTrue(ray["decoder_onchain_verified"])
         self.assertEqual(ray["candidates_checked"],1)

@@ -11,14 +11,8 @@ class OrcaLegacyPublicCandidateTests(unittest.TestCase):
                    side_effect=ValueError("Orca Token Swap pool owner mismatch")) as verify:
             report=probe("http://127.0.0.1:8899",{"pools":[]},
                          public_orca_legacy_candidates=[CANDIDATE])
-        row=next(row for row in report["venues"]
-                 if row["venue"]=="orca_token_swap_v1")
-        verify.assert_called_once_with("http://127.0.0.1:8899",
-                                      "orca_token_swap_v1",CANDIDATE)
-        self.assertEqual(row["candidates_checked"],1)
-        self.assertFalse(row["decoder_onchain_verified"])
-        self.assertFalse(row["builder_onchain_execution_verified"])
-        self.assertIn("owner mismatch",row["errors"][0])
+        self.assertNotIn("orca_token_swap_v1",[r["venue"] for r in report["venues"]])
+        verify.assert_not_called()
         self.assertFalse(report["actionable"])
         self.assertFalse(report["live_execution_approved"])
         self.assertFalse(report["broadcast"])
@@ -29,12 +23,8 @@ class OrcaLegacyPublicCandidateTests(unittest.TestCase):
                                  "vaults_verified":True,"slot":123}) as verify:
             report=probe("http://127.0.0.1:8899",{"pools":[]},
                          public_orca_legacy_candidates=[CANDIDATE,CANDIDATE])
-        row=next(row for row in report["venues"]
-                 if row["venue"]=="orca_token_swap_v1")
-        self.assertEqual(verify.call_count,1)
-        self.assertEqual(row["candidates_checked"],1)
-        self.assertTrue(row["decoder_onchain_verified"])
-        self.assertFalse(row["builder_onchain_execution_verified"])
+        self.assertNotIn("orca_token_swap_v1",[r["venue"] for r in report["venues"]])
+        verify.assert_not_called()
 
 if __name__=="__main__":
     unittest.main()
