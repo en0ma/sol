@@ -41,6 +41,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_eight_venue_onchain_probe.py -v
       - name: Test local-only signed cross-venue atomic verifier
         run: python3 -m unittest discover -s tests -p test_cross_venue_atomic_simulation.py -v
+      - name: Test PumpSwap signed local runner transaction and output-bound wiring
+        run: python3 -m unittest discover -s tests -p test_pumpswap_signed_runner.py -v
       - name: Test PumpSwap signed simulation post-state and slippage floor
         run: python3 -m unittest discover -s tests -p test_pumpswap_local_simulation.py -v
       - name: Test PumpSwap v2 swap instruction encoding
