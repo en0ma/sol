@@ -1,4 +1,5 @@
 import unittest
+import importlib.util
 from arb.orca_whirlpool import b58
 from arb.token_vaults import TOKEN_PROGRAM
 from arb.raydium_amm_v4 import decode as decode_amm
@@ -28,6 +29,7 @@ class LegacyVenueAdapterTests(unittest.TestCase):
         self.assertEqual(state["quote_mint"],key(4))
         self.assertEqual(state["status"],6)
 
+    @unittest.skipUnless(importlib.util.find_spec('solders'), 'solders required for PDA and key fixtures')
     def test_orca_token_swap_v1_decode_and_rejections(self):
         data=bytearray(324)
         data[:3]=bytes([1,1,7])
@@ -44,6 +46,7 @@ class LegacyVenueAdapterTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             decode_orca(bytes(data))
 
+    @unittest.skipUnless(importlib.util.find_spec('solders'), 'solders required for instruction construction')
     def test_orca_swap_builder_exact_input_instruction(self):
         accounts=[key(i) for i in range(1,11)]
         ix=build_swap(*accounts,amount_in=100,min_amount_out=1)
