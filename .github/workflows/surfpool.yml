@@ -19,6 +19,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+      - name: Install solders for real builder serialization tests
+        run: python3 -m pip install --disable-pip-version-check solders==0.26.0
       - name: Unit-test pairwise execution evidence
         run: python3 -m unittest discover -s tests -p test_atomic_pair_evidence_matrix.py -v
       - name: Test Raydium AMM v4 market owner authentication
