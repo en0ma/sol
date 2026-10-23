@@ -45,3 +45,18 @@ class EightVenueOnchainProbeTests(unittest.TestCase):
         for row in report["venues"]:
             if row["venue"] in LEGACY:
                 self.assertIn("429",row["errors"][0])
+
+    def test_raydium_v4_curated_candidate_skips_rate_limited_discovery(self):
+        registry={"pools":[{"venue":"raydium_amm_v4",
+                             "address":"58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUWBkwMihLYQo2"}]}
+        with patch("arb.legacy_pool_discovery.discover",return_value=[]) as discover:
+            with patch("arb.eight_venue_onchain_probe.verify_legacy",
+                       return_value={"pool_decoder_verified":True,
+                                     "vaults_verified":True,"slot":123}) as verify:
+                report=probe("http://127.0.0.1:8899",registry,discover_legacy=True)
+        self.assertEqual(verify.call_count,1)
+        self.assertEqual(discover.call_count,1)
+        ray=next(x for x in report["venues"] if x["venue"]=="raydium_amm_v4")
+        self.assertTrue(ray["decoder_onchain_verified"])
+        self.assertEqual(ray["candidates_checked"],1)
+        self.assertFalse(ray["builder_onchain_execution_verified"])
