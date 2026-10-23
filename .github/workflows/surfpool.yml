@@ -1255,6 +1255,9 @@ jobs:
       # The upstream-backed process is stopped BEFORE any surfnet_setAccount call.
       - name: Export authenticated Orca state from read-only fork
         run: python3 -m arb.orca_swap_v2_isolated_offline_execution export "$RUNNER_TEMP/orca-isolated-state.json"
+      - name: Export authenticated DAMM v2 pool and executable (read-only)
+        continue-on-error: true
+        run: python3 -m arb.damm_v2_isolated_execution export "$RUNNER_TEMP/damm-v2-fixture.json"
       - name: Stop upstream-backed fork and start isolated offline Surfpool
         if: ${{ hashFiles('arb/orca_swap_v2_isolated_offline_execution.py') != '' }}
         run: |
@@ -1313,6 +1316,25 @@ jobs:
             ${{ runner.temp }}/orca-isolated-attempt.json
             ${{ runner.temp }}/orca-isolated-offline.log
           if-no-files-found: ignore
+
+      - name: Attempt isolated DAMM v2 signed swap and slippage negative control
+        continue-on-error: true
+        env:
+          SURFPOOL_EXPLICITLY_OFFLINE: "1"
+        run: |
+          if [ -s "$RUNNER_TEMP/damm-v2-fixture.json" ]; then
+            python3 -m arb.damm_v2_isolated_execution offline "$RUNNER_TEMP/damm-v2-fixture.json" \
+              --output "$RUNNER_TEMP/damm-v2-isolated-evidence.json"
+          else
+            printf '{"status":"SOURCE_FIXTURE_UNAVAILABLE","signed_standalone_simulation_verified":false,"positive_and_negative_controls_verified":false,"actionable":false,"live_execution_approved":false,"broadcast":false}\n' > "$RUNNER_TEMP/damm-v2-isolated-evidence.json"
+          fi
+      - name: Upload isolated DAMM v2 signed swap and slippage evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: damm-v2-isolated-signed-execution
+          path: ${{ runner.temp }}/damm-v2-isolated-evidence.json
+          if-no-files-found: error
 
   meteora-dlmm-standalone-offline:
     runs-on: ubuntu-latest
