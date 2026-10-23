@@ -6,8 +6,8 @@ class ExecutionTargetMatrixTests(unittest.TestCase):
         report=execution_matrix()
         self.assertEqual(report["venue_target"],8)
         self.assertEqual(len(report["venues"]),8)
-        self.assertEqual(report["decoder_implemented"],6)
-        self.assertEqual(report["builder_implemented"],4)
+        self.assertEqual(report["decoder_implemented"],8)
+        self.assertEqual(report["builder_implemented"],8)
         self.assertEqual(report["unordered_pair_target"],28)
         self.assertEqual(report["ordered_pair_target"],56)
         self.assertEqual(len({(p["first_venue"],p["second_venue"])
@@ -35,12 +35,15 @@ class ExecutionTargetMatrixTests(unittest.TestCase):
         self.assertIsNotNone(pair["unordered_historical_pair_evidence"])
         self.assertFalse(pair["this_execution_order_verified"])
 
-    def test_missing_venue_builders_are_explicit(self):
+    def test_all_eight_modules_present_but_no_new_execution_claim(self):
         report=execution_matrix()
         venues={v["venue"]:v for v in report["venues"]}
-        for name in ("meteora_damm_v2","pumpswap"):
-            self.assertTrue(venues[name]["pool_decoder_implemented"])
-            self.assertFalse(venues[name]["signed_swap_builder_implemented"])
-        for name in ("raydium_amm_v4","orca_token_swap_v1"):
-            self.assertFalse(venues[name]["pool_decoder_implemented"])
-            self.assertFalse(venues[name]["signed_swap_builder_implemented"])
+        for name in TARGET_VENUES:
+            self.assertTrue(venues[name]["pool_decoder_implemented"],name)
+            self.assertTrue(venues[name]["signed_swap_builder_implemented"],name)
+            self.assertFalse(venues[name]["current_run_standalone_execution_verified"])
+        self.assertEqual(report["historical_standalone_evidence"],4)
+        self.assertEqual(report["current_run_standalone_verified"],0)
+        self.assertEqual(report["ordered_pair_verified"],0)
+        self.assertTrue(all(p["both_decoders_implemented"] and
+                            p["both_builders_implemented"] for p in report["ordered_pairs"]))
