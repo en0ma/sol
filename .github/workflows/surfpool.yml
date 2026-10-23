@@ -39,6 +39,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_validate_eight_venue_probe.py -v
       - name: Test eight-venue onchain validation probe
         run: python3 -m unittest discover -s tests -p test_eight_venue_onchain_probe.py -v
+      - name: Test DAMM v2 fresh onchain authentication before signing
+        run: python3 -m unittest discover -s tests -p test_damm_v2_signed_preflight.py -v
       - name: Test authenticated DAMM v2 signed standalone simulation runner
         run: python3 -m unittest discover -s tests -p test_meteora_damm_v2_signed_runner.py -v
       - name: Test cryptographically signed standalone swap post-state verifier
