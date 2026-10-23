@@ -8,7 +8,7 @@ import base64
 import importlib
 import json
 from pathlib import Path
-from arb.rpc import call
+from arb.rpc import call,RPCError
 from arb.execution_target_matrix import TARGET_VENUES
 from arb.onchain_pool_discovery import VENUES,verify as verify_pool
 from arb.token_vaults import TOKEN_PROGRAM,decode_token_account
@@ -118,7 +118,7 @@ def probe(rpc,registry,*,discover_legacy=False):
             try:
                 from arb.legacy_pool_discovery import discover
                 discovered=discover(rpc,venue)
-            except (ValueError,KeyError,TypeError,TimeoutError) as exc:
+            except (ValueError,KeyError,TypeError,TimeoutError,RPCError) as exc:
                 errors.append("legacy discovery: "+str(exc))
         candidates=(candidates+discovered)[:8]
         for address in candidates:
@@ -135,7 +135,7 @@ def probe(rpc,registry,*,discover_legacy=False):
                     state=decoder(base64.b64decode(value["data"][0],validate=True))
                     evidence=verify_pool(rpc,venue,address,state)
                 break
-            except (ValueError,KeyError,TypeError,IndexError,ImportError) as exc:
+            except (ValueError,KeyError,TypeError,IndexError,ImportError,RPCError) as exc:
                 errors.append(str(exc))
         rows.append({"venue":venue,"candidates_checked":len(candidates),
                      "discovered_candidate_addresses":discovered,
