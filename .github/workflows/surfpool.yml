@@ -23,6 +23,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_atomic_pair_evidence_matrix.py -v
       - name: Test Raydium AMM v4 market owner authentication
         run: python3 -m unittest discover -s tests -p test_raydium_v4_market_preflight.py -v
+      - name: Test local-fork Orca legacy program ownership preflight
+        run: python3 -m unittest discover -s tests -p test_orca_legacy_owner_preflight.py -v
       - name: Test token-agnostic Orca public DEX index adapter
         run: python3 -m unittest discover -s tests -p test_orca_legacy_public_index.py -v
       - name: Test untrusted Orca legacy pool candidate authentication
@@ -379,8 +381,17 @@ jobs:
           name: orca-legacy-index-candidates
           path: ${{ runner.temp }}/orca-legacy-index-candidates.json
           if-no-files-found: error
+      - name: Classify indexed Orca pools by actual onchain program owner
+        run: python3 -m arb.orca_legacy_owner_preflight --rpc "$SOLANA_RPC_URL" --input "$RUNNER_TEMP/orca-legacy-index-candidates.json" --output "$RUNNER_TEMP/orca-legacy-owner-candidates.json" --report "$RUNNER_TEMP/orca-legacy-owner-report.json"
+      - name: Upload Orca legacy owner classification
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orca-legacy-owner-preflight
+          path: ${{ runner.temp }}/orca-legacy-owner-report.json
+          if-no-files-found: error
       - name: Probe all eight pool decoders and builder availability against mainnet fork
-        run: python3 -m arb.eight_venue_onchain_probe --rpc "$SOLANA_RPC_URL" --public-raydium-candidates "$RUNNER_TEMP/raydium-public-candidates.json" --public-orca-legacy-candidates "$RUNNER_TEMP/orca-legacy-index-candidates.json" --output "$RUNNER_TEMP/eight-venue-onchain-probe.json"
+        run: python3 -m arb.eight_venue_onchain_probe --rpc "$SOLANA_RPC_URL" --public-raydium-candidates "$RUNNER_TEMP/raydium-public-candidates.json" --public-orca-legacy-candidates "$RUNNER_TEMP/orca-legacy-owner-candidates.json" --output "$RUNNER_TEMP/eight-venue-onchain-probe.json"
       - name: Validate eight-venue probe schema and simulation-only flags
         run: python3 -m arb.validate_eight_venue_probe --input "$RUNNER_TEMP/eight-venue-onchain-probe.json"
       - name: Upload eight-venue onchain verification evidence
