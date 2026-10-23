@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from arb.damm_v2_fork_execution import execute, SAFETY
+from arb.damm_v2_fork_execution import execute, provision_offline_user, SAFETY
 
 try:
     from solders.keypair import Keypair
@@ -68,6 +68,32 @@ class DammV2ForkExecutionTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 execute("http://localhost:8899", **kwargs)
             rpc.assert_not_called()
+
+    def test_ephemeral_provision_requires_explicit_offline_opt_in(self):
+        with patch.dict("os.environ", {"SURFPOOL_EXPLICITLY_OFFLINE": "0"}):
+            with patch("arb.damm_v2_fork_execution.call") as rpc:
+                with self.assertRaisesRegex(ValueError, "explicit offline"):
+                    provision_offline_user("http://localhost:8899",
+                        pool="pool", input_is_a=True, amount_in=25)
+                rpc.assert_not_called()
+
+    def test_ephemeral_provision_rejects_remote_rpc(self):
+        with patch("arb.damm_v2_fork_execution.call") as rpc:
+            with self.assertRaises(ValueError):
+                provision_offline_user("https://api.mainnet-beta.solana.com",
+                    pool="pool", input_is_a=True, amount_in=25)
+            rpc.assert_not_called()
+
+    def test_ephemeral_provision_fails_before_cheatcode_on_wrong_pool(self):
+        with patch.dict("os.environ", {"SURFPOOL_EXPLICITLY_OFFLINE": "1"}):
+            with patch("arb.damm_v2_fork_execution.call",
+                       return_value={"value": {"owner": "wrong", "executable": False}}) as rpc:
+                with self.assertRaisesRegex(ValueError, "pool missing"):
+                    provision_offline_user("http://localhost:8899",
+                        pool="pool", input_is_a=True, amount_in=25)
+                self.assertEqual(rpc.call_count, 1)
+                self.assertEqual(rpc.call_args.args[1], "getAccountInfo")
+
 
     def test_fails_closed_on_stale_pool_snapshot(self):
         with patch("arb.damm_v2_fork_execution.call",
