@@ -25,19 +25,13 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_atomic_pair_evidence_matrix.py -v
       - name: Test Raydium AMM v4 market owner authentication
         run: python3 -m unittest discover -s tests -p test_raydium_v4_market_preflight.py -v
-      - name: Test local-fork Orca legacy program ownership preflight
-        run: python3 -m unittest discover -s tests -p test_orca_legacy_owner_preflight.py -v
-      - name: Test token-agnostic Orca public DEX index adapter
-        run: python3 -m unittest discover -s tests -p test_orca_legacy_public_index.py -v
-      - name: Test untrusted Orca legacy pool candidate authentication
-        run: python3 -m unittest discover -s tests -p test_orca_legacy_public_candidates.py -v
       - name: Test public Raydium pool discovery and onchain authentication boundary
         run: python3 -m unittest discover -s tests -p test_raydium_public_pool_discovery.py -v
       - name: Test bounded legacy pool discovery
         run: python3 -m unittest discover -s tests -p test_legacy_pool_discovery.py -v
-      - name: Test eight-venue evidence validation contract
+      - name: Test seven-venue evidence validation contract
         run: python3 -m unittest discover -s tests -p test_validate_eight_venue_probe.py -v
-      - name: Test eight-venue onchain validation probe
+      - name: Test seven-venue onchain validation probe
         run: python3 -m unittest discover -s tests -p test_eight_venue_onchain_probe.py -v
       - name: Test DAMM v2 fresh onchain authentication before signing
         run: python3 -m unittest discover -s tests -p test_damm_v2_signed_preflight.py -v
@@ -59,14 +53,14 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_meteora_damm_v2_swap.py -v
       - name: Test legacy venue decoders and swap instruction encoding
         run: python3 -m unittest discover -s tests -p test_legacy_venue_adapters.py -v
-      - name: Test complete eight-venue execution target
+      - name: Test seven-venue execution target
         run: python3 -m unittest discover -s tests -p test_execution_target_matrix.py -v
-      - name: Generate 8-venue 56-order atomic execution gap report
+      - name: Generate 7-venue 42-order atomic execution gap report
         run: python3 -m arb.execution_target_matrix --output "$RUNNER_TEMP/execution-target-matrix.json"
       - name: Upload complete execution target matrix
         uses: actions/upload-artifact@v4
         with:
-          name: eight-venue-execution-target-matrix
+          name: seven-venue-execution-target-matrix
           path: ${{ runner.temp }}/execution-target-matrix.json
       - name: Test verified missing-pair route prioritization
         run: python3 -m unittest discover -s tests -p test_missing_pair_route_inventory.py -v
@@ -379,40 +373,15 @@ jobs:
           name: raydium-public-api-candidates
           path: ${{ runner.temp }}/raydium-public-candidates.json
           if-no-files-found: ignore
-      - name: Discover indexed Orca DEX candidates without fixed token pairs
-        env:
-          ORCA_LEGACY_GECKO_DEX_ID: ${{ vars.ORCA_LEGACY_GECKO_DEX_ID }}
-        run: |
-          if [ -n "$ORCA_LEGACY_GECKO_DEX_ID" ]; then
-            python3 -m arb.orca_legacy_public_candidates --dex-id "$ORCA_LEGACY_GECKO_DEX_ID" --output "$RUNNER_TEMP/orca-legacy-index-candidates.json"
-          else
-            python3 -m arb.orca_legacy_public_candidates --dex-id orca --output "$RUNNER_TEMP/orca-legacy-index-candidates.json"
-          fi
-      - name: Upload Orca legacy index discovery diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: orca-legacy-index-candidates
-          path: ${{ runner.temp }}/orca-legacy-index-candidates.json
-          if-no-files-found: error
-      - name: Classify indexed Orca pools by actual onchain program owner
-        run: python3 -m arb.orca_legacy_owner_preflight --rpc "$SOLANA_RPC_URL" --input "$RUNNER_TEMP/orca-legacy-index-candidates.json" --output "$RUNNER_TEMP/orca-legacy-owner-candidates.json" --report "$RUNNER_TEMP/orca-legacy-owner-report.json"
-      - name: Upload Orca legacy owner classification
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: orca-legacy-owner-preflight
-          path: ${{ runner.temp }}/orca-legacy-owner-report.json
-          if-no-files-found: error
-      - name: Probe all eight pool decoders and builder availability against mainnet fork
-        run: python3 -m arb.eight_venue_onchain_probe --rpc "$SOLANA_RPC_URL" --public-raydium-candidates "$RUNNER_TEMP/raydium-public-candidates.json" --public-orca-legacy-candidates "$RUNNER_TEMP/orca-legacy-owner-candidates.json" --output "$RUNNER_TEMP/eight-venue-onchain-probe.json"
-      - name: Validate eight-venue probe schema and simulation-only flags
+      - name: Probe all seven active pool decoders and builders against mainnet fork
+        run: python3 -m arb.eight_venue_onchain_probe --rpc "$SOLANA_RPC_URL" --public-raydium-candidates "$RUNNER_TEMP/raydium-public-candidates.json" --output "$RUNNER_TEMP/eight-venue-onchain-probe.json"
+      - name: Validate seven-venue probe schema and simulation-only flags
         run: python3 -m arb.validate_eight_venue_probe --input "$RUNNER_TEMP/eight-venue-onchain-probe.json"
-      - name: Upload eight-venue onchain verification evidence
+      - name: Upload seven-venue onchain verification evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: eight-venue-onchain-verification
+          name: seven-venue-onchain-verification
           path: ${{ runner.temp }}/eight-venue-onchain-probe.json
           if-no-files-found: error
       - name: Enumerate multi-pair token graph cycles
