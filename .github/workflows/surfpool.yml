@@ -370,7 +370,7 @@ jobs:
           if [ -n "$ORCA_LEGACY_GECKO_DEX_ID" ]; then
             python3 -m arb.orca_legacy_public_candidates --dex-id "$ORCA_LEGACY_GECKO_DEX_ID" --output "$RUNNER_TEMP/orca-legacy-index-candidates.json"
           else
-            python3 -m arb.orca_legacy_public_candidates --output "$RUNNER_TEMP/orca-legacy-index-candidates.json"
+            python3 -m arb.orca_legacy_public_candidates --dex-id orca --output "$RUNNER_TEMP/orca-legacy-index-candidates.json"
           fi
       - name: Upload Orca legacy index discovery diagnostics
         if: always()
