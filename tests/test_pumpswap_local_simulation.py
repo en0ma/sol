@@ -23,6 +23,45 @@ class PumpSwapLocalSimulationTests(unittest.TestCase):
         self.assertEqual(call.call_args.args[1],"simulateTransaction")
         self.assertTrue(call.call_args.args[2][1]["sigVerify"])
 
+    @patch("arb.pumpswap_local_simulation.decode_token_account")
+    @patch("arb.pumpswap_local_simulation.call")
+    def test_signed_success_requires_both_balance_deltas_and_output_floor(self,call,decode):
+        from arb.pumpswap_pool import PROGRAM
+        import base64
+        from arb.token_vaults import TOKEN_PROGRAM
+        account={"owner":TOKEN_PROGRAM,"data":[base64.b64encode(b"state").decode(),"base64"]}
+        call.return_value={"value":{"err":None,
+            "logs":["Program "+PROGRAM+" invoke [1]"],
+            "accounts":[account,account]}}
+        decode.side_effect=[
+            {"mint":"base-mint","amount_base_units":65},
+            {"mint":"quote-mint","amount_base_units":24}]
+        result=simulate_signed("http://127.0.0.1:8899",b"signed",
+            "user-base","user-quote","base-mint","quote-mint",100,0,50,
+            min_amount_out=20)
+        self.assertTrue(result["simulation_verified"])
+        self.assertEqual(result["spent_base_units"],35)
+        self.assertEqual(result["received_base_units"],24)
+        self.assertEqual(result["min_output_base_units"],20)
+        self.assertTrue(call.call_args.args[2][1]["sigVerify"])
+        decode.side_effect=[
+            {"mint":"base-mint","amount_base_units":65},
+            {"mint":"quote-mint","amount_base_units":19}]
+        with self.assertRaisesRegex(ValueError,"output threshold"):
+            simulate_signed("http://127.0.0.1:8899",b"signed",
+                "user-base","user-quote","base-mint","quote-mint",100,0,50,
+                min_amount_out=20)
+
+    def test_minimum_output_input_validation_fails_before_rpc(self):
+        with patch("arb.pumpswap_local_simulation.call") as rpc:
+            for bad in (0,-1,False,1<<64):
+                with self.subTest(bad=bad):
+                    with self.assertRaisesRegex(ValueError,"invalid signed"):
+                        simulate_signed("http://127.0.0.1:8899",b"signed",
+                            "user-base","user-quote","base-mint","quote-mint",
+                            100,0,50,min_amount_out=bad)
+            rpc.assert_not_called()
+
     @patch("arb.pumpswap_local_simulation.call")
     def test_reject_missing_post_state(self,call):
         from arb.pumpswap_pool import PROGRAM
