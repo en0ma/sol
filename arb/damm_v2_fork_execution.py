@@ -63,8 +63,19 @@ def _signed_negative_control(rpc, *, pool, state, signer, input_account,
     value = result.get("value") if isinstance(result, dict) else None
     if not isinstance(value, dict) or value.get("err") is None:
         raise ValueError("negative slippage control did not fail")
+    logs = value.get("logs")
+    # Generic RPC or account-loading errors are not slippage evidence.
+    if (not isinstance(logs, list)
+            or not any(isinstance(line, str) and line.startswith(
+                "Program " + PROGRAM + " invoke [") for line in logs)
+            or not any(isinstance(line, str) and any(
+                term in line.lower() for term in (
+                    "slippage", "minimum", "output amount", "minimum_amount_out"))
+                for line in logs)):
+        raise ValueError("negative failure does not establish DAMM v2 slippage rejection")
     return {"negative_slippage_failure_observed": True,
             "negative_error": str(value["err"]),
+            "negative_logs": logs,
             "negative_signature": str(signed.signatures[0])}
 
 
@@ -180,31 +191,32 @@ def main():
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
     local_rpc_only(args.rpc)
-    from solders.keypair import Keypair
-    if args.provision_offline_user:
-        if args.signer_file or args.input_account or args.output_account:
-            raise ValueError("ephemeral provisioning cannot use supplied signer or accounts")
-        signer, input_account, output_account = provision_offline_user(
-            args.rpc, pool=args.pool, input_is_a=args.input_is_a,
-            amount_in=args.amount_in)
-    else:
-        if not args.signer_file or not args.input_account or not args.output_account:
-            raise ValueError("existing local signer and both token accounts required")
-        secret = json.loads(Path(args.signer_file).read_text())
-        if not isinstance(secret, list) or len(secret) != 64 or any(
-                type(v) is not int or not 0 <= v <= 255 for v in secret):
-            raise ValueError("invalid local signer file")
-        signer = Keypair.from_bytes(bytes(secret))
-        input_account, output_account = args.input_account, args.output_account
     destination = Path(args.output)
     try:
-        report = execute(
-            args.rpc, pool=args.pool, signer=signer,
-            input_account=input_account, output_account=output_account,
-            amount_in=args.amount_in, min_amount_out=args.min_amount_out,
-            input_is_a=args.input_is_a)
+        from solders.keypair import Keypair
+        if args.provision_offline_user:
+            if args.signer_file or args.input_account or args.output_account:
+                raise ValueError("ephemeral provisioning cannot use supplied signer or accounts")
+            signer, input_account, output_account = provision_offline_user(
+                args.rpc, pool=args.pool, input_is_a=args.input_is_a,
+                amount_in=args.amount_in)
+        else:
+            if not args.signer_file or not args.input_account or not args.output_account:
+                raise ValueError("existing local signer and both token accounts required")
+            secret = json.loads(Path(args.signer_file).read_text())
+            if not isinstance(secret, list) or len(secret) != 64 or any(
+                    type(v) is not int or not 0 <= v <= 255 for v in secret):
+                raise ValueError("invalid local signer file")
+            signer = Keypair.from_bytes(bytes(secret))
+            input_account, output_account = args.input_account, args.output_account
+            report = execute(
+                args.rpc, pool=args.pool, signer=signer,
+                input_account=input_account, output_account=output_account,
+                amount_in=args.amount_in, min_amount_out=args.min_amount_out,
+                input_is_a=args.input_is_a)
     except Exception as exc:
         report = {"status": "UNVERIFIED", "reason": type(exc).__name__,
+                  "diagnostic": str(exc)[:400],
                   "signed_standalone_simulation_verified": False,
                   "positive_and_negative_controls_verified": False, **SAFETY}
         destination.write_text(json.dumps(report, indent=2) + "\n")
