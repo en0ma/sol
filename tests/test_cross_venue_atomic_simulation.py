@@ -24,7 +24,7 @@ class CrossVenueAtomicSimulationTests(unittest.TestCase):
         with patch("arb.cross_venue_atomic_simulation.call",return_value={
             "value":{"err":None,"logs":["Program "+A+" invoke [1]","Program "+A+" success"],
                      "accounts":[]}}):
-            with self.assertRaisesRegex(ValueError,"missing venue program invocation"):
+            with self.assertRaisesRegex(ValueError,"venue invocation/success order mismatch"):
                 verify_signed_atomic("http://127.0.0.1:8899",b"tx",**self.args())
 
     def test_simulation_error_rejected(self):
