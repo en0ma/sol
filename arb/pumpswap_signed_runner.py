@@ -38,6 +38,7 @@ def sign_and_simulate(rpc, pool, payer, direction, addresses, amount_in, min_out
     if len(wire)>1232:
         raise ValueError("PumpSwap transaction exceeds Solana packet limit")
     result=simulate_signed(rpc,wire,input_address,output_address,mint_in,mint_out,
-                           initial_input,initial_output,amount_in)
+                           initial_input,initial_output,amount_in,
+                           min_amount_out=min_out)
     return {**result,"transaction_bytes":len(wire),"local_only":True,
             "fee_mode_verified":False,"quote_reconciled":False}
