@@ -12,11 +12,11 @@ This project is **simulation and verification only**. Do not send, sign-and-broa
 - Fail closed on missing accounts, stale API responses, mismatched program owners, unsupported layouts, RPC 429s, and unverified token/vault authority. Do not equate missing RPC evidence with venue absence.
 - Prefer **venue-wide public API/index pool enumeration**, no hardcoded token pair or static pool-only universe. Apply configurable liquidity screening, classify by venue program, and authenticate candidates independently on-chain in Surfpool. APIs are discovery hints, never security or execution evidence. Add RPC-native exhaustive discovery later when the user upgrades RPC.
 - Do not require a closed X→Y→X arbitrage cycle for the two-venue atomic acceptance test: X→Y on venue A then Y→Z on venue B is sufficient when token continuity and atomic execution are proved.
-- Test **both execution directions** for every distinct venue pair (8 venues = 28 unordered, 56 ordered). Begin testing ready pairs without waiting for all eight venues.
+- Test **both execution directions** for each active venue pair (7 venues = 21 unordered, 42 ordered). Begin testing ready pairs without waiting for all seven venues. Orca Token Swap v1 is deprecated and archived as optional legacy code; do not make it an execution acceptance gate or run its legacy discovery in active CI.
 
 ## Source of truth
 - Roadmap: `docs/ROADMAP_AND_ARCHITECTURE.md`
-- Venue target matrix: `arb/execution_target_matrix.py`
+- Active seven-venue target matrix: `arb/execution_target_matrix.py`
 - Fork evidence: `arb/eight_venue_onchain_probe.py` and GitHub Actions artifacts
 - Discovery: `arb/raydium_public_pool_discovery.py`, `arb/onchain_pool_discovery.py`
 - Capability registries may lag actual builder modules; reconcile before claiming coverage.
