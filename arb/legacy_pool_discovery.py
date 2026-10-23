@@ -4,7 +4,7 @@ Uses exact mint-pair filters; never trusts returned program ownership without
 subsequent independent account and vault authentication. An empty result is
 not proof that a legacy swap venue is unavailable.
 """
-from arb.rpc import call
+from arb.rpc import call,RPCError
 from arb.pumpswap_local_simulation import local_rpc_only
 from arb.orca_whirlpool import SOL,USDC
 
@@ -30,9 +30,14 @@ def discover(rpc,venue,*,pairs=((SOL,USDC),),max_matches=8):
             filters=[{"dataSize":size},
                      {"memcmp":{"offset":offset_a,"bytes":left}},
                      {"memcmp":{"offset":offset_b,"bytes":right}}]
-            accounts=call(rpc,"getProgramAccounts",[
-                program,{"encoding":"base64","commitment":"confirmed","filters":filters}],
-                timeout=45,retries=2)
+            try:
+                accounts=call(rpc,"getProgramAccounts",[
+                    program,{"encoding":"base64","commitment":"confirmed","filters":filters}],
+                    timeout=45,retries=0)
+            except RPCError as exc:
+                if "429" in str(exc) or "Too Many Requests" in str(exc):
+                    raise ValueError("legacy discovery rate limited; no pool verification evidence") from exc
+                raise
             if not isinstance(accounts,list) or len(accounts)>max_matches:
                 raise ValueError("legacy candidate response unbounded or malformed")
             for item in accounts:
