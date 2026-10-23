@@ -21,6 +21,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Unit-test pairwise execution evidence
         run: python3 -m unittest discover -s tests -p test_atomic_pair_evidence_matrix.py -v
+      - name: Test legacy venue decoders and swap instruction encoding
+        run: python3 -m unittest discover -s tests -p test_legacy_venue_adapters.py -v
       - name: Test complete eight-venue execution target
         run: python3 -m unittest discover -s tests -p test_execution_target_matrix.py -v
       - name: Generate 8-venue 56-order atomic execution gap report
