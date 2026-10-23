@@ -358,15 +358,16 @@ jobs:
           path: ${{ runner.temp }}/raydium-public-candidates.json
           if-no-files-found: ignore
       - name: Probe all eight pool decoders and builder availability against mainnet fork
-        continue-on-error: true
         run: python3 -m arb.eight_venue_onchain_probe --rpc "$SOLANA_RPC_URL" --public-raydium-candidates "$RUNNER_TEMP/raydium-public-candidates.json" --output "$RUNNER_TEMP/eight-venue-onchain-probe.json"
+      - name: Validate eight-venue probe schema and simulation-only flags
+        run: python3 -m arb.validate_eight_venue_probe --input "$RUNNER_TEMP/eight-venue-onchain-probe.json"
       - name: Upload eight-venue onchain verification evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: eight-venue-onchain-verification
           path: ${{ runner.temp }}/eight-venue-onchain-probe.json
-          if-no-files-found: ignore
+          if-no-files-found: error
       - name: Enumerate multi-pair token graph cycles
         env:
           TOKEN_GRAPH_INDEX_ENABLED: "1"
