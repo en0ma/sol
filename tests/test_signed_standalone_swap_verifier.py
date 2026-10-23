@@ -8,7 +8,7 @@ try:
     from solders.keypair import Keypair
     from solders.hash import Hash
     from solders.transaction import Transaction
-    from solders.instruction import Instruction
+    from solders.instruction import Instruction,AccountMeta
     from solders.pubkey import Pubkey
     HAVE_SOLDERS=True
 except ImportError:
@@ -24,7 +24,9 @@ class SignedStandaloneSwapVerifierTests(unittest.TestCase):
         self.mint_in=str(Keypair().pubkey())
         self.mint_out=str(Keypair().pubkey())
         self.wire=bytes(Transaction.new_signed_with_payer(
-            [Instruction(Pubkey.from_string(self.program),b"swap",[])],
+            [Instruction(Pubkey.from_string(self.program),b"swap",[
+                AccountMeta(Pubkey.from_string(self.input),False,True),
+                AccountMeta(Pubkey.from_string(self.output),False,True)])],
             self.payer.pubkey(),[self.payer],Hash.default()))
 
     def args(self):
@@ -73,6 +75,16 @@ class SignedStandaloneSwapVerifierTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,"signature"):
                 verify_signed_swap("http://localhost:8899",bytes(wire),
                                    **self.args())
+            rpc.assert_not_called()
+
+    def test_signed_instruction_must_reference_both_user_token_accounts(self):
+        from solders.instruction import Instruction
+        wire=bytes(Transaction.new_signed_with_payer(
+            [Instruction(Pubkey.from_string(self.program),b"swap",[])],
+            self.payer.pubkey(),[self.payer],Hash.default()))
+        with patch("arb.signed_standalone_swap_verifier.call") as rpc:
+            with self.assertRaisesRegex(ValueError,"instruction or signature"):
+                verify_signed_swap("http://localhost:8899",wire,**self.args())
             rpc.assert_not_called()
 
     def test_wrong_program_rejected_before_rpc(self):
