@@ -7,10 +7,10 @@ def report():
     rows=[{"venue":name,"decoder_onchain_verified":False,
            "builder_code_present":True,"builder_onchain_execution_verified":False,
            "candidates_checked":0,"pool_evidence":None,"errors":[]} for name in TARGET_VENUES]
-    return {"status":"EIGHT_VENUE_ONCHAIN_READONLY_PROBE",
-            "decoder_verified_count":0,"builder_code_count":8,
+    return {"status":"SEVEN_VENUE_ONCHAIN_READONLY_PROBE",
+            "decoder_verified_count":0,"builder_code_count":7,
             "builder_execution_verified_count":0,
-            "venues":rows,"actionable":False,"live_execution_approved":False,"broadcast":False}
+            "venues":rows,"archived_optional_venues":["orca_token_swap_v1"],"actionable":False,"live_execution_approved":False,"broadcast":False}
 
 class ValidateProbeTests(unittest.TestCase):
     def test_missing_pools_are_a_coverage_gap_not_fake_success(self):
