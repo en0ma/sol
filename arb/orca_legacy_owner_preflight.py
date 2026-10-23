@@ -13,6 +13,7 @@ from arb.pumpswap_local_simulation import local_rpc_only
 ORCA_TOKEN_SWAP_V1="DjVE6JNiYqPL2QXyCUUh8rNjHrbz9hXHNYt99MQ59qw1"
 MAX_INPUT=64
 MAX_OUTPUT=16
+BATCH_SIZE=16
 
 def preflight(rpc,addresses):
     local_rpc_only(rpc)
@@ -24,11 +25,15 @@ def preflight(rpc,addresses):
         return {"status":"NO_INDEX_CANDIDATES","matching_program":[],"checked":0,
                 "mismatched_owner":0,"missing":0,
                 "actionable":False,"live_execution_approved":False,"broadcast":False}
-    response=call(rpc,"getMultipleAccounts",[
-        unique,{"encoding":"base64","commitment":"confirmed"}])
-    accounts=response.get("value") if isinstance(response,dict) else None
-    if not isinstance(accounts,list) or len(accounts)!=len(unique):
-        raise ValueError("incomplete Orca index owner preflight")
+    accounts=[]
+    for start in range(0,len(unique),BATCH_SIZE):
+        batch=unique[start:start+BATCH_SIZE]
+        response=call(rpc,"getMultipleAccounts",[
+            batch,{"encoding":"base64","commitment":"confirmed"}])
+        values=response.get("value") if isinstance(response,dict) else None
+        if not isinstance(values,list) or len(values)!=len(batch):
+            raise ValueError("incomplete Orca index owner preflight")
+        accounts.extend(values)
     matching=[]
     mismatch=missing=0
     for address,account in zip(unique,accounts):
