@@ -8,6 +8,14 @@ class EightVenueOnchainProbeTests(unittest.TestCase):
         self.assertEqual(set(TARGET_VENUES),set(BUILDERS)-{"orca_token_swap_v1"})
         self.assertEqual(set(LEGACY),{"raydium_amm_v4","orca_token_swap_v1"})
 
+    def test_archived_orca_v1_candidates_are_not_active_probes(self):
+        with patch("arb.eight_venue_onchain_probe.verify_legacy") as legacy:
+            report=probe("http://127.0.0.1:8899",{"pools":[]},
+                         public_orca_legacy_candidates=["archived-pool"])
+        self.assertNotIn("orca_token_swap_v1",[row["venue"] for row in report["venues"]])
+        self.assertEqual(report["archived_optional_venues"],["orca_token_swap_v1"])
+        legacy.assert_not_called()
+
     def test_reject_external_rpc_before_fetch(self):
         with patch("arb.eight_venue_onchain_probe.call") as rpc:
             with self.assertRaises(ValueError):
