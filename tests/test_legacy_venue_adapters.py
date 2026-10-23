@@ -47,7 +47,7 @@ class LegacyVenueAdapterTests(unittest.TestCase):
     def test_orca_swap_builder_exact_input_instruction(self):
         accounts=[key(i) for i in range(1,11)]
         ix=build_swap(*accounts,amount_in=100,min_amount_out=1)
-        self.assertEqual(bytes(ix.data),b"\\x01"+(100).to_bytes(8,"little")+(1).to_bytes(8,"little"))
+        self.assertEqual(bytes(ix.data),bytes([1])+(100).to_bytes(8,"little")+(1).to_bytes(8,"little"))
         self.assertEqual(len(ix.accounts),10)
         self.assertTrue(ix.accounts[2].is_signer)
         with self.assertRaises(ValueError):
