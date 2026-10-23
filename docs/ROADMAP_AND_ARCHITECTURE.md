@@ -77,6 +77,8 @@ Capability registries such as `arb/venue_capabilities.py` and `arb/onchain_pool_
 
 **Builder validation improvement (2026-10-23):** the pairwise capability audit now installs `solders==0.26.0` so real instruction serialization tests are not silently skipped due to missing runtime dependencies. PumpSwap's local signed simulation post-state verifier also requires received output to meet the exact minimum-output threshold passed to the builder, in addition to signature verification, invocation and positive token deltas. These are **test and verification harness improvements**, not new successful standalone signed swap execution evidence. Confirm the latest CI run before treating its tests as passed.
 
+**Signed-runner wiring regression (2026-10-23):** `tests/test_pumpswap_signed_runner.py` now exercises real `solders` transaction signing/serialization with mocked pool preflight, instruction construction and RPC simulation, checks forwarding of the minimum-output threshold to the post-state verifier, and asserts that unverified pools fail before signing. CI now runs this test. This is **unit-level wiring evidence only**: mocked simulation must never be counted as a successfully simulated real PumpSwap swap. The runner explicitly returns `actionable=false`, `live_execution_approved=false`, and `broadcast=false`.
+
 ## 7. Milestones and order of work
 
 **M1 — Discovery coverage.** Complete venue-wide, mint-agnostic, bounded API/index discovery for all eight venues where available; normalize candidates, liquidity/recent-pool queues, provenance, deduplication, refresh and failure handling. Public API discovery is allowed immediately. Document any venue without a suitable listing feed.
