@@ -24,6 +24,8 @@ class OrcaLegacyOwnerPreflightTests(unittest.TestCase):
         self.assertEqual(result["checked"],3)
         self.assertEqual(result["mismatched_owner"],1)
         self.assertEqual(result["missing"],1)
+        self.assertEqual(result["owners_by_program"][ORCA_TOKEN_SWAP_V1],1)
+        self.assertEqual(result["owners_by_program"]["whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc"],1)
         self.assertFalse(result["onchain_pool_decoder_verified"])
         self.assertFalse(result["actionable"])
         self.assertFalse(result["live_execution_approved"])
