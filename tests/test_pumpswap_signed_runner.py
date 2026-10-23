@@ -68,6 +68,9 @@ class PumpSwapSignedRunnerTests(unittest.TestCase):
         self.assertTrue(result["local_only"])
         self.assertFalse(result["quote_reconciled"])
         self.assertFalse(result["fee_mode_verified"])
+        self.assertFalse(result["actionable"])
+        self.assertFalse(result["live_execution_approved"])
+        self.assertFalse(result["broadcast"])
         self.assertGreater(result["transaction_bytes"],0)
 
     def test_unverified_pool_rejected_before_account_preflight(self):
