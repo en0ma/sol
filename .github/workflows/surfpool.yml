@@ -1,7 +1,7 @@
 name: Surfpool CI
 
 on:
-  push:
+  pull_request:
   workflow_dispatch:
 
 # Avoid competing Surfpool forks against the same free-tier Alchemy account.
