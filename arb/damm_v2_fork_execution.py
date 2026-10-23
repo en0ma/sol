@@ -68,6 +68,53 @@ def _signed_negative_control(rpc, *, pool, state, signer, input_account,
             "negative_signature": str(signed.signatures[0])}
 
 
+def provision_offline_user(rpc, *, pool, input_is_a, amount_in):
+    """Create ephemeral fork-only payer and SPL accounts for a real pool's mints.
+
+    Only Surfpool's local surfnet_setAccount cheatcode is used; no transaction
+    is broadcast and no signer material is persisted.
+    """
+    import os
+    from solders.keypair import Keypair
+    from arb.orca_swap_v2_offline_provision import token_account_bytes
+    local_rpc_only(rpc)
+    if os.environ.get("SURFPOOL_EXPLICITLY_OFFLINE") != "1":
+        raise ValueError("local account provisioning requires explicit offline opt-in")
+    if type(input_is_a) is not bool or type(amount_in) is not int or not 0 < amount_in < (1 << 64):
+        raise ValueError("invalid offline funding request")
+    response = call(rpc, "getAccountInfo", [
+        pool, {"encoding": "base64", "commitment": "confirmed"}])
+    value = response.get("value") if isinstance(response, dict) else None
+    if not isinstance(value, dict) or value.get("owner") != PROGRAM or value.get("executable") is not False:
+        raise ValueError("pool missing from local fork")
+    encoded = value.get("data")
+    if not isinstance(encoded, list) or len(encoded) != 2 or encoded[1] != "base64":
+        raise ValueError("pool encoding invalid")
+    state = decode(base64.b64decode(encoded[0], validate=True))
+    # Authenticate the genuine fork pool before creating artificial user balances.
+    evidence = verify(rpc, pool, state)
+    if evidence.get("venue") != "meteora_damm_v2" or evidence.get("address") != pool:
+        raise ValueError("pool verification failed before provisioning")
+    mints = [state["token_a_mint"], state["token_b_mint"]]
+    if not input_is_a:
+        mints.reverse()
+    signer = Keypair()
+    owner = str(signer.pubkey())
+    accounts = [str(Keypair().pubkey()), str(Keypair().pubkey())]
+    # Funding comes from a local-only Surfpool cheatcode, never an external wallet.
+    call(rpc, "surfnet_setAccount", [owner, {
+        "lamports": 1000000000, "data": "",
+        "owner": "11111111111111111111111111111111", "executable": False}])
+    for addr, mint, amount in zip(accounts, mints, (amount_in, 0)):
+        call(rpc, "surfnet_setAccount", [addr, {
+            "lamports": 2039280, "data": token_account_bytes(mint, owner, amount).hex(),
+            "owner": TOKEN_PROGRAM, "executable": False}])
+    _, balances = _account_snapshot(rpc, accounts, mints, owner)
+    if balances != [amount_in, 0]:
+        raise ValueError("local provisional user balance readback mismatch")
+    return signer, accounts[0], accounts[1]
+
+
 def execute(rpc, *, pool, signer, input_account, output_account,
             amount_in, min_amount_out, input_is_a):
     local_rpc_only(rpc)
@@ -121,27 +168,39 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--rpc", default="http://127.0.0.1:8899")
     parser.add_argument("--pool", required=True)
-    parser.add_argument("--signer-file", required=True,
+    parser.add_argument("--signer-file",
                         help="Local fork-only ephemeral 64-byte keypair JSON; never stored in artifacts")
-    parser.add_argument("--input-account", required=True)
-    parser.add_argument("--output-account", required=True)
+    parser.add_argument("--input-account")
+    parser.add_argument("--output-account")
     parser.add_argument("--amount-in", type=int, required=True)
     parser.add_argument("--min-amount-out", type=int, required=True)
     parser.add_argument("--input-is-a", action="store_true")
+    parser.add_argument("--provision-offline-user", action="store_true",
+                        help="Use ephemeral Surfpool-only payer and token-account cheatcodes")
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
     local_rpc_only(args.rpc)
     from solders.keypair import Keypair
-    secret = json.loads(Path(args.signer_file).read_text())
-    if not isinstance(secret, list) or len(secret) != 64 or any(
-            type(v) is not int or not 0 <= v <= 255 for v in secret):
-        raise ValueError("invalid local signer file")
-    signer = Keypair.from_bytes(bytes(secret))
+    if args.provision_offline_user:
+        if args.signer_file or args.input_account or args.output_account:
+            raise ValueError("ephemeral provisioning cannot use supplied signer or accounts")
+        signer, input_account, output_account = provision_offline_user(
+            args.rpc, pool=args.pool, input_is_a=args.input_is_a,
+            amount_in=args.amount_in)
+    else:
+        if not args.signer_file or not args.input_account or not args.output_account:
+            raise ValueError("existing local signer and both token accounts required")
+        secret = json.loads(Path(args.signer_file).read_text())
+        if not isinstance(secret, list) or len(secret) != 64 or any(
+                type(v) is not int or not 0 <= v <= 255 for v in secret):
+            raise ValueError("invalid local signer file")
+        signer = Keypair.from_bytes(bytes(secret))
+        input_account, output_account = args.input_account, args.output_account
     destination = Path(args.output)
     try:
         report = execute(
             args.rpc, pool=args.pool, signer=signer,
-            input_account=args.input_account, output_account=args.output_account,
+            input_account=input_account, output_account=output_account,
             amount_in=args.amount_in, min_amount_out=args.min_amount_out,
             input_is_a=args.input_is_a)
     except Exception as exc:
