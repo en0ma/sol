@@ -43,8 +43,16 @@ def verify_signed_swap(rpc,signed_bytes,*,program,input_account,output_account,
         if (input_index not in venue_ix.accounts
                 or output_index not in venue_ix.accounts):
             raise ValueError("signed venue instruction must reference both user token accounts")
-        if (not tx.message.is_writable(input_index)
-                or not tx.message.is_writable(output_index)):
+        # Legacy solders.message.Message has no is_writable() method.
+        # Determine writable privileges from the compiled message header.
+        header=tx.message.header
+        signed_count=header.num_required_signatures
+        signed_writable=signed_count-header.num_readonly_signed_accounts
+        unsigned_writable_end=len(keys)-header.num_readonly_unsigned_accounts
+        def writable(index):
+            return (index<signed_writable if index<signed_count
+                    else index<unsigned_writable_end)
+        if not writable(input_index) or not writable(output_index):
             raise ValueError("signed venue user token accounts must be writable")
     except Exception as exc:
         raise ValueError("invalid signed standalone swap instruction or signature") from exc
