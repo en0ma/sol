@@ -51,6 +51,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_pumpswap_trade_v2.py -v
       - name: Test offline source bundle structural audit and fail-closed accounting
         run: python3 -m unittest discover -s tests -p test_source_evidence_audit.py -v
+      - name: Test bounded missing venue source candidate enrichment
+        run: python3 -m unittest discover -s tests -p test_atomic_missing_venue_candidates.py -v
       - name: Test real source-stage blocker classifications
         run: python3 -m unittest discover -s tests -p test_atomic_source_blocker_report.py -v
       - name: Test missing Raydium venue builders and mandatory account authentication
@@ -454,9 +456,22 @@ jobs:
           name: following-ten-authenticated-dual-program-fixtures
           path: ${{ runner.temp }}/following-ten-fixtures/
           if-no-files-found: warn
+      - name: Bound AMM v4 candidate discovery once for remaining routes
+        run: |
+          python3 -m arb.atomic_missing_venue_candidates \
+            --registry arb/pool_registry.json \
+            --output "$RUNNER_TEMP/missing-venue-candidates.json"
+      - name: Upload untrusted Raydium candidate provenance for debugging
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: missing-venue-untrusted-candidates
+          path: ${{ runner.temp }}/missing-venue-candidates.json
+          if-no-files-found: error
       - name: Discover remaining twenty-four authenticated ordered pool candidates
         run: |
           python3 -m arb.next_ten_fork_pool_probe --batch remaining \
+            --registry "$RUNNER_TEMP/missing-venue-candidates.json" \
             --output "$RUNNER_TEMP/remaining-24-pool-pairs.json"
       - name: Export remaining twenty-four read-only source-fork fixtures
         run: |
