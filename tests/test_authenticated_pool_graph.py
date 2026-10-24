@@ -2,8 +2,8 @@ import unittest
 from arb.authenticated_pool_graph import enumerate_cycles,candidate_summary
 
 def pool(venue,address,a,b,slot=100,**other):
-    return {"venue":venue,"pool":address,"mints":[a,b],"slot":slot,
-            "authenticated":True,**other}
+    return {**{"venue":venue,"pool":address,"mints":[a,b],"slot":slot,
+            "authenticated":True},**other}
 
 class PoolGraphTests(unittest.TestCase):
     def test_cross_venue_two_hops_both_directions(self):
