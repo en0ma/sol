@@ -29,8 +29,8 @@ def top_level_events(logs, venues):
     import re
     stack=[]
     events=[]
-    starts=re.compile(r"^Program (\\S+) invoke \\[(\\d+)\\]$")
-    ends=re.compile(r"^Program (\\S+) (success|failed:.*)$")
+    starts=re.compile(r"^Program (\S+) invoke \[(\d+)\]$")
+    ends=re.compile(r"^Program (\S+) (success|failed:.*)$")
     for line in logs:
         if not isinstance(line,str):
             return []
