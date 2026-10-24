@@ -15,7 +15,7 @@ from solders.transaction import Transaction
 from solders.hash import Hash
 from arb.rpc import call
 from arb.damm_cpmm_atomic_offline import (_pool,_fetch,_simulate,_post,
-    _cpi_intermediate_flow,_top_level_venue_events,LOADER,SAFETY)
+    _cpi_intermediate_flow,LOADER,SAFETY)
 from arb.next_ten_fork_pool_probe import PROGRAMS,DECODERS,MINT_KEYS
 from arb.next_ten_atomic_routes import BATCH_10
 from arb.orca_swap_v2_offline_provision import token_account_bytes
@@ -23,6 +23,34 @@ from arb.token_vaults import TOKEN_PROGRAM,decode_token_account
 from arb.pumpswap_local_simulation import local_rpc_only
 
 SYSTEM="11111111111111111111111111111111"
+
+def top_level_events(logs, venues):
+    import re
+    stack=[]
+    events=[]
+    starts=re.compile(r"^Program (\\S+) invoke \\[(\\d+)\\]$")
+    ends=re.compile(r"^Program (\\S+) (success|failed:.*)$")
+    for line in logs:
+        if not isinstance(line,str):
+            return []
+        start=starts.fullmatch(line)
+        if start:
+            program,depth=start.group(1),int(start.group(2))
+            if depth!=len(stack)+1:
+                return []
+            stack.append(program)
+            if depth==1 and program in venues:
+                events.append([program,"invoke"])
+            continue
+        end=ends.fullmatch(line)
+        if end:
+            if not stack or stack[-1]!=end.group(1):
+                return []
+            depth=len(stack)
+            stack.pop()
+            if depth==1 and end.group(1) in venues:
+                events.append([end.group(1),"success" if end.group(2)=="success" else "failed"])
+    return events if not stack else []
 
 def hydrate(rpc, fixture):
     local_rpc_only(rpc)
@@ -182,7 +210,7 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000):
         return result
     expected=[[PROGRAMS[first],"invoke"],[PROGRAMS[first],"success"],
               [PROGRAMS[second],"invoke"],[PROGRAMS[second],"success"]]
-    events=_top_level_venue_events(positive.get("logs") or [])
+    events=top_level_events(positive.get("logs") or [],{PROGRAMS[first],PROGRAMS[second]})
     result["positive_top_level_venues"]=[first,second] if events==expected else []
     if events!=expected:
         result["status"]="POSITIVE_PROGRAM_ORDER_NOT_VERIFIED"
@@ -216,7 +244,7 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000):
     bad=Transaction.new_signed_with_payer([ix1,ix2_bad],signer.pubkey(),[signer],bh)
     failed,_=_simulate(rpc,bad,keys)
     error=failed.get("err")
-    bad_events=_top_level_venue_events(failed.get("logs") or [])
+    bad_events=top_level_events(failed.get("logs") or [],{PROGRAMS[first],PROGRAMS[second]})
     required=[[PROGRAMS[first],"invoke"],[PROGRAMS[first],"success"],
               [PROGRAMS[second],"invoke"],[PROGRAMS[second],"failed"]]
     failed_index=(error.get("InstructionError",[None])[0]

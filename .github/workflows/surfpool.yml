@@ -1438,12 +1438,6 @@ jobs:
           python3 -m arb.damm_cpmm_atomic_evidence_audit \
             --input "$RUNNER_TEMP/damm-cpmm-atomic-evidence.json" \
             --output "$RUNNER_TEMP/damm-cpmm-acceptance.json"
-      - name: Reconcile verified current-run atomic evidence into 42 ordered pairs
-        run: |
-          python3 -m arb.current_run_atomic_matrix \
-            --input "$RUNNER_TEMP/damm-cpmm-atomic-evidence.json" \
-            --reverse-input "$RUNNER_TEMP/cpmm-damm-reverse-evidence.json" \
-            --output "$RUNNER_TEMP/current-run-atomic-matrix.json"
       - name: Execute ten signed atomic two-swap attempts on isolated Surfpool
         env:
           SURFPOOL_EXPLICITLY_OFFLINE: "1"
@@ -1458,6 +1452,13 @@ jobs:
           name: next-ten-isolated-signed-atomic-runtime-evidence
           path: ${{ runner.temp }}/next-ten-signed-evidence/
           if-no-files-found: error
+      - name: Reconcile verified current-run atomic evidence into 42 ordered pairs
+        run: |
+          python3 -m arb.current_run_atomic_matrix \
+            --input "$RUNNER_TEMP/damm-cpmm-atomic-evidence.json" \
+            --reverse-input "$RUNNER_TEMP/cpmm-damm-reverse-evidence.json" \
+            --next-ten-evidence-dir "$RUNNER_TEMP/next-ten-signed-evidence" \
+            --output "$RUNNER_TEMP/current-run-atomic-matrix.json"
       - name: Publish next ten ordered route evidence gap report
         run: |
           python3 -m arb.next_ten_atomic_evidence \

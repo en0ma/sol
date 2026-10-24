@@ -67,6 +67,12 @@ def assess(route, evidence):
             errors.append("SPL intermediate delta reconciliation failed")
         if not (0<=post[0]<balances[0] and post[2]>0):
             errors.append("input/output balance movement invalid")
+    if evidence.get("positive_error")!="None":
+        errors.append("positive signed transaction returned an error")
+    if evidence.get("status")!="SIGNED_ATOMIC_AND_ROLLBACK_VERIFIED":
+        errors.append("signed atomic runtime status not verified")
+    if not isinstance(evidence.get("negative_error"),str) or "InstructionError" not in evidence["negative_error"]:
+        errors.append("negative instruction error not observed")
     if evidence.get("second_leg_failure_instruction_index")!=1:
         errors.append("negative case did not fail at instruction 1")
     if not isinstance(evidence.get("positive_logs"),list) or not evidence["positive_logs"]:
