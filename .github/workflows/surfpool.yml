@@ -1,7 +1,6 @@
 name: Surfpool Full 42 Manual Regression
 
 on:
-  pull_request:
   workflow_dispatch:
 
 # Avoid competing Surfpool forks against the same free-tier Alchemy account.
