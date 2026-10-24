@@ -23,6 +23,33 @@ class GraphCoordinatorTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             compile_route(legs,self.tokens,self.states,self.evidence,"payer",
                           {"SOL":"a","USDC":"b"},[100,10],[1,1])
+    def test_six_leg_closed_graph_includes_reused_venue_and_token(self):
+        tokens=["A","B","C","A","D","E","A"]
+        legs=[{"venue":"orca" if i%2==0 else "raydium_cpmm",
+               "pool":"pool"+str(i),"input_mint":tokens[i],
+               "output_mint":tokens[i+1]} for i in range(6)]
+        states={(x["venue"],x["pool"]):{} for x in legs}
+        with patch("arb.atomic_graph_coordinator.build_leg",return_value="ix") as build:
+            compiled=compile_route(legs,tokens,states,{k:{} for k in states},
+                "owner",["a"+str(i) for i in range(7)],[100]*6,[1]*6)
+        self.assertEqual(compiled,["ix"]*6)
+        self.assertEqual(build.call_count,6)
+        self.assertEqual(build.call_args_list[2].args[5:7],("a2","a3"))
+    def test_seven_legs_rejected_before_builder(self):
+        tokens=["A","B","C","D","E","F","G","A"]
+        legs=[{"venue":"orca","pool":str(i),"input_mint":tokens[i],
+               "output_mint":tokens[i+1]} for i in range(7)]
+        with patch("arb.atomic_graph_coordinator.build_leg") as build:
+            with self.assertRaises(ValueError):
+                compile_route(legs,tokens,{},{},"owner",
+                              ["a"]*8,[100]*7,[1]*7)
+            build.assert_not_called()
+    def test_invalid_amount_rejected_before_any_builder(self):
+        with patch("arb.atomic_graph_coordinator.build_leg") as build:
+            with self.assertRaises(ValueError):
+                compile_route(self.legs,self.tokens,self.states,self.evidence,
+                              "owner",["a","b","c"],[100,0],[1,1])
+            build.assert_not_called()
     def test_fail_closed_no_broadcast_even_with_profit(self):
         result=simulation_decision(simulation_verified=True,rollback_verified=True,
                                    net_profit_base_units=999999,live_execution_approved=True)

@@ -6,12 +6,20 @@ All swap-specific details stay in venue_swap_adapter. No sendTransaction.
 from arb.venue_swap_adapter import build_leg
 from arb.pumpswap_local_simulation import local_rpc_only
 
+MAX_ATOMIC_LEGS=6
+
 def compile_route(legs,tokens,states,evidence,owner,token_accounts,amounts,floors):
-    if (not isinstance(legs,list) or not 2<=len(legs)<=3
+    if (not isinstance(legs,list) or not 2<=len(legs)<=MAX_ATOMIC_LEGS
             or not isinstance(tokens,list) or len(tokens)!=len(legs)+1
-            or tokens[0]!=tokens[-1] or len(set(tokens[:-1]))!=len(tokens)-1):
-        raise ValueError("connected two/three-leg closed token graph required")
-    if len(amounts)!=len(legs) or len(floors)!=len(legs):
+            or tokens[0]!=tokens[-1]):
+        raise ValueError("connected closed token graph with 2–6 legs required")
+    if (not isinstance(amounts,(list,tuple)) or not isinstance(floors,(list,tuple))
+            or len(amounts)!=len(legs) or len(floors)!=len(legs)):
+        raise ValueError("per-leg amount bounds missing")
+    if any(type(a) is not int or type(f) is not int or not 0<a<2**64 or not 0<f<2**64
+           for a,f in zip(amounts,floors)):
+        raise ValueError("invalid per-leg input or minimum output")
+    if False:
         raise ValueError("per-leg amount bounds missing")
     if (not isinstance(owner,str) or not owner
             or any(not isinstance(token,str) for token in tokens)
@@ -51,8 +59,8 @@ def compile_route(legs,tokens,states,evidence,owner,token_accounts,amounts,floor
 
 def signed_packet(rpc,instructions,signer):
     local_rpc_only(rpc)
-    if not 2<=len(instructions)<=3:
-        raise ValueError("atomic transaction must contain 2 or 3 swap instructions")
+    if not 2<=len(instructions)<=MAX_ATOMIC_LEGS:
+        raise ValueError("atomic transaction requires 2–6 venue instructions")
     from solders.hash import Hash
     from solders.transaction import Transaction
     from arb.rpc import call
