@@ -21,6 +21,16 @@ def compile_route(legs,tokens,states,evidence,owner,token_accounts,amounts,floor
             or (isinstance(token_accounts,dict) and
                 any(token not in token_accounts for token in tokens))):
         raise ValueError("graph token accounts or signer unavailable")
+    # Validate the ENTIRE graph before asking any venue builder to encode
+    # instructions. An invalid later hop must not partially build earlier hops.
+    for i,leg in enumerate(legs):
+        if not isinstance(leg,dict):
+            raise ValueError("invalid graph edge")
+        if leg.get("input_mint")!=tokens[i] or leg.get("output_mint")!=tokens[i+1]:
+            raise ValueError("graph edge disconnected")
+        key=(leg.get("venue"),leg.get("pool"))
+        if key not in states or key not in evidence:
+            raise ValueError("authenticated venue state unavailable")
     compiled=[]
     for i,leg in enumerate(legs):
         if not isinstance(leg,dict):
