@@ -41,6 +41,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_damm_v2_fork_execution.py -v
       - name: Test DAMM v2 source export and isolated hydration safety
         run: python3 -m unittest discover -s tests -p test_damm_v2_isolated_execution.py -v
+      - name: Test signed DAMM v2 evidence acceptance and negative controls
+        run: python3 -m unittest discover -s tests -p test_damm_v2_execution_evidence_audit.py -v
       - name: Test cryptographically signed standalone swap post-state verifier
         run: python3 -m unittest discover -s tests -p test_signed_standalone_swap_verifier.py -v
       - name: Test signed atomic instruction order and intermediate account preflight
@@ -1330,6 +1332,19 @@ jobs:
           else
             printf '{"status":"SOURCE_FIXTURE_UNAVAILABLE","signed_standalone_simulation_verified":false,"positive_and_negative_controls_verified":false,"actionable":false,"live_execution_approved":false,"broadcast":false}\n' > "$RUNNER_TEMP/damm-v2-isolated-evidence.json"
           fi
+      - name: Audit isolated DAMM v2 signed execution evidence
+        continue-on-error: true
+        run: |
+          python3 -m arb.damm_v2_execution_evidence_audit \
+            --input "$RUNNER_TEMP/damm-v2-isolated-evidence.json" \
+            --output "$RUNNER_TEMP/damm-v2-acceptance.json"
+      - name: Upload DAMM v2 acceptance decision
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: damm-v2-signed-execution-acceptance
+          path: ${{ runner.temp }}/damm-v2-acceptance.json
+          if-no-files-found: error
       - name: Upload isolated DAMM v2 signed swap and slippage evidence
         if: always()
         uses: actions/upload-artifact@v4
