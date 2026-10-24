@@ -51,6 +51,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_pumpswap_trade_v2.py -v
       - name: Test offline source bundle structural audit and fail-closed accounting
         run: python3 -m unittest discover -s tests -p test_source_evidence_audit.py -v
+      - name: Test CLMM candidate discovery and matching mint preference
+        run: python3 -m unittest discover -s tests -p test_clmm_candidate_coverage.py -v
       - name: Test bounded missing venue source candidate enrichment
         run: python3 -m unittest discover -s tests -p test_atomic_missing_venue_candidates.py -v
       - name: Test real source-stage blocker classifications
