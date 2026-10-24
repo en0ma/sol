@@ -45,6 +45,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_damm_v2_execution_evidence_audit.py -v
       - name: Test DAMM to CPMM atomic fork integration safety
         run: python3 -m unittest discover -s tests -p test_damm_cpmm_atomic_offline.py -v
+      - name: Test next ten authenticated paired source fixture boundaries
+        run: python3 -m unittest discover -s tests -p test_next_ten_pair_fixture_export.py -v
       - name: Test real-fork next-ten pool authentication probe safety
         run: python3 -m unittest discover -s tests -p test_next_ten_fork_pool_probe.py -v
       - name: Test next ten directional Surfpool evidence gates
@@ -1286,6 +1288,18 @@ jobs:
         with:
           name: next-ten-authenticated-readonly-fork-pools
           path: ${{ runner.temp }}/next-ten-authenticated-pool-pairs.json
+          if-no-files-found: error
+      - name: Export ten authenticated dual-program fixtures from read-only Surfpool
+        run: |
+          python3 -m arb.next_ten_pair_fixture_export \
+            --readiness "$RUNNER_TEMP/next-ten-authenticated-pool-pairs.json" \
+            --output-dir "$RUNNER_TEMP/next-ten-dual-program-fixtures"
+      - name: Upload ten genuine source-fork dual-program fixtures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: next-ten-dual-program-readonly-fixtures
+          path: ${{ runner.temp }}/next-ten-dual-program-fixtures/
           if-no-files-found: error
       - name: Export authenticated DAMM and CPMM atomic route
         run: python3 -m arb.damm_cpmm_atomic_offline export "$RUNNER_TEMP/damm-cpmm-atomic-fixture.json"
