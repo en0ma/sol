@@ -40,8 +40,8 @@ def run(rpc):
             "lamports":2039280,"data":raw.hex(),"owner":TOKEN,"executable":False}])
     observed=[observe_token_account(rpc,account,mint,authority,TOKEN)
               for account,mint in zip(accounts,MINTS)]
-    if observed[0]["slot"]!=observed[1]["slot"]:
-        raise ValueError("offline account reads not slot-aligned")
+    # Independent RPC observations may cross Surfpool slots. The subsequent
+    # getMultipleAccounts read is the authoritative synchronized snapshot.
     import base64
     snapshot=call(rpc,"getMultipleAccounts",[accounts,{"encoding":"base64","commitment":"confirmed"}])
     slot=snapshot.get("context",{}).get("slot") if isinstance(snapshot,dict) else None
