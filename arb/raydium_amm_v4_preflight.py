@@ -42,3 +42,59 @@ def verify_pool_market(rpc,pool,state):
     return {"slot":slot,"pool_and_market_authenticated":True,
             "market_accounts_authenticated":False,
             "signed_atomic_simulation_verified":False,"broadcast":False}
+
+def authenticate_swap_market(rpc,pool,state):
+    """Decode and verify legacy Serum/OpenBook market swap roles from source RPC."""
+    from solders.pubkey import Pubkey
+    from arb.orca_whirlpool import b58
+    market=state["market_id"]
+    program=state["market_program"]
+    result=call(rpc,"getAccountInfo",[market,{"encoding":"base64","commitment":"confirmed"}])
+    info=result.get("value") if isinstance(result,dict) else None
+    if not isinstance(info,dict) or info.get("owner")!=program or info.get("executable") is not False:
+        raise ValueError("AMM v4 source market missing or wrong owner")
+    raw=base64.b64decode(info["data"][0],validate=True)
+    # Serum v3 MarketState layout: 5-byte padding + 376-byte base state.
+    if len(raw)<388 or raw[:5]!=b"serum" or raw[-7:]!=b"padding":
+        raise ValueError("AMM v4 market does not have legacy Serum account padding")
+    flags=int.from_bytes(raw[5:13],"little")
+    if flags & 3 != 3:
+        raise ValueError("AMM v4 source market flags do not identify initialized market")
+    def key(start):return b58(raw[start:start+32])
+    if key(13)!=market or {key(53),key(85)}!={state["base_mint"],state["quote_mint"]}:
+        raise ValueError("AMM v4 market identity or mints mismatch")
+    if key(53)!=state["base_mint"] or key(85)!=state["quote_mint"]:
+        raise ValueError("AMM v4 market base/quote orientation mismatch")
+    nonce=int.from_bytes(raw[45:53],"little")
+    signer=str(Pubkey.create_program_address(
+        [bytes(Pubkey.from_string(market)),nonce.to_bytes(8,"little")],
+        Pubkey.from_string(program)))
+    roles={"market_base_vault":key(117),"market_quote_vault":key(165),
+           "market_event_queue":key(253),"market_bids":key(285),"market_asks":key(317),
+           "market_vault_signer":signer}
+    accounts=[roles[x] for x in ("market_bids","market_asks","market_event_queue",
+                                  "market_base_vault","market_quote_vault")]
+    if len(set(accounts))!=len(accounts):
+        raise ValueError("AMM v4 market role accounts are duplicated")
+    response=call(rpc,"getMultipleAccounts",[accounts,{"encoding":"base64","commitment":"confirmed"}])
+    values=response.get("value") if isinstance(response,dict) else None
+    slot=response.get("context",{}).get("slot") if isinstance(response,dict) else None
+    if type(slot)is not int or not isinstance(values,list) or len(values)!=5:
+        raise ValueError("AMM v4 market roles snapshot missing")
+    for i in range(3):
+        if not isinstance(values[i],dict) or values[i].get("owner")!=program or values[i].get("executable") is not False:
+            raise ValueError("AMM v4 orderbook/event role owner mismatch")
+    for i,mint in ((3,state["base_mint"]),(4,state["quote_mint"])):
+        account=values[i]
+        if not isinstance(account,dict) or account.get("owner")!=TOKEN_PROGRAM:
+            raise ValueError("AMM v4 market vault owner mismatch")
+        token=decode_token_account(base64.b64decode(account["data"][0],validate=True))
+        if token["mint"]!=mint or token["authority"]!=signer:
+            raise ValueError("AMM v4 market vault mint or signer mismatch")
+    amm_nonce=state["nonce"]
+    amm_authority=str(Pubkey.create_program_address(
+        [b"amm authority",bytes([amm_nonce])],Pubkey.from_string(PROGRAM)))
+    roles["amm_authority"]=amm_authority
+    return {"market_accounts_authenticated":True,"market_role_slot":slot,
+            **roles,"market_role_addresses":accounts,
+            "broadcast":False}

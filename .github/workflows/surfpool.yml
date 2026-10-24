@@ -81,6 +81,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_atomic_source_blocker_report.py -v
       - name: Test authenticated CLMM tick array direction binding in signed runner
         run: python3 -m unittest discover -s tests -p test_clmm_atomic_direction_evidence.py -v
+      - name: Test AMM v4 Serum market role authentication rejects forged snapshots
+        run: python3 -m unittest discover -s tests -p test_amm_v4_market_roles.py -v
       - name: Test AMM v4 OpenOrders market ownership against source snapshot
         run: python3 -m unittest discover -s tests -p test_amm_v4_open_orders_market_owner.py -v
       - name: Test retrospective CI job audit without upstream RPC

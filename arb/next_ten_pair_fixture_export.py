@@ -102,10 +102,10 @@ def venue_accounts(rpc, venue, pool, mints):
         extras += [state["base_vault"],state["quote_vault"],
                    state["open_orders"],state["market_id"],
                    state["target_orders"]]
-        # Market bids/asks/event queue and vault-signer remain mandatory.
-        # A source account snapshot alone must not certify a complete swap.
-        evidence={"market_preflight":preflight,
-                  "market_accounts_authenticated":False}
+        from arb.raydium_amm_v4_preflight import authenticate_swap_market
+        roles=authenticate_swap_market(rpc,pool,state)
+        extras.extend(roles["market_role_addresses"])
+        evidence={"market_preflight":preflight,**roles}
     elif venue=="pumpswap":
         from arb.pumpswap_global_config import ADDRESS as CONFIG
         from arb.pumpswap_fee_account import authenticated_address
