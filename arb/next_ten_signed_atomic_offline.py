@@ -94,14 +94,6 @@ def hydrate(rpc, fixture):
             call(rpc,"surfnet_writeProgram",[program,elf[offset:offset+16384].hex(),offset])
 
 
-def build_graph_leg(edge,states,evidence,owner,source_account,target_account,
-                    amount,floor):
-    from arb.venue_swap_adapter import build_leg
-    key=(edge["venue"],edge["pool"])
-    return build_leg(edge["venue"],edge["pool"],states[key],evidence[key],
-                     owner,source_account,target_account,
-                     edge["input_mint"],edge["output_mint"],amount,floor)
-
 def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000):
     local_rpc_only(rpc)
     if any(type(n)is not int or not 0<n<2**64 for n in (amount_in,amount_intermediate)):
@@ -139,14 +131,10 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000):
     state_map={(first,legs[0][1]):states[0],(second,legs[1][1]):states[1]}
     proof_map={(first,legs[0][1]):evidence[first],
                (second,legs[1][1]):evidence[second]}
-    accounts={mint:key for mint,key in zip(mints,keys)}
-    # Token cycle repeats input mint; preserve distinct terminal SPL account
-    # even when input/output mint match by overriding graph account slots.
-    from arb.atomic_graph_coordinator import compile_route
-    ix1=build_graph_leg(graph[0],state_map,proof_map,owner,keys[0],keys[1],
-                        amount_in,amount_intermediate)
-    ix2=build_graph_leg(graph[1],state_map,proof_map,owner,keys[1],keys[2],
-                        amount_intermediate,1)
+    # Aligned SPL accounts retain distinct input and terminal token accounts
+    # even though their mint identities are the same.
+    ix1,ix2=compile_route(graph,mints,state_map,proof_map,owner,keys,
+                          [amount_in,amount_intermediate],[amount_intermediate,1])
     tx=signed_packet(rpc,[ix1,ix2],signer)
     tx.verify()
     # Solana signed two-instruction preflight checks account continuity.
@@ -202,8 +190,9 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000):
                   initial_balances_base_units=before)
     if _post(rpc,keys,mints,owner)!=before:
         raise ValueError("simulation mutated persistent source balances")
-    ix2_bad=build_graph_leg(graph[1],state_map,proof_map,owner,
-                            keys[1],keys[2],amount_intermediate,2**64-1)
+    from arb.venue_swap_adapter import build_leg
+    ix2_bad=build_leg(second,legs[1][1],states[1],evidence[second],owner,
+                      keys[1],keys[2],mints[1],mints[2],amount_intermediate,2**64-1)
     bad=Transaction.new_signed_with_payer([ix1,ix2_bad],signer.pubkey(),[signer],bh)
     failed,_=_simulate(rpc,bad,keys)
     error=failed.get("err")

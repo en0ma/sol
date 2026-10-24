@@ -14,7 +14,12 @@ def compile_route(legs,tokens,states,evidence,owner,token_accounts,amounts,floor
     if len(amounts)!=len(legs) or len(floors)!=len(legs):
         raise ValueError("per-leg amount bounds missing")
     if (not isinstance(owner,str) or not owner
-            or any(not isinstance(token,str) or token not in token_accounts for token in tokens)):
+            or any(not isinstance(token,str) for token in tokens)
+            or (not isinstance(token_accounts,(list,tuple,dict)))
+            or (isinstance(token_accounts,(list,tuple)) and
+                (len(token_accounts)!=len(tokens) or any(not isinstance(a,str) or not a for a in token_accounts)))
+            or (isinstance(token_accounts,dict) and
+                any(token not in token_accounts for token in tokens))):
         raise ValueError("graph token accounts or signer unavailable")
     compiled=[]
     for i,leg in enumerate(legs):
@@ -29,7 +34,8 @@ def compile_route(legs,tokens,states,evidence,owner,token_accounts,amounts,floor
         # its input by reading the output of an earlier instruction.
         compiled.append(build_leg(
             venue,pool,states[(venue,pool)],evidence[(venue,pool)],owner,
-            token_accounts[tokens[i]],token_accounts[tokens[i+1]],
+            (token_accounts[i] if not isinstance(token_accounts,dict) else token_accounts[tokens[i]]),
+            (token_accounts[i+1] if not isinstance(token_accounts,dict) else token_accounts[tokens[i+1]]),
             tokens[i],tokens[i+1],amounts[i],floors[i]))
     return compiled
 
