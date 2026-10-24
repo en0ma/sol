@@ -46,3 +46,13 @@ def fetch(rpc):
         raise ValueError("missing or invalid PumpSwap fee account")
     info = decode(base64.b64decode(account["data"][0], validate=True))
     return {**info, "slot": slot, "address": ADDRESS}
+
+def authenticated_buyback_wallets(raw):
+    """GlobalConfig's on-chain buyback recipient table, not a hardcoded list."""
+    from arb.orca_whirlpool import b58
+    if not isinstance(raw,bytes) or len(raw)<643+8*32 or raw[:8]!=DISC:
+        raise ValueError("PumpSwap buyback recipient table unavailable")
+    wallets=[b58(raw[643+i*32:643+(i+1)*32]) for i in range(8)]
+    if len(set(wallets))!=8:
+        raise ValueError("duplicate PumpSwap buyback recipient wallet")
+    return wallets

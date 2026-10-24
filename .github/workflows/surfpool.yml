@@ -47,6 +47,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_damm_cpmm_atomic_offline.py -v
       - name: Test remaining 24-pair full signed integration and fail-closed matrix
         run: python3 -m unittest discover -s tests -p test_remaining_twenty_four_pipeline.py -v
+      - name: Verify PumpSwap V2 exact-input 17-account builder and authenticated buyback gate
+        run: python3 -m unittest discover -s tests -p test_pumpswap_trade_v2.py -v
       - name: Test missing Raydium venue builders and mandatory account authentication
         run: python3 -m unittest discover -s tests -p test_remaining_venue_adapters.py -v
       - name: Test complete 42-pair inventory and incremental read-only state graph

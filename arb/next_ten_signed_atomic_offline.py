@@ -179,6 +179,11 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache
                 raise ValueError("PumpSwap source account not authenticated: "+meta["name"])
         proof["account_addresses"]=addresses
         proof["account_addresses_authenticated"]=True
+        buyback=proof.get("buyback_fee_recipient")
+        if not isinstance(buyback,str) or buyback not in fixture["accounts"]:
+            raise ValueError("PumpSwap V2 authenticated buyback ATA missing")
+        addresses["buyback_fee_recipient"]=buyback
+        addresses["buyback_fee_recipient_authenticated"]=True
     graph=[{"venue":first,"pool":legs[0][1],
             "input_mint":mints[0],"output_mint":mints[1]},
            {"venue":second,"pool":legs[1][1],

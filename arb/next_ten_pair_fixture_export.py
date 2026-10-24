@@ -133,7 +133,31 @@ def venue_accounts(rpc, venue, pool, mints):
             if info is not None:
                 extras.append(address)
                 optional[key]=address
+        # V2 trades require an authenticated buyback recipient quote ATA
+        # sourced from the current GlobalConfig buyback wallet table.
+        from arb.pumpswap_global_config import authenticated_buyback_wallets
+        from arb.token_vaults import TOKEN_PROGRAM,decode_token_account
+        from arb.pumpswap_account_resolver import ATA
+        from solders.pubkey import Pubkey
+        config_raw=base64.b64decode(_fetch(rpc,[CONFIG])[CONFIG]["data"][0],validate=True)
+        wallets=authenticated_buyback_wallets(config_raw)
+        buyback_ata=None
+        for wallet in wallets:
+            candidate=str(Pubkey.find_program_address(
+                [bytes(Pubkey.from_string(wallet)),bytes(Pubkey.from_string(TOKEN_PROGRAM)),
+                 bytes(Pubkey.from_string(state["quote_mint"]))],Pubkey.from_string(ATA))[0])
+            info=call(rpc,"getAccountInfo",[candidate,{"encoding":"base64"}])["value"]
+            if not info or info.get("owner")!=TOKEN_PROGRAM:
+                continue
+            token=decode_token_account(base64.b64decode(info["data"][0],validate=True))
+            if token["mint"]==state["quote_mint"] and token["authority"]==wallet:
+                buyback_ata=candidate
+                extras.append(candidate)
+                break
+        if not buyback_ata:
+            raise ValueError("authenticated PumpSwap V2 buyback recipient ATA missing")
         evidence={"verified_pool":verified,
+                  "buyback_fee_recipient":buyback_ata,
                   "protocol_fee_recipient":recipient,
                   "derived_source_accounts":optional}
     else:

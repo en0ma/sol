@@ -107,6 +107,7 @@ def build_leg(venue,pool,state,evidence,owner,src,dst,
             raise ValueError("PumpSwap user token direction mismatch")
         if (addresses.get("base_mint"),addresses.get("quote_mint"))!=(base,quote):
             raise ValueError("PumpSwap authenticated mint mismatch")
-        return build_instruction(direction,addresses,amount,floor)
+        from arb.pumpswap_trade_v2 import build_v2
+        return build_v2(direction,addresses,amount,floor)
     raise ValueError("unsupported execution venue")
 
