@@ -22,6 +22,14 @@ class PumpSwapAccountMetaTests(unittest.TestCase):
                                       "fee_config","fee_program"])
         self.assertTrue(result["metas"][-3]["is_writable"])
 
+    def test_classic_spl_program_reused_for_both_idl_token_roles(self):
+        accounts=self.addresses(SELL)
+        accounts["quote_token_program"]=accounts["base_token_program"]
+        self.assertEqual(len(account_metas("sell",accounts)["metas"]),len(SELL))
+        accounts["pool"]=accounts["base_token_program"]
+        with self.assertRaisesRegex(ValueError,"duplicate"):
+            account_metas("sell",accounts)
+
     def test_missing_wrong_program_and_duplicate_accounts_rejected(self):
         accounts=self.addresses(SELL)
         del accounts["coin_creator_vault_ata"]

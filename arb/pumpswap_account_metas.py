@@ -27,7 +27,15 @@ def account_metas(direction, addresses):
                        "is_signer":name in SIGNERS})
     if addresses["program"]!="pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA" or addresses["fee_program"]!="pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ":
         raise ValueError("PumpSwap or fee program mismatch")
-    if len({x["address"] for x in result})!=len(result):
-        raise ValueError("duplicate PumpSwap account addresses")
+    # The IDL has *two* token-program roles even for classic SPL/SPL
+    # pools. Their identical account addresses are required, not invalid.
+    by_address={}
+    for meta in result:
+        address=meta["address"]
+        roles=by_address.setdefault(address,[])
+        roles.append(meta["name"])
+    for roles in by_address.values():
+        if len(roles)>1 and set(roles)!={"base_token_program","quote_token_program"}:
+            raise ValueError("duplicate PumpSwap account addresses")
     return {"direction":direction,"metas":result,"fully_verified":False,
             "transaction_built":False,"simulation_verified":False}
