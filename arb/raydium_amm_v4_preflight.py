@@ -37,8 +37,8 @@ def verify_pool_market(rpc,pool,state):
         token=decode_token_account(base64.b64decode(values[idx]["data"][0],validate=True))
         if token["mint"]!=mint or token["amount_base_units"]<=0:
             raise ValueError("AMM v4 vault mint or balance mismatch")
-    if values[3].get("owner")!=PROGRAM or values[4].get("owner")!=state["market_program"]:
-        raise ValueError("AMM v4 OpenOrders or OpenBook market owner mismatch")
+    if values[3].get("owner")!=state["market_program"] or values[4].get("owner")!=state["market_program"]:
+        raise ValueError("AMM v4 OpenOrders or market must both be owned by the authenticated market program")
     return {"slot":slot,"pool_and_market_authenticated":True,
             "market_accounts_authenticated":False,
             "signed_atomic_simulation_verified":False,"broadcast":False}
