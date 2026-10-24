@@ -95,7 +95,17 @@ def venue_accounts(rpc, venue, pool, mints):
             raise ValueError("no authenticated CLMM tick array direction")
         evidence={"tick_arrays_by_direction":directions}
     elif venue=="raydium_amm_v4":
-        raise ValueError("OpenBook market account resolver not authenticated")
+        from arb.raydium_amm_v4_preflight import verify_pool_market
+        from arb.raydium_amm_v4 import decode
+        state=decode(raw)
+        preflight=verify_pool_market(rpc,pool,state)
+        extras += [state["base_vault"],state["quote_vault"],
+                   state["open_orders"],state["market_id"],
+                   state["target_orders"]]
+        # Market bids/asks/event queue and vault-signer remain mandatory.
+        # A source account snapshot alone must not certify a complete swap.
+        evidence={"market_preflight":preflight,
+                  "market_accounts_authenticated":False}
     elif venue=="pumpswap":
         from arb.pumpswap_global_config import ADDRESS as CONFIG
         from arb.pumpswap_fee_account import authenticated_address

@@ -22,6 +22,6 @@ class ForkCandidateTests(unittest.TestCase):
     def test_unordered_shared_pools_reconcile_both_directions(self):
         from arb.next_ten_fork_pool_probe import PROGRAMS
         self.assertEqual(len(BATCH_10),10)
-        self.assertEqual(len(PROGRAMS),5)
+        self.assertEqual(len(PROGRAMS),7)
 if __name__=="__main__":
     unittest.main()

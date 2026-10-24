@@ -59,7 +59,8 @@ def snapshot(rpc, pool, venue):
     elif venue=="raydium_clmm":
         evidence=clmm_verify(rpc,pool,state)
     elif venue=="raydium_amm_v4":
-        raise ValueError("AMM v4 OpenBook market and vault snapshot authentication required")
+        from arb.raydium_amm_v4_preflight import verify_pool_market
+        evidence=verify_pool_market(rpc,pool,state)
     else:
         # Orca vaults must be authenticated, not just decode a state hint.
         from arb.token_vaults import TOKEN_PROGRAM, decode_token_account

@@ -22,6 +22,12 @@ class MissingVenueAdapterTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"tick arrays unavailable"):
             build_leg("raydium_clmm","p",{"token_mint_0":"A",
                       "token_mint_1":"B"},{},"o","i","d","A","B",100,1)
+    def test_amm4_source_preflight_never_claims_complete_executable_metas(self):
+        from arb.raydium_amm_v4_preflight import verify_pool_market
+        with patch("arb.raydium_amm_v4_preflight.call",
+                   return_value={"context":{"slot":1},"value":[None]*5}):
+            with self.assertRaisesRegex(ValueError,"required market accounts missing"):
+                verify_pool_market("http://127.0.0.1:8899","pool",{})
     def test_amm4_requires_openbook_authentication(self):
         with self.assertRaisesRegex(ValueError,"OpenBook accounts unavailable"):
             build_leg("raydium_amm_v4","p",{"base_mint":"A",
