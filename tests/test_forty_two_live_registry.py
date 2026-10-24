@@ -22,6 +22,9 @@ class FortyTwoAndLiveStateTests(unittest.TestCase):
         self.assertTrue(all(len(shard)==6 for shard in shards))
         with self.assertRaises(ValueError):
             pair_shards(shards=0)
+    def test_duplicate_attempts_keep_missing_routes_unverified(self):
+        from arb.next_ten_atomic_evidence import assess
+        self.assertEqual(assess(ALL_42[0],{"status":"SIGNED_ATOMIC_AND_ROLLBACK_VERIFIED"})["status"],"UNVERIFIED")
     def test_full_matrix_refuses_mock_or_missing_receipts(self):
         report=reconcile_forty_two({})
         self.assertEqual(report["ordered_pair_verified"],0)

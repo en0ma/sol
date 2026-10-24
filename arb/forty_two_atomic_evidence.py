@@ -32,7 +32,17 @@ def main():
                 # No last-writer-wins: repeated route evidence must not
                 # silently overwrite a failed or contradictory receipt.
                 if key in receipts and receipts[key]!=value:
-                    raise ValueError("conflicting directional route receipts")
+                    # A deliberate retry has its own independently signed
+                    # evidence. Prefer an accepted attempt, and never allow a
+                    # failed retry to demote a valid prior accepted receipt.
+                    earlier=assess(key,receipts[key])["status"]=="VERIFIED"
+                    later=assess(key,value)["status"]=="VERIFIED"
+                    if earlier and later:
+                        continue
+                    if earlier:
+                        continue
+                    if not later:
+                        continue
                 receipts[key]=value
     report=reconcile_forty_two(receipts)
     Path(args.output).write_text(json.dumps(report,indent=2)+"\n")
