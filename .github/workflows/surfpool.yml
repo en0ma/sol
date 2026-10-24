@@ -1269,7 +1269,6 @@ jobs:
         continue-on-error: true
         run: python3 -m arb.damm_v2_isolated_execution export "$RUNNER_TEMP/damm-v2-fixture.json"
       - name: Export authenticated DAMM and CPMM atomic route
-        continue-on-error: true
         run: python3 -m arb.damm_cpmm_atomic_offline export "$RUNNER_TEMP/damm-cpmm-atomic-fixture.json"
       - name: Stop upstream-backed fork and start isolated offline Surfpool
         if: ${{ hashFiles('arb/orca_swap_v2_isolated_offline_execution.py') != '' }}
@@ -1363,7 +1362,6 @@ jobs:
           if-no-files-found: error
 
       - name: Attempt signed DAMM to CPMM atomic swap and rollback on isolated fork
-        continue-on-error: true
         env:
           SURFPOOL_EXPLICITLY_OFFLINE: "1"
         run: |
@@ -1374,7 +1372,6 @@ jobs:
             printf '{"status":"SOURCE_FIXTURE_UNAVAILABLE","signed_atomic_simulation_verified":false,"rollback_failure_case_verified":false,"intermediate_intra_transaction_consumption_verified":false,"actionable":false,"live_execution_approved":false,"broadcast":false}\n' > "$RUNNER_TEMP/damm-cpmm-atomic-evidence.json"
           fi
       - name: Independently accept observed signed atomic Surfpool execution
-        continue-on-error: true
         run: |
           python3 -m arb.damm_cpmm_atomic_evidence_audit \
             --input "$RUNNER_TEMP/damm-cpmm-atomic-evidence.json" \

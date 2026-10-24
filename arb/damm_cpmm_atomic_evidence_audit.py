@@ -62,6 +62,26 @@ def accept(evidence):
             errors.append("invalid intermediate CPI amounts")
         elif after[1]!=start[1]+transferred-consumed:
             errors.append("intermediate not reconciled")
+    signature=evidence.get("signature")
+    packet=evidence.get("signed_packet_bytes")
+    if not isinstance(signature,str) or not 80<=len(signature)<=90:
+        errors.append("missing signed transaction identity")
+    if type(packet) is not int or not 100<=packet<=1232:
+        errors.append("missing Solana signed packet size")
+    if evidence.get("positive_error")!="None":
+        errors.append("positive simulation error is nonempty")
+    if (not isinstance(evidence.get("positive_logs"),list)
+            or not evidence["positive_logs"]):
+        errors.append("missing positive execution trace")
+    if (type(evidence.get("first_leg_output_floor")) is not int
+            or evidence["first_leg_output_floor"]<=0
+            or evidence.get("second_leg_input_base_units")!=consumed):
+        errors.append("requested intermediate input not evidenced")
+    if not isinstance(evidence.get("mints"),list) or len(evidence["mints"])!=3:
+        errors.append("mint path metadata missing")
+    elif (evidence["mints"][0]!=evidence["mints"][2]
+          or evidence["mints"][0]==evidence["mints"][1]):
+        errors.append("unexpected closed-loop mint continuity")
     if evidence.get("negative_simulation_post_accounts_available") is True:
         if evidence.get("negative_simulation_post_balances_base_units")!=start:
             errors.append("negative returned post-state did not roll back")

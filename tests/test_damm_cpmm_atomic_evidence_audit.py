@@ -24,6 +24,12 @@ def valid():
             "negative_simulation_post_accounts_available":False,
             "rollback_evidence_mode":"atomic_abort_instruction_1_and_persistence",
             "signed_packet_bytes":824,
+            "signature":"1"*88,
+            "positive_error":"None",
+            "positive_logs":["Program invoke"],
+            "first_leg_output_floor":1000,
+            "second_leg_input_base_units":1000,
+            "mints":["So11111111111111111111111111111111111111112","EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v","So11111111111111111111111111111111111111112"],
             "actionable":False,"live_execution_approved":False,"broadcast":False}
 
 class EvidenceAcceptanceTests(unittest.TestCase):
@@ -43,6 +49,18 @@ class EvidenceAcceptanceTests(unittest.TestCase):
     def test_missing_rollback_rejected(self):
         row=valid()
         row["rollback_failure_case_verified"]=False
+        self.assertEqual(accept(row)["verified_ordered_pair_count"],0)
+    def test_unsigned_report_rejected(self):
+        row=valid()
+        row.pop("signature")
+        self.assertEqual(accept(row)["verified_ordered_pair_count"],0)
+    def test_inconsistent_requested_second_leg_input_rejected(self):
+        row=valid()
+        row["second_leg_input_base_units"]=2000
+        self.assertEqual(accept(row)["verified_ordered_pair_count"],0)
+    def test_mint_continuity_rejected(self):
+        row=valid()
+        row["mints"][2]="different"
         self.assertEqual(accept(row)["verified_ordered_pair_count"],0)
     def test_synthetic_incomplete_artifact_rejected(self):
         self.assertEqual(accept({"status":"SIGNED_ATOMIC_TWO_VENUE_AND_ROLLBACK_VERIFIED"})["verified_ordered_pair_count"],0)
