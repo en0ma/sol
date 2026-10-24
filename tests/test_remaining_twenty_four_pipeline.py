@@ -19,6 +19,7 @@ class RemainingRoutePipelineTests(unittest.TestCase):
     def test_unproven_remaining_routes_never_count(self):
         report=build({},batch=REMAINING_42)
         self.assertEqual(report["batch_verified"],0)
+        self.assertEqual(report["batch_target"],24)
         self.assertEqual(report["batch_unverified"],24)
     def test_matrix_reconciles_remaining_batch_without_fabricating_success(self):
         with patch("arb.current_run_atomic_matrix.accept",return_value={"verified_ordered_pair_count":0}):

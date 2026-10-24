@@ -90,8 +90,8 @@ def build(evidence_by_route,*,batch=BATCH_10):
     rows=[assess(route,evidence_by_route.get(route)) for route in batch]
     count=sum(r["status"]=="VERIFIED" for r in rows)
     return {"status":"NEXT_TEN_REAL_FORK_EXECUTION_EVIDENCE",
-            "batch_target":10,"batch_verified":count,
-            "batch_unverified":10-count,"routes":rows,**SAFETY}
+            "batch_target":len(batch),"batch_verified":count,
+            "batch_unverified":len(batch)-count,"routes":rows,**SAFETY}
 
 def main():
     p=argparse.ArgumentParser()
@@ -108,6 +108,6 @@ def main():
     report=build(evidence,batch=route_batch(args.batch))
     Path(args.output).write_text(json.dumps(report,indent=2)+"\n")
     print(json.dumps({"batch_verified":report["batch_verified"],
-                      "batch_target":10,"broadcast":False}))
+                      "batch_target":report["batch_target"],"broadcast":False}))
 if __name__=="__main__":
     main()
