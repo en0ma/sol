@@ -26,7 +26,7 @@ class MissingVenueAdapterTests(unittest.TestCase):
         from arb.raydium_amm_v4_preflight import verify_pool_market
         with patch("arb.raydium_amm_v4_preflight.call",
                    return_value={"context":{"slot":1},"value":[None]*5}):
-            with self.assertRaisesRegex(ValueError,"required market accounts missing"):
+            with self.assertRaisesRegex(ValueError,"required authenticated pool fields missing"):
                 verify_pool_market("http://127.0.0.1:8899","pool",{})
     def test_amm4_requires_openbook_authentication(self):
         with self.assertRaisesRegex(ValueError,"OpenBook accounts unavailable"):

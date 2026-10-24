@@ -13,6 +13,15 @@ class FortyTwoAndLiveStateTests(unittest.TestCase):
         self.assertEqual(len(REMAINING_42),24)
         self.assertEqual(len(route_batch("remaining")),24)
         self.assertEqual(set(ALL_42),set(route_batch("all")))
+    def test_disjoint_remaining_pair_shards_cover_inventory(self):
+        from arb.next_ten_atomic_routes import pair_shards
+        shards=pair_shards(shards=4)
+        self.assertEqual(len(shards),4)
+        self.assertEqual(set(x for shard in shards for x in shard),set(REMAINING_42))
+        self.assertEqual(sum(len(shard) for shard in shards),24)
+        self.assertTrue(all(len(shard)==6 for shard in shards))
+        with self.assertRaises(ValueError):
+            pair_shards(shards=0)
     def test_full_matrix_refuses_mock_or_missing_receipts(self):
         report=reconcile_forty_two({})
         self.assertEqual(report["ordered_pair_verified"],0)

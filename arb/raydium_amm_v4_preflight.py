@@ -14,6 +14,10 @@ from arb.venue_watchlist import RECOGNIZED_UNSUPPORTED
 PROGRAM=next(k for k,v in RECOGNIZED_UNSUPPORTED.items() if v=="raydium_amm_v4")
 
 def verify_pool_market(rpc,pool,state):
+    required=("base_vault","quote_vault","open_orders","market_id",
+              "base_mint","quote_mint","market_program")
+    if not isinstance(state,dict) or any(not isinstance(state.get(k),str) or not state[k] for k in required):
+        raise ValueError("AMM v4 required authenticated pool fields missing")
     addresses=[pool,state["base_vault"],state["quote_vault"],
                state["open_orders"],state["market_id"]]
     response=call(rpc,"getMultipleAccounts",[addresses,{"encoding":"base64","commitment":"confirmed"}])

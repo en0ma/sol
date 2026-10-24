@@ -47,3 +47,11 @@ ALL_42=tuple(permutations(TARGET_VENUES,2))
 assert len(ALL_42)==42 and len(set(ALL_42))==42
 REMAINING_42=tuple(pair for pair in ALL_42 if pair not in set(BATCH_10)|set(NEXT_10))
 assert len(REMAINING_42)==24
+
+def pair_shards(*,batch="remaining",shards=4):
+    """Stable disjoint deterministic directed route worklists for separate forks."""
+    if type(shards) is not int or not 1<=shards<=42:
+        raise ValueError("invalid route shard count")
+    routes=route_batch(batch)
+    return tuple(tuple(route for i,route in enumerate(routes) if i%shards==shard)
+                 for shard in range(shards))
