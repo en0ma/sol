@@ -85,21 +85,66 @@ def discover_clmm_candidates(registry,*,max_pages=2,timeout=8):
     leads.sort(key=lambda x:not x["matching_peer_mints"])
     return leads
 
+def discover_amm_v4_candidates(registry,*,max_pages=2,timeout=8):
+    """Prioritize mint-matched classic AMM pools; do not trust API owners."""
+    from urllib.parse import urlencode
+    from urllib.request import Request,urlopen
+    from arb.raydium_public_pool_discovery import API,AMM_V4
+    peers={frozenset(x["mints"]) for x in registry["pools"]
+           if x.get("venue")!="raydium_amm_v4" and
+           isinstance(x.get("mints"),list) and len(x["mints"])==2}
+    leads=[]
+    seen=set()
+    for page in range(1,max_pages+1):
+        url=API+"?"+urlencode({"poolType":"standard",
+            "poolSortField":"liquidity","sortType":"desc","pageSize":100,"page":page})
+        with urlopen(Request(url,headers={"Accept":"application/json",
+                       "User-Agent":"sol-readonly-candidate-discovery/1"}),timeout=timeout) as response:
+            raw=response.read(1_000_001)
+        if len(raw)>1_000_000:
+            raise ValueError("AMM v4 public candidate page exceeds byte bound")
+        data=json.loads(raw)
+        if not isinstance(data,dict) or data.get("success") is not True:
+            raise ValueError("AMM v4 public discovery response invalid")
+        rows=data.get("data",{}).get("data")
+        if not isinstance(rows,list):
+            raise ValueError("AMM v4 public discovery rows invalid")
+        for row in rows:
+            if not isinstance(row,dict) or row.get("programId")!=AMM_V4:
+                continue
+            a,b=row.get("mintA"),row.get("mintB")
+            if not isinstance(a,dict) or not isinstance(b,dict):
+                continue
+            mints=[a.get("address"),b.get("address")]
+            address=row.get("id")
+            if (not isinstance(address,str) or not 32<=len(address)<=44 or
+                address in seen or
+                any(not isinstance(m,str) or not 32<=len(m)<=44 for m in mints)
+                or mints[0]==mints[1]):
+                continue
+            seen.add(address)
+            leads.append({"address":address,"mints":mints,
+                          "matching_peer_mints":frozenset(mints) in peers})
+        if len(rows)<100:
+            break
+    leads.sort(key=lambda x:not x["matching_peer_mints"])
+    return leads
+
 def main():
     p=argparse.ArgumentParser()
     p.add_argument("--registry",required=True)
     p.add_argument("--output",required=True)
     p.add_argument("--max-candidates",type=int,default=8)
     args=p.parse_args()
-    from arb.raydium_public_pool_discovery import discover
+    registry=json.loads(Path(args.registry).read_text())
     try:
-        candidates=discover(max_matches=args.max_candidates,max_pages=2,
-                            min_liquidity_usd=10000,timeout=8)
+        amm_leads=discover_amm_v4_candidates(registry)
+        candidates=[x["address"] for x in amm_leads[:args.max_candidates]]
         error=None
     except (OSError,ValueError,TimeoutError,KeyError,TypeError) as exc:
+        amm_leads=[]
         candidates=[]
         error=type(exc).__name__+": "+str(exc)[:150]
-    registry=json.loads(Path(args.registry).read_text())
     try:
         clmm_candidates=discover_clmm_candidates(registry)
         clmm_error=None
@@ -109,7 +154,9 @@ def main():
     result=enrich(registry,candidates,limit=args.max_candidates,
                   clmm_candidates=clmm_candidates)
     result["discovery"]={"source":"UNTRUSTED_PUBLIC_API","candidate_count":len(candidates),
-                         "error":error,"clmm_candidate_count":len(clmm_candidates),
+                         "error":error,"amm_v4_scanned":len(amm_leads),
+                         "amm_v4_matching_peer_mints":sum(x["matching_peer_mints"] for x in amm_leads),
+                         "clmm_candidate_count":len(clmm_candidates),
                          "clmm_matching_peer_mint_count":sum(x["matching_peer_mints"] for x in clmm_candidates),
                          "clmm_error":clmm_error,
                          "onchain_authenticated":False,"broadcast":False}
