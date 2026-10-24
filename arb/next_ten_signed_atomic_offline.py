@@ -53,7 +53,7 @@ def top_level_events(logs, venues):
                 events.append([end.group(1),"success" if end.group(2)=="success" else "failed"])
     return events if not stack else []
 
-def hydrate(rpc, fixture):
+def hydrate(rpc, fixture, *, program_cache=None):
     local_rpc_only(rpc)
     if os.environ.get("SURFPOOL_EXPLICITLY_OFFLINE")!="1":
         raise ValueError("isolated Surfpool explicit offline gate required")
@@ -89,16 +89,24 @@ def hydrate(rpc, fixture):
             "lamports":account["lamports"],
             "data":base64.b64decode(encoded[0],validate=True).hex(),
             "owner":account["owner"],"executable":account["executable"]}])
+    # Source program ELF binaries are immutable within this offline snapshot.
+    # Avoid uploading the same multi-megabyte program for every directed pair.
+    import hashlib
     for program,(_,elf) in program_data.items():
+        digest=hashlib.sha256(elf).hexdigest()
+        if program_cache is not None and program_cache.get(program)==digest:
+            continue
         for offset in range(0,len(elf),16384):
             call(rpc,"surfnet_writeProgram",[program,elf[offset:offset+16384].hex(),offset])
+        if program_cache is not None:
+            program_cache[program]=digest
 
 
-def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000):
+def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache=None):
     local_rpc_only(rpc)
     if any(type(n)is not int or not 0<n<2**64 for n in (amount_in,amount_intermediate)):
         raise ValueError("invalid atomic amounts")
-    hydrate(rpc,fixture)
+    hydrate(rpc,fixture,program_cache=program_cache)
     first,second=fixture["first_venue"],fixture["second_venue"]
     mints=fixture["route_mints"]
     if (len(mints)!=3 or mints[0]!=mints[2] or mints[0]==mints[1]):
@@ -193,7 +201,7 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000):
     from arb.venue_swap_adapter import build_leg
     ix2_bad=build_leg(second,legs[1][1],states[1],evidence[second],owner,
                       keys[1],keys[2],mints[1],mints[2],amount_intermediate,2**64-1)
-    bad=Transaction.new_signed_with_payer([ix1,ix2_bad],signer.pubkey(),[signer],bh)
+    bad=Transaction.new_signed_with_payer([ix1,ix2_bad],signer.pubkey(),[signer],tx.message.recent_blockhash)
     failed,_=_simulate(rpc,bad,keys)
     error=failed.get("err")
     bad_events=top_level_events(failed.get("logs") or [],{PROGRAMS[first],PROGRAMS[second]})
@@ -224,20 +232,26 @@ def main():
     local_rpc_only("http://127.0.0.1:8899")
     root=Path(args.output_dir)
     root.mkdir(parents=True,exist_ok=True)
+    program_cache={}
     for first,second in BATCH_10:
         name=first+"__"+second+".json"
         out={"status":"MISSING_AUTHENTICATED_SOURCE_FIXTURE",
              "first_venue":first,"second_venue":second,
              "signed_atomic_simulation_verified":False,**SAFETY}
         path=Path(args.fixture_dir)/name
+        # Write a durable per-route receipt BEFORE any heavy local ELF
+        # hydration; interrupted CI must not lose all diagnostic evidence.
+        (root/name).write_text(json.dumps(out,indent=2)+"\n")
+        print(json.dumps({"route":name,"status":"ATTEMPT_STARTED","broadcast":False}),flush=True)
         if path.is_file():
             try:
-                out=run("http://127.0.0.1:8899",json.loads(path.read_text()))
+                out=run("http://127.0.0.1:8899",json.loads(path.read_text()),
+                        program_cache=program_cache)
             except Exception as exc:
                 out.update(status="ISOLATED_SIGNED_ATOMIC_BLOCKED",
                            error_class=type(exc).__name__,diagnostic=str(exc)[:500])
         (root/name).write_text(json.dumps(out,indent=2)+"\n")
-        print(json.dumps({"route":name,"status":out["status"],"broadcast":False}))
+        print(json.dumps({"route":name,"status":out["status"],"broadcast":False}),flush=True)
 
 if __name__=="__main__":
     main()
