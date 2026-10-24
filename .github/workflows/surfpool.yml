@@ -45,6 +45,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_damm_v2_execution_evidence_audit.py -v
       - name: Test DAMM to CPMM atomic fork integration safety
         run: python3 -m unittest discover -s tests -p test_damm_cpmm_atomic_offline.py -v
+      - name: Test next ten real signed atomic runner and offline safeguards
+        run: python3 -m unittest discover -s tests -p test_next_ten_signed_atomic_offline.py -v
       - name: Test next ten authenticated paired source fixture boundaries
         run: python3 -m unittest discover -s tests -p test_next_ten_pair_fixture_export.py -v
       - name: Test real-fork next-ten pool authentication probe safety
@@ -1442,6 +1444,20 @@ jobs:
             --input "$RUNNER_TEMP/damm-cpmm-atomic-evidence.json" \
             --reverse-input "$RUNNER_TEMP/cpmm-damm-reverse-evidence.json" \
             --output "$RUNNER_TEMP/current-run-atomic-matrix.json"
+      - name: Execute ten signed atomic two-swap attempts on isolated Surfpool
+        env:
+          SURFPOOL_EXPLICITLY_OFFLINE: "1"
+        run: |
+          python3 -m arb.next_ten_signed_atomic_offline \
+            --fixture-dir "$RUNNER_TEMP/next-ten-dual-program-fixtures" \
+            --output-dir "$RUNNER_TEMP/next-ten-signed-evidence"
+      - name: Publish ten signed atomic runtime receipts and rollback controls
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: next-ten-isolated-signed-atomic-runtime-evidence
+          path: ${{ runner.temp }}/next-ten-signed-evidence/
+          if-no-files-found: error
       - name: Publish next ten ordered route evidence gap report
         run: |
           python3 -m arb.next_ten_atomic_evidence \
