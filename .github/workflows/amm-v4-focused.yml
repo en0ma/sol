@@ -25,6 +25,8 @@ jobs:
           python3 -m unittest discover -s tests -p test_raydium_v4_market_preflight.py -v
       - name: Verify oversized CLMM and AMM v4 packets report exact size and v0 prerequisite
         run: python3 -m unittest discover -s tests -p test_atomic_packet_diagnostics.py -v
+      - name: Test local-only v0 lookup table safety boundaries
+        run: python3 -m unittest discover -s tests -p test_atomic_v0_lookup.py -v
       - name: Check focused source export and execution scripts parse
         run: python3 -m compileall -q arb/
   authenticate-amm-v4:
