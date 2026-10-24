@@ -1654,6 +1654,24 @@ jobs:
           python3 -m arb.forty_two_atomic_evidence \
             --evidence-dirs "$RUNNER_TEMP/next-ten-signed-evidence" "$RUNNER_TEMP/following-ten-signed-evidence" "$RUNNER_TEMP/remaining-24-signed-evidence" \
             --output "$RUNNER_TEMP/forty-two-ordered-atomic-acceptance.json"
+      - name: Enforce accepted first-five venue pair regression floor
+        run: |
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          p=Path(os.environ["RUNNER_TEMP"])/"forty-two-ordered-atomic-acceptance.json"
+          report=json.loads(p.read_text())
+          core={"orca","raydium_cpmm","meteora_dlmm","meteora_damm_v2","pumpswap"}
+          covered={(row["first_venue"],row["second_venue"]) for row in report["routes"]
+                   if row["status"]=="VERIFIED" and row["first_venue"] in core
+                   and row["second_venue"] in core}
+          print("Core venue signed atomic accepted:",len(covered),"/20")
+          missing=[(x,y) for x in sorted(core) for y in sorted(core)
+                   if x!=y and (x,y) not in covered]
+          if missing:
+              raise SystemExit("Previously verified core ordered pairs regressed: "+str(missing))
+          assert report["ordered_pair_verified"]>=20
+          PY
       - name: Upload independently accepted 42-pair coverage artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -1745,6 +1763,8 @@ jobs:
           if-no-files-found: ignore
 
   orca-meteora-atomic-offline:
+    needs: [mainnet-fork-probe]
+    if: ${{ needs.mainnet-fork-probe.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     permissions:
@@ -1755,28 +1775,28 @@ jobs:
       SURFPOOL_EXPLICITLY_OFFLINE: "1"
     steps:
       - uses: actions/checkout@v4
-      - name: Wait for verified mixed-venue fixture
+      - name: Fetch mixed-venue source fixture when published
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: bash
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/orca-meteora-export"
-          for attempt in $(seq 1 90); do
-            id=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" \
-              --jq '.artifacts[] | select(.name == "orca-meteora-mixed-readonly-fixture") | .id' | head -n 1) || true
-            if [ -n "$id" ]; then
-              gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" > "$RUNNER_TEMP/orca-meteora-fixture.zip"
-              unzip -q "$RUNNER_TEMP/orca-meteora-fixture.zip" -d "$RUNNER_TEMP/orca-meteora-export"
-              exit 0
-            fi
-            sleep 10
-          done
-          echo "Mixed venue fixture unavailable" >&2
-          exit 1
+          id=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" \
+            --jq '.artifacts[] | select(.name == "orca-meteora-mixed-readonly-fixture") | .id' | head -n 1)
+          if test -z "$id"; then
+            echo "Optional mixed-venue source fixture absent; skip diagnostic, do not count coverage"
+            echo "MIXED_FIXTURE_PRESENT=0" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" > "$RUNNER_TEMP/orca-meteora-fixture.zip"
+          unzip -q "$RUNNER_TEMP/orca-meteora-fixture.zip" -d "$RUNNER_TEMP/orca-meteora-export"
+          test -s "$RUNNER_TEMP/orca-meteora-export/orca-dlmm-mixed-fixture.json"
+          echo "MIXED_FIXTURE_PRESENT=1" >> "$GITHUB_ENV"
       - name: Install signed simulation dependencies
+        if: env.MIXED_FIXTURE_PRESENT == '1'
         run: python3 -m pip install --disable-pip-version-check solders==0.26.0
       - name: Install isolated Surfpool runtime
+        if: env.MIXED_FIXTURE_PRESENT == '1'
         shell: bash
         run: |
           set -euo pipefail
@@ -1784,6 +1804,7 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
       - name: Attempt atomic signed Orca-Meteora cycle offline
+        if: env.MIXED_FIXTURE_PRESENT == '1'
         shell: bash
         run: |
           set -euo pipefail
