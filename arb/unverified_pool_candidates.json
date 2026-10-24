@@ -1,0 +1,9 @@
+{
+  "note": "Externally identified pool addresses are UNVERIFIED hints; validate account owner, decoder, mints and vaults using pool_registry.refresh before using in routes.",
+  "pools": [
+    {
+      "venue": "meteora_damm_v2",
+      "address": "HtoZbnFf7BDGvPg3RxwiXN5pPG7hLa78XVGscLF9fkYV"
+    }
+  ]
+}
