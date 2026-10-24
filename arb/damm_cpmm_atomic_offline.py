@@ -472,9 +472,179 @@ def run(rpc, fixture, *, first_input=100000000, second_input=1000, second_floor=
     return report
 
 
+def run_reverse(rpc, fixture, *, first_input=100000000, second_input=1000, second_floor=1):
+    local_rpc_only(rpc)
+    if os.environ.get("SURFPOOL_EXPLICITLY_OFFLINE")!="1":
+        raise ValueError("atomic execution requires explicitly isolated offline Surfpool")
+    if any(type(v)is not int or not 0<v<1<<64 for v in (first_input,second_input,second_floor)):
+        raise ValueError("positive atomic trade amounts required")
+    _hydrate(rpc,fixture)
+    damm_pool,cpmm_pool=fixture["damm_pool"],fixture["cpmm_pool"]
+    damm=_pool(rpc,damm_pool,DAMM,decode_damm)
+    proof=verify_damm(rpc,damm_pool,damm)
+    auth=authenticate_pool(rpc,damm_pool,damm,proof)
+    if auth.get("pool_reauthenticated") is not True:
+        raise ValueError("DAMM reauthentication failed")
+    cpmm=_pool(rpc,cpmm_pool,CPMM,decode_cpmm)
+    verified=verify_vaults(rpc,cpmm_pool,cpmm,expected_mints=None)
+    if verified.get("verified") is not True:
+        raise ValueError("CPMM reauthentication failed")
+    mint_x,mint_y,mint_z=fixture["mints"]
+    if ((damm["token_a_mint"],damm["token_b_mint"])!=(mint_x,mint_y)
+            or mint_y not in (cpmm["token_0_mint"],cpmm["token_1_mint"])
+            or mint_z!=(cpmm["token_1_mint"] if cpmm["token_0_mint"]==mint_y else cpmm["token_0_mint"])):
+        raise ValueError("atomic pool route changed since source authentication")
+    from solders.keypair import Keypair
+    from solders.hash import Hash
+    from solders.transaction import Transaction
+    payer=Keypair()
+    owner=str(payer.pubkey())
+    keys=[str(Keypair().pubkey()) for _ in range(3)]
+    call(rpc,"surfnet_setAccount",[owner,{"lamports":1000000000,
+        "data":"","owner":"11111111111111111111111111111111","executable":False}])
+    for address,mint,amount in zip(keys,(mint_x,mint_y,mint_z),(first_input,0,0)):
+        call(rpc,"surfnet_setAccount",[address,{
+            "lamports":2039280,
+            "data":token_account_bytes(mint,owner,amount).hex(),
+            "owner":TOKEN_PROGRAM,"executable":False}])
+    before=_post(rpc,keys,(mint_x,mint_y,mint_z),owner)
+    if before!=[first_input,0,0]:
+        raise ValueError("ephemeral user token balances incorrect")
+    # Reverse route: CPMM spends WSOL and credits the fresh USDC account.
+    # DAMM v2 consumes the actual produced USDC in the SAME signed message.
+    cpmm_direction=cpmm["token_0_mint"]==mint_x
+    ix1=cpmm_instruction(cpmm_pool,cpmm,owner,keys[0],keys[1],
+                         first_input,second_input,
+                         input_is_token_0=cpmm_direction,expected_mints=None)
+    ix2=build_swap2(damm_pool,damm,owner,keys[1],keys[2],
+                    second_input,second_floor,input_is_a=False)
+    bh=Hash.from_string(call(rpc,"getLatestBlockhash")["value"]["blockhash"])
+    tx=Transaction.new_signed_with_payer([ix1,ix2],payer.pubkey(),[payer],bh)
+    from arb.signed_atomic_instruction_preflight import inspect_signed_legacy_order
+    structure=inspect_signed_legacy_order(bytes(tx),CPMM,DAMM,
+                                           intermediate_account=keys[1])
+    positive,packet=_simulate(rpc,tx,keys)
+    report={"status":"REVERSE_ATOMIC_EXECUTION_NOT_VERIFIED",
+            "first_venue":"raydium_cpmm","second_venue":"meteora_damm_v2",
+            "damm_pool":damm_pool,"cpmm_pool":cpmm_pool,
+            "mints":[mint_x,mint_y,mint_z],
+            "signed_packet_bytes":packet,
+            "signature":str(tx.signatures[0]),
+            "positive_error":str(positive.get("err")),
+            "positive_logs":positive.get("logs",[]),
+            "first_leg_output_floor":second_input,
+            "second_leg_input_base_units":second_input,
+            "instruction_order_verified":structure["instruction_order_verified"],
+            "signed_atomic_simulation_verified":False,
+            "rollback_failure_case_verified":False,
+            "intermediate_intra_transaction_consumption_verified":False,
+            **SAFETY}
+    if positive.get("err") is not None:
+        report["status"]="POSITIVE_ATOMIC_SIMULATION_FAILED"
+        return report
+    logs=positive.get("logs") or []
+    events=_top_level_venue_events(logs)
+    report["top_level_venue_events"]=events
+    if events!=[[CPMM,"invoke"],[CPMM,"success"],[DAMM,"invoke"],[DAMM,"success"]]:
+        report["status"]="ATOMIC_INVOCATION_ORDER_NOT_PROVEN"
+        return report
+    flow=_cpi_intermediate_flow(tx,positive,keys[1],second_input)
+    if flow is None:
+        report["status"]="INTERMEDIATE_CPI_FLOW_NOT_PROVEN"
+        report["positive_inner_instruction_groups"]=positive.get("innerInstructions")
+        return report
+    post=positive.get("accounts")
+    if not isinstance(post,list) or len(post)!=3:
+        report["status"]="MISSING_POST_STATE"
+        return report
+    from arb.token_vaults import decode_token_account
+    amounts=[]
+    for entry,mint in zip(post,(mint_x,mint_y,mint_z)):
+        if not isinstance(entry,dict) or entry.get("owner")!=TOKEN_PROGRAM:
+            raise ValueError("atomic post token program invalid")
+        token=decode_token_account(base64.b64decode(entry["data"][0],validate=True))
+        if token["mint"]!=mint or token["authority"]!=owner:
+            raise ValueError("atomic post mint or authority invalid")
+        amounts.append(token["amount_base_units"])
+    if not (0<=amounts[0]<first_input and amounts[1]==flow["first_leg_intermediate_received_base_units"]-second_input
+            and amounts[2]>=second_floor):
+        report["status"]="ATOMIC_TERMINAL_BALANCES_NOT_PROVEN"
+        return report
+    if _post(rpc,keys,(mint_x,mint_y,mint_z),owner)!=before:
+        raise ValueError("positive simulated transaction unexpectedly persisted")
+    # Force second-leg slippage after a valid first leg. Error must be at
+    # instruction index 1; first-leg error or missing blockhash is insufficient.
+    ix2_bad=build_swap2(damm_pool,damm,owner,keys[1],keys[2],
+                        second_input,(1<<64)-1,input_is_a=False)
+    bad=Transaction.new_signed_with_payer([ix1,ix2_bad],payer.pubkey(),[payer],bh)
+    fail,_=_simulate(rpc,bad,keys)
+    err=fail.get("err")
+    error_instruction=(err.get("InstructionError")
+                       if isinstance(err,dict) else None)
+    negative_logs=fail.get("logs") or []
+    negative_events=_top_level_venue_events(negative_logs)
+    report["negative_top_level_venue_events"]=negative_events
+    # A failure at instruction 1 after DAMM succeeded is a real atomic
+    # abort, not an isolated failure of either swap. Surfpool may omit
+    # simulated post accounts on an aborted transaction; never invent them.
+    observed_persistent=_post(rpc,keys,(mint_x,mint_y,mint_z),owner)
+    failed_after_first_leg=(
+        isinstance(error_instruction,list) and len(error_instruction)==2
+        and error_instruction[0]==1
+        and error_instruction[1]=={"Custom":6002}
+        and negative_events==[[CPMM,"invoke"],[CPMM,"success"],
+                              [DAMM,"invoke"],[DAMM,"failed"]]
+        and any("ExceededSlippage" in line
+                for line in negative_logs))
+    negative_accounts=fail.get("accounts")
+    negative_post=None
+    if isinstance(negative_accounts,list) and len(negative_accounts)==3:
+        negative_post=[]
+        for entry,mint in zip(negative_accounts,(mint_x,mint_y,mint_z)):
+            if not isinstance(entry,dict) or entry.get("owner")!=TOKEN_PROGRAM:
+                negative_post=None
+                break
+            data=entry.get("data")
+            if not isinstance(data,list) or len(data)!=2 or data[1]!="base64":
+                negative_post=None
+                break
+            token=decode_token_account(base64.b64decode(data[0],validate=True))
+            if token["mint"]!=mint or token["authority"]!=owner:
+                negative_post=None
+                break
+            negative_post.append(token["amount_base_units"])
+    # Non-persistence alone is never evidence of rollback, since all
+    # simulations are non-persistent. Demand first-leg success followed by
+    # a verified failing second-leg slippage check.
+    rollback=failed_after_first_leg and observed_persistent==before and (
+        negative_post is None or negative_post==before)
+    report["negative_simulation_post_accounts_available"]=negative_post is not None
+    report["negative_simulation_post_balances_base_units"]=negative_post
+    report["negative_persistent_balances_base_units"]=observed_persistent
+    report["failed_at_second_instruction_after_successful_first"]=failed_after_first_leg
+    report["rollback_evidence_mode"]=(
+        "failed_post_state_and_persistence" if negative_post is not None
+        else "atomic_abort_instruction_1_and_persistence")
+    report.update(
+        **flow,
+        positive_post_balances_base_units=amounts,
+        initial_balances_base_units=before,
+        terminal_input_spent_base_units=first_input-amounts[0],
+        terminal_output_received_base_units=amounts[2],
+        intermediate_after_both_legs_base_units=amounts[1],
+        intermediate_intra_transaction_consumption_verified=True,
+        negative_error=str(err),
+        negative_logs=negative_logs,
+        rollback_failure_case_verified=bool(rollback),
+        signed_atomic_simulation_verified=bool(rollback),
+        status="SIGNED_REVERSE_ATOMIC_AND_ROLLBACK_VERIFIED" if rollback
+               else "SECOND_LEG_ROLLBACK_NOT_VERIFIED")
+    return report
+
+
 def main():
     parser=argparse.ArgumentParser()
-    parser.add_argument("mode",choices=("export","offline"))
+    parser.add_argument("mode",choices=("export","offline","offline-reverse"))
     parser.add_argument("fixture")
     parser.add_argument("--output")
     parser.add_argument("--rpc",default="http://127.0.0.1:8899")
@@ -488,8 +658,9 @@ def main():
         if not args.output:
             parser.error("--output required")
         try:
-            result=run(args.rpc,json.loads(Path(args.fixture).read_text()),
-                       first_input=args.first_input,second_input=args.second_input)
+            runner=run_reverse if args.mode=="offline-reverse" else run
+            result=runner(args.rpc,json.loads(Path(args.fixture).read_text()),
+                          first_input=args.first_input,second_input=args.second_input)
         except Exception as exc:
             result={"status":"ATOMIC_EXECUTION_BLOCKED",
                     "error_class":type(exc).__name__,"diagnostic":str(exc)[:600],
@@ -499,7 +670,7 @@ def main():
                     **SAFETY}
         Path(args.output).write_text(json.dumps(result,indent=2)+"\n")
     print(json.dumps({"status":result["status"],"broadcast":False}))
-    if args.mode=="offline" and result.get("signed_atomic_simulation_verified") is not True:
+    if args.mode in ("offline","offline-reverse") and result.get("signed_atomic_simulation_verified") is not True:
         raise SystemExit(2)
 
 

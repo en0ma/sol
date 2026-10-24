@@ -45,6 +45,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_damm_v2_execution_evidence_audit.py -v
       - name: Test DAMM to CPMM atomic fork integration safety
         run: python3 -m unittest discover -s tests -p test_damm_cpmm_atomic_offline.py -v
+      - name: Test reverse CPMM to DAMM signed atomic runner safety
+        run: python3 -m unittest discover -s tests -p test_cpmm_damm_reverse_atomic.py -v
       - name: Test independent DAMM to CPMM signed evidence acceptance
         run: python3 -m unittest discover -s tests -p test_damm_cpmm_atomic_evidence_audit.py -v
       - name: Test current-run 42 ordered-pair evidence reconciliation
@@ -1371,6 +1373,21 @@ jobs:
           else
             printf '{"status":"SOURCE_FIXTURE_UNAVAILABLE","signed_atomic_simulation_verified":false,"rollback_failure_case_verified":false,"intermediate_intra_transaction_consumption_verified":false,"actionable":false,"live_execution_approved":false,"broadcast":false}\n' > "$RUNNER_TEMP/damm-cpmm-atomic-evidence.json"
           fi
+      - name: Attempt signed reverse CPMM to DAMM atomic transaction
+        continue-on-error: true
+        env:
+          SURFPOOL_EXPLICITLY_OFFLINE: "1"
+        run: |
+          python3 -m arb.damm_cpmm_atomic_offline offline-reverse \
+            "$RUNNER_TEMP/damm-cpmm-atomic-fixture.json" \
+            --output "$RUNNER_TEMP/cpmm-damm-reverse-evidence.json"
+      - name: Upload reverse CPMM to DAMM isolated execution
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpmm-damm-signed-atomic-reverse
+          path: ${{ runner.temp }}/cpmm-damm-reverse-evidence.json
+          if-no-files-found: error
       - name: Independently accept observed signed atomic Surfpool execution
         run: |
           python3 -m arb.damm_cpmm_atomic_evidence_audit \
