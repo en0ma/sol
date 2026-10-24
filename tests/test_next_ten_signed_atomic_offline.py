@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import patch
-from arb.next_ten_signed_atomic_offline import run,hydrate,build_leg
+from arb.next_ten_signed_atomic_offline import run,hydrate
+from arb.venue_swap_adapter import build_leg
 
 class SignedNextTenTests(unittest.TestCase):
     def test_mainnet_endpoint_rejected_without_mutation(self):
