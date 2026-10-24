@@ -1,7 +1,9 @@
 import unittest
 from unittest.mock import patch
 from arb.current_run_atomic_matrix import reconcile
-from tests.test_damm_cpmm_atomic_evidence_audit import valid
+from pathlib import Path
+from runpy import run_path
+valid=run_path(str(Path(__file__).with_name("test_damm_cpmm_atomic_evidence_audit.py")))["valid"]
 
 class CurrentRunMatrixTests(unittest.TestCase):
     def test_no_evidence_does_not_mark_any_pair(self):
