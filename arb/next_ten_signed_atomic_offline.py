@@ -275,7 +275,7 @@ def main():
     p=argparse.ArgumentParser()
     p.add_argument("--fixture-dir",required=True)
     p.add_argument("--output-dir",required=True)
-    p.add_argument("--batch",choices=("first","next"),default="first")
+    p.add_argument("--batch",choices=("first","next","remaining"),default="first")
     args=p.parse_args()
     local_rpc_only("http://127.0.0.1:8899")
     root=Path(args.output_dir)

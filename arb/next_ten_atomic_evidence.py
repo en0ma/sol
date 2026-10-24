@@ -97,7 +97,7 @@ def main():
     p=argparse.ArgumentParser()
     p.add_argument("--evidence-dir",required=True)
     p.add_argument("--output",required=True)
-    p.add_argument("--batch",choices=("first","next"),default="first")
+    p.add_argument("--batch",choices=("first","next","remaining"),default="first")
     args=p.parse_args()
     root=Path(args.evidence_dir)
     evidence={}

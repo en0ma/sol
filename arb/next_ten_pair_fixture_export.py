@@ -196,7 +196,7 @@ def main():
     p.add_argument("--rpc",default="http://127.0.0.1:8899")
     p.add_argument("--readiness",required=True)
     p.add_argument("--output-dir",required=True)
-    p.add_argument("--batch",choices=("first","next"),default="first")
+    p.add_argument("--batch",choices=("first","next","remaining"),default="first")
     args=p.parse_args()
     root=Path(args.output_dir)
     root.mkdir(parents=True,exist_ok=True)
