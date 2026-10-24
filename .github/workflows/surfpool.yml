@@ -51,6 +51,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_pumpswap_trade_v2.py -v
       - name: Test offline source bundle structural audit and fail-closed accounting
         run: python3 -m unittest discover -s tests -p test_source_evidence_audit.py -v
+      - name: Test real source-stage blocker classifications
+        run: python3 -m unittest discover -s tests -p test_atomic_source_blocker_report.py -v
       - name: Test missing Raydium venue builders and mandatory account authentication
         run: python3 -m unittest discover -s tests -p test_remaining_venue_adapters.py -v
       - name: Test complete 42-pair inventory and incremental read-only state graph
@@ -470,6 +472,19 @@ jobs:
           if-no-files-found: warn
       - name: Export authenticated DAMM and CPMM atomic route
         run: python3 -m arb.damm_cpmm_atomic_offline export "$RUNNER_TEMP/damm-cpmm-atomic-fixture.json"
+      - name: Produce actionable per-venue blocker breakdown before expensive offline execution
+        run: |
+          python3 -m arb.atomic_source_blocker_report \
+            --probes "$RUNNER_TEMP/next-ten-authenticated-pool-pairs.json" "$RUNNER_TEMP/following-ten-pool-pairs.json" "$RUNNER_TEMP/remaining-24-pool-pairs.json" \
+            --summaries "$RUNNER_TEMP/next-ten-dual-program-fixtures/summary.json" "$RUNNER_TEMP/following-ten-fixtures/summary.json" "$RUNNER_TEMP/remaining-24-fixtures/summary.json" \
+            --output "$RUNNER_TEMP/atomic-source-blockers.json"
+      - name: Publish exact source blockers and priority diagnosis
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: forty-two-source-blocker-diagnostics
+          path: ${{ runner.temp }}/atomic-source-blockers.json
+          if-no-files-found: error
       - name: Publish one verified fixture bundle for offline-only workers
         uses: actions/upload-artifact@v4
         with:
