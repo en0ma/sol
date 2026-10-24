@@ -105,6 +105,21 @@ def hydrate(rpc, fixture, *, program_cache=None, batch=BATCH_10):
             program_cache[program]=digest
 
 
+def clmm_direction_evidence(state,mint_in,directional,source_accounts):
+    """Select only source-snapshotted tick arrays for the signed mint direction."""
+    if mint_in==state["token_mint_0"]:
+        key="0_to_1"
+    elif mint_in==state["token_mint_1"]:
+        key="1_to_0"
+    else:
+        raise ValueError("CLMM signed input mint mismatches pool")
+    arrays=directional.get(key) if isinstance(directional,dict) else None
+    if not isinstance(arrays,list) or len(arrays)!=3 or len(set(arrays))!=3:
+        raise ValueError("CLMM directional authenticated tick array triplet missing")
+    if not isinstance(source_accounts,dict) or any(x not in source_accounts for x in arrays):
+        raise ValueError("CLMM directional arrays absent from authenticated source fixture")
+    return {"tick_arrays":arrays,"tick_arrays_authenticated":True}
+
 def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache=None,batch=BATCH_10):
     local_rpc_only(rpc)
     if any(type(n)is not int or not 0<n<2**64 for n in (amount_in,amount_intermediate)):
@@ -184,6 +199,15 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache
             raise ValueError("PumpSwap V2 authenticated buyback ATA missing")
         addresses["buyback_fee_recipient"]=buyback
         addresses["buyback_fee_recipient_authenticated"]=True
+    # Bind source-authenticated CLMM arrays to the actual mint direction.
+    # A pool-level union of arrays is not sufficient: the signed builder
+    # must receive arrays from the intended exact-input direction only.
+    for leg_index,(venue,pool) in enumerate(legs):
+        if venue=="raydium_clmm":
+            directional=evidence[venue].get("tick_arrays_by_direction")
+            evidence[venue].update(clmm_direction_evidence(
+                states[leg_index],mints[leg_index],
+                directional,fixture["accounts"]))
     graph=[{"venue":first,"pool":legs[0][1],
             "input_mint":mints[0],"output_mint":mints[1]},
            {"venue":second,"pool":legs[1][1],
