@@ -45,6 +45,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_damm_v2_execution_evidence_audit.py -v
       - name: Test DAMM to CPMM atomic fork integration safety
         run: python3 -m unittest discover -s tests -p test_damm_cpmm_atomic_offline.py -v
+      - name: Test complete 42-pair inventory and incremental read-only state graph
+        run: python3 -m unittest discover -s tests -p test_forty_two_live_registry.py -v
       - name: Test following ten authenticated signed atomic integrations
         run: python3 -m unittest discover -s tests -p test_following_ten_atomic_integration.py -v
       - name: Test authenticated pool-level graph enumeration up to six legs
@@ -1519,6 +1521,18 @@ jobs:
         with:
           name: next-ten-ordered-signed-atomic-audit
           path: ${{ runner.temp }}/next-ten-ordered-evidence.json
+          if-no-files-found: error
+      - name: Independently reconcile full 42 directed atomic evidence receipts
+        run: |
+          python3 -m arb.forty_two_atomic_evidence \
+            --evidence-dirs "$RUNNER_TEMP/next-ten-signed-evidence" "$RUNNER_TEMP/following-ten-signed-evidence" \
+            --output "$RUNNER_TEMP/forty-two-ordered-atomic-acceptance.json"
+      - name: Upload independently accepted 42-pair coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: complete-42-ordered-atomic-coverage-audit
+          path: ${{ runner.temp }}/forty-two-ordered-atomic-acceptance.json
           if-no-files-found: error
       - name: Upload current-run ordered atomic acceptance matrix
         if: always()

@@ -36,4 +36,14 @@ assert len(set(NEXT_10)-set(BATCH_10))==8
 def route_batch(name):
     if name=="first":return BATCH_10
     if name=="next":return NEXT_10
+    if name=="all":return ALL_42
+    if name=="remaining":return REMAINING_42
     raise ValueError("unknown atomic route batch")
+
+# Exhaustive ordered seven-venue inventory for future sharded fork execution.
+# Existing batch receipts are retained; an inventory never implies proof.
+from itertools import permutations
+ALL_42=tuple(permutations(TARGET_VENUES,2))
+assert len(ALL_42)==42 and len(set(ALL_42))==42
+REMAINING_42=tuple(pair for pair in ALL_42 if pair not in set(BATCH_10)|set(NEXT_10))
+assert len(REMAINING_42)==24
