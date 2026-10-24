@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import patch
-from arb.damm_cpmm_atomic_offline import export, run, _cpi_intermediate_flow
+from arb.damm_cpmm_atomic_offline import export, run, _cpi_intermediate_flow, _post, _decode_base58, _inner_token_transfer
 
 class AtomicIntegrationSafety(unittest.TestCase):
     def test_source_export_refuses_remote_endpoint_before_rpc(self):
@@ -43,7 +43,34 @@ class AtomicIntegrationSafety(unittest.TestCase):
             [Instruction(Pubkey.from_string(token),b"",[])],
             k.pubkey(),[k],Hash.default())
         with self.assertRaises(ValueError):
-            _cpi_intermediate_flow(tx,{"innerInstructions":[]},account)
+            _cpi_intermediate_flow(tx,{"innerInstructions":[]},account,1000)
+
+    def test_three_token_account_snapshot_requires_three_accounts(self):
+        with patch("arb.damm_cpmm_atomic_offline.call",
+                   return_value={"context":{"slot":1},"value":[None,None]}):
+            with self.assertRaisesRegex(ValueError,"three-account"):
+                _post("http://localhost:8899",["a","b","c"],["x","y","z"],"owner")
+
+    def test_cpi_decoder_distinguishes_transfer_checked_destination(self):
+        from solders.pubkey import Pubkey
+        from solders.keypair import Keypair
+        from arb.token_vaults import TOKEN_PROGRAM
+        keys=[Pubkey.from_string(TOKEN_PROGRAM)]+[Keypair().pubkey() for _ in range(4)]
+        def b58(raw):
+            alphabet="123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+            n=int.from_bytes(raw,"big")
+            chars=""
+            while n:
+                n,r=divmod(n,58)
+                chars=alphabet[r]+chars
+            return "1"*(len(raw)-len(raw.lstrip(b"\\x00")))+(chars or "")
+        data=bytes([12])+(1000).to_bytes(8,"little")+bytes([6])
+        event={"programIdIndex":0,"accounts":[1,2,3,4],"data":b58(data)}
+        self.assertEqual(_inner_token_transfer(event,keys,0),(1,3,1000))
+
+    def test_invalid_base58_data_rejected(self):
+        with self.assertRaises(ValueError):
+            _decode_base58("0-invalid")
 
 if __name__=="__main__":
     unittest.main()

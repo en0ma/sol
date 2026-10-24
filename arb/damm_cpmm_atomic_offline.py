@@ -146,42 +146,102 @@ def _simulate(rpc, tx, addresses):
     return value,len(wire)
 
 
-def _post(rpc, accounts, mints, owner):
-    _,bal=_account_snapshot(rpc,accounts,mints,owner)
-    return bal
+def _post(rpc, addresses, mints, owner):
+    """Read exactly three SPL accounts from one synchronized fork snapshot."""
+    from arb.token_vaults import decode_token_account
+    response=call(rpc,"getMultipleAccounts",[
+        list(addresses),{"encoding":"base64","commitment":"confirmed"}])
+    values=response.get("value") if isinstance(response,dict) else None
+    slot=response.get("context",{}).get("slot") if isinstance(response,dict) else None
+    if (type(slot) is not int or slot<0 or not isinstance(values,list)
+            or len(values)!=3):
+        raise ValueError("missing three-account local token snapshot")
+    amounts=[]
+    for entry,mint in zip(values,mints):
+        if not isinstance(entry,dict) or entry.get("owner")!=TOKEN_PROGRAM or entry.get("executable") is not False:
+            raise ValueError("untrusted three-account SPL snapshot")
+        data=entry.get("data")
+        if not isinstance(data,list) or len(data)!=2 or data[1]!="base64":
+            raise ValueError("three-account SPL encoding mismatch")
+        decoded=decode_token_account(base64.b64decode(data[0],validate=True))
+        if decoded["mint"]!=mint or decoded["authority"]!=owner:
+            raise ValueError("three-account mint/authority mismatch")
+        amounts.append(decoded["amount_base_units"])
+    return amounts
 
 
-def _cpi_intermediate_flow(tx, response, intermediate):
-    """Require real inner token transfers into Y from leg 1 and out in leg 2."""
+def _decode_base58(encoded):
+    if not isinstance(encoded,str) or not encoded:
+        raise ValueError("invalid inner instruction data")
+    alphabet="123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+    value=0
+    for ch in encoded:
+        i=alphabet.find(ch)
+        if i<0:
+            raise ValueError("invalid base58 inner instruction")
+        value=value*58+i
+    raw=value.to_bytes((value.bit_length()+7)//8,"big")
+    return bytes(len(encoded)-len(encoded.lstrip("1")))+raw
+
+
+def _inner_token_transfer(entry, keys, token_program_index):
+    """Decode real SPL Transfer (3) or TransferChecked (12) account roles."""
+    if not isinstance(entry,dict):
+        return None
+    program_index=entry.get("programIdIndex")
+    accounts=entry.get("accounts")
+    if type(program_index) is not int or program_index!=token_program_index:
+        return None
+    if not isinstance(accounts,list) or any(type(x)is not int for x in accounts):
+        return None
+    encoded=entry.get("data")
+    if not isinstance(encoded,str):
+        return None
+    try:
+        data=_decode_base58(encoded)
+    except ValueError:
+        return None
+    if not data:
+        return None
+    if data[0]==3 and len(data)==9 and len(accounts)>=3:
+        source,destination=accounts[0],accounts[1]
+    elif data[0]==12 and len(data)==10 and len(accounts)>=4:
+        source,destination=accounts[0],accounts[2]
+    else:
+        return None
+    if source>=len(keys) or destination>=len(keys):
+        return None
+    amount=int.from_bytes(data[1:9],"little")
+    return (source,destination,amount) if amount>0 else None
+
+
+def _cpi_intermediate_flow(tx,response,intermediate,second_amount):
+    """Return independently observed positive first-in and second-out SPL CPIs."""
     from solders.pubkey import Pubkey
     keys=tx.message.account_keys
-    index=keys.index(Pubkey.from_string(intermediate))
+    intermediate_index=keys.index(Pubkey.from_string(intermediate))
     token_index=keys.index(Pubkey.from_string(TOKEN_PROGRAM))
     rows=response.get("innerInstructions")
-    if not isinstance(rows,list):
-        return False
-    proven=[]
-    for index_outer in (0,1):
-        group=next((g for g in rows if g.get("index")==index_outer),None)
-        if not isinstance(group,dict):
-            return False
-        found=False
-        for entry in group.get("instructions",[]):
-            if (entry.get("programIdIndex")!=token_index
-                    or not isinstance(entry.get("accounts"),list)):
+    if not isinstance(rows,list) or type(second_amount) is not int or second_amount<=0:
+        return None
+    received=consumed=0
+    for outer in (0,1):
+        groups=[g for g in rows if isinstance(g,dict) and g.get("index")==outer]
+        if len(groups)!=1:
+            return None
+        for entry in groups[0].get("instructions",[]):
+            transfer=_inner_token_transfer(entry,keys,token_index)
+            if transfer is None:
                 continue
-            accounts=entry["accounts"]
-            # SPL Token Transfer/TransferChecked: source account is first,
-            # destination is second (for both opcodes).
-            if len(accounts)<2:
-                continue
-            if index_outer==0 and accounts[1]==index:
-                found=True
-            if index_outer==1 and accounts[0]==index:
-                found=True
-        proven.append(found)
-    return proven==[True,True]
-
+            source,destination,amount=transfer
+            if outer==0 and destination==intermediate_index:
+                received+=amount
+            if outer==1 and source==intermediate_index:
+                consumed+=amount
+    if received<second_amount or consumed!=second_amount:
+        return None
+    return {"first_leg_intermediate_received_base_units":received,
+            "second_leg_intermediate_consumed_base_units":consumed}
 
 def run(rpc, fixture, *, first_input=100000000, second_input=1000, second_floor=1):
     local_rpc_only(rpc)
@@ -264,7 +324,8 @@ def run(rpc, fixture, *, first_input=100000000, second_input=1000, second_floor=
     if events!=[(DAMM,"invoke"),(DAMM,"success"),(CPMM,"invoke"),(CPMM,"success")]:
         report["status"]="ATOMIC_INVOCATION_ORDER_NOT_PROVEN"
         return report
-    if not _cpi_intermediate_flow(tx,positive,keys[1]):
+    flow=_cpi_intermediate_flow(tx,positive,keys[1],second_input)
+    if flow is None:
         report["status"]="INTERMEDIATE_CPI_FLOW_NOT_PROVEN"
         return report
     post=positive.get("accounts")
@@ -280,7 +341,7 @@ def run(rpc, fixture, *, first_input=100000000, second_input=1000, second_floor=
         if token["mint"]!=mint or token["authority"]!=owner:
             raise ValueError("atomic post mint or authority invalid")
         amounts.append(token["amount_base_units"])
-    if not (0<amounts[0]<first_input and amounts[1]>=0
+    if not (0<=amounts[0]<first_input and amounts[1]==flow["first_leg_intermediate_received_base_units"]-second_input
             and amounts[2]>=second_floor):
         report["status"]="ATOMIC_TERMINAL_BALANCES_NOT_PROVEN"
         return report
@@ -314,6 +375,7 @@ def run(rpc, fixture, *, first_input=100000000, second_input=1000, second_floor=
             negative_post.append(token["amount_base_units"] if token["mint"]==mint and token["authority"]==owner else None)
         rollback=rollback and negative_post==before
     report.update(
+        **flow,
         positive_post_balances_base_units=amounts,
         initial_balances_base_units=before,
         terminal_input_spent_base_units=first_input-amounts[0],
