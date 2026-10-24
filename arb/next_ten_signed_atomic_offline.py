@@ -63,6 +63,9 @@ def hydrate(rpc, fixture, *, program_cache=None):
     if route not in BATCH_10:
         raise ValueError("non-batch ordered pair")
     programs={PROGRAMS[route[0]],PROGRAMS[route[1]]}
+    if "pumpswap" in route:
+        from arb.pumpswap_fee_account import PROGRAM as FEE_PROGRAM
+        programs.add(FEE_PROGRAM)
     accounts=fixture["accounts"]
     program_data={}
     # Validate every executable + ELF before making any local writes.

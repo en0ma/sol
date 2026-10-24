@@ -144,7 +144,14 @@ def export(rpc,readiness,route_index,output):
     accounts=_fetch(rpc,addresses)
     if any(v is None for v in accounts.values()):
         raise ValueError("required authenticated account unavailable")
-    accounts.update(program_data_accounts(rpc,(PROGRAMS[first],PROGRAMS[second])))
+    # PumpSwap uses the separately deployed pump_fees program as an
+    # executable account. Copy its authenticated ELF as well, not merely
+    # the PumpSwap AMM executable.
+    executable_programs={PROGRAMS[first],PROGRAMS[second]}
+    if "pumpswap" in (first,second):
+        from arb.pumpswap_fee_account import PROGRAM as FEE_PROGRAM
+        executable_programs.add(FEE_PROGRAM)
+    accounts.update(program_data_accounts(rpc,executable_programs))
     output_data={"source":"READ_ONLY_MAINNET_BACKED_SURFPOOL",
                  "first_venue":first,"second_venue":second,
                  "route_mints":[mints[0],mints[1],mints[0]],
