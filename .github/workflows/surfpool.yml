@@ -45,6 +45,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_damm_v2_execution_evidence_audit.py -v
       - name: Test DAMM to CPMM atomic fork integration safety
         run: python3 -m unittest discover -s tests -p test_damm_cpmm_atomic_offline.py -v
+      - name: Test authenticated pool-level graph enumeration up to six legs
+        run: python3 -m unittest discover -s tests -p test_authenticated_pool_graph.py -v
       - name: Test venue-agnostic atomic graph routing and existing PumpSwap builder
         run: python3 -m unittest discover -s tests -p test_atomic_graph_coordinator.py -v
       - name: Test next ten real signed atomic runner and offline safeguards
