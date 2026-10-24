@@ -45,6 +45,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_damm_v2_execution_evidence_audit.py -v
       - name: Test DAMM to CPMM atomic fork integration safety
         run: python3 -m unittest discover -s tests -p test_damm_cpmm_atomic_offline.py -v
+      - name: Test next ten directional Surfpool evidence gates
+        run: python3 -m unittest discover -s tests -p test_next_ten_atomic_evidence.py -v
       - name: Test reverse CPMM to DAMM signed atomic runner safety
         run: python3 -m unittest discover -s tests -p test_cpmm_damm_reverse_atomic.py -v
       - name: Test independent reverse atomic evidence acceptance safety
@@ -1413,6 +1415,18 @@ jobs:
             --input "$RUNNER_TEMP/damm-cpmm-atomic-evidence.json" \
             --reverse-input "$RUNNER_TEMP/cpmm-damm-reverse-evidence.json" \
             --output "$RUNNER_TEMP/current-run-atomic-matrix.json"
+      - name: Publish next ten ordered route evidence gap report
+        run: |
+          python3 -m arb.next_ten_atomic_evidence \
+            --evidence-dir "$RUNNER_TEMP/next-ten-signed-evidence" \
+            --output "$RUNNER_TEMP/next-ten-ordered-evidence.json"
+      - name: Upload next ten ordered evidence audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: next-ten-ordered-signed-atomic-audit
+          path: ${{ runner.temp }}/next-ten-ordered-evidence.json
+          if-no-files-found: error
       - name: Upload current-run ordered atomic acceptance matrix
         if: always()
         uses: actions/upload-artifact@v4
