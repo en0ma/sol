@@ -45,6 +45,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_damm_v2_execution_evidence_audit.py -v
       - name: Test DAMM to CPMM atomic fork integration safety
         run: python3 -m unittest discover -s tests -p test_damm_cpmm_atomic_offline.py -v
+      - name: Test following ten authenticated signed atomic integrations
+        run: python3 -m unittest discover -s tests -p test_following_ten_atomic_integration.py -v
       - name: Test authenticated pool-level graph enumeration up to six legs
         run: python3 -m unittest discover -s tests -p test_authenticated_pool_graph.py -v
       - name: Test venue-agnostic atomic graph routing and existing PumpSwap builder
@@ -1240,7 +1242,7 @@ jobs:
   isolated-orca-execution:
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 65
     env:
       SOLANA_RPC_URL: http://127.0.0.1:8899
       SURFPOOL_DATASOURCE_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
@@ -1307,6 +1309,22 @@ jobs:
           name: next-ten-dual-program-readonly-fixtures
           path: ${{ runner.temp }}/next-ten-dual-program-fixtures/
           if-no-files-found: error
+      - name: Discover following ten authenticated pool pair candidates
+        run: |
+          python3 -m arb.next_ten_fork_pool_probe --batch next \
+            --output "$RUNNER_TEMP/following-ten-pool-pairs.json"
+      - name: Export following ten authenticated source fixtures
+        run: |
+          python3 -m arb.next_ten_pair_fixture_export --batch next \
+            --readiness "$RUNNER_TEMP/following-ten-pool-pairs.json" \
+            --output-dir "$RUNNER_TEMP/following-ten-fixtures"
+      - name: Upload following ten source fork fixtures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: following-ten-authenticated-dual-program-fixtures
+          path: ${{ runner.temp }}/following-ten-fixtures/
+          if-no-files-found: warn
       - name: Export authenticated DAMM and CPMM atomic route
         run: python3 -m arb.damm_cpmm_atomic_offline export "$RUNNER_TEMP/damm-cpmm-atomic-fixture.json"
       - name: Stop upstream-backed fork and start isolated offline Surfpool
@@ -1350,6 +1368,20 @@ jobs:
         with:
           name: next-ten-isolated-signed-atomic-runtime-evidence
           path: ${{ runner.temp }}/next-ten-signed-evidence/
+          if-no-files-found: error
+      - name: Execute following ten signed atomic two-instruction attempts
+        env:
+          SURFPOOL_EXPLICITLY_OFFLINE: "1"
+        run: |
+          python3 -m arb.next_ten_signed_atomic_offline --batch next \
+            --fixture-dir "$RUNNER_TEMP/following-ten-fixtures" \
+            --output-dir "$RUNNER_TEMP/following-ten-signed-evidence"
+      - name: Publish following ten signed atomic runtime receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: following-ten-isolated-signed-atomic-runtime-evidence
+          path: ${{ runner.temp }}/following-ten-signed-evidence/
           if-no-files-found: error
       - name: Hydrate disposable offline Orca fixture and attempt signed SwapV2
         env:
@@ -1462,12 +1494,25 @@ jobs:
             --input "$RUNNER_TEMP/damm-cpmm-atomic-evidence.json" \
             --reverse-input "$RUNNER_TEMP/cpmm-damm-reverse-evidence.json" \
             --next-ten-evidence-dir "$RUNNER_TEMP/next-ten-signed-evidence" \
+            --following-ten-evidence-dir "$RUNNER_TEMP/following-ten-signed-evidence" \
             --output "$RUNNER_TEMP/current-run-atomic-matrix.json"
       - name: Publish next ten ordered route evidence gap report
         run: |
           python3 -m arb.next_ten_atomic_evidence \
             --evidence-dir "$RUNNER_TEMP/next-ten-signed-evidence" \
             --output "$RUNNER_TEMP/next-ten-ordered-evidence.json"
+      - name: Independently audit following ten signed route receipts
+        run: |
+          python3 -m arb.next_ten_atomic_evidence --batch next \
+            --evidence-dir "$RUNNER_TEMP/following-ten-signed-evidence" \
+            --output "$RUNNER_TEMP/following-ten-evidence-audit.json"
+      - name: Upload independently audited following ten coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: following-ten-ordered-signed-atomic-audit
+          path: ${{ runner.temp }}/following-ten-evidence-audit.json
+          if-no-files-found: error
       - name: Upload next ten ordered evidence audit
         if: always()
         uses: actions/upload-artifact@v4

@@ -21,3 +21,19 @@ BATCH_10=(
 assert len(BATCH_10)==10 and len(set(BATCH_10))==10
 assert all(a in TARGET_VENUES and b in TARGET_VENUES and a!=b
            for a,b in BATCH_10)
+
+# Eight previously unattempted ordered venue pairs, plus both PumpSwap/DAMM
+# retry controls. The latter are deliberately NOT new coverage identities.
+NEXT_10=(
+    ("orca","meteora_dlmm"),("meteora_dlmm","orca"),
+    ("orca","pumpswap"),("pumpswap","orca"),
+    ("raydium_cpmm","pumpswap"),("pumpswap","raydium_cpmm"),
+    ("meteora_dlmm","pumpswap"),("pumpswap","meteora_dlmm"),
+    ("meteora_damm_v2","pumpswap"),("pumpswap","meteora_damm_v2"),
+)
+assert len(NEXT_10)==10 and len(set(NEXT_10))==10
+assert len(set(NEXT_10)-set(BATCH_10))==8
+def route_batch(name):
+    if name=="first":return BATCH_10
+    if name=="next":return NEXT_10
+    raise ValueError("unknown atomic route batch")

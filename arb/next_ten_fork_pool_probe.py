@@ -7,7 +7,7 @@ import argparse
 import base64
 import json
 from pathlib import Path
-from arb.next_ten_atomic_routes import BATCH_10
+from arb.next_ten_atomic_routes import BATCH_10,route_batch
 from arb.rpc import call
 from arb.pumpswap_local_simulation import local_rpc_only
 from arb.orca_whirlpool import PROGRAM as ORCA, decode as orca_decode
@@ -93,10 +93,10 @@ def candidates(registry):
             result[venue].insert(0,pool)
     return result
 
-def probe(rpc, registry):
+def probe(rpc, registry, *, batch=BATCH_10):
     local_rpc_only(rpc)
     entries=candidates(registry)
-    relevant={v for pair in BATCH_10 for v in pair}
+    relevant={v for pair in batch for v in pair}
     pools={}
     failures=[]
     for venue in sorted(relevant):
@@ -109,7 +109,7 @@ def probe(rpc, registry):
                                  "error_class":type(exc).__name__,
                                  "diagnostic":str(exc)[:120]})
     routes=[]
-    for first,second in BATCH_10:
+    for first,second in batch:
         combinations=[]
         for a in pools[first]:
             for b in pools[second]:
@@ -135,8 +135,9 @@ def main():
     p.add_argument("--rpc",default="http://127.0.0.1:8899")
     p.add_argument("--registry",default="arb/pool_registry.json")
     p.add_argument("--output",required=True)
+    p.add_argument("--batch",choices=("first","next"),default="first")
     args=p.parse_args()
-    report=probe(args.rpc,json.loads(Path(args.registry).read_text()))
+    report=probe(args.rpc,json.loads(Path(args.registry).read_text()),batch=route_batch(args.batch))
     Path(args.output).write_text(json.dumps(report,indent=2)+"\n")
     print(json.dumps({"status":report["status"],
                       "routes_with_authenticated_candidates":sum(

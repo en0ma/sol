@@ -6,7 +6,7 @@ unit test, fixture export, or one-leg success into pair coverage.
 import argparse
 import json
 from pathlib import Path
-from arb.next_ten_atomic_routes import BATCH_10
+from arb.next_ten_atomic_routes import BATCH_10,route_batch
 from arb.execution_target_matrix import TARGET_VENUES
 
 SAFETY={"actionable":False,"live_execution_approved":False,"broadcast":False}
@@ -83,11 +83,11 @@ def assess(route, evidence):
             "status":"VERIFIED" if not errors else "UNVERIFIED",
             "failure_reasons":errors,**SAFETY}
 
-def build(evidence_by_route):
-    keys=set(BATCH_10)
+def build(evidence_by_route,*,batch=BATCH_10):
+    keys=set(batch)
     if set(evidence_by_route)-keys:
         raise ValueError("unrecognized or non-batch route")
-    rows=[assess(route,evidence_by_route.get(route)) for route in BATCH_10]
+    rows=[assess(route,evidence_by_route.get(route)) for route in batch]
     count=sum(r["status"]=="VERIFIED" for r in rows)
     return {"status":"NEXT_TEN_REAL_FORK_EXECUTION_EVIDENCE",
             "batch_target":10,"batch_verified":count,
@@ -97,14 +97,15 @@ def main():
     p=argparse.ArgumentParser()
     p.add_argument("--evidence-dir",required=True)
     p.add_argument("--output",required=True)
+    p.add_argument("--batch",choices=("first","next"),default="first")
     args=p.parse_args()
     root=Path(args.evidence_dir)
     evidence={}
-    for first,second in BATCH_10:
+    for first,second in route_batch(args.batch):
         path=root/(first+"__"+second+".json")
         if path.is_file():
             evidence[(first,second)]=json.loads(path.read_text())
-    report=build(evidence)
+    report=build(evidence,batch=route_batch(args.batch))
     Path(args.output).write_text(json.dumps(report,indent=2)+"\n")
     print(json.dumps({"batch_verified":report["batch_verified"],
                       "batch_target":10,"broadcast":False}))

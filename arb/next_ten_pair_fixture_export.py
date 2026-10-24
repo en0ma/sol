@@ -11,7 +11,7 @@ from solders.pubkey import Pubkey
 from arb.rpc import call
 from arb.pumpswap_local_simulation import local_rpc_only
 from arb.next_ten_fork_pool_probe import PROGRAMS, snapshot
-from arb.next_ten_atomic_routes import BATCH_10
+from arb.next_ten_atomic_routes import BATCH_10,route_batch
 from arb.damm_cpmm_atomic_offline import _fetch, LOADER
 
 def program_data_accounts(rpc, programs):
@@ -113,15 +113,15 @@ def venue_accounts(rpc, venue, pool, mints):
         raise ValueError("unsupported fixture venue")
     return list(dict.fromkeys(extras)),evidence
 
-def export(rpc,readiness,route_index,output):
+def export(rpc,readiness,route_index,output,*,batch=BATCH_10):
     local_rpc_only(rpc)
-    if type(route_index) is not int or not 0<=route_index<len(BATCH_10):
+    if type(route_index) is not int or not 0<=route_index<len(batch):
         raise ValueError("route index outside first ten")
     if readiness.get("source")!="READ_ONLY_MAINNET_BACKED_SURFPOOL":
         raise ValueError("not an authenticated source-fork report")
-    route=BATCH_10[route_index]
+    route=batch[route_index]
     rows=readiness.get("route_candidates")
-    if not isinstance(rows,list) or len(rows)!=10:
+    if not isinstance(rows,list) or len(rows)!=len(batch):
         raise ValueError("read-only source route candidates missing")
     target=rows[route_index]
     if (target.get("first_venue"),target.get("second_venue"))!=route:
@@ -169,15 +169,16 @@ def main():
     p.add_argument("--rpc",default="http://127.0.0.1:8899")
     p.add_argument("--readiness",required=True)
     p.add_argument("--output-dir",required=True)
+    p.add_argument("--batch",choices=("first","next"),default="first")
     args=p.parse_args()
     root=Path(args.output_dir)
     root.mkdir(parents=True,exist_ok=True)
     ready=json.loads(Path(args.readiness).read_text())
     reports=[]
-    for index,(first,second) in enumerate(BATCH_10):
+    for index,(first,second) in enumerate(route_batch(args.batch)):
         try:
             reports.append(export(args.rpc,ready,index,
-                                  root/(first+"__"+second+".json")))
+                                  root/(first+"__"+second+".json"),batch=route_batch(args.batch)))
         except (ValueError,KeyError,TypeError) as exc:
             reports.append({"status":"SOURCE_FIXTURE_BLOCKED","first_venue":first,
                             "second_venue":second,"reason":str(exc)[:200],

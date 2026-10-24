@@ -17,7 +17,7 @@ from arb.rpc import call
 from arb.damm_cpmm_atomic_offline import (_pool,_fetch,_simulate,_post,
     _cpi_intermediate_flow,LOADER,SAFETY)
 from arb.next_ten_fork_pool_probe import PROGRAMS,DECODERS,MINT_KEYS
-from arb.next_ten_atomic_routes import BATCH_10
+from arb.next_ten_atomic_routes import BATCH_10,route_batch
 from arb.orca_swap_v2_offline_provision import token_account_bytes
 from arb.token_vaults import TOKEN_PROGRAM,decode_token_account
 from arb.pumpswap_local_simulation import local_rpc_only
@@ -53,14 +53,14 @@ def top_level_events(logs, venues):
                 events.append([end.group(1),"success" if end.group(2)=="success" else "failed"])
     return events if not stack else []
 
-def hydrate(rpc, fixture, *, program_cache=None):
+def hydrate(rpc, fixture, *, program_cache=None, batch=BATCH_10):
     local_rpc_only(rpc)
     if os.environ.get("SURFPOOL_EXPLICITLY_OFFLINE")!="1":
         raise ValueError("isolated Surfpool explicit offline gate required")
     if fixture.get("source")!="READ_ONLY_MAINNET_BACKED_SURFPOOL":
         raise ValueError("untrusted source fixture")
     route=(fixture.get("first_venue"),fixture.get("second_venue"))
-    if route not in BATCH_10:
+    if route not in batch:
         raise ValueError("non-batch ordered pair")
     programs={PROGRAMS[route[0]],PROGRAMS[route[1]]}
     if "pumpswap" in route:
@@ -105,11 +105,11 @@ def hydrate(rpc, fixture, *, program_cache=None):
             program_cache[program]=digest
 
 
-def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache=None):
+def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache=None,batch=BATCH_10):
     local_rpc_only(rpc)
     if any(type(n)is not int or not 0<n<2**64 for n in (amount_in,amount_intermediate)):
         raise ValueError("invalid atomic amounts")
-    hydrate(rpc,fixture,program_cache=program_cache)
+    hydrate(rpc,fixture,program_cache=program_cache,batch=batch)
     first,second=fixture["first_venue"],fixture["second_venue"]
     mints=fixture["route_mints"]
     if (len(mints)!=3 or mints[0]!=mints[2] or mints[0]==mints[1]):
@@ -275,12 +275,13 @@ def main():
     p=argparse.ArgumentParser()
     p.add_argument("--fixture-dir",required=True)
     p.add_argument("--output-dir",required=True)
+    p.add_argument("--batch",choices=("first","next"),default="first")
     args=p.parse_args()
     local_rpc_only("http://127.0.0.1:8899")
     root=Path(args.output_dir)
     root.mkdir(parents=True,exist_ok=True)
     program_cache={}
-    for first,second in BATCH_10:
+    for first,second in route_batch(args.batch):
         name=first+"__"+second+".json"
         out={"status":"MISSING_AUTHENTICATED_SOURCE_FIXTURE",
              "first_venue":first,"second_venue":second,
@@ -293,7 +294,7 @@ def main():
         if path.is_file():
             try:
                 out=run("http://127.0.0.1:8899",json.loads(path.read_text()),
-                        program_cache=program_cache)
+                        program_cache=program_cache,batch=route_batch(args.batch))
             except Exception as exc:
                 out.update(status="ISOLATED_SIGNED_ATOMIC_BLOCKED",
                            error_class=type(exc).__name__,diagnostic=str(exc)[:500])
