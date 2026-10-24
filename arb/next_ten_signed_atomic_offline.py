@@ -135,7 +135,6 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache
     if "pumpswap" in (first,second):
         from arb.pumpswap_account_resolver import resolve as resolve_pump
         from arb.pumpswap_pool import verify as verify_pump
-        from arb.token_vaults import decode_token_account
         pump_idx=0 if first=="pumpswap" else 1
         pump_state=states[pump_idx]
         pump_pool=legs[pump_idx][1]
@@ -169,7 +168,8 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache
                                 "system_program","associated_token_program",
                                 "base_token_program","quote_token_program",
                                 "event_authority","program","fee_program",
-                                "coin_creator_vault_authority"):
+                                "coin_creator_vault_authority",
+                                "protocol_fee_recipient"):
                 continue
             address=meta["address"]
             if address not in fixture["accounts"]:

@@ -20,6 +20,11 @@ class SignedNextTenTests(unittest.TestCase):
         logs[-1]="Program VENUE_B failed: custom program error: 0x1"
         self.assertEqual(top_level_events(logs,{a,b})[-1],[b,"failed"])
         self.assertEqual(top_level_events(logs[:-1],{a,b}),[])
+    def test_shared_token_decoder_not_shadowed_by_pumpswap_branch(self):
+        import inspect
+        from arb.next_ten_signed_atomic_offline import run
+        source=inspect.getsource(run)
+        self.assertNotIn("from arb.token_vaults import decode_token_account",source)
     def test_mainnet_endpoint_rejected_without_mutation(self):
         with patch("arb.next_ten_signed_atomic_offline.call") as rpc:
             with self.assertRaises(ValueError):
