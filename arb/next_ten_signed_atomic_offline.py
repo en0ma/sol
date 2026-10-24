@@ -132,6 +132,50 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache
     if before!=[amount_in,0,0]:
         raise ValueError("ephemeral funding mismatch")
     evidence=fixture["leg_evidence"]
+    if "pumpswap" in (first,second):
+        from arb.pumpswap_account_resolver import resolve as resolve_pump
+        from arb.pumpswap_pool import verify as verify_pump
+        from arb.token_vaults import decode_token_account
+        pump_idx=0 if first=="pumpswap" else 1
+        pump_state=states[pump_idx]
+        pump_pool=legs[pump_idx][1]
+        proof=evidence["pumpswap"]
+        actual=verify_pump(rpc,pump_pool,pump_state)
+        source_verified=proof.get("verified_pool")
+        if (not isinstance(source_verified,dict) or
+                source_verified.get("address")!=pump_pool or
+                source_verified.get("base_mint")!=actual.get("base_mint") or
+                source_verified.get("quote_mint")!=actual.get("quote_mint") or
+                source_verified.get("global_config")!=actual.get("global_config") or
+                source_verified.get("fee_config")!=actual.get("fee_config")):
+            raise ValueError("hydrated PumpSwap authentication diverged from source")
+        recipient=proof["protocol_fee_recipient"]
+        base=pump_state["base_mint"]
+        user_base=keys[0 if mints[0]==base else 1]
+        user_quote=keys[0 if mints[0]==pump_state["quote_mint"] else 1]
+        # Pool may appear on the second leg, whose terminal account is a
+        # different SPL address carrying the same starting mint.
+        if pump_idx==1:
+            user_base=keys[1 if mints[1]==base else 2]
+            user_quote=keys[1 if mints[1]==pump_state["quote_mint"] else 2]
+        addresses=resolve_pump(actual,owner,user_base,user_quote,recipient)
+        from arb.pumpswap_account_metas import account_metas
+        direction=("sell" if mints[pump_idx]==base else "buy_exact_quote_in")
+        required=account_metas(direction,addresses)["metas"]
+        from arb.rpc import call as rpc_call
+        for meta in required:
+            if meta["name"] in ("user","user_base_token_account",
+                                "user_quote_token_account",
+                                "system_program","associated_token_program",
+                                "base_token_program","quote_token_program",
+                                "event_authority","program","fee_program",
+                                "coin_creator_vault_authority"):
+                continue
+            address=meta["address"]
+            if address not in fixture["accounts"]:
+                raise ValueError("PumpSwap source account not authenticated: "+meta["name"])
+        proof["account_addresses"]=addresses
+        proof["account_addresses_authenticated"]=True
     graph=[{"venue":first,"pool":legs[0][1],
             "input_mint":mints[0],"output_mint":mints[1]},
            {"venue":second,"pool":legs[1][1],

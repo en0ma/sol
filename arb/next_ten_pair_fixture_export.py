@@ -83,7 +83,32 @@ def venue_accounts(rpc, venue, pool, mints):
         from arb.pumpswap_global_config import ADDRESS as CONFIG
         from arb.pumpswap_fee_account import authenticated_address
         state=decode_pump(raw)
-        extras += [state["base_vault"],state["quote_vault"],CONFIG,authenticated_address()[0]]
+        # Fetch authenticated pool + fee configuration and derive stable
+        # protocol/creator destinations with the existing PumpSwap resolver.
+        from arb.pumpswap_pool import verify as verify_pump
+        from arb.pumpswap_account_resolver import resolve
+        from solders.keypair import Keypair
+        verified=verify_pump(rpc,pool,state)
+        recipient=verified["global_config"]["protocol_fee_recipients"][0]
+        # Ephemeral user keys are substituted at offline signing time.
+        placeholder=str(Keypair().pubkey())
+        derived=resolve(verified,placeholder,placeholder,placeholder,recipient)
+        extras += [state["base_vault"],state["quote_vault"],CONFIG,
+                   authenticated_address()[0]]
+        # Many fee/creator/volume accounts are optional during execution.
+        # Capture existent source accounts, never fabricate source data.
+        optional_keys=("protocol_fee_recipient_token_account",
+                       "coin_creator_vault_ata","global_volume_accumulator")
+        optional={}
+        for key in optional_keys:
+            address=derived[key]
+            info=call(rpc,"getAccountInfo",[address,{"encoding":"base64"}])["value"]
+            if info is not None:
+                extras.append(address)
+                optional[key]=address
+        evidence={"verified_pool":verified,
+                  "protocol_fee_recipient":recipient,
+                  "derived_source_accounts":optional}
     else:
         raise ValueError("unsupported fixture venue")
     return list(dict.fromkeys(extras)),evidence

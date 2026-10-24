@@ -40,6 +40,10 @@ class SignedNextTenTests(unittest.TestCase):
             build_leg("meteora_dlmm","pool",{
                 "token_x_mint":"x","token_y_mint":"y",
             },{"bin_arrays":["present"]},"owner","a","b","x","y",100,1)
+    def test_pumpswap_fixture_missing_source_accounts_fails_closed(self):
+        from arb.pumpswap_account_metas import account_metas
+        self.assertIn("protocol_fee_recipient_token_account",
+                      [x for x in __import__("arb.pumpswap_account_metas",fromlist=["SELL"]).SELL])
     def test_positive_amounts_required_before_writes(self):
         with patch("arb.next_ten_signed_atomic_offline.call") as rpc:
             with self.assertRaises(ValueError):
