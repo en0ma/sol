@@ -254,8 +254,8 @@ def _top_level_venue_events(logs):
     import re
     if not isinstance(logs,list):
         return []
-    pattern=re.compile(r"^Program (\\S+) invoke \\[(\\d+)\\]$")
-    success=re.compile(r"^Program (\\S+) (success|failed:.*)$")
+    pattern=re.compile(r"^Program (\S+) invoke \[(\d+)\]$")
+    success=re.compile(r"^Program (\S+) (success|failed:.*)$")
     stack=[]
     events=[]
     for line in logs:
