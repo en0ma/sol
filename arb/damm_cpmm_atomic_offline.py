@@ -414,21 +414,47 @@ def run(rpc, fixture, *, first_input=100000000, second_input=1000, second_floor=
     negative_logs=fail.get("logs") or []
     negative_events=_top_level_venue_events(negative_logs)
     report["negative_top_level_venue_events"]=negative_events
-    rollback=(isinstance(error_instruction,list) and len(error_instruction)==2
-              and error_instruction[0]==1
-              and negative_events==[[DAMM,"invoke"],[DAMM,"success"],
-                                    [CPMM,"invoke"],[CPMM,"failed"]]
-              and isinstance(fail.get("accounts"),list)
-              and _post(rpc,keys,(mint_x,mint_y,mint_z),owner)==before)
-    if rollback:
+    # A failure at instruction 1 after DAMM succeeded is a real atomic
+    # abort, not an isolated failure of either swap. Surfpool may omit
+    # simulated post accounts on an aborted transaction; never invent them.
+    observed_persistent=_post(rpc,keys,(mint_x,mint_y,mint_z),owner)
+    failed_after_first_leg=(
+        isinstance(error_instruction,list) and len(error_instruction)==2
+        and error_instruction[0]==1
+        and error_instruction[1]=={"Custom":6005}
+        and negative_events==[[DAMM,"invoke"],[DAMM,"success"],
+                              [CPMM,"invoke"],[CPMM,"failed"]]
+        and any("ExceededSlippage" in line and "6005" in line
+                for line in negative_logs))
+    negative_accounts=fail.get("accounts")
+    negative_post=None
+    if isinstance(negative_accounts,list) and len(negative_accounts)==3:
         negative_post=[]
-        for entry,mint in zip(fail["accounts"],(mint_x,mint_y,mint_z)):
+        for entry,mint in zip(negative_accounts,(mint_x,mint_y,mint_z)):
             if not isinstance(entry,dict) or entry.get("owner")!=TOKEN_PROGRAM:
-                rollback=False
+                negative_post=None
                 break
-            token=decode_token_account(base64.b64decode(entry["data"][0],validate=True))
-            negative_post.append(token["amount_base_units"] if token["mint"]==mint and token["authority"]==owner else None)
-        rollback=rollback and negative_post==before
+            data=entry.get("data")
+            if not isinstance(data,list) or len(data)!=2 or data[1]!="base64":
+                negative_post=None
+                break
+            token=decode_token_account(base64.b64decode(data[0],validate=True))
+            if token["mint"]!=mint or token["authority"]!=owner:
+                negative_post=None
+                break
+            negative_post.append(token["amount_base_units"])
+    # Non-persistence alone is never evidence of rollback, since all
+    # simulations are non-persistent. Demand first-leg success followed by
+    # a verified failing second-leg slippage check.
+    rollback=failed_after_first_leg and observed_persistent==before and (
+        negative_post is None or negative_post==before)
+    report["negative_simulation_post_accounts_available"]=negative_post is not None
+    report["negative_simulation_post_balances_base_units"]=negative_post
+    report["negative_persistent_balances_base_units"]=observed_persistent
+    report["failed_at_second_instruction_after_successful_first"]=failed_after_first_leg
+    report["rollback_evidence_mode"]=(
+        "failed_post_state_and_persistence" if negative_post is not None
+        else "atomic_abort_instruction_1_and_persistence")
     report.update(
         **flow,
         positive_post_balances_base_units=amounts,
