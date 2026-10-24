@@ -66,7 +66,7 @@ def signed_packet(rpc,instructions,signer):
     tx=Transaction.new_signed_with_payer(instructions,signer.pubkey(),[signer],blockhash)
     tx.verify()
     if len(bytes(tx))>1232:
-        raise ValueError("atomic signed transaction exceeds packet limit")
+        raise ValueError(f"atomic signed transaction exceeds packet limit: {len(bytes(tx))} > 1232 bytes; requires authenticated v0 address lookup table support")
     return tx
 
 def simulation_decision(*,simulation_verified,rollback_verified,net_profit_base_units=None,
