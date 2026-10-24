@@ -21,6 +21,7 @@ from arb.next_ten_atomic_routes import BATCH_10
 from arb.orca_swap_v2_offline_provision import token_account_bytes
 from arb.token_vaults import TOKEN_PROGRAM,decode_token_account
 from arb.pumpswap_local_simulation import local_rpc_only
+from arb.atomic_graph_coordinator import compile_route, signed_packet, simulation_decision
 
 SYSTEM="11111111111111111111111111111111"
 
@@ -92,62 +93,14 @@ def hydrate(rpc, fixture):
         for offset in range(0,len(elf),16384):
             call(rpc,"surfnet_writeProgram",[program,elf[offset:offset+16384].hex(),offset])
 
-def build_leg(venue,pool,state,evidence,owner,src,dst,
-              mint_in,mint_out,amount,floor):
-    if not (type(amount) is int and type(floor) is int and 0<amount<2**64 and 0<floor<2**64):
-        raise ValueError("invalid nonzero swap amount")
-    if venue=="meteora_damm_v2":
-        from arb.meteora_damm_v2_swap import build_swap2
-        if (mint_in,mint_out) not in (
-            (state["token_a_mint"],state["token_b_mint"]),
-            (state["token_b_mint"],state["token_a_mint"])):
-            raise ValueError("DAMM pair mismatch")
-        return build_swap2(pool,state,owner,src,dst,amount,floor,
-                           input_is_a=mint_in==state["token_a_mint"])
-    if venue=="raydium_cpmm":
-        from arb.raydium_swap import instruction
-        if (mint_in,mint_out) not in (
-            (state["token_0_mint"],state["token_1_mint"]),
-            (state["token_1_mint"],state["token_0_mint"])):
-            raise ValueError("CPMM pair mismatch")
-        return instruction(pool,state,owner,src,dst,amount,floor,
-                           input_is_token_0=mint_in==state["token_0_mint"],
-                           expected_mints=None)
-    if venue=="orca":
-        from arb.whirlpool_swap import build_swap
-        from arb.whirlpool_swap import select_tick_arrays
-        from arb.whirlpool_preflight import verify_oracle
-        a,b=state["token_mint_a"],state["token_mint_b"]
-        if (mint_in,mint_out) not in ((a,b),(b,a)):
-            raise ValueError("Orca pair mismatch")
-        oracle=evidence["oracle"]
-        arrays=select_tick_arrays(pool,state["tick_current_index"],
-                                  state["tick_spacing"],mint_in==a)
-        if not set(arrays).issubset(set(evidence["tick_arrays"])):
-            raise ValueError("unauthenticated Orca tick array")
-        # Orca accounts are always A/B order, regardless of input direction.
-        user_a,user_b=(src,dst) if mint_in==a else (dst,src)
-        return build_swap(pool,state,owner,user_a,user_b,oracle,amount,floor,
-                          a_to_b=mint_in==a,amount_specified_is_input=True,
-                          oracle_writable=state["tick_spacing"]!=state["fee_tier_index_seed"])
-    if venue=="meteora_dlmm":
-        from arb.meteora_dlmm_swap import build_swap
-        x,y=state["token_x_mint"],state["token_y_mint"]
-        if (mint_in,mint_out) not in ((x,y),(y,x)):
-            raise ValueError("DLMM pair mismatch")
-        bins=evidence.get("bin_arrays")
-        if not bins or not isinstance(bins,list):
-            raise ValueError("authenticated DLMM bins unavailable")
-        enriched=dict(state,input_mint=mint_in,output_mint=mint_out)
-        return build_swap(pool,enriched,owner,src,dst,state["oracle"],bins,
-                          amount,floor,input_is_x=mint_in==x,
-                          bitmap_extension=state.get("bitmap_extension"))
-    if venue=="pumpswap":
-        # PumpSwap buy_v2 is exact OUTPUT, while sell_v2 is exact INPUT.
-        # Refuse to use exact-output buy as an exact-input hop without a
-        # separately authenticated upper-bound quote and fee PDAs.
-        raise ValueError("PumpSwap v2 exact-output / fee-account adapter not yet safe for atomic routing")
-    raise ValueError("unsupported execution venue")
+
+def build_graph_leg(edge,states,evidence,owner,source_account,target_account,
+                    amount,floor):
+    from arb.venue_swap_adapter import build_leg
+    key=(edge["venue"],edge["pool"])
+    return build_leg(edge["venue"],edge["pool"],states[key],evidence[key],
+                     owner,source_account,target_account,
+                     edge["input_mint"],edge["output_mint"],amount,floor)
 
 def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000):
     local_rpc_only(rpc)
@@ -179,12 +132,22 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000):
     if before!=[amount_in,0,0]:
         raise ValueError("ephemeral funding mismatch")
     evidence=fixture["leg_evidence"]
-    ix1=build_leg(first,legs[0][1],states[0],evidence[first],owner,
-                  keys[0],keys[1],mints[0],mints[1],amount_in,amount_intermediate)
-    ix2=build_leg(second,legs[1][1],states[1],evidence[second],owner,
-                  keys[1],keys[2],mints[1],mints[2],amount_intermediate,1)
-    bh=Hash.from_string(call(rpc,"getLatestBlockhash")["value"]["blockhash"])
-    tx=Transaction.new_signed_with_payer([ix1,ix2],signer.pubkey(),[signer],bh)
+    graph=[{"venue":first,"pool":legs[0][1],
+            "input_mint":mints[0],"output_mint":mints[1]},
+           {"venue":second,"pool":legs[1][1],
+            "input_mint":mints[1],"output_mint":mints[2]}]
+    state_map={(first,legs[0][1]):states[0],(second,legs[1][1]):states[1]}
+    proof_map={(first,legs[0][1]):evidence[first],
+               (second,legs[1][1]):evidence[second]}
+    accounts={mint:key for mint,key in zip(mints,keys)}
+    # Token cycle repeats input mint; preserve distinct terminal SPL account
+    # even when input/output mint match by overriding graph account slots.
+    from arb.atomic_graph_coordinator import compile_route
+    ix1=build_graph_leg(graph[0],state_map,proof_map,owner,keys[0],keys[1],
+                        amount_in,amount_intermediate)
+    ix2=build_graph_leg(graph[1],state_map,proof_map,owner,keys[1],keys[2],
+                        amount_intermediate,1)
+    tx=signed_packet(rpc,[ix1,ix2],signer)
     tx.verify()
     # Solana signed two-instruction preflight checks account continuity.
     from arb.signed_atomic_instruction_preflight import inspect_signed_legacy_order
@@ -239,8 +202,8 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000):
                   initial_balances_base_units=before)
     if _post(rpc,keys,mints,owner)!=before:
         raise ValueError("simulation mutated persistent source balances")
-    ix2_bad=build_leg(second,legs[1][1],states[1],evidence[second],owner,
-                      keys[1],keys[2],mints[1],mints[2],amount_intermediate,2**64-1)
+    ix2_bad=build_graph_leg(graph[1],state_map,proof_map,owner,
+                            keys[1],keys[2],amount_intermediate,2**64-1)
     bad=Transaction.new_signed_with_payer([ix1,ix2_bad],signer.pubkey(),[signer],bh)
     failed,_=_simulate(rpc,bad,keys)
     error=failed.get("err")
