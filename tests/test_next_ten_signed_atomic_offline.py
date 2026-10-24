@@ -1,9 +1,25 @@
 import unittest
 from unittest.mock import patch
-from arb.next_ten_signed_atomic_offline import run,hydrate
+from arb.next_ten_signed_atomic_offline import run,hydrate,top_level_events
 from arb.venue_swap_adapter import build_leg
 
 class SignedNextTenTests(unittest.TestCase):
+    def test_real_surfpool_nested_program_log_parser(self):
+        a="VENUE_A"
+        b="VENUE_B"
+        logs=[
+            "Program VENUE_A invoke [1]",
+            "Program TOKEN_PROGRAM invoke [2]",
+            "Program TOKEN_PROGRAM success",
+            "Program VENUE_A success",
+            "Program VENUE_B invoke [1]",
+            "Program VENUE_B success",
+        ]
+        self.assertEqual(top_level_events(logs,{a,b}),
+                         [[a,"invoke"],[a,"success"],[b,"invoke"],[b,"success"]])
+        logs[-1]="Program VENUE_B failed: custom program error: 0x1"
+        self.assertEqual(top_level_events(logs,{a,b})[-1],[b,"failed"])
+        self.assertEqual(top_level_events(logs[:-1],{a,b}),[])
     def test_mainnet_endpoint_rejected_without_mutation(self):
         with patch("arb.next_ten_signed_atomic_offline.call") as rpc:
             with self.assertRaises(ValueError):
