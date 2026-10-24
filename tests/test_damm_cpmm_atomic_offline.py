@@ -42,8 +42,7 @@ class AtomicIntegrationSafety(unittest.TestCase):
         tx=Transaction.new_signed_with_payer(
             [Instruction(Pubkey.from_string(token),b"",[])],
             k.pubkey(),[k],Hash.default())
-        with self.assertRaises(ValueError):
-            _cpi_intermediate_flow(tx,{"innerInstructions":[]},account,1000)
+        self.assertIsNone(_cpi_intermediate_flow(tx,{"innerInstructions":[]},account,1000))
 
     def test_nested_damm_reentry_does_not_false_fail_atomic_order(self):
         from arb.damm_cpmm_atomic_offline import DAMM, CPMM
@@ -92,7 +91,7 @@ class AtomicIntegrationSafety(unittest.TestCase):
             return "1"*(len(raw)-len(raw.lstrip(bytes([0]))))+(chars or "")
         data=bytes([12])+(1000).to_bytes(8,"little")+bytes([6])
         event={"programIdIndex":0,"accounts":[1,2,3,4],"data":b58(data)}
-        self.assertEqual(_inner_token_transfer(event,keys,0),(1,3,1000))
+        self.assertEqual(_inner_token_transfer(event,keys,0),(str(keys[1]),str(keys[3]),1000))
 
     def test_parsed_transfer_checked_uses_base_units(self):
         from arb.token_vaults import TOKEN_PROGRAM

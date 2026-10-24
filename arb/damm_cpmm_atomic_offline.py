@@ -237,7 +237,8 @@ def _cpi_intermediate_flow(tx,response,intermediate,second_amount):
     keys=tx.message.account_keys
     if Pubkey.from_string(intermediate) not in keys:
         return None
-    token_index=keys.index(Pubkey.from_string(TOKEN_PROGRAM))
+    token_key=Pubkey.from_string(TOKEN_PROGRAM)
+    token_index=keys.index(token_key) if token_key in keys else None
     rows=response.get("innerInstructions")
     if not isinstance(rows,list) or type(second_amount) is not int or second_amount<=0:
         return None
