@@ -14,6 +14,26 @@ permissions:
   actions: read
 
 jobs:
+  ci-runtime-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit prior CI job durations and obsolete diagnostic candidates without RPC
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_RUNTIME_AUDIT_OUTPUT: ${{ runner.temp }}/ci-runtime-audit.json
+        run: python3 -m arb.ci_job_runtime_audit
+      - name: Publish retrospective CI performance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-runtime-audit
+          path: ${{ runner.temp }}/ci-runtime-audit.json
+          if-no-files-found: warn
   pairwise-capability-audit:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -61,6 +81,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_atomic_source_blocker_report.py -v
       - name: Test authenticated CLMM tick array direction binding in signed runner
         run: python3 -m unittest discover -s tests -p test_clmm_atomic_direction_evidence.py -v
+      - name: Test retrospective CI job audit without upstream RPC
+        run: python3 -m unittest discover -s tests -p test_ci_job_runtime_audit.py -v
       - name: Test missing Raydium venue builders and mandatory account authentication
         run: python3 -m unittest discover -s tests -p test_remaining_venue_adapters.py -v
       - name: Test complete 42-pair inventory and incremental read-only state graph
