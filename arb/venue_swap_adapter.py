@@ -51,7 +51,14 @@ def build_leg(venue,pool,state,evidence,owner,src,dst,
         bins=evidence.get("bin_arrays")
         if not bins or not isinstance(bins,list):
             raise ValueError("authenticated DLMM bins unavailable")
-        enriched=dict(state,input_mint=mint_in,output_mint=mint_out)
+        index=evidence.get("active_bin_array_index")
+        if type(index) is not int:
+            raise ValueError("authenticated DLMM active bin index required")
+        from arb.meteora_dlmm_bin_preflight import bin_array_pda
+        if bin_array_pda(pool,index) not in bins:
+            raise ValueError("authenticated active DLMM bin array missing")
+        enriched=dict(state,input_mint=mint_in,output_mint=mint_out,
+                      active_bin_array_index=index)
         return build_swap(pool,enriched,owner,src,dst,state["oracle"],bins,
                           amount,floor,input_is_x=mint_in==x,
                           bitmap_extension=state.get("bitmap_extension"))

@@ -56,8 +56,10 @@ def venue_accounts(rpc, venue, pool, mints):
         for forward in (True,False):
             arrays.update(select_tick_arrays(pool,state["tick_current_index"],state["tick_spacing"],forward))
         extras += [state["token_vault_a"],state["token_vault_b"],*sorted(arrays)]
-        maybe=_fetch(rpc,[oracle])
-        if maybe[oracle] is not None:
+        # Non-adaptive Whirlpool oracles may not exist on chain.
+        # getAccountInfo permits a null optional oracle; strict _fetch does not.
+        optional=call(rpc,"getAccountInfo",[oracle,{"encoding":"base64"}])["value"]
+        if optional is not None:
             extras.append(oracle)
         evidence={"oracle":oracle,"tick_arrays":sorted(arrays)}
     elif venue=="meteora_damm_v2":
@@ -75,7 +77,8 @@ def venue_accounts(rpc, venue, pool, mints):
         bins=[v["pda"] for v in preflight["neighboring_bin_arrays"]
               if v.get("authenticated")]
         extras += [state["reserve_x"],state["reserve_y"],state["oracle"],*bins]
-        evidence={"bin_preflight":preflight,"bin_arrays":bins}
+        evidence={"bin_preflight":preflight,"bin_arrays":bins,
+                  "active_bin_array_index":preflight["active_bin_array_index"]}
     elif venue=="pumpswap":
         from arb.pumpswap_global_config import ADDRESS as CONFIG
         from arb.pumpswap_fee_account import authenticated_address

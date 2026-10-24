@@ -19,6 +19,11 @@ class SignedNextTenTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             build_leg("pumpswap","pool",{"base_mint":"x","quote_mint":"y"},{},"owner","a","b",
                       "x","y",100,1)
+    def test_dlmm_active_index_must_be_authenticated(self):
+        with self.assertRaisesRegex(ValueError,"active bin index required"):
+            build_leg("meteora_dlmm","pool",{
+                "token_x_mint":"x","token_y_mint":"y",
+            },{"bin_arrays":["present"]},"owner","a","b","x","y",100,1)
     def test_positive_amounts_required_before_writes(self):
         with patch("arb.next_ten_signed_atomic_offline.call") as rpc:
             with self.assertRaises(ValueError):
