@@ -15,17 +15,25 @@ from arb.raydium_cpmm import PROGRAM as CPMM, decode as cpmm_decode, verify_vaul
 from arb.meteora_damm_v2 import PROGRAM as DAMM, decode as damm_decode, verify as damm_verify
 from arb.meteora_dlmm import PROGRAM as DLMM, decode as dlmm_decode, verify as dlmm_verify
 from arb.pumpswap_pool import PROGRAM as PUMP, decode as pump_decode, verify as pump_verify
+from arb.raydium_clmm import PROGRAM as CLMM, decode as clmm_decode, verify as clmm_verify
+from arb.raydium_amm_v4 import decode as amm4_decode
+from arb.venue_watchlist import RECOGNIZED_UNSUPPORTED
 
 PROGRAMS={"orca":ORCA,"raydium_cpmm":CPMM,"meteora_damm_v2":DAMM,
-          "meteora_dlmm":DLMM,"pumpswap":PUMP}
+          "meteora_dlmm":DLMM,"pumpswap":PUMP,
+          "raydium_clmm":CLMM,
+          "raydium_amm_v4":next(k for k,v in RECOGNIZED_UNSUPPORTED.items() if v=="raydium_amm_v4")}
 DECODERS={"orca":orca_decode,"raydium_cpmm":cpmm_decode,
           "meteora_damm_v2":damm_decode,"meteora_dlmm":dlmm_decode,
-          "pumpswap":pump_decode}
+          "pumpswap":pump_decode,"raydium_clmm":clmm_decode,
+          "raydium_amm_v4":amm4_decode}
 MINT_KEYS={"orca":("token_mint_a","token_mint_b"),
            "raydium_cpmm":("token_0_mint","token_1_mint"),
            "meteora_damm_v2":("token_a_mint","token_b_mint"),
            "meteora_dlmm":("token_x_mint","token_y_mint"),
-           "pumpswap":("base_mint","quote_mint")}
+           "pumpswap":("base_mint","quote_mint"),
+           "raydium_clmm":("token_mint_0","token_mint_1"),
+           "raydium_amm_v4":("base_mint","quote_mint")}
 SAFETY={"actionable":False,"live_execution_approved":False,"broadcast":False}
 
 def snapshot(rpc, pool, venue):
@@ -48,6 +56,10 @@ def snapshot(rpc, pool, venue):
         evidence=dlmm_verify(rpc,pool,state)
     elif venue=="pumpswap":
         evidence=pump_verify(rpc,pool,state)
+    elif venue=="raydium_clmm":
+        evidence=clmm_verify(rpc,pool,state)
+    elif venue=="raydium_amm_v4":
+        raise ValueError("AMM v4 OpenBook market and vault snapshot authentication required")
     else:
         # Orca vaults must be authenticated, not just decode a state hint.
         from arb.token_vaults import TOKEN_PROGRAM, decode_token_account

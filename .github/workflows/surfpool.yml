@@ -45,6 +45,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_damm_v2_execution_evidence_audit.py -v
       - name: Test DAMM to CPMM atomic fork integration safety
         run: python3 -m unittest discover -s tests -p test_damm_cpmm_atomic_offline.py -v
+      - name: Test missing Raydium venue builders and mandatory account authentication
+        run: python3 -m unittest discover -s tests -p test_remaining_venue_adapters.py -v
       - name: Test complete 42-pair inventory and incremental read-only state graph
         run: python3 -m unittest discover -s tests -p test_forty_two_live_registry.py -v
       - name: Test following ten authenticated signed atomic integrations

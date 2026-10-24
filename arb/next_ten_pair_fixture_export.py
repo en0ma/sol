@@ -79,6 +79,23 @@ def venue_accounts(rpc, venue, pool, mints):
         extras += [state["reserve_x"],state["reserve_y"],state["oracle"],*bins]
         evidence={"bin_preflight":preflight,"bin_arrays":bins,
                   "active_bin_array_index":preflight["active_bin_array_index"]}
+    elif venue=="raydium_clmm":
+        from arb.raydium_clmm_ticks import inspect
+        state=__import__("arb.raydium_clmm",fromlist=["decode"]).decode(raw)
+        extras += [state["token_vault_0"],state["token_vault_1"],
+                   state["amm_config"],state["observation_key"]]
+        directions={}
+        for zero_for_one in (True,False):
+            result=inspect(rpc,pool,zero_for_one=zero_for_one)
+            if result["all_arrays_valid"]:
+                directions["0_to_1" if zero_for_one else "1_to_0"]=[
+                    item["address"] for item in result["tick_arrays"]]
+                extras.extend(directions["0_to_1" if zero_for_one else "1_to_0"])
+        if not directions:
+            raise ValueError("no authenticated CLMM tick array direction")
+        evidence={"tick_arrays_by_direction":directions}
+    elif venue=="raydium_amm_v4":
+        raise ValueError("OpenBook market account resolver not authenticated")
     elif venue=="pumpswap":
         from arb.pumpswap_global_config import ADDRESS as CONFIG
         from arb.pumpswap_fee_account import authenticated_address

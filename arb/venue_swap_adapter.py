@@ -62,6 +62,29 @@ def build_leg(venue,pool,state,evidence,owner,src,dst,
         return build_swap(pool,enriched,owner,src,dst,state["oracle"],bins,
                           amount,floor,input_is_x=mint_in==x,
                           bitmap_extension=state.get("bitmap_extension"))
+    if venue=="raydium_clmm":
+        from arb.raydium_clmm_swap import build
+        a,b=state["token_mint_0"],state["token_mint_1"]
+        if (mint_in,mint_out) not in ((a,b),(b,a)):
+            raise ValueError("CLMM mint direction mismatch")
+        arrays=evidence.get("tick_arrays")
+        if evidence.get("tick_arrays_authenticated") is not True or not isinstance(arrays,list) or not arrays:
+            raise ValueError("authenticated CLMM tick arrays unavailable")
+        return build(pool,state,owner,src,dst,amount,floor,arrays,
+                     input_is_token_0=mint_in==a,is_base_input=True)
+    if venue=="raydium_amm_v4":
+        from arb.raydium_amm_v4_swap import build_swap
+        a,b=state["base_mint"],state["quote_mint"]
+        if (mint_in,mint_out) not in ((a,b),(b,a)):
+            raise ValueError("AMM v4 mint direction mismatch")
+        expected=("amm_authority","market_bids","market_asks",
+                  "market_event_queue","market_base_vault",
+                  "market_quote_vault","market_vault_signer")
+        if evidence.get("market_accounts_authenticated") is not True or any(
+                not isinstance(evidence.get(k),str) or not evidence[k] for k in expected):
+            raise ValueError("authenticated AMM v4 OpenBook accounts unavailable")
+        return build_swap(pool,state,*(evidence[k] for k in expected),
+                          src,dst,owner,amount,floor,input_is_base=mint_in==a)
     if venue=="pumpswap":
         # Reuse the existing PumpSwap *exact-input* buy_exact_quote_in /
         # sell transaction builder. Its internally different wire formats
