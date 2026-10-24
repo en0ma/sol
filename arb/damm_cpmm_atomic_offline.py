@@ -243,6 +243,45 @@ def _cpi_intermediate_flow(tx,response,intermediate,second_amount):
     return {"first_leg_intermediate_received_base_units":received,
             "second_leg_intermediate_consumed_base_units":consumed}
 
+
+def _top_level_venue_events(logs):
+    """Ignore real recursive DAMM CPI invocations at stack depth >= 2.
+
+    Surfpool's signed Swap2 trace includes a nested DAMM invocation at [2],
+    despite exactly one top-level DAMM instruction. Only [1] and matching
+    top-level successes can prove the two outer instructions' order.
+    """
+    import re
+    if not isinstance(logs,list):
+        return []
+    pattern=re.compile(r"^Program (\\S+) invoke \\[(\\d+)\\]$")
+    success=re.compile(r"^Program (\\S+) (success|failed:.*)$")
+    stack=[]
+    events=[]
+    for line in logs:
+        if not isinstance(line,str):
+            return []
+        start=pattern.fullmatch(line)
+        if start:
+            program,depth=start.group(1),int(start.group(2))
+            if depth!=len(stack)+1:
+                return []
+            stack.append(program)
+            if depth==1 and program in (DAMM,CPMM):
+                events.append([program,"invoke"])
+            continue
+        finish=success.fullmatch(line)
+        if finish:
+            program=finish.group(1)
+            if not stack or stack[-1]!=program:
+                return []
+            depth=len(stack)
+            stack.pop()
+            if depth==1 and program in (DAMM,CPMM):
+                events.append([program,"success" if finish.group(2)=="success" else "failed"])
+    return events if not stack else []
+
+
 def run(rpc, fixture, *, first_input=100000000, second_input=1000, second_floor=1):
     local_rpc_only(rpc)
     if os.environ.get("SURFPOOL_EXPLICITLY_OFFLINE")!="1":
@@ -314,19 +353,15 @@ def run(rpc, fixture, *, first_input=100000000, second_input=1000, second_floor=
         report["status"]="POSITIVE_ATOMIC_SIMULATION_FAILED"
         return report
     logs=positive.get("logs") or []
-    events=[]
-    for line in logs:
-        for program in (DAMM,CPMM):
-            if line.startswith("Program "+program+" invoke ["):
-                events.append((program,"invoke"))
-            elif line=="Program "+program+" success":
-                events.append((program,"success"))
-    if events!=[(DAMM,"invoke"),(DAMM,"success"),(CPMM,"invoke"),(CPMM,"success")]:
+    events=_top_level_venue_events(logs)
+    report["top_level_venue_events"]=events
+    if events!=[[DAMM,"invoke"],[DAMM,"success"],[CPMM,"invoke"],[CPMM,"success"]]:
         report["status"]="ATOMIC_INVOCATION_ORDER_NOT_PROVEN"
         return report
     flow=_cpi_intermediate_flow(tx,positive,keys[1],second_input)
     if flow is None:
         report["status"]="INTERMEDIATE_CPI_FLOW_NOT_PROVEN"
+        report["positive_inner_instruction_groups"]=positive.get("innerInstructions")
         return report
     post=positive.get("accounts")
     if not isinstance(post,list) or len(post)!=3:
@@ -359,10 +394,12 @@ def run(rpc, fixture, *, first_input=100000000, second_input=1000, second_floor=
     error_instruction=(err.get("InstructionError")
                        if isinstance(err,dict) else None)
     negative_logs=fail.get("logs") or []
+    negative_events=_top_level_venue_events(negative_logs)
+    report["negative_top_level_venue_events"]=negative_events
     rollback=(isinstance(error_instruction,list) and len(error_instruction)==2
               and error_instruction[0]==1
-              and any(l=="Program "+DAMM+" success" for l in negative_logs)
-              and any(l.startswith("Program "+CPMM+" invoke [") for l in negative_logs)
+              and negative_events==[[DAMM,"invoke"],[DAMM,"success"],
+                                    [CPMM,"invoke"],[CPMM,"failed"]]
               and isinstance(fail.get("accounts"),list)
               and _post(rpc,keys,(mint_x,mint_y,mint_z),owner)==before)
     if rollback:
