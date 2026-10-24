@@ -94,6 +94,55 @@ class AtomicIntegrationSafety(unittest.TestCase):
         event={"programIdIndex":0,"accounts":[1,2,3,4],"data":b58(data)}
         self.assertEqual(_inner_token_transfer(event,keys,0),(1,3,1000))
 
+    def test_parsed_transfer_checked_uses_base_units(self):
+        from arb.token_vaults import TOKEN_PROGRAM
+        entry={"programId":TOKEN_PROGRAM,"parsed":{"type":"transferChecked",
+            "info":{"source":"source","destination":"intermediate",
+                    "tokenAmount":{"amount":"10211913","decimals":6,
+                                   "uiAmountString":"10.211913"}}}}
+        self.assertEqual(_inner_token_transfer(entry,[],0),
+                         ("source","intermediate",10211913))
+
+    def test_parsed_transfer_checked_rejects_ui_amount(self):
+        from arb.token_vaults import TOKEN_PROGRAM
+        entry={"programId":TOKEN_PROGRAM,"parsed":{"type":"transferChecked",
+            "info":{"source":"source","destination":"intermediate",
+                    "tokenAmount":{"uiAmountString":"10.211913"}}}}
+        self.assertIsNone(_inner_token_transfer(entry,[],0))
+
+    def test_parsed_transfer_checked_rejects_foreign_program(self):
+        entry={"programId":"untrusted","parsed":{"type":"transferChecked",
+            "info":{"source":"source","destination":"intermediate",
+                    "tokenAmount":{"amount":"1000"}}}}
+        self.assertIsNone(_inner_token_transfer(entry,[],0))
+
+    def test_real_surfpool_parsed_inner_cpi_flow_reconciles(self):
+        from solders.keypair import Keypair
+        from solders.hash import Hash
+        from solders.instruction import Instruction,AccountMeta
+        from solders.pubkey import Pubkey
+        from solders.transaction import Transaction
+        from arb.damm_cpmm_atomic_offline import DAMM, CPMM
+        from arb.token_vaults import TOKEN_PROGRAM
+        signer=Keypair()
+        intermediate=str(Keypair().pubkey())
+        def ix(program):
+            return Instruction(Pubkey.from_string(program),b"",
+                               [AccountMeta(Pubkey.from_string(intermediate),False,True)])
+        tx=Transaction.new_signed_with_payer(
+            [ix(DAMM),ix(CPMM)],signer.pubkey(),[signer],Hash.default())
+        def transfer(source,destination,amount):
+            return {"programId":TOKEN_PROGRAM,
+                    "parsed":{"type":"transferChecked",
+                              "info":{"source":source,"destination":destination,
+                                      "tokenAmount":{"amount":str(amount)}}}}
+        result={"innerInstructions":[
+            {"index":0,"instructions":[transfer("vault",intermediate,10211913)]},
+            {"index":1,"instructions":[transfer(intermediate,"vault2",1000)]}]}
+        self.assertEqual(_cpi_intermediate_flow(tx,result,intermediate,1000),
+                         {"first_leg_intermediate_received_base_units":10211913,
+                          "second_leg_intermediate_consumed_base_units":1000})
+
     def test_invalid_base58_data_rejected(self):
         with self.assertRaises(ValueError):
             _decode_base58("0-invalid")

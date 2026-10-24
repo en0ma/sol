@@ -185,14 +185,34 @@ def _decode_base58(encoded):
 
 
 def _inner_token_transfer(entry, keys, token_program_index):
-    """Decode real SPL Transfer (3) or TransferChecked (12) account roles."""
+    """Return (source, destination, base-unit amount) for parsed or compiled SPL CPIs."""
     if not isinstance(entry,dict):
         return None
-    program_index=entry.get("programIdIndex")
-    accounts=entry.get("accounts")
-    if type(program_index) is not int or program_index!=token_program_index:
+    parsed=entry.get("parsed")
+    if isinstance(parsed,dict):
+        if entry.get("programId")!=TOKEN_PROGRAM:
+            return None
+        if parsed.get("type") not in ("transfer","transferChecked"):
+            return None
+        info=parsed.get("info")
+        if not isinstance(info,dict):
+            return None
+        source,destination=info.get("source"),info.get("destination")
+        amount=info.get("amount")
+        if parsed.get("type")=="transferChecked":
+            token_amount=info.get("tokenAmount")
+            if isinstance(token_amount,dict):
+                amount=token_amount.get("amount")
+        if not isinstance(source,str) or not isinstance(destination,str):
+            return None
+        if not isinstance(amount,str) or not amount.isdecimal():
+            return None
+        quantity=int(amount)
+        return (source,destination,quantity) if 0<quantity<2**64 else None
+    if entry.get("programIdIndex")!=token_program_index:
         return None
-    if not isinstance(accounts,list) or any(type(x)is not int for x in accounts):
+    accounts=entry.get("accounts")
+    if not isinstance(accounts,list) or any(type(i)is not int or i<0 or i>=len(keys) for i in accounts):
         return None
     encoded=entry.get("data")
     if not isinstance(encoded,str):
@@ -201,25 +221,22 @@ def _inner_token_transfer(entry, keys, token_program_index):
         data=_decode_base58(encoded)
     except ValueError:
         return None
-    if not data:
-        return None
-    if data[0]==3 and len(data)==9 and len(accounts)>=3:
+    if len(data)==9 and data[0]==3 and len(accounts)>=3:
         source,destination=accounts[0],accounts[1]
-    elif data[0]==12 and len(data)==10 and len(accounts)>=4:
+    elif len(data)==10 and data[0]==12 and len(accounts)>=4:
         source,destination=accounts[0],accounts[2]
     else:
         return None
-    if source>=len(keys) or destination>=len(keys):
-        return None
     amount=int.from_bytes(data[1:9],"little")
-    return (source,destination,amount) if amount>0 else None
+    return (str(keys[source]),str(keys[destination]),amount) if amount>0 else None
 
 
 def _cpi_intermediate_flow(tx,response,intermediate,second_amount):
-    """Return independently observed positive first-in and second-out SPL CPIs."""
+    """Confirm intermediate is actually credited by first leg and debited by second."""
     from solders.pubkey import Pubkey
     keys=tx.message.account_keys
-    intermediate_index=keys.index(Pubkey.from_string(intermediate))
+    if Pubkey.from_string(intermediate) not in keys:
+        return None
     token_index=keys.index(Pubkey.from_string(TOKEN_PROGRAM))
     rows=response.get("innerInstructions")
     if not isinstance(rows,list) or type(second_amount) is not int or second_amount<=0:
@@ -234,9 +251,9 @@ def _cpi_intermediate_flow(tx,response,intermediate,second_amount):
             if transfer is None:
                 continue
             source,destination,amount=transfer
-            if outer==0 and destination==intermediate_index:
+            if outer==0 and destination==intermediate:
                 received+=amount
-            if outer==1 and source==intermediate_index:
+            if outer==1 and source==intermediate:
                 consumed+=amount
     if received<second_amount or consumed!=second_amount:
         return None
