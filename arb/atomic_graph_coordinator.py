@@ -69,6 +69,39 @@ def signed_packet(rpc,instructions,signer):
         raise ValueError(f"atomic signed transaction exceeds packet limit: {len(bytes(tx))} > 1232 bytes; requires authenticated v0 address lookup table support")
     return tx
 
+def sign_atomic_offline(rpc,instructions,signer,*,programs,intermediate,lookup=None,recent_blockhash=None):
+    """Sign and independently preflight any two-leg graph, legacy first, v0 if oversized.
+
+    No DEX-name special cases. Offline ALT provisioning is only permitted when
+    an oversized legacy packet needs compression; negative controls reuse
+    the same lookup table rather than creating a different transaction context.
+    """
+    from solders.hash import Hash
+    from solders.transaction import Transaction
+    from arb.rpc import call
+    from arb.signed_atomic_instruction_preflight import inspect_signed_legacy_order
+    from arb.atomic_v0_lookup import sign_v0_offline,verify_v0_order,sign_v0_with_lookup
+    local_rpc_only(rpc)
+    if len(instructions)!=2 or len(programs)!=2 or programs[0]==programs[1]:
+        raise ValueError("expected exactly two distinct ordered swap venues")
+    blockhash=recent_blockhash or Hash.from_string(call(
+        rpc,"getLatestBlockhash")["value"]["blockhash"])
+    if lookup is not None:
+        tx=sign_v0_with_lookup(instructions,signer,blockhash,lookup)
+        check=verify_v0_order(tx,lookup,programs[0],programs[1],intermediate)
+        return tx,lookup,check
+    legacy=Transaction.new_signed_with_payer(
+        instructions,signer.pubkey(),[signer],blockhash)
+    legacy.verify()
+    if len(bytes(legacy))<=1232:
+        check=inspect_signed_legacy_order(
+            bytes(legacy),programs[0],programs[1],
+            intermediate_account=intermediate)
+        return legacy,None,check
+    tx,lookup=sign_v0_offline(rpc,instructions,signer,blockhash)
+    check=verify_v0_order(tx,lookup,programs[0],programs[1],intermediate)
+    return tx,lookup,check
+
 def simulation_decision(*,simulation_verified,rollback_verified,net_profit_base_units=None,
                         live_execution_approved=False):
     # Execution is unavailable during this integration phase, irrespective of

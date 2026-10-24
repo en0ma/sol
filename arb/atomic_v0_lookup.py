@@ -58,6 +58,17 @@ def sign_v0_offline(rpc,instructions,signer,recent_blockhash):
         raise ValueError(f"v0 signed packet still too large: {len(bytes(tx))} > 1232 bytes")
     return tx,lookup
 
+def sign_v0_with_lookup(instructions,signer,recent_blockhash,lookup):
+    """Reuse the positive transaction's offline ALT for the rollback control."""
+    from solders.message import MessageV0
+    from solders.transaction import VersionedTransaction
+    msg=MessageV0.try_compile(signer.pubkey(),instructions,[lookup],recent_blockhash)
+    tx=VersionedTransaction(msg,[signer])
+    tx.verify_and_hash_message()
+    if len(bytes(tx))>1232:
+        raise ValueError("negative v0 signed packet exceeds 1232-byte limit")
+    return tx
+
 def resolved_v0_keys(msg,lookup):
     if len(msg.address_table_lookups)!=1:
         raise ValueError("expected exactly one isolated lookup table")
