@@ -47,6 +47,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_damm_cpmm_atomic_offline.py -v
       - name: Test reverse CPMM to DAMM signed atomic runner safety
         run: python3 -m unittest discover -s tests -p test_cpmm_damm_reverse_atomic.py -v
+      - name: Test independent reverse atomic evidence acceptance safety
+        run: python3 -m unittest discover -s tests -p test_cpmm_damm_reverse_evidence_audit.py -v
       - name: Test independent DAMM to CPMM signed evidence acceptance
         run: python3 -m unittest discover -s tests -p test_damm_cpmm_atomic_evidence_audit.py -v
       - name: Test current-run 42 ordered-pair evidence reconciliation
@@ -1388,6 +1390,18 @@ jobs:
           name: cpmm-damm-signed-atomic-reverse
           path: ${{ runner.temp }}/cpmm-damm-reverse-evidence.json
           if-no-files-found: error
+      - name: Independently accept reverse signed Surfpool atomic evidence
+        run: |
+          python3 -m arb.cpmm_damm_reverse_evidence_audit \
+            --input "$RUNNER_TEMP/cpmm-damm-reverse-evidence.json" \
+            --output "$RUNNER_TEMP/cpmm-damm-reverse-acceptance.json"
+      - name: Upload independently accepted reverse atomic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpmm-damm-reverse-independent-acceptance
+          path: ${{ runner.temp }}/cpmm-damm-reverse-acceptance.json
+          if-no-files-found: error
       - name: Independently accept observed signed atomic Surfpool execution
         run: |
           python3 -m arb.damm_cpmm_atomic_evidence_audit \
@@ -1397,6 +1411,7 @@ jobs:
         run: |
           python3 -m arb.current_run_atomic_matrix \
             --input "$RUNNER_TEMP/damm-cpmm-atomic-evidence.json" \
+            --reverse-input "$RUNNER_TEMP/cpmm-damm-reverse-evidence.json" \
             --output "$RUNNER_TEMP/current-run-atomic-matrix.json"
       - name: Upload current-run ordered atomic acceptance matrix
         if: always()
