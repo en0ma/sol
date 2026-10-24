@@ -15,9 +15,9 @@ class SignedNextTenTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     hydrate("http://localhost:8899",{"source":"MOCK"})
                 rpc.assert_not_called()
-    def test_pumpswap_exact_output_buyer_is_fail_closed(self):
+    def test_pumpswap_unverified_accounts_fail_closed(self):
         with self.assertRaises(ValueError):
-            build_leg("pumpswap","pool",{},{},"owner","a","b",
+            build_leg("pumpswap","pool",{"base_mint":"x","quote_mint":"y"},{},"owner","a","b",
                       "x","y",100,1)
     def test_positive_amounts_required_before_writes(self):
         with patch("arb.next_ten_signed_atomic_offline.call") as rpc:
