@@ -1,6 +1,5 @@
 name: AMM v4 Focused Atomic CI
 on:
-  pull_request:
   workflow_dispatch:
 concurrency:
   group: amm-v4-focused-${{ github.event.pull_request.head.ref || github.ref_name }}
