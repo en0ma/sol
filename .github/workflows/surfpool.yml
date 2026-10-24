@@ -363,6 +363,7 @@ jobs:
           if-no-files-found: ignore
 
   mainnet-fork-probe:
+    needs: [authenticated-source-fork]
     # Secrets are unavailable to untrusted fork PRs; verify forks on trusted branches/PRs.
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
@@ -1247,10 +1248,10 @@ jobs:
           path: ${{ runner.temp }}/fork.log
           if-no-files-found: ignore
 
-  isolated-orca-execution:
+  authenticated-source-fork:
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 35
     env:
       SOLANA_RPC_URL: http://127.0.0.1:8899
       SURFPOOL_DATASOURCE_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
@@ -1351,76 +1352,119 @@ jobs:
           if-no-files-found: warn
       - name: Export authenticated DAMM and CPMM atomic route
         run: python3 -m arb.damm_cpmm_atomic_offline export "$RUNNER_TEMP/damm-cpmm-atomic-fixture.json"
-      - name: Stop upstream-backed fork and start isolated offline Surfpool
-        if: ${{ hashFiles('arb/orca_swap_v2_isolated_offline_execution.py') != '' }}
+      - name: Publish one verified fixture bundle for offline-only workers
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-fork-offline-bundle
+          path: |
+            ${{ runner.temp }}/orca-isolated-state.json
+            ${{ runner.temp }}/damm-v2-fixture.json
+            ${{ runner.temp }}/damm-cpmm-atomic-fixture.json
+            ${{ runner.temp }}/next-ten-dual-program-fixtures/
+            ${{ runner.temp }}/following-ten-fixtures/
+            ${{ runner.temp }}/remaining-24-fixtures/
+          if-no-files-found: warn
+      - name: Stop upstream-backed source fork
+        if: always()
+        run: |
+          if test -f "$RUNNER_TEMP/fork.pid"; then kill "$(cat "$RUNNER_TEMP/fork.pid")" || true; fi
+
+  offline-atomic-route-batches:
+    needs: [authenticated-source-fork]
+    if: ${{ needs.authenticated-source-fork.result == 'success' }}
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        include:
+          - batch: first
+            fixture_dir: next-ten-dual-program-fixtures
+          - batch: next
+            fixture_dir: following-ten-fixtures
+          - batch: remaining
+            fixture_dir: remaining-24-fixtures
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    env:
+      SOLANA_RPC_URL: http://127.0.0.1:8899
+      SURFPOOL_EXPLICITLY_OFFLINE: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install offline Surfpool and signing dependencies
         run: |
           set -euo pipefail
-          kill "$(cat "$RUNNER_TEMP/fork.pid")"
-          for attempt in $(seq 1 30); do
-            if ! kill -0 "$(cat "$RUNNER_TEMP/fork.pid")" 2>/dev/null; then break; fi
-            sleep 1
-          done
-          # A pending process MUST NOT receive synthetic account writes.
-          if kill -0 "$(cat "$RUNNER_TEMP/fork.pid")" 2>/dev/null; then
-            echo "Mainnet-backed Surfpool still alive; refusing offline provisioning" >&2
-            exit 1
-          fi
-          nohup surfpool start --ci --offline > "$RUNNER_TEMP/orca-isolated-offline.log" 2>&1 < /dev/null &
+          bash ci/install_surfpool.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Download source-authenticated fixtures without upstream RPC
+        uses: actions/download-artifact@v4
+        with:
+          name: source-fork-offline-bundle
+          path: ${{ runner.temp }}
+      - name: Start isolated offline Surfpool
+        run: |
+          nohup surfpool start --ci --offline > "$RUNNER_TEMP/offline.log" 2>&1 < /dev/null &
+          python3 - <<'PY'
+          import time
+          from arb.rpc import call
+          for _ in range(60):
+              try:
+                  assert call("http://127.0.0.1:8899","getLatestBlockhash")["value"]["blockhash"]
+                  break
+              except Exception: time.sleep(2)
+          else: raise SystemExit("isolated offline Surfpool unavailable")
+          PY
+      - name: Execute authenticated signed batch with rollback verification
+        run: |
+          python3 -m arb.next_ten_signed_atomic_offline --batch "${{ matrix.batch }}" \
+            --fixture-dir "$RUNNER_TEMP/${{ matrix.fixture_dir }}" \
+            --output-dir "$RUNNER_TEMP/signed-evidence"
+      - name: Publish independently replayable signed batch receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: isolated-atomic-receipts-${{ matrix.batch }}
+          path: ${{ runner.temp }}/signed-evidence/
+          if-no-files-found: error
+
+  isolated-orca-execution:
+    needs: [authenticated-source-fork, offline-atomic-route-batches]
+    if: ${{ always() && needs.authenticated-source-fork.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    env:
+      SOLANA_RPC_URL: http://127.0.0.1:8899
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Surfpool
+        run: |
+          set -euo pipefail
+          bash ci/install_surfpool.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - name: Install transaction dependency
+        run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Retrieve authenticated read-only source fixtures
+        uses: actions/download-artifact@v4
+        with:
+          name: source-fork-offline-bundle
+          path: ${{ runner.temp }}
+      - name: Launch strictly offline Surfpool
+        run: |
+          nohup surfpool start --ci --offline > "$RUNNER_TEMP/offline.log" 2>&1 < /dev/null &
           echo $! > "$RUNNER_TEMP/orca-isolated-offline.pid"
           python3 - <<'PY'
           import time
           from arb.rpc import call
           for _ in range(60):
               try:
-                  assert call("http://127.0.0.1:8899", "getLatestBlockhash")["value"]["blockhash"]
+                  assert call("http://127.0.0.1:8899","getLatestBlockhash")["value"]["blockhash"]
                   break
               except Exception:
                   time.sleep(2)
-          else:
-              raise SystemExit("isolated Surfpool RPC did not become ready")
+          else: raise SystemExit("offline Surfpool unavailable")
           PY
-      - name: Execute ten signed atomic two-swap attempts on isolated Surfpool
-        env:
-          SURFPOOL_EXPLICITLY_OFFLINE: "1"
-        run: |
-          python3 -m arb.next_ten_signed_atomic_offline \
-            --fixture-dir "$RUNNER_TEMP/next-ten-dual-program-fixtures" \
-            --output-dir "$RUNNER_TEMP/next-ten-signed-evidence"
-      - name: Publish ten signed atomic runtime receipts and rollback controls
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: next-ten-isolated-signed-atomic-runtime-evidence
-          path: ${{ runner.temp }}/next-ten-signed-evidence/
-          if-no-files-found: error
-      - name: Execute following ten signed atomic two-instruction attempts
-        env:
-          SURFPOOL_EXPLICITLY_OFFLINE: "1"
-        run: |
-          python3 -m arb.next_ten_signed_atomic_offline --batch next \
-            --fixture-dir "$RUNNER_TEMP/following-ten-fixtures" \
-            --output-dir "$RUNNER_TEMP/following-ten-signed-evidence"
-      - name: Publish following ten signed atomic runtime receipts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: following-ten-isolated-signed-atomic-runtime-evidence
-          path: ${{ runner.temp }}/following-ten-signed-evidence/
-          if-no-files-found: error
-      - name: Execute remaining twenty-four ordered atomic routes on isolated Surfpool
-        env:
-          SURFPOOL_EXPLICITLY_OFFLINE: "1"
-        run: |
-          python3 -m arb.next_ten_signed_atomic_offline --batch remaining \
-            --fixture-dir "$RUNNER_TEMP/remaining-24-fixtures" \
-            --output-dir "$RUNNER_TEMP/remaining-24-signed-evidence"
-      - name: Upload remaining twenty-four signed runtime receipts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: remaining-24-signed-atomic-and-rollback-evidence
-          path: ${{ runner.temp }}/remaining-24-signed-evidence/
-          if-no-files-found: error
       - name: Hydrate disposable offline Orca fixture and attempt signed SwapV2
         env:
           SURFPOOL_EXPLICITLY_OFFLINE: "1"
@@ -1526,6 +1570,18 @@ jobs:
           python3 -m arb.damm_cpmm_atomic_evidence_audit \
             --input "$RUNNER_TEMP/damm-cpmm-atomic-evidence.json" \
             --output "$RUNNER_TEMP/damm-cpmm-acceptance.json"
+      - name: Download three independent signed atomic runtime artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: isolated-atomic-receipts-*
+          path: ${{ runner.temp }}/receipt-shards
+      - name: Collate disjoint per-batch signed receipts
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/next-ten-signed-evidence" "$RUNNER_TEMP/following-ten-signed-evidence" "$RUNNER_TEMP/remaining-24-signed-evidence"
+          cp -a "$RUNNER_TEMP/receipt-shards/isolated-atomic-receipts-first/." "$RUNNER_TEMP/next-ten-signed-evidence/"
+          cp -a "$RUNNER_TEMP/receipt-shards/isolated-atomic-receipts-next/." "$RUNNER_TEMP/following-ten-signed-evidence/"
+          cp -a "$RUNNER_TEMP/receipt-shards/isolated-atomic-receipts-remaining/." "$RUNNER_TEMP/remaining-24-signed-evidence/"
       - name: Reconcile verified current-run atomic evidence into 42 ordered pairs
         run: |
           python3 -m arb.current_run_atomic_matrix \
