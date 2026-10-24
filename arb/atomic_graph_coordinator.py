@@ -19,8 +19,6 @@ def compile_route(legs,tokens,states,evidence,owner,token_accounts,amounts,floor
     if any(type(a) is not int or type(f) is not int or not 0<a<2**64 or not 0<f<2**64
            for a,f in zip(amounts,floors)):
         raise ValueError("invalid per-leg input or minimum output")
-    if False:
-        raise ValueError("per-leg amount bounds missing")
     if (not isinstance(owner,str) or not owner
             or any(not isinstance(token,str) for token in tokens)
             or (not isinstance(token_accounts,(list,tuple,dict)))
