@@ -43,6 +43,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_damm_v2_isolated_execution.py -v
       - name: Test signed DAMM v2 evidence acceptance and negative controls
         run: python3 -m unittest discover -s tests -p test_damm_v2_execution_evidence_audit.py -v
+      - name: Test DAMM to CPMM atomic fork integration safety
+        run: python3 -m unittest discover -s tests -p test_damm_cpmm_atomic_offline.py -v
       - name: Test cryptographically signed standalone swap post-state verifier
         run: python3 -m unittest discover -s tests -p test_signed_standalone_swap_verifier.py -v
       - name: Test signed atomic instruction order and intermediate account preflight
@@ -1262,6 +1264,9 @@ jobs:
       - name: Export authenticated DAMM v2 pool and executable (read-only)
         continue-on-error: true
         run: python3 -m arb.damm_v2_isolated_execution export "$RUNNER_TEMP/damm-v2-fixture.json"
+      - name: Export authenticated DAMM and CPMM atomic route
+        continue-on-error: true
+        run: python3 -m arb.damm_cpmm_atomic_offline export "$RUNNER_TEMP/damm-cpmm-atomic-fixture.json"
       - name: Stop upstream-backed fork and start isolated offline Surfpool
         if: ${{ hashFiles('arb/orca_swap_v2_isolated_offline_execution.py') != '' }}
         run: |
@@ -1351,6 +1356,25 @@ jobs:
         with:
           name: damm-v2-isolated-signed-execution
           path: ${{ runner.temp }}/damm-v2-isolated-evidence.json
+          if-no-files-found: error
+
+      - name: Attempt signed DAMM to CPMM atomic swap and rollback on isolated fork
+        continue-on-error: true
+        env:
+          SURFPOOL_EXPLICITLY_OFFLINE: "1"
+        run: |
+          if [ -s "$RUNNER_TEMP/damm-cpmm-atomic-fixture.json" ]; then
+            python3 -m arb.damm_cpmm_atomic_offline offline "$RUNNER_TEMP/damm-cpmm-atomic-fixture.json" \
+              --output "$RUNNER_TEMP/damm-cpmm-atomic-evidence.json"
+          else
+            printf '{"status":"SOURCE_FIXTURE_UNAVAILABLE","signed_atomic_simulation_verified":false,"rollback_failure_case_verified":false,"intermediate_intra_transaction_consumption_verified":false,"actionable":false,"live_execution_approved":false,"broadcast":false}\n' > "$RUNNER_TEMP/damm-cpmm-atomic-evidence.json"
+          fi
+      - name: Upload DAMM to CPMM signed atomic and rollback evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: damm-cpmm-signed-atomic-rollback
+          path: ${{ runner.temp }}/damm-cpmm-atomic-evidence.json
           if-no-files-found: error
 
   meteora-dlmm-standalone-offline:
