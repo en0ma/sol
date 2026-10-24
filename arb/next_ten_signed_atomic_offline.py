@@ -307,6 +307,7 @@ def main():
     p.add_argument("--batch",choices=("first","next","remaining"),default="first")
     p.add_argument("--shard-index",type=int,default=0)
     p.add_argument("--shard-count",type=int,default=1)
+    p.add_argument("--only-venue",choices=("raydium_amm_v4",))
     args=p.parse_args()
     local_rpc_only("http://127.0.0.1:8899")
     root=Path(args.output_dir)
@@ -315,6 +316,8 @@ def main():
         raise ValueError("invalid deterministic offline work shard")
     program_cache={}
     for index,(first,second) in enumerate(route_batch(args.batch)):
+        if args.only_venue and args.only_venue not in (first,second):
+            continue
         if index%args.shard_count!=args.shard_index:
             continue
         name=first+"__"+second+".json"

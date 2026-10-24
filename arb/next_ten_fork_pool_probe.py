@@ -149,8 +149,9 @@ def main():
     p.add_argument("--registry",default="arb/pool_registry.json")
     p.add_argument("--output",required=True)
     p.add_argument("--batch",choices=("first","next","remaining"),default="first")
+    p.add_argument("--only-venue",choices=("raydium_amm_v4",))
     args=p.parse_args()
-    report=probe(args.rpc,json.loads(Path(args.registry).read_text()),batch=route_batch(args.batch))
+    report=probe(args.rpc,json.loads(Path(args.registry).read_text()),batch=tuple(pair for pair in route_batch(args.batch) if not args.only_venue or args.only_venue in pair))
     Path(args.output).write_text(json.dumps(report,indent=2)+"\n")
     print(json.dumps({"status":report["status"],
                       "routes_with_authenticated_candidates":sum(

@@ -221,15 +221,17 @@ def main():
     p.add_argument("--readiness",required=True)
     p.add_argument("--output-dir",required=True)
     p.add_argument("--batch",choices=("first","next","remaining"),default="first")
+    p.add_argument("--only-venue",choices=("raydium_amm_v4",))
     args=p.parse_args()
     root=Path(args.output_dir)
     root.mkdir(parents=True,exist_ok=True)
     ready=json.loads(Path(args.readiness).read_text())
     reports=[]
-    for index,(first,second) in enumerate(route_batch(args.batch)):
+    selected=tuple(pair for pair in route_batch(args.batch) if not args.only_venue or args.only_venue in pair)
+    for index,(first,second) in enumerate(selected):
         try:
             reports.append(export(args.rpc,ready,index,
-                                  root/(first+"__"+second+".json"),batch=route_batch(args.batch)))
+                                  root/(first+"__"+second+".json"),batch=selected))
         except (ValueError,KeyError,TypeError) as exc:
             reports.append({"status":"SOURCE_FIXTURE_BLOCKED","first_venue":first,
                             "second_venue":second,"reason":str(exc)[:200],
@@ -238,6 +240,6 @@ def main():
              "routes":reports,"exported":sum(x["status"]=="AUTHENTICATED_DUAL_PROGRAM_SOURCE_FIXTURE" for x in reports),
              "actionable":False,"live_execution_approved":False,"broadcast":False}
     (root/"summary.json").write_text(json.dumps(summary,indent=2)+"\n")
-    print(json.dumps({"exported":summary["exported"],"target":10,"broadcast":False}))
+    print(json.dumps({"exported":summary["exported"],"target":len(selected),"broadcast":False}))
 if __name__=="__main__":
     main()

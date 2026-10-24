@@ -1,0 +1,152 @@
+name: AMM v4 Focused Atomic CI
+on:
+  pull_request:
+  workflow_dispatch:
+concurrency:
+  group: amm-v4-focused-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+  actions: read
+jobs:
+  fast-safety-and-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install builder dependency
+        run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Check focused evidence cannot misrepresent historic coverage
+        run: python3 -m unittest discover -s tests -p test_focused_amm_v4_evidence.py -v
+      - name: Check AMM v4 accounts, ownership and market roles
+        run: |
+          python3 -m unittest discover -s tests -p test_amm_v4_open_orders_market_owner.py -v
+          python3 -m unittest discover -s tests -p test_amm_v4_market_roles.py -v
+          python3 -m unittest discover -s tests -p test_raydium_v4_market_preflight.py -v
+      - name: Check focused source export and execution scripts parse
+        run: python3 -m compileall -q arb/
+  authenticate-amm-v4:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    env:
+      SOLANA_RPC_URL: http://127.0.0.1:8899
+      SURFPOOL_DATASOURCE_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
+      SOLANA_RPC_MIN_INTERVAL_SECONDS: "0.5"
+      SOLANA_RPC_ALCHEMY_FREE_TIER: "1"
+      SOLANA_RPC_PACING_FILE: /tmp/solana-rpc-amm-v4-only
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require upstream RPC secret
+        run: test -n "$SURFPOOL_DATASOURCE_RPC_URL"
+      - name: Install Surfpool and solders
+        run: |
+          bash ci/install_surfpool.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Launch read-only upstream-backed Surfpool
+        run: |
+          nohup surfpool start --ci --rpc-url "$SURFPOOL_DATASOURCE_RPC_URL" --no-deploy > "$RUNNER_TEMP/source-fork.log" 2>&1 < /dev/null &
+          echo $! > "$RUNNER_TEMP/source-fork.pid"
+          python3 - <<'PY'
+          import time
+          from arb.rpc import call
+          for _ in range(60):
+              try:
+                  assert call("http://127.0.0.1:8899","getLatestBlockhash")["value"]["blockhash"]
+                  break
+              except Exception:
+                  time.sleep(2)
+          else: raise SystemExit("read-only RPC unavailable")
+          PY
+      - name: Discover only new AMM v4 pool candidates
+        run: |
+          python3 -m arb.atomic_missing_venue_candidates --registry arb/pool_registry.json --output "$RUNNER_TEMP/venues.json"
+      - name: Authenticate only AMM v4 ordered pool-pair candidates
+        run: |
+          python3 -m arb.next_ten_fork_pool_probe --batch remaining --only-venue raydium_amm_v4 --registry "$RUNNER_TEMP/venues.json" --output "$RUNNER_TEMP/amm-v4-ready.json"
+      - name: Export twelve authenticated AMM v4 fixtures only
+        run: |
+          python3 -m arb.next_ten_pair_fixture_export --batch remaining --only-venue raydium_amm_v4 --readiness "$RUNNER_TEMP/amm-v4-ready.json" --output-dir "$RUNNER_TEMP/amm-v4-fixtures"
+      - name: Publish authentic source diagnostics and isolated fixture bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: amm-v4-focused-source
+          path: |
+            ${{ runner.temp }}/amm-v4-fixtures/
+            ${{ runner.temp }}/amm-v4-ready.json
+            ${{ runner.temp }}/venues.json
+          if-no-files-found: error
+      - name: Shut down upstream-backed fork before offline account writes
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/source-fork.pid" ]; then kill "$(cat "$RUNNER_TEMP/source-fork.pid")" || true; fi
+  offline-amm-v4:
+    needs: [authenticate-amm-v4]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0,1]
+    env:
+      SOLANA_RPC_URL: http://127.0.0.1:8899
+      SURFPOOL_EXPLICITLY_OFFLINE: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Surfpool offline runtime
+        run: |
+          bash ci/install_surfpool.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - uses: actions/download-artifact@v4
+        with:
+          name: amm-v4-focused-source
+          path: ${{ runner.temp }}
+      - name: Start disposable explicitly offline Surfpool
+        run: |
+          nohup surfpool start --ci --offline > "$RUNNER_TEMP/offline.log" 2>&1 < /dev/null &
+          python3 - <<'PY'
+          import time
+          from arb.rpc import call
+          for _ in range(60):
+              try:
+                  assert call("http://127.0.0.1:8899","getLatestBlockhash")["value"]["blockhash"]
+                  break
+              except Exception:time.sleep(2)
+          else:raise SystemExit("offline RPC unavailable")
+          PY
+      - name: Execute only target AMM v4 routes with signed positive and rollback checks
+        run: |
+          python3 -m arb.next_ten_signed_atomic_offline --batch remaining --only-venue raydium_amm_v4 --shard-count 2 --shard-index ${{ matrix.shard }} --fixture-dir "$RUNNER_TEMP/amm-v4-fixtures" --output-dir "$RUNNER_TEMP/amm-v4-receipts"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: amm-v4-signed-receipts-${{ matrix.shard }}
+          path: ${{ runner.temp }}/amm-v4-receipts/
+          if-no-files-found: error
+  independent-amm-v4-audit:
+    needs: [authenticate-amm-v4,offline-amm-v4]
+    if: ${{ always() && needs.authenticate-amm-v4.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: amm-v4-signed-receipts-*
+          path: ${{ runner.temp }}/shards
+      - name: Merge independent receipt shards
+        run: |
+          mkdir -p "$RUNNER_TEMP/receipts"
+          for shard in 0 1; do cp -a "$RUNNER_TEMP/shards/amm-v4-signed-receipts-$shard/." "$RUNNER_TEMP/receipts/"; done
+      - name: Independent acceptance; keep prior 30 strictly labeled historical
+        run: python3 -m arb.focused_amm_v4_evidence --receipts "$RUNNER_TEMP/receipts" --output "$RUNNER_TEMP/amm-v4-audit.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: focused-twelve-atomic-acceptance
+          path: ${{ runner.temp }}/amm-v4-audit.json
+          if-no-files-found: error
