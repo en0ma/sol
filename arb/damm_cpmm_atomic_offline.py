@@ -131,7 +131,10 @@ def _hydrate(rpc, fixture):
 
 
 def _simulate(rpc, tx, addresses):
-    tx.verify()
+    if hasattr(tx,"verify_and_hash_message"):
+        tx.verify_and_hash_message()
+    else:
+        tx.verify()
     wire=bytes(tx)
     if len(wire)>1232:
         raise ValueError("signed two-venue transaction exceeds Solana packet size")
@@ -231,10 +234,14 @@ def _inner_token_transfer(entry, keys, token_program_index):
     return (str(keys[source]),str(keys[destination]),amount) if amount>0 else None
 
 
-def _cpi_intermediate_flow(tx,response,intermediate,second_amount):
-    """Confirm intermediate is actually credited by first leg and debited by second."""
+def _cpi_intermediate_flow(tx,response,intermediate,second_amount,*,lookup=None):
+    """Confirm intermediate credited then debited using actual v0 loaded account indices."""
     from solders.pubkey import Pubkey
-    keys=tx.message.account_keys
+    if lookup is None:
+        keys=tx.message.account_keys
+    else:
+        from arb.atomic_v0_lookup import resolved_v0_keys
+        keys=resolved_v0_keys(tx.message,lookup)
     if Pubkey.from_string(intermediate) not in keys:
         return None
     token_key=Pubkey.from_string(TOKEN_PROGRAM)

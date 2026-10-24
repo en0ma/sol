@@ -219,12 +219,19 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache
     # even though their mint identities are the same.
     ix1,ix2=compile_route(graph,mints,state_map,proof_map,owner,keys,
                           [amount_in,amount_intermediate],[amount_intermediate,1])
-    tx=signed_packet(rpc,[ix1,ix2],signer)
-    tx.verify()
-    # Solana signed two-instruction preflight checks account continuity.
+    from arb.atomic_v0_lookup import sign_v0_offline,verify_v0_order
     from arb.signed_atomic_instruction_preflight import inspect_signed_legacy_order
-    check=inspect_signed_legacy_order(bytes(tx),PROGRAMS[first],PROGRAMS[second],
-                                      intermediate_account=keys[1])
+    use_v0={first,second}=={"raydium_clmm","raydium_amm_v4"}
+    lookup=None
+    if use_v0:
+        blockhash=Hash.from_string(call(rpc,"getLatestBlockhash")["value"]["blockhash"])
+        tx,lookup=sign_v0_offline(rpc,[ix1,ix2],signer,blockhash)
+        check=verify_v0_order(tx,lookup,PROGRAMS[first],PROGRAMS[second],keys[1])
+    else:
+        tx=signed_packet(rpc,[ix1,ix2],signer)
+        tx.verify()
+        check=inspect_signed_legacy_order(bytes(tx),PROGRAMS[first],PROGRAMS[second],
+                                          intermediate_account=keys[1])
     positive,packet=_simulate(rpc,tx,keys)
     result={"status":"POSITIVE_SIGNED_ATOMIC_FAILED" if positive.get("err") else "POSITIVE_PENDING_CPI_CHECK",
             "first_venue":first,"second_venue":second,
@@ -250,7 +257,7 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache
     if events!=expected:
         result["status"]="POSITIVE_PROGRAM_ORDER_NOT_VERIFIED"
         return result
-    flow=_cpi_intermediate_flow(tx,positive,keys[1],amount_intermediate)
+    flow=_cpi_intermediate_flow(tx,positive,keys[1],amount_intermediate,lookup=lookup)
     if flow is None:
         result["status"]="INTERMEDIATE_SPL_CPI_NOT_VERIFIED"
         return result
@@ -277,7 +284,14 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache
     from arb.venue_swap_adapter import build_leg
     ix2_bad=build_leg(second,legs[1][1],states[1],evidence[second],owner,
                       keys[1],keys[2],mints[1],mints[2],amount_intermediate,2**64-1)
-    bad=Transaction.new_signed_with_payer([ix1,ix2_bad],signer.pubkey(),[signer],tx.message.recent_blockhash)
+    if use_v0:
+        from solders.message import MessageV0
+        from solders.transaction import VersionedTransaction
+        msg=MessageV0.try_compile(signer.pubkey(),[ix1,ix2_bad],[lookup],tx.message.recent_blockhash)
+        bad=VersionedTransaction(msg,[signer])
+        bad.verify_and_hash_message()
+    else:
+        bad=Transaction.new_signed_with_payer([ix1,ix2_bad],signer.pubkey(),[signer],tx.message.recent_blockhash)
     failed,_=_simulate(rpc,bad,keys)
     error=failed.get("err")
     bad_events=top_level_events(failed.get("logs") or [],{PROGRAMS[first],PROGRAMS[second]})
