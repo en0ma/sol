@@ -281,12 +281,18 @@ def main():
     p.add_argument("--fixture-dir",required=True)
     p.add_argument("--output-dir",required=True)
     p.add_argument("--batch",choices=("first","next","remaining"),default="first")
+    p.add_argument("--shard-index",type=int,default=0)
+    p.add_argument("--shard-count",type=int,default=1)
     args=p.parse_args()
     local_rpc_only("http://127.0.0.1:8899")
     root=Path(args.output_dir)
     root.mkdir(parents=True,exist_ok=True)
+    if not 1<=args.shard_count<=42 or not 0<=args.shard_index<args.shard_count:
+        raise ValueError("invalid deterministic offline work shard")
     program_cache={}
-    for first,second in route_batch(args.batch):
+    for index,(first,second) in enumerate(route_batch(args.batch)):
+        if index%args.shard_count!=args.shard_index:
+            continue
         name=first+"__"+second+".json"
         out={"status":"MISSING_AUTHENTICATED_SOURCE_FIXTURE",
              "first_venue":first,"second_venue":second,

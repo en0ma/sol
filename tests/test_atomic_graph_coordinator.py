@@ -64,7 +64,13 @@ class GraphCoordinatorTests(unittest.TestCase):
         state={"base_mint":"base","quote_mint":"quote"}
         addresses={"pool":"pool","user":"owner","base_mint":"base","quote_mint":"quote",
                    "user_base_token_account":"dst","user_quote_token_account":"src"}
-        with patch("arb.pumpswap_instruction.build_instruction",return_value="pump_ix") as b:
+        addresses["buyback_fee_recipient_authenticated"]=True
+        from arb.pumpswap_pool import PROGRAM
+        from arb.token_vaults import TOKEN_PROGRAM
+        from arb.pumpswap_account_resolver import SYSTEM
+        addresses.update(program=PROGRAM,base_token_program=TOKEN_PROGRAM,
+                         quote_token_program=TOKEN_PROGRAM,system_program=SYSTEM)
+        with patch("arb.pumpswap_trade_v2.build_v2",return_value="pump_ix") as b:
             ix=build_leg("pumpswap","pool",state,
                          {"account_addresses_authenticated":True,"account_addresses":addresses},
                          "owner","src","dst","quote","base",100,1)
