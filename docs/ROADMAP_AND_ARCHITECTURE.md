@@ -137,6 +137,10 @@ New \`arb/seven_venue_aux_pricing_requirements.py\` explicitly records missing a
 
 \`arb/raydium_amm_v4_open_orders_reserves.py\` extracts Serum/OpenBook v3 OpenOrders free and total base/quote balances from manifest-captured bytes, validates the linked market and authority, and derives net CPMM reserves as vault + OpenOrders totals - AMM pending PnL. This is bounded to legacy v3 layout; OpenOrders authority is independently derived from the pool nonce and fixed AMM program PDA rather than accepted from a caller, as must market-role account correctness. It is not validated swap-price parity nor broad live state ingestion.
 
+## M5 pricing decoding vs source-derived quote validation — October 25, 2026
+
+The seven **pool decoders** were completed earlier: these parse pool-account identity and native fields, not all referenced tick arrays, bin arrays, fee configuration or OpenOrders accounts. The new \`arb/fixture_concentrated_ticks.py\` reuses existing Orca fixed tick and Raydium CLMM tick-array parsers against a manifest-bound captured fixture and cross-checks pool identities and array starts, without asserting complete directional coverage or swap accuracy. Priority 1 is signed exact-amount quote parity; Priority 2 is missing auxiliary-account pricing extraction. Both proceed in parallel. Neither constitutes live-trading approval.
+
 ## 1. Mission and non-goals
 
 Build a Solana **simulation-only** research and verification system capable of discovering pools across seven active DEX venue implementations, authenticating their on-chain state, decoding them, constructing valid swap instructions, verifying each venue's signed standalone swap simulation, and proving **atomic, ordered, two-venue swaps** on a local Surfpool mainnet fork. Eventually use fresh pool coverage to study arbitrage opportunities, but **profitable discovery, trade execution, and live broadcasting are not acceptance criteria for the current implementation phase**.
