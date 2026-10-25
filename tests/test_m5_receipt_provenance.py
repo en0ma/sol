@@ -11,6 +11,9 @@ class TestM5ReceiptProvenance(unittest.TestCase):
  def test_contextual_pool_pair_is_not_full_source_quote_attestation(self):
     src=Path("arb/next_ten_pair_fixture_export.py").read_text()
     self.assertIn('paired_pool_observed_slot',src)
+    self.assertIn('state_accounts_observed_slot',src)
+    self.assertIn('contextual companion accounts differ',src)
+    self.assertIn('addresses,{"encoding":"base64","commitment":"confirmed"}',src)
     self.assertIn('"full_source_snapshot_slot":None',src)
     self.assertIn('paired contextual pool accounts differ',src)
  def test_incomplete_receipt_is_not_atomic_or_quote_evidence(self):

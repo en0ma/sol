@@ -203,23 +203,26 @@ def export(rpc,readiness,route_index,output,*,batch=BATCH_10):
         from arb.pumpswap_fee_account import PROGRAM as FEE_PROGRAM
         executable_programs.add(FEE_PROGRAM)
     accounts.update(program_data_accounts(rpc,executable_programs))
-    # One contextual read anchors *both pool accounts* at one observed slot.
-    # Companion accounts and program binaries were fetched separately, so this
-    # does NOT establish a same-slot full execution/quote snapshot.
-    paired=call(rpc,"getMultipleAccounts",[
-        [choice["first_pool"],choice["second_pool"]],
-        {"encoding":"base64","commitment":"confirmed"}])
-    paired_slot=paired.get("context",{}).get("slot")
-    paired_values=paired.get("value")
-    if (type(paired_slot)is not int or paired_slot<0 or
-        not isinstance(paired_values,list) or len(paired_values)!=2):
-        raise ValueError("missing contextual dual-pool source snapshot")
-    for address,value in zip((choice["first_pool"],choice["second_pool"]),paired_values):
+    # One contextual RPC response covers the entire selected non-program
+    # state inventory, not just the two pool accounts. Verify byte-for-byte
+    # agreement with the independently preflighted accounts before retaining
+    # any timestamp. Programs and upgradeable ELF were fetched separately.
+    contextual=call(rpc,"getMultipleAccounts",[
+        addresses,{"encoding":"base64","commitment":"confirmed"}])
+    state_slot=contextual.get("context",{}).get("slot")
+    state_values=contextual.get("value")
+    if (type(state_slot)is not int or state_slot<0 or
+        not isinstance(state_values,list) or len(state_values)!=len(addresses)):
+        raise ValueError("missing contextual companion-account snapshot")
+    for address,value in zip(addresses,state_values):
         if not isinstance(value,dict) or value!=accounts[address]:
-            raise ValueError("paired contextual pool accounts differ from exported account inventory")
+            raise ValueError("contextual companion accounts differ from authenticated inventory")
+    paired_slot=state_slot
     output_data={"source":"READ_ONLY_MAINNET_BACKED_SURFPOOL",
                  "first_venue":first,"second_venue":second,
                  "paired_pool_observed_slot":paired_slot,
+                 "state_accounts_observed_slot":state_slot,
+                 "state_account_count":len(addresses),
                  "full_source_snapshot_slot":None,
                  "route_mints":[mints[0],mints[1],mints[0]],
                  "first_pool":choice["first_pool"],"second_pool":choice["second_pool"],

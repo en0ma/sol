@@ -234,6 +234,8 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache
             "route_pool_addresses":[legs[0][1],legs[1][1]],
             "source_snapshot_slot":None,  # Companion accounts not proven same-slot.
             "paired_pool_observed_slot":fixture.get("paired_pool_observed_slot"),
+            "state_accounts_observed_slot":fixture.get("state_accounts_observed_slot"),
+            "state_account_count":fixture.get("state_account_count"),
             "quote_accuracy_verified":False,
             "positive_logs":positive.get("logs") or [],
             "positive_error":str(positive.get("err")),

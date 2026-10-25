@@ -94,6 +94,21 @@ were fetched independently. Signed receipts carry the pool-pair observation,
 but `source_snapshot_slot` remains null, so the independent quote-to-simulation
 checker still refuses an unsupported full provenance claim.
 
+## M5 companion account state context — October 25, 2026
+
+The source exporter now cross-checks **all selected non-program pool,
+vault, oracle, tick/bin and market accounts** in a single contextual
+`getMultipleAccounts` response (up to the bounded 64-address inventory).
+Every returned account must exactly match the independently preflighted
+exported bytes. `state_accounts_observed_slot` and
+`state_account_count` are recorded in source fixtures and signed receipts.
+
+Upgradeable program-data accounts are still separately fetched, and the
+complete source-state quote input is not yet independently generated and
+bound to a quote. Therefore `source_snapshot_slot` remains null and
+quote reconciliation still fails closed. This is source consistency
+hardening, not measured quote-vs-execution accuracy.
+
 ## 1. Mission and non-goals
 
 Build a Solana **simulation-only** research and verification system capable of discovering pools across seven active DEX venue implementations, authenticating their on-chain state, decoding them, constructing valid swap instructions, verifying each venue's signed standalone swap simulation, and proving **atomic, ordered, two-venue swaps** on a local Surfpool mainnet fork. Eventually use fresh pool coverage to study arbitrage opportunities, but **profitable discovery, trade execution, and live broadcasting are not acceptance criteria for the current implementation phase**.
