@@ -21,6 +21,15 @@ def audit(fixture,receipt,*,quoted_first_input=None):
     captured=fixture.get("state_accounts_observed_slot")
     if receipt.get("state_accounts_observed_slot")!=captured:
         reasons.append("signed receipt captured state slot missing/mismatch")
+    readback=receipt.get("hydrated_fork_state_readback")
+    if not isinstance(readback,dict) or readback.get("status")!="HYDRATED_FORK_ACCOUNT_BYTES_MATCH":
+        reasons.append("hydrated fork readback evidence missing")
+    elif (readback.get("captured_source_slot")!=captured or
+          type(readback.get("accounts_checked"))is not int or
+          not 0<readback["accounts_checked"]<=fixture.get("state_account_count",0) or
+          type(readback.get("fork_readback_slot"))is not int or
+          readback.get("source_mainnet_slot_independently_attested") is not False):
+        reasons.append("hydrated fork readback metadata inconsistent")
     if receipt.get("source_snapshot_slot")!=captured or type(captured)is not int:
         reasons.append("signed receipt execution source slot unauthenticated")
     if type(quoted_first_input)is not int or quoted_first_input<=0:

@@ -26,6 +26,12 @@ class Tests(unittest.TestCase):
     "initial_balances_base_units":[500,0,0],
     "positive_post_balances_base_units":[400,0,90]}
   x=audit(f,r,quoted_first_input=100)
+  self.assertEqual(x["status"],"UNVERIFIED")
+  self.assertIn("hydrated fork readback evidence missing",x["reasons"])
+  r["hydrated_fork_state_readback"]={"status":"HYDRATED_FORK_ACCOUNT_BYTES_MATCH",
+    "captured_source_slot":42,"fork_readback_slot":98,"accounts_checked":1,
+    "source_mainnet_slot_independently_attested":False}
+  x=audit(f,r,quoted_first_input=100)
   self.assertEqual(x["status"],"PROVENANCE_FIELDS_CONSISTENT_NOT_INDEPENDENTLY_ATTESTED")
   self.assertFalse(x["same_fork_state_independently_attested"])
  def test_tampered_manifest_and_wrong_amount_rejected(self):
