@@ -1,11 +1,11 @@
 # Sol — Agent operating instructions
 
-Read this file and [docs/ROADMAP_AND_ARCHITECTURE.md](docs/ROADMAP_AND_ARCHITECTURE.md) before making changes. The roadmap is the durable record of user-agreed design directions and acceptance criteria. Update it whenever a design decision, target, or milestone changes.
+Read this file, [docs/MILESTONE_EXECUTION_LEDGER.md](docs/MILESTONE_EXECUTION_LEDGER.md), and [docs/ROADMAP_AND_ARCHITECTURE.md](docs/ROADMAP_AND_ARCHITECTURE.md) before making changes. The roadmap is the durable record of user-agreed design directions and acceptance criteria. Update it whenever a design decision, target, or milestone changes.
 
 ## Non-negotiable safety boundary
 This project is **simulation and verification only**. Do not send, sign-and-broadcast, or submit live/mainnet swaps, connect funded execution wallets, enable automated trading, or claim trading approval. Local-fork transaction signing solely for `simulateTransaction` is permitted. Keep `actionable=false`, `live_execution_approved=false`, and `broadcast=false` in execution/evidence outputs. Any eventual live execution is a separate future project phase requiring explicit user authorization and controls.
 
-## Required working style
+## Anti-circular-work mandate\n- Before implementing anything, check the milestone ledger: existing decoders, venue adapters, 42/42 historical two-leg atomic/rollback infrastructure and generic 2–6 compiler are already built. Do not recreate them.\n- Only work on an unchecked acceptance item. Update its checkbox when independently supported; link CI artifacts and do not confuse workflow-green with route-level evidence.\n- Reuse one adaptive route coordinator for 2–6 hops rather than adding separate hop-count or per-venue-pair engines.\n\n## Required working style
 - Make actual code/test/CI changes when asked to proceed; commit to the working branch and report SHA and evidence. Do not report intentions as accomplishments.
 - Distinguish **implemented**, **unit tested**, **on-chain authenticated**, **signed standalone simulated**, and **atomic execution verified**. A builder module or a green CI workflow does not prove successful execution.
 - Preserve and cite evidence artifacts, fork slot, pool/program IDs, ordered instructions, token balance deltas, failure/rollback checks, and CI run ID. Never fabricate a passing result or upgrade verification flags without proof.

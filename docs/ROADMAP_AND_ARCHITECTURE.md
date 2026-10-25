@@ -4,6 +4,10 @@
 **Last consolidated:** 2026-10-25.  
 **Applies to:** all subsequent contributors, coding agents and conversations. Read with root [AGENTS.md](../AGENTS.md).
 
+## Current engineering checklist — 2026-10-25
+
+**Primary active work tracking:** [MILESTONE_EXECUTION_LEDGER.md](MILESTONE_EXECUTION_LEDGER.md). This ledger audits completed venue adapters, atomic execution, historical 42/42 evidence and generic compiler; it tracks outstanding adaptive multi-leg coordination, per-venue effective pricing, observed costs, and CI acceptance. Do not redo completed infrastructure. This section supersedes any older roadmap phrasing suggesting the primary adapters or atomic engine are still missing.
+
 ## Scope decision — 2026-10-23 (supersedes earlier eight-venue requirements)
 
 **User-approved active scope: seven venues.** Orca deprecated its original Token Swap v1/standard pools and migrated its supported liquidity focus to Whirlpools. Retire `orca_token_swap_v1` from mandatory discovery, fork authentication, standalone signed execution, and atomic pair acceptance. Preserve its existing adapter and optional legacy tests for reference, but **do not count it as an active eighth venue** or spend active CI/API budget seeking v1 pools. Deprecation does not establish that no old onchain pools exist.
