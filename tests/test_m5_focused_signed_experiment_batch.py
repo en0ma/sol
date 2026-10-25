@@ -11,6 +11,7 @@ class BatchTests(unittest.TestCase):
             report = audit(Path(d), Path(d), observed_unix=1)
         self.assertEqual(report["attempted"], 2)
         self.assertEqual(report["independently_validated_quote_samples"], 0)
+        self.assertIn("FULL_INTERMEDIATE_NOT_VERIFIED",report["blocker_summary"]["issue_counts"])
         self.assertIn("SOURCE_FIXTURE_MISSING", report["routes"][0]["reason_codes"])
         self.assertFalse(report["broadcast"])
     def test_dispatches_real_pairs_without_synthetic_proof(self):

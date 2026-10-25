@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 from arb.m5_signed_fixture_experiment_report import evaluate, SAFE
 from arb.m5_captured_fee_compute_audit import diagnose
+from arb.m5_experiment_blocker_summary import summarize
 
 PAIRS = ("raydium_cpmm__raydium_amm_v4", "raydium_amm_v4__raydium_cpmm")
 
@@ -39,6 +40,7 @@ def audit(fixture_dir, receipt_dir, *, observed_unix):
                 row["reason_codes"].append("EXPERIMENT_INPUT_OR_DECODER_BLOCKED: " + str(exc)[:160])
         rows.append(row)
     return {"status": "OFFLINE_DIAGNOSTICS_ONLY", "routes": rows,
+            "blocker_summary": summarize(rows),
             "attempted": len(rows),
             "signed_receipts_with_evidence": sum(r["signed_proof_status"] == "VERIFIED" for r in rows),
             "full_intermediate_consumption_observed": sum(
