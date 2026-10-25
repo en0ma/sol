@@ -150,6 +150,20 @@ jobs:
           for shard in 0 1; do cp -a "$RUNNER_TEMP/shards/amm-v4-signed-receipts-$shard/." "$RUNNER_TEMP/receipts/"; done
       - name: Independent acceptance; keep prior 30 strictly labeled historical
         run: python3 -m arb.focused_amm_v4_evidence --receipts "$RUNNER_TEMP/receipts" --output "$RUNNER_TEMP/amm-v4-audit.json"
+      - name: Enforce all twelve signed atomic and rollback acceptances
+        run: |
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          result=json.loads((Path(os.environ["RUNNER_TEMP"])/"amm-v4-audit.json").read_text())
+          missing=[row["first_venue"]+"__"+row["second_venue"]
+                   for row in result["routes"] if row["status"]!="VERIFIED"]
+          assert result["current_run_target"]==12
+          assert result["current_run_verified"]==12, "AMM v4 pairs regressed: "+str(missing)
+          assert result["fresh_full_42_verified"] is False
+          assert result["broadcast"] is False
+          print("Fresh AMM v4 signed atomic and rollback regression: 12/12")
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
