@@ -61,7 +61,7 @@
 4. Execute **C01–C04** in parallel when source state and test cases exist.
 5. Every meaningful commit: mark only supported checkboxes, cite SHA/run/artifact, record failure or evidence gap in the PR. No more reporting-only "blocker" modules while executable acceptance remains open.
 
-## Current signed N-leg runtime integrity
+## CI correction — 2026-10-25\n\nFocused CI #40209685513 failed in synthetic N-leg execution test after a deliberate safety hardening: its mocked successful simulation did not supply signed post-account data. The production validator correctly rejected it as `SIGNED_POST_BALANCES_UNVERIFIED`, so the fixture now supplies explicit mocked post balances to reach the intended missing-negative-control branch. Do not relax production validation. CI rerun pending.\n\n## Current signed N-leg runtime integrity
 
 The integrated simulator now validates the actual positive signed post-transaction SPL account snapshots for every boundary, verifies mint/authority identities, exact initial debit, zero intermediate remainder, and positive terminal credit **before** checking negative rollback. Missing simulated account data is rejected; standalone preflights and CPI-only evidence cannot replace terminal reconciliation. Synthetic CPI test corrected to distinguish the pool vault source from the user's intermediate token account. Actual signed three-to-six-leg runtime evidence still pending.
 
