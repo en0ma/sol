@@ -53,6 +53,12 @@
 - [ ] **C04 — Make existing discovery, market registry and opportunity graph supply candidates to the coordinator.** Existing: `arb/raydium_public_pool_discovery.py`, `arb/market_state_registry.py`, `arb/opportunity_graph.py`, `arb/research_engine_pipeline.py`. Wire and harden, don't rewrite.
 - [ ] **C05 — Continuous monitoring/indexing (M6)** deferred pending reliable M5 source-state and user's RPC/budget authorization.
 
+## Three-hop verified signed runtime — October 25, 2026
+
+CI [#40212458787](https://github.com/en0ma/sol/actions/runs/40212458787) produced two genuine signed offline **three-hop** receipts with `SIGNED_N_LEG_ATOMIC_AND_ROLLBACK_VERIFIED`. CPMM→v4→CPMM consumed 8,203,755 then 80,666,106 intermediate units, ending with 4,653,406 terminal units; reverse v4→CPMM→v4 consumed 10,119,208 then 80,718,247, ending with 8,168,031 terminal units. Both had zero user intermediate SPL residuals and failed their signed negative controls at instruction index 2. These are A→B→A→B **interoperability paths**, not closed arbitrage nor quote accuracy, and their upstream source slot is not independently attested.
+
+A separate strict independent CI audit of the actual two three-hop receipts is now mandatory; passing overall workflow alone must never award credit. Remaining: route-general 4–6 signed cases, effective-fee and quote parity, and continuous market-state research. No broadcast.
+
 ## Three-hop execution blocker from actual CI evidence
 
 CI #40211600343 completed green, but **both** trial receipts in `m5-three-hop-actual-signed-receipts` were BLOCKED with `missing three-account local token snapshot`. That message came from legacy `_post`, which strictly expected three SPL accounts while the real trial provisioned four. Widened the existing synchronized account reader to 3–7 unique aligned accounts, preserving mint/authority, owner and slot checks. A green workflow does not mean three-hop passed. Rerun trial to locate the next actual execution boundary.

@@ -16,6 +16,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install builder dependency
         run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Test independent real signed three-hop acceptance
+        run: python3 -m unittest discover -s tests -p test_m5_three_hop_signed_acceptance.py -v
       - name: Test synchronized N-leg SPL fork snapshot reader
         run: python3 -m unittest discover -s tests -p test_n_leg_snapshot.py -v
       - name: Test sequential cumulative signed prefix amount observations
@@ -307,6 +309,19 @@ jobs:
         with:
           name: m5-all-venue-adaptive-acceptance
           path: ${{ runner.temp }}/m5-all-adaptive.json
+          if-no-files-found: warn
+      - uses: actions/download-artifact@v4
+        with:
+          name: m5-three-hop-actual-signed-receipts
+          path: ${{ runner.temp }}/three-hop
+      - name: Independently enforce both real signed three-hop execution and rollback routes
+        run: |
+          python3 -m arb.m5_three_hop_signed_acceptance --receipts "$RUNNER_TEMP/three-hop" --output "$RUNNER_TEMP/m5-three-hop-acceptance.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: m5-three-hop-independent-acceptance
+          path: ${{ runner.temp }}/m5-three-hop-acceptance.json
           if-no-files-found: warn
       - name: Download adaptive CPMM-v4 signed research receipts
         uses: actions/download-artifact@v4
