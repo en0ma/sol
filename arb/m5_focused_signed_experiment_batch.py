@@ -28,7 +28,12 @@ def audit(fixture_dir, receipt_dir, *, observed_unix):
             try:
                 fixture = json.loads(fixture_path.read_text())
                 receipt = json.loads(receipt_path.read_text())
-                row["captured_fee_and_compute"] = diagnose(fixture, receipt)
+                try:
+                    row["captured_fee_and_compute"] = diagnose(fixture, receipt)
+                except (ValueError, TypeError, KeyError, OSError, ImportError, ArithmeticError) as exc:
+                    row["captured_fee_and_compute"] = {
+                        "status": "UNVERIFIED", "reason": "CAPTURED_FEE_COMPUTE_BLOCKED: "+str(exc)[:160],
+                        "quote_accuracy_verified": False, "start_mint_fee_cost_verified": False, **SAFE}
                 row.update(evaluate(fixture, receipt, observed_unix=observed_unix))
             except (ValueError, TypeError, KeyError, OSError, ImportError, ArithmeticError) as exc:
                 row["reason_codes"].append("EXPERIMENT_INPUT_OR_DECODER_BLOCKED: " + str(exc)[:160])

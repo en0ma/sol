@@ -21,6 +21,8 @@ class Tests(unittest.TestCase):
         self.assertEqual(result["fee_rows"][0]["creator_fee_ppm"],100)
         self.assertEqual(result["fee_rows"][0]["blocker"],"CPMM_CREATOR_FEE_PLACEMENT_UNVERIFIED")
         self.assertEqual(result["positive_units_consumed"],12345)
+        self.assertEqual(result["compute_source"],"SIGNED_OFFLINE_SIMULATE_TRANSACTION_RECEIPT")
+        self.assertFalse(result["network_fee_lamports_verified"])
         self.assertFalse(result["start_mint_fee_cost_verified"])
         self.assertFalse(result["broadcast"])
     def test_missing_compute_is_not_zero(self):

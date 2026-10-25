@@ -34,6 +34,11 @@ def diagnose(fixture,receipt):
         units=receipt.get("positive_units_consumed")
         if type(units)is int and units>=0:
             result["positive_units_consumed"]=units
+            result["compute_source"]="SIGNED_OFFLINE_SIMULATE_TRANSACTION_RECEIPT"
         else:
             result["compute_blocker"]="POSITIVE_COMPUTE_UNAVAILABLE"
+    # Units consumed do not determine a paid fee; no conversion to start
+    # token units is possible without measured fee prices and mint conversion.
+    result["priority_fee_lamports_verified"]=False
+    result["network_fee_lamports_verified"]=False
     return result

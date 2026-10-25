@@ -19,14 +19,31 @@ class BatchTests(unittest.TestCase):
             for pair in PAIRS:
                 (root/"fixtures"/(pair+".json")).write_text('{"source":"fixture"}')
                 (root/"receipts"/(pair+".json")).write_text('{"source":"receipt"}')
-            with patch("arb.m5_focused_signed_experiment_batch.evaluate",return_value={
+            with patch("arb.m5_focused_signed_experiment_batch.diagnose",return_value={"status":"DIAGNOSTIC_ONLY"}) as cost, \
+                 patch("arb.m5_focused_signed_experiment_batch.evaluate",return_value={
                 "status":"DIAGNOSTIC_ONLY","reason_codes":["SOURCE_TO_EXECUTION_PROVENANCE_UNVERIFIED"],
                 "signed_proof_status":"VERIFIED","provenance_status":"UNVERIFIED",
                 "actionable":False,"live_execution_approved":False,"broadcast":False}) as f:
                 report=audit(root/"fixtures",root/"receipts",observed_unix=123)
         self.assertEqual(f.call_count,2)
+        self.assertEqual(cost.call_count,2)
         self.assertEqual(report["signed_receipts_with_evidence"],2)
         self.assertEqual(report["independently_validated_quote_samples"],0)
+    def test_fee_diagnostic_failure_does_not_hide_signed_analysis(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);(root/"fixtures").mkdir();(root/"receipts").mkdir()
+            name=PAIRS[0]+".json"
+            (root/"fixtures"/name).write_text("{}")
+            (root/"receipts"/name).write_text("{}")
+            with patch("arb.m5_focused_signed_experiment_batch.diagnose",
+                       side_effect=ValueError("unknown captured fee state")), \
+                 patch("arb.m5_focused_signed_experiment_batch.evaluate",
+                       return_value={"signed_proof_status":"VERIFIED","status":"DIAGNOSTIC_ONLY"}) as ev:
+                out=audit(root/"fixtures",root/"receipts",observed_unix=1)
+        ev.assert_called_once()
+        self.assertEqual(out["signed_receipts_with_evidence"],1)
+        self.assertEqual(out["routes"][0]["captured_fee_and_compute"]["status"],"UNVERIFIED")
+        self.assertEqual(out["independently_validated_quote_samples"],0)
     def test_missing_optional_decoder_dependency_fails_closed(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);(root/"fixtures").mkdir();(root/"receipts").mkdir()
