@@ -57,6 +57,10 @@
 
 Focused CI #40229037828 failed two newly introduced fee source identity tests because the captured native fee diagnostic had not actually enforced the decoded pool configuration address and venue linkage. Added these checks *before* any native fee claim is accepted, alongside explicit authenticated trade-rate type/range validation. On error all intermediate decoded values are discarded, as the prior C01 evidence rule requires. Regression tests now cover contradictory identities and malformed native trade rates. The unrelated signed execution and rollback audit jobs in #101 succeeded. New commit CI remains pending.
 
+## B01/C04 — Actual authenticated three-distinct-venue route candidate discovery
+
+The existing read-only source-pool probe now discovers genuine A→B→C→A *mint-graph candidates* involving three different supported venues, using only successful authenticated pool snapshots and observed slots. It rejects two-token alternating loops, reused pool addresses, incomplete source identities and unauthenticated candidate pools. Candidates are exposed directly in the existing probe artifact and are not hardcoded to venue triples. **This is not a signed third-venue execution proof**: the current pair fixture hydrator still supports only two pools, so three-pool fixture export and actual signed coordinator trials are the next blocker. Do not claim B01 complete or count any newly verified three-venue atomic route until CI shows real signed CPI and rollback.
+
 ## C01/C02 — Authenticated fixture quote-state joins
 
 The existing fixture quote projection now joins native vault fundamentals to decoded source pools by distinct (venue, pool) identity instead of positional zipping. It rejects duplicate/missing pool identities, mismatched mints/slots, pool/config fee identity drift, and authenticated fee claims without a valid ppm. Regression tests include reversed source inventory order and invalid fee evidence, wired into fast CI. The projection remains indicative and cannot certify source provenance or signed output parity.

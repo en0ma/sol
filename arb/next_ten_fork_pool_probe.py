@@ -106,6 +106,65 @@ def candidates(registry):
             result[venue].insert(0,pool)
     return result
 
+def authenticated_distinct_venue_triangles(authenticated_pools, *, limit=30):
+    """Discover genuinely closed A→B→C→A three-venue paths from read-only proofs.
+
+    A candidate is only an input to the existing adaptive coordinator: pool
+    readback, source fixture hydration, signed CPI and rollback remain unproven.
+    """
+    if type(limit) is not int or not 1<=limit<=1000:
+        raise ValueError("bounded read-only route candidate inventory required")
+    if not isinstance(authenticated_pools,dict):
+        raise ValueError("authenticated source pool mapping missing")
+    edges=[]
+    for venue,items in sorted(authenticated_pools.items()):
+        if venue not in PROGRAMS or not isinstance(items,list):
+            raise ValueError("untrusted authenticated source venue")
+        for item in items:
+            if (not isinstance(item,dict) or item.get("venue")!=venue
+                    or item.get("authenticated") is not True
+                    or type(item.get("slot")) is not int or item["slot"]<0
+                    or not isinstance(item.get("pool"),str) or not item["pool"]
+                    or not isinstance(item.get("mints"),list)
+                    or len(item["mints"])!=2 or
+                    any(not isinstance(m,str) or not m for m in item["mints"])
+                    or item["mints"][0]==item["mints"][1]):
+                raise ValueError("untrusted candidate pool identity or source slot")
+            for a,b in (item["mints"],item["mints"][::-1]):
+                edges.append((a,b,venue,item["pool"],item["slot"]))
+    by_input={}
+    for edge in edges:
+        by_input.setdefault(edge[0],[]).append(edge)
+    output=[]
+    seen=set()
+    for first in edges:
+        for second in by_input.get(first[1],[]):
+            if second[2]==first[2] or second[1] in (first[0],first[1]):
+                continue
+            for third in by_input.get(second[1],[]):
+                if (third[1]!=first[0] or
+                        len({first[2],second[2],third[2]})!=3 or
+                        len({first[3],second[3],third[3]})!=3):
+                    continue
+                identity=((first[2],first[3],first[0],first[1]),
+                          (second[2],second[3],second[0],second[1]),
+                          (third[2],third[3],third[0],third[1]))
+                if identity in seen:
+                    continue
+                seen.add(identity)
+                output.append({
+                    "route_venues":[first[2],second[2],third[2]],
+                    "route_pool_addresses":[first[3],second[3],third[3]],
+                    "route_mints":[first[0],first[1],second[1],first[0]],
+                    "source_slots":[first[4],second[4],third[4]],
+                    "three_distinct_venues":True,
+                    "source_account_fixture_hydrated":False,
+                    "signed_atomic_simulation_verified":False,
+                    "rollback_failure_case_verified":False,**SAFETY})
+                if len(output)>=limit:
+                    return output
+    return output
+
 def probe(rpc, registry, *, batch=BATCH_10):
     local_rpc_only(rpc)
     entries=candidates(registry)
@@ -137,7 +196,10 @@ def probe(rpc, registry, *, batch=BATCH_10):
                        "candidate_count":len(combinations),
                        "signed_atomic_simulation_verified":False,
                        "rollback_failure_case_verified":False,**SAFETY})
+    triangles=authenticated_distinct_venue_triangles(pools)
     return {"status":"READONLY_NEXT_TEN_FORK_POOL_AUTHENTICATION",
+            "authenticated_distinct_venue_three_leg_candidates":triangles,
+            "authenticated_distinct_venue_three_leg_candidate_count":len(triangles),
             "source":"READ_ONLY_MAINNET_BACKED_SURFPOOL",
             "route_count":len(routes),"authenticated_pools":pools,
             "route_candidates":routes,"failed_pool_checks":failures,
