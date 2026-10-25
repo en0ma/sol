@@ -1,9 +1,10 @@
-"""M5 first real venue-math integration: authenticated Raydium CPMM exact-input.
+"""M5 authenticated Raydium CPMM and within-tick CLMM exact-input models.
 
-All other venues explicitly fail closed until their directional fee/liquidity
+Other venues explicitly fail closed until their directional fee/liquidity
 models are integrated. No mock swap amounts, inferred fee tiers, or live RPC.
 """
 from arb.cpmm_quote import quote_exact_input
+from arb.raydium_clmm_within_tick_quote import quote_within_tick
 from arb.venue_quote_contract import validate
 from arb.market_state_registry import normalize
 
@@ -20,6 +21,38 @@ def from_snapshot(snapshot,*,now,max_age=60,max_slot_skew=32):
             raise ValueError("pool not in authenticated snapshot")
         if type(amount_in)is not int or not 0<amount_in<2**64:
             raise ValueError("exact-input amount required")
+        if venue=="raydium_clmm":
+            if state.get("trade_fee_authenticated") is not True or state.get("tick_boundary_authenticated") is not True:
+                raise ValueError("CLMM fee and directional tick boundary must be authenticated")
+            fee=state.get("trade_fee_ppm")
+            if type(fee)is not int:
+                raise ValueError("CLMM authenticated fee required")
+            if (leg.get("input_mint"),leg.get("output_mint")) not in (
+                (state["mints"][0],state["mints"][1]),
+                (state["mints"][1],state["mints"][0])):
+                raise ValueError("CLMM mint direction invalid")
+            if (state.get("token_mint_0"),state.get("token_mint_1"))!=tuple(state["mints"]):
+                raise ValueError("CLMM onchain orientation mismatch")
+            bound=state.get("next_initialized_sqrt_by_input_mint")
+            if not isinstance(bound,dict) or type(bound.get(leg["input_mint"])) is not int:
+                raise ValueError("authenticated directional CLMM tick boundary missing")
+            size=state.get("max_within_tick_input_by_mint")
+            if not isinstance(size,dict) or type(size.get(leg["input_mint"])) is not int or size[leg["input_mint"]]<=0:
+                raise ValueError("authenticated directional CLMM input budget missing")
+            raw=quote_within_tick(state,leg["input_mint"],amount_in,fee,bound[leg["input_mint"]])
+            result={"venue":venue,"pool":pool,
+                "input_mint":leg["input_mint"],"output_mint":leg["output_mint"],
+                "amount_in":amount_in,"amount_out":raw["estimated_output_base_units"],
+                "fee_input_units":(amount_in*fee+999999)//1000000,
+                "liquidity_input_units":size[leg["input_mint"]],
+                "price_impact_bps":min(10000,(amount_in*10000+size[leg["input_mint"]]-1)//size[leg["input_mint"]]),
+                "snapshot_slot":state["slot"],"observed_unix":state["observed_unix"],
+                "source_authenticated":True,"quote_source":"AUTHENTICATED_POOL_SNAPSHOT",
+                "quote_model":"RAYDIUM_CLMM_AUTHENTICATED_WITHIN_TICK_INDICATIVE"}
+            assessment=validate(result,state,requested_input=amount_in,now=now,max_age=max_age)
+            if assessment["status"]!="VALIDATED_INDICATIVE_QUOTE":
+                raise ValueError("CLMM quote rejected: "+", ".join(assessment["reason_codes"]))
+            return result
         if venue!="raydium_cpmm":
             raise ValueError("venue amount-aware model not integrated: "+str(venue))
         if state.get("trade_fee_authenticated") is not True:
