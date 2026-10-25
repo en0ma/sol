@@ -26,6 +26,12 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_n_leg_snapshot.py -v
       - name: Test repeatable signed observer failure without partial plan mutation
         run: python3 -m unittest discover -s tests -p test_adaptive_signed_prefix_observer.py -v
+      - name: Test captured CPMM native fee bounds and manifest config identity
+        run: python3 -m unittest discover -s tests -p test_native_cpmm_config_fee_integrity.py -v
+      - name: Test CLMM native fee bytes spacing and account owner
+        run: python3 -m unittest discover -s tests -p test_native_clmm_config_fee_integrity.py -v
+      - name: Test independently bound native fee decoder identities
+        run: python3 -m unittest discover -s tests -p test_native_fee_source_identity.py -v
       - name: Test source quote and signed execution blocker grouping
         run: python3 -m unittest discover -s tests -p test_m5_source_blocker_priorities.py -v
       - name: Test signed simulation compute unit caps for all route lengths

@@ -53,6 +53,10 @@
 - [ ] **C04 — Make existing discovery, market registry and opportunity graph supply candidates to the coordinator.** Existing: `arb/raydium_public_pool_discovery.py`, `arb/market_state_registry.py`, `arb/opportunity_graph.py`, `arb/research_engine_pipeline.py`. Wire and harden, don't rewrite.
 - [ ] **C05 — Continuous monitoring/indexing (M6)** deferred pending reliable M5 source-state and user's RPC/budget authorization.
 
+## C01 — Native CLMM fee bytes and source binding independent test gate
+
+New focused CI tests exercise the real native CLMM decoder with constructed config-layout bytes, owner verification, on-chain fee bounds and pool/config tick-spacing agreement. The captured fee audit additionally rejects any decoder's returned configuration address that differs from the actual decoded pool reference or returned venue that differs from the source pool venue, then discards partially validated fees. New regression suites are **wired into the fast-safety CI job**, including the previously unconnected CPMM source-fee tests. The evidence remains offline account-layout/fixture evidence; quote accuracy remains zero independent signed comparisons. CI confirmation pending.
+
 ## C01 — Native source fee bounds and config identity
 
 Added decoder-level fail-closed integer ppm constraints for both CPMM trade and creator fees, rejecting booleans, negative values and values at/above one million. A fee account must be referenced by a nonempty pool-derived address appearing exactly once in the contextual manifest inventory. The captured-fee diagnostic independently rejects an unauthenticated or out-of-range native trade rate even if a decoder returned a contradictory object. Added native decoder regressions. This does not attest independently sourced RPC or quote parity.

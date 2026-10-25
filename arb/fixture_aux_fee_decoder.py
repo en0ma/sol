@@ -55,7 +55,9 @@ def decode_native_config_fee(venue,state,fixture):
             raise ValueError("invalid CLMM config layout")
         spacing=int.from_bytes(raw[51:53],"little")
         fee=int.from_bytes(raw[47:51],"little")
-        if spacing!=state["tick_spacing"] or not 0<=fee<1000000:
+        if (type(state["tick_spacing"]) is not int or
+                state["tick_spacing"]<=0 or spacing!=state["tick_spacing"]
+                or not 0<=fee<1_000_000):
             raise ValueError("CLMM pool tick spacing/config trade fee mismatch")
         return {"venue":venue,"config_address":address,
             "trade_fee_ppm":fee,"trade_fee_authenticated":True,
