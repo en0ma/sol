@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 from arb.cpmm_ammv4_signed_experiment import run as quote_experiment
 from arb.source_snapshot_manifest import verify
+from arb.next_ten_atomic_evidence import assess
 from arb.fixture_config_quote_projection import quote_cpmm_only
 from arb.raydium_amm_v4_fixture_quote import quote_from_fixture
 
@@ -34,6 +35,13 @@ def evaluate(fixture, receipt, *, observed_unix, costs=None):
     if receipt.get("route_pool_addresses") != result["route_pools"] or receipt.get("route_mints") != fixture.get("route_mints"):
         result["reason_codes"].append("SIGNED_ROUTE_IDENTITY_MISMATCH")
         return result
+    # Atomicity is independently auditable even when CPMM effective fee
+    # prevents any quote from being calculated.
+    evidence = assess(tuple(result["route_venues"]), receipt)
+    result["signed_proof_status"] = evidence["status"]
+    result["signed_proof_failure_reasons"] = evidence["failure_reasons"]
+    if evidence["status"] != "VERIFIED":
+        result["reason_codes"].append("SIGNED_ATOMIC_EVIDENCE_UNVERIFIED")
     initial = receipt.get("initial_balances_base_units")
     final = receipt.get("positive_post_balances_base_units")
     received = receipt.get("first_leg_intermediate_received_base_units")
@@ -130,7 +138,8 @@ def evaluate(fixture, receipt, *, observed_unix, costs=None):
     result["quoted_legs"] = [{"input": q["amount_in"], "output": q["amount_out"]} for q in study["quotes"]]
     accuracy = study["accuracy"]
     result["deviation_bps"] = [accuracy["first_leg_deviation_bps"], accuracy["second_leg_deviation_bps"]]
-    result["signed_proof_status"] = accuracy["signed_atomic_evidence_status"]
+    # Never upgrade an independently failed receipt using quote comparison.
+    result["quote_comparison_signed_proof_status"] = accuracy["signed_atomic_evidence_status"]
     result["provenance_status"] = accuracy["provenance_status"]
     result["reconciliation_status"] = accuracy["reconciliation_status"]
     risk = study["observed_risk"]

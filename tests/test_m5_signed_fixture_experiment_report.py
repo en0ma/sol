@@ -77,6 +77,17 @@ class Tests(unittest.TestCase):
         self.assertEqual(probes[1]["signed_input"],80)
         self.assertEqual(probes[1]["deviation_bps"],0)
         self.assertFalse(result["actionable"])
+    def test_signed_proof_independent_of_pricing_failure(self):
+        r=receipt()
+        with patch("arb.m5_signed_fixture_experiment_report.assess",
+                   return_value={"status":"VERIFIED","failure_reasons":[]}), \
+             patch("arb.m5_signed_fixture_experiment_report.quote_experiment",
+                   side_effect=ValueError("CPMM source fee/reserves unavailable")):
+            report=evaluate(fixture(),r,observed_unix=1)
+        self.assertEqual(report["signed_proof_status"],"VERIFIED")
+        self.assertEqual(report["quoted_legs"],[])
+        self.assertIn("CPMM_EFFECTIVE_FEE_OR_RESERVES_UNAVAILABLE",report["reason_codes"])
+        self.assertFalse(report["actionable"])
     def test_explicit_second_leg_amount_and_surplus(self):
         r=receipt()
         r["declared_first_leg_input_base_units"]=100

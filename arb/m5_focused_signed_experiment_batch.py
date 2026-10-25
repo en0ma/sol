@@ -44,6 +44,11 @@ def audit(fixture_dir, receipt_dir, *, observed_unix):
             "full_intermediate_consumption_observed": sum(
                 r.get("full_intermediate_consumption_observed") is True for r in rows),
             "independently_validated_quote_samples": 0,
+            "observed_input_quote_probes": sum(
+                len(r.get("observed_input_quote_probes", [])) for r in rows),
+            "indicative_observed_input_comparisons": sum(
+                q.get("status") == "INDICATIVE_OBSERVED_INPUT_COMPARISON"
+                for r in rows for q in r.get("observed_input_quote_probes", [])),
             "independent_source_authentication_verified": False,
             "profitability_confirmed": False, **SAFE}
 
