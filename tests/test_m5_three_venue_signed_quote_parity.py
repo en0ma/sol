@@ -8,8 +8,8 @@ class Tests(unittest.TestCase):
                 "route_mints":["A","B","C","A"],"state_accounts_observed_slot":9}
     def receipt(self):
         return {"planned_inputs":[100,80,60],
-                "cpi_hops":[{"hop":1,"received_base_units":80},
-                            {"hop":2,"received_base_units":60}],
+                "cpi_hops":[{"hop":1,"received_base_units":80,"consumed_base_units":80},
+                            {"hop":2,"received_base_units":60,"consumed_base_units":60}],
                 "initial_balances_base_units":[100,0,0,0],
                 "positive_post_balances_base_units":[0,0,0,65]}
     @patch("arb.m5_three_venue_signed_quote_parity.accept",return_value={})

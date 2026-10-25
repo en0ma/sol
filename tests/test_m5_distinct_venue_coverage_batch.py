@@ -30,7 +30,7 @@ class Tests(unittest.TestCase):
                        return_value={"status":"SIGNED_N_LEG_ATOMIC_AND_ROLLBACK_VERIFIED"}),patch(
                  "arb.m5_distinct_venue_coverage_batch.accept",side_effect=[{},ValueError("rollback missing")]),patch(
                  "arb.m5_distinct_venue_coverage_batch.compare",
-                 return_value={"signed_execution_accepted":True,"independently_validated_quote_samples":0}):
+                 return_value={"signed_execution_accepted":True,"independently_validated_quote_samples":0,"leg_comparisons":[]}):
                 report=offline_batch("http://127.0.0.1:8899",source,output,observed_unix=100)
             self.assertEqual(report["independent_signed_accepted"],1)
             self.assertEqual(report["independently_validated_quote_samples"],0)
