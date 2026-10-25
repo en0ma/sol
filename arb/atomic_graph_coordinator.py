@@ -166,6 +166,62 @@ def sign_adaptive_n_leg_offline(rpc,instructions,signer,*,programs,intermediates
                       "legs":n,"actionable":False,
                       "live_execution_approved":False,"broadcast":False}
 
+def audit_n_leg_cpi(tx,response,accounts,amounts,*,lookup=None):
+    """Independently reconcile each intermediate SPL transfer from signed CPI.
+
+    Reuses the existing SPL transfer decoder and loaded v0 keys. A final
+    balance-only check cannot prove an intermediate was produced and consumed.
+    """
+    from solders.pubkey import Pubkey
+    from arb.damm_cpmm_atomic_offline import _inner_token_transfer
+    from arb.token_vaults import TOKEN_PROGRAM
+    if not isinstance(accounts,(list,tuple)) or not isinstance(amounts,(list,tuple)):
+        raise ValueError("missing atomic SPL account or amount inventory")
+    n=len(amounts)
+    if not 2<=n<=MAX_ATOMIC_LEGS or len(accounts)!=n+1 or len(set(accounts))!=n+1:
+        raise ValueError("distinct per-boundary SPL accounts required")
+    if any(type(a)is not int or not 0<a<2**64 for a in amounts):
+        raise ValueError("invalid exact input amounts")
+    keys=(list(tx.message.account_keys) if lookup is None else
+          __import__("arb.atomic_v0_lookup",fromlist=["resolved_v0_keys"]).resolved_v0_keys(tx.message,lookup))
+    token=Pubkey.from_string(TOKEN_PROGRAM)
+    token_index=keys.index(token) if token in keys else None
+    rows=response.get("innerInstructions") if isinstance(response,dict) else None
+    if not isinstance(rows,list):
+        raise ValueError("signed inner SPL instructions unavailable")
+    groups={}
+    for entry in rows:
+        if not isinstance(entry,dict) or type(entry.get("index")) is not int:
+            raise ValueError("invalid inner instruction group")
+        index=entry["index"]
+        if index<0 or index>=n or index in groups or not isinstance(entry.get("instructions"),list):
+            raise ValueError("ambiguous inner instruction group")
+        groups[index]=entry["instructions"]
+    if len(groups)!=n:
+        raise ValueError("signed leg CPI groups incomplete")
+    hops=[]
+    for i in range(1,n):
+        account=accounts[i]
+        received=consumed=0
+        for outer in (i-1,i):
+            for instruction in groups[outer]:
+                flow=_inner_token_transfer(instruction,keys,token_index)
+                if flow is None:
+                    continue
+                src,dst,quantity=flow
+                if outer==i-1 and dst==account:
+                    received+=quantity
+                if outer==i and src==account:
+                    consumed+=quantity
+        if received!=amounts[i] or consumed!=amounts[i]:
+            raise ValueError("signed CPI full intermediate consumption mismatch hop "+str(i))
+        hops.append({"hop":i,"account":account,
+                     "received_base_units":received,"consumed_base_units":consumed,
+                     "planned_input_base_units":amounts[i]})
+    return {"status":"N_LEG_SIGNED_CPI_RECONCILED","hops":hops,
+            "signed_cpi_per_leg_verified":True,
+            "actionable":False,"live_execution_approved":False,"broadcast":False}
+
 def audit_n_leg_balances(amounts, before, after, *, rollback_balances=None, later_instruction_failed=False):
     """Check actual signed N-leg SPL balances, never inferred preflight output."""
     n=len(amounts) if isinstance(amounts,(list,tuple)) else 0
