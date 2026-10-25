@@ -16,6 +16,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install builder dependency
         run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Test empirical two-leg parity portfolio and conservative cost accounting
+        run: python3 -m unittest discover -s tests -p test_signed_quote_parity_portfolio.py -v
+      - name: Test contextual CLMM and Whirlpool tick array coverage diagnostics
+        run: python3 -m unittest discover -s tests -p test_fixture_tick_coverage.py -v
       - name: Test observed signed two-leg quote deviation diagnostic without accuracy self-certification
         run: python3 -m unittest discover -s tests -p test_signed_quote_accuracy_report.py -v
       - name: Test captured Orca and CLMM initialized tick array extraction
