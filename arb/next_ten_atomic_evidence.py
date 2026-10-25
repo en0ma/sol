@@ -49,6 +49,15 @@ def assess(route, evidence):
         errors.append("three authenticated route mints missing")
     elif mints[0]!=mints[2] or mints[0]==mints[1]:
         errors.append("closed cycle mint continuity invalid")
+    # Quote-to-execution source binding is an additional, distinct M5 gate.
+    # Legacy accepted 42/42 proof cannot acquire a slot claim by assertion.
+    pool_addresses=evidence.get("route_pool_addresses")
+    if pool_addresses is not None and (
+        not isinstance(pool_addresses,list) or len(pool_addresses)!=2 or
+        any(not isinstance(p,str) or not p for p in pool_addresses)):
+        errors.append("invalid signed route pool provenance")
+    if evidence.get("quote_accuracy_verified") is True:
+        errors.append("quote accuracy incorrectly self-certified by atomic receipt")
     balances=evidence.get("initial_balances_base_units")
     post=evidence.get("positive_post_balances_base_units")
     persistent=evidence.get("negative_persistent_balances_base_units")

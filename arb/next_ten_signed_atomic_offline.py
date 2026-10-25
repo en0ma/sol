@@ -231,6 +231,9 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache
             "transaction_signature":str(tx.signatures[0]),
             "signed_packet_bytes":packet,
             "route_mints":mints,
+            "route_pool_addresses":[legs[0][1],legs[1][1]],
+            "source_snapshot_slot":None,  # Source fixture lacks slot-attested cross-pool context.
+            "quote_accuracy_verified":False,
             "positive_logs":positive.get("logs") or [],
             "positive_error":str(positive.get("err")),
             "instruction_order_verified":check["instruction_order_verified"],

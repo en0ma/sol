@@ -71,6 +71,18 @@ Seven active venue branches now support indicative exact-input snapshot quote sc
 
 `arb/quote_simulation_reconciliation.py` checks indicative exact-input route quotes against an independently accepted signed Surfpool atomic/rollback receipt. It requires exact venue/pool/mint identities, same source snapshot slot and actual SPL input and output deltas. Missing source-bound pool identities in older 42/42 receipts are **not** silently promoted into quote accuracy evidence. The current tests exercise synthetic but strict receipts only; real source-bound quote-vs-swap accuracy is still pending. Indicative screening does not imply profitability or live execution.
 
+## M5 signed-receipt source binding — October 25, 2026
+
+The offline signed atomic runner now preserves the two exact pool addresses
+in each signed receipt, making route identity inspectable alongside independently
+verified SPL deltas and rollback. The existing source fixture exporter does
+**not yet** retain a cryptographically or RPC-context authenticated common
+source snapshot slot; receipts explicitly set `source_snapshot_slot:null` and
+`quote_accuracy_verified:false`. Consequently the strict M5 quote-to-swap
+reconciler **must reject** these receipts until synchronized source account
+capture and authentic quote derivation are implemented. Historical 42/42 proof
+remains valid *for atomicity*, never quote accuracy. No broadcast.
+
 ## 1. Mission and non-goals
 
 Build a Solana **simulation-only** research and verification system capable of discovering pools across seven active DEX venue implementations, authenticating their on-chain state, decoding them, constructing valid swap instructions, verifying each venue's signed standalone swap simulation, and proving **atomic, ordered, two-venue swaps** on a local Surfpool mainnet fork. Eventually use fresh pool coverage to study arbitrage opportunities, but **profitable discovery, trade execution, and live broadcasting are not acceptance criteria for the current implementation phase**.
