@@ -247,6 +247,43 @@ def audit_n_leg_balances(amounts, before, after, *, rollback_balances=None, late
             "source_rpc_independently_attested":False,
             "actionable":False,"live_execution_approved":False,"broadcast":False}
 
+def verify_signed_prefix_balances(simulated, tokens, owner, initial_amount,
+                                  planned_inputs, prefix_index):
+    """Verify all touched SPL accounts after a signed cumulative prefix.
+
+    Untouched future accounts may be null because Solana RPC need not load
+    accounts absent from the signed message. Every touched account is required.
+    """
+    import base64
+    from arb.token_vaults import TOKEN_PROGRAM,decode_token_account
+    n=len(tokens)-1
+    rows=simulated.get("accounts") if isinstance(simulated,dict) else None
+    if (not isinstance(rows,list) or len(rows)!=len(tokens)
+            or not 0<=prefix_index<n or len(planned_inputs)!=prefix_index+1
+            or any(type(x)is not int or not 0<x<2**64 for x in planned_inputs)):
+        raise ValueError("invalid signed prefix evidence inventory")
+    values=[]
+    for index,row in enumerate(rows[:prefix_index+2]):
+        if not isinstance(row,dict) or row.get("owner")!=TOKEN_PROGRAM:
+            raise ValueError("signed prefix touched SPL account absent")
+        data=row.get("data")
+        if not isinstance(data,list) or len(data)!=2 or data[1]!="base64":
+            raise ValueError("signed prefix touched SPL encoding absent")
+        token=decode_token_account(base64.b64decode(data[0],validate=True))
+        if token["mint"]!=tokens[index] or token["authority"]!=owner:
+            raise ValueError("signed prefix touched SPL identity mismatch")
+        value=token["amount_base_units"]
+        if type(value)is not int or not 0<=value<2**64:
+            raise ValueError("signed prefix touched SPL amount invalid")
+        values.append(value)
+    if values[0]!=initial_amount-planned_inputs[0]:
+        raise ValueError("signed prefix initial debit mismatch")
+    if any(value!=0 for value in values[1:-1]):
+        raise ValueError("signed prefix prior intermediate residual")
+    if values[-1]<=0:
+        raise ValueError("signed prefix terminal output missing")
+    return values[-1]
+
 def signed_prefix_observer(rpc,legs,tokens,states,evidence,owner,accounts,signer,
                            *,initial_amount):
     """Build and signed-simulate each growing route prefix to observe next input.
@@ -272,6 +309,7 @@ def signed_prefix_observer(rpc,legs,tokens,states,evidence,owner,accounts,signer
     if initial!=[initial_amount]+[0]*n:
         raise ValueError("signed prefix initial SPL state mismatch")
     prefix=[]
+    planned_inputs=[]
     last_index=-1
     def observe(i,leg,amount):
         nonlocal last_index
@@ -293,21 +331,9 @@ def signed_prefix_observer(rpc,legs,tokens,states,evidence,owner,accounts,signer
         simulated,_=_simulate(rpc,tx,accounts)
         if simulated.get("err") is not None:
             raise ValueError("signed prefix simulation failed: "+str(simulated["err"])[:160])
-        rows=simulated.get("accounts")
-        if not isinstance(rows,list) or len(rows)!=len(accounts):
-            raise ValueError("signed prefix SPL accounts missing")
-        row=rows[i+1]
-        if not isinstance(row,dict) or row.get("owner")!=TOKEN_PROGRAM:
-            raise ValueError("signed prefix output SPL owner missing")
-        data=row.get("data")
-        if not isinstance(data,list) or len(data)!=2 or data[1]!="base64":
-            raise ValueError("signed prefix output SPL bytes missing")
-        token=decode_token_account(base64.b64decode(data[0],validate=True))
-        if token["mint"]!=tokens[i+1] or token["authority"]!=owner:
-            raise ValueError("signed prefix output mint or authority mismatch")
-        output=token["amount_base_units"]-initial[i+1]
-        if type(output)is not int or not 0<output<2**64:
-            raise ValueError("signed prefix output invalid")
+        planned_inputs.append(amount)
+        output=verify_signed_prefix_balances(
+            simulated,tokens,owner,initial_amount,planned_inputs,i)
         if _post(rpc,accounts,tokens,owner)!=initial:
             raise ValueError("signed prefix mutated persistent token state")
         return {"signed_offline_observed":True,"output_base_units":output,

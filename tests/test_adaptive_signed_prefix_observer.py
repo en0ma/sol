@@ -21,12 +21,18 @@ class Tests(unittest.TestCase):
         def simulate(rpc,tx,keys):
             slot=call_count[0];call_count[0]+=1
             rows=[None]*4
-            rows[slot+1]={"owner":"token","data":["YQ==","base64"]}
+            for index in range(slot+2):
+                rows[index]={"owner":"token","data":["YQ==","base64"]}
             return {"err":None,"accounts":rows},200
         call_count=[0]
+        decode_index=[0]
         def decode(raw):
-            return {"mint":["B","C"][call_count[0]-1],"authority":"owner",
-                    "amount_base_units":signed_outputs[call_count[0]-1]}
+            slot=call_count[0]-1
+            index=decode_index[0];decode_index[0]+=1
+            if index==slot+2:
+                index=0
+            return {"mint":["A","B","C"][index],"authority":"owner",
+                    "amount_base_units":(0 if index<=slot else signed_outputs[slot])}
         with patch("arb.damm_cpmm_atomic_offline._post",return_value=balances),patch(
              "arb.atomic_graph_coordinator.build_leg",return_value="ix") as builder,patch(
              "arb.rpc.call",return_value={"value":{"blockhash":"fake"}}),patch(

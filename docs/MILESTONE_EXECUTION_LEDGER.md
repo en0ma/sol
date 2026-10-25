@@ -53,6 +53,10 @@
 - [ ] **C04 — Make existing discovery, market registry and opportunity graph supply candidates to the coordinator.** Existing: `arb/raydium_public_pool_discovery.py`, `arb/market_state_registry.py`, `arb/opportunity_graph.py`, `arb/research_engine_pipeline.py`. Wire and harden, don't rewrite.
 - [ ] **C05 — Continuous monitoring/indexing (M6)** deferred pending reliable M5 source-state and user's RPC/budget authorization.
 
+## Signed cumulative prefix full-account consistency (B01b/A03)
+
+The default signed prefix observer now verifies *every touched* simulated SPL account, not only the next output: input debit matches its signed exact amount, earlier intermediate user balances are fully consumed, and the next output is positive and mint/authority-authenticated. Untouched future accounts may be null, consistent with Solana simulation. This closes a gap where a nonzero earlier residual or incorrect initial debit could silently flow into a later compiled input. Unit regressions cover both. CI validation pending; source-exact quote parity still unverified.
+
 ## Independent rollback instruction-index hardening
 
 The three- and four-to-six-hop audits now parse the actual signed negative-control InstructionError index and demand the last swap instruction failed, rather than accepting an arbitrary error substring. Receipts also include a structured negative_failure_instruction_index cross-check. Older receipts without this field are accepted only when the raw error pinpoints the correct instruction. Tests reject early failures and contradictory indices. No trading authorization.
