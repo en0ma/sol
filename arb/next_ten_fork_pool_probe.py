@@ -106,6 +106,40 @@ def candidates(registry):
             result[venue].insert(0,pool)
     return result
 
+def select_distinct_triangle_coverage(candidates, *, maximum=4):
+    """Deterministic greedy venue-triple and pair diversity, not first-N duplicates."""
+    if type(maximum) is not int or not 1<=maximum<=30:
+        raise ValueError("bounded venue coverage required")
+    if not isinstance(candidates,list):
+        raise ValueError("candidate inventory missing")
+    selected=[]
+    remaining=list(candidates)
+    used_triples=set()
+    used_pairs=set()
+    while remaining and len(selected)<maximum:
+        best=None
+        best_score=(-1,-1)
+        for index,row in enumerate(remaining):
+            venues=row.get("route_venues") if isinstance(row,dict) else None
+            if (not isinstance(venues,list) or len(venues)!=3
+                    or len(set(venues))!=3):
+                raise ValueError("untrusted three-venue candidate")
+            triple=frozenset(venues)
+            pairs={frozenset((venues[0],venues[1])),
+                   frozenset((venues[1],venues[2])),
+                   frozenset((venues[2],venues[0]))}
+            score=(int(triple not in used_triples),len(pairs-used_pairs))
+            if score>best_score:
+                best_score=score
+                best=index
+        selected.append(remaining.pop(best))
+        venues=selected[-1]["route_venues"]
+        used_triples.add(frozenset(venues))
+        used_pairs.update((frozenset((venues[0],venues[1])),
+                          frozenset((venues[1],venues[2])),
+                          frozenset((venues[2],venues[0]))))
+    return selected
+
 def authenticated_distinct_venue_triangles(authenticated_pools, *, limit=30):
     """Discover genuinely closed A→B→C→A three-venue paths from read-only proofs.
 
