@@ -9,6 +9,7 @@ from arb.next_ten_pair_fixture_export import export_three_venue
 from arb.next_ten_signed_atomic_offline import run_three_venue
 from arb.m5_three_distinct_venue_signed_acceptance import verify as accept
 from arb.m5_three_venue_signed_quote_parity import compare
+from arb.m5_three_venue_observed_economics import evaluate as evaluate_economics
 from arb.next_ten_fork_pool_probe import authenticated_distinct_venue_triangles,select_distinct_triangle_coverage
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
 
@@ -46,19 +47,27 @@ def offline_batch(rpc,fixtures,directory,*,observed_unix):
         target=root/row["fixture"]
         result={"status":"SIGNED_TRIANGLE_BLOCKED",**SAFE}
         parity=None
+        economics=None
         try:
             fixture=json.loads(path.read_text())
             result=run_three_venue(rpc,fixture)
             accept(fixture,result)
             parity=compare(fixture,result,observed_unix=observed_unix)
+            # Simulation does not yield an independently assessed fee or
+            # authenticated SOL→start-mint conversion; report the actual blocker.
+            economics=evaluate_economics(fixture,result)
         except (ValueError,TypeError,KeyError,RuntimeError) as exc:
             result["acceptance_error"]=str(exc)[:240]
         target.write_text(json.dumps(result,indent=2)+"\n")
         if parity is not None:
             (root/("parity-%02d.json"%row["index"])).write_text(json.dumps(parity,indent=2)+"\n")
+        if economics is not None:
+            (root/("economics-%02d.json"%row["index"])).write_text(json.dumps(economics,indent=2)+"\n")
         rows.append({"index":row["index"],"status":result["status"],
                      "independent_signed_accepted":parity is not None and parity["signed_execution_accepted"],
-                     "independently_validated_quote_samples":0,**SAFE})
+                     "independently_validated_quote_samples":0,
+                     "economics_status":economics["status"] if economics is not None else "UNAVAILABLE",
+                     "quote_diagnostic_legs":len(parity["leg_comparisons"]) if parity is not None else 0,**SAFE})
     report={"attempted":len(rows),
             "independent_signed_accepted":sum(r.get("independent_signed_accepted") is True for r in rows),
             "independently_validated_quote_samples":0,"routes":rows,**SAFE}

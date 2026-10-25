@@ -34,6 +34,10 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_native_fee_source_identity.py -v
       - name: Test fixture quote projection source identity joins and fee proof boundaries
         run: python3 -m unittest discover -s tests -p test_fixture_quote_projection_identity.py -v
+      - name: Test evidence-based multi-venue distinct triple acceptance and costs
+        run: |
+          python3 -m unittest discover -s tests -p test_m5_three_venue_coverage_acceptance.py -v
+          python3 -m unittest discover -s tests -p test_m5_three_venue_observed_economics.py -v
       - name: Test multiple real three-venue source/receipt batch accounting
         run: python3 -m unittest discover -s tests -p test_m5_distinct_venue_coverage_batch.py -v
       - name: Test signed three-venue per-leg source-quote comparisons stay non-actionable
@@ -318,6 +322,10 @@ jobs:
         if: ${{ matrix.shard == 0 }}
         run: |
           python3 -m arb.m5_distinct_venue_coverage_batch --mode offline --fixtures "$RUNNER_TEMP/three-venue-source-batch" --output-dir "$RUNNER_TEMP/three-venue-batch-receipts" --observed-unix "$(date +%s)"
+      - name: Independently audit number of genuinely distinct signed source venue triples
+        if: ${{ matrix.shard == 0 }}
+        run: |
+          python3 -m arb.m5_three_venue_coverage_acceptance "$RUNNER_TEMP/three-venue-source-batch" "$RUNNER_TEMP/three-venue-batch-receipts" 2 "$(date +%s)"
       - uses: actions/upload-artifact@v4
         if: ${{ always() && matrix.shard == 0 }}
         with:
