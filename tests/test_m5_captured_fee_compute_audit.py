@@ -61,6 +61,8 @@ class Tests(unittest.TestCase):
              "arb.m5_captured_fee_compute_audit.decode_native_config_fee",return_value=fee):
             report=diagnose(f,{})
         self.assertIn("INVALID",report["fee_rows"][0]["blocker"])
+        self.assertIsNone(report["fee_rows"][0].get("effective_quote_fee_ppm"))
+        self.assertFalse(report["fee_rows"][0]["trade_fee_authenticated"])
         self.assertFalse(report["fee_rows"][0]["total_effective_fee_authenticated"])
     def test_authenticated_fee_must_have_numeric_ppm(self):
         f=fixture()
@@ -73,6 +75,20 @@ class Tests(unittest.TestCase):
             report=diagnose(f,{})
         self.assertFalse(report["fee_rows"][0]["total_effective_fee_authenticated"])
         self.assertIn("INVALID",report["fee_rows"][0]["blocker"])
+    def test_partial_decoded_fee_conflict_not_leaked(self):
+        f=fixture()
+        state=[{"venue":"raydium_cpmm","address":"pool","snapshot_slot":30,"decoded_pool_state":{}}]
+        fee={"config_address":"cfg","trade_fee_ppm":2200,"creator_fee_ppm":100,
+             "trade_fee_authenticated":True,"total_effective_fee_authenticated":False,
+             "creator_fee_placement_verified":False,"effective_quote_fee_ppm":2300}
+        with patch("arb.m5_captured_fee_compute_audit.extract_pool_states",return_value=state),patch(
+             "arb.m5_captured_fee_compute_audit.decode_native_config_fee",return_value=fee):
+            result=diagnose(f,{})
+        row=result["fee_rows"][0]
+        self.assertFalse(row["trade_fee_authenticated"])
+        self.assertFalse(row["total_effective_fee_authenticated"])
+        self.assertNotIn("trade_fee_ppm",row)
+        self.assertIsNone(row["effective_quote_fee_ppm"])
     def test_duplicate_pool_fee_source_rejected(self):
         f=fixture()
         state={"venue":"raydium_cpmm","address":"pool","snapshot_slot":30,"decoded_pool_state":{}}

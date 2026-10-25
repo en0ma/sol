@@ -40,6 +40,13 @@ def diagnose(fixture,receipt):
             if not fee["total_effective_fee_authenticated"]:
                 item["blocker"]=("CPMM_CREATOR_FEE_PLACEMENT_UNVERIFIED" if row["venue"]=="raydium_cpmm" else "CLMM_EFFECTIVE_FEE_UNVERIFIED")
         except (ValueError,KeyError,TypeError) as exc:
+            # A partially decoded fee is not authenticated evidence.
+            # Keep only source identity and failure, never leaked fee claims.
+            item={"venue":row["venue"],"pool":row["address"],
+                  "source_slot":row["snapshot_slot"],
+                  "total_effective_fee_authenticated":False,
+                  "trade_fee_authenticated":False,
+                  "effective_quote_fee_ppm":None}
             item["blocker"]=row["venue"].upper()+"_CAPTURED_CONFIG_INVALID: "+str(exc)[:160]
         result["fee_rows"].append(item)
     if isinstance(receipt,dict):
