@@ -34,6 +34,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_native_fee_source_identity.py -v
       - name: Test fixture quote projection source identity joins and fee proof boundaries
         run: python3 -m unittest discover -s tests -p test_fixture_quote_projection_identity.py -v
+      - name: Test independent actual three-distinct-venue signed receipt acceptance
+        run: python3 -m unittest discover -s tests -p test_three_distinct_venue_signed_acceptance.py -v
       - name: Test universal signed three-venue runner source and topology gates
         run: python3 -m unittest discover -s tests -p test_signed_three_venue_runner.py -v
       - name: Test read-only three-distinct-venue fixture export
@@ -299,6 +301,9 @@ jobs:
                             "rollback_failure_case_verified":r.get("rollback_failure_case_verified",False),
                             "broadcast":False}))
           PY
+          if [ -f "$RUNNER_TEMP/three-venue-source.json" ]; then
+            python3 -m arb.m5_three_distinct_venue_signed_acceptance "$RUNNER_TEMP/three-venue-source.json" "$RUNNER_TEMP/three-venue-trial/three-venue.json"
+          fi
       - uses: actions/upload-artifact@v4
         if: ${{ always() && matrix.shard == 0 }}
         with:

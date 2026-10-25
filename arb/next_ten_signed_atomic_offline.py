@@ -536,13 +536,13 @@ def main():
     if args.three_venue_fixture:
         path=Path(args.three_venue_fixture)
         result={"status":"THREE_VENUE_SIGNED_EXECUTION_BLOCKED",**SAFETY}
-        (root/"three-venue.json").write_text(json.dumps(result,indent=2)+"\\n")
+        (root/"three-venue.json").write_text(json.dumps(result,indent=2)+"\n")
         try:
             result=run_three_venue("http://127.0.0.1:8899",
                                    json.loads(path.read_text()),program_cache={})
         except Exception as exc:
             result.update(error_class=type(exc).__name__,diagnostic=str(exc)[:500])
-        (root/"three-venue.json").write_text(json.dumps(result,indent=2)+"\\n")
+        (root/"three-venue.json").write_text(json.dumps(result,indent=2)+"\n")
         print(json.dumps({"route":"three-distinct-venues","status":result["status"],
                           "broadcast":False}),flush=True)
         return
