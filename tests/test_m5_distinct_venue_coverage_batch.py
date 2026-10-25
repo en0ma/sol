@@ -25,7 +25,7 @@ class Tests(unittest.TestCase):
                 {"index":0,"status":"AUTHENTICATED_THREE_VENUE_SOURCE_FIXTURE","fixture":"triangle-00.json"},
                 {"index":1,"status":"AUTHENTICATED_THREE_VENUE_SOURCE_FIXTURE","fixture":"triangle-01.json"}]}))
             for i in range(2):
-                (root/("triangle-%02d.json"%i)).write_text("{}")
+                (root/("triangle-%02d.json"%i)).write_text(json.dumps({"route_venues":["orca","raydium_cpmm","raydium_amm_v4"],"route_pool_addresses":["p","q","r"],"route_mints":["A","B","C","A"]}))
             with patch("arb.m5_distinct_venue_coverage_batch.run_three_venue",
                        return_value={"status":"SIGNED_N_LEG_ATOMIC_AND_ROLLBACK_VERIFIED"}),patch(
                  "arb.m5_distinct_venue_coverage_batch.accept",side_effect=[{},ValueError("rollback missing")]),patch(
