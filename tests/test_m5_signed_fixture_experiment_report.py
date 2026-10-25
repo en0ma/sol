@@ -50,11 +50,12 @@ class Tests(unittest.TestCase):
         self.assertIn("OBSERVED_INTERMEDIATE_UNCONSUMED",report["reason_codes"])
         self.assertEqual(report["intermediate_amount_gap_base_units"],5)
     def test_quote_failure_preserves_observed_continuity_failure(self):
+        r=receipt();r["positive_post_balances_base_units"]=[0,5,110]
         with patch("arb.m5_signed_fixture_experiment_report.quote_experiment",
                    side_effect=ValueError("CPMM source fee/reserves unavailable")):
-            result=evaluate(fixture(),receipt(),observed_unix=1)
+            result=evaluate(fixture(),r,observed_unix=1)
         self.assertIn("OBSERVED_INTERMEDIATE_UNCONSUMED",result["reason_codes"])
-        self.assertEqual(result["intermediate_amount_gap_base_units"],80)
+        self.assertEqual(result["intermediate_amount_gap_base_units"],5)
         self.assertIn("CPMM_EFFECTIVE_FEE_OR_RESERVES_UNAVAILABLE",result["reason_codes"])
         self.assertEqual(result["quoted_legs"],[])
         self.assertFalse(result["live_execution_approved"])
