@@ -16,6 +16,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install builder dependency
         run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Test focused real-source fixture receipt batch assessment
+        run: python3 -m unittest discover -s tests -p test_m5_focused_signed_experiment_batch.py -v
       - name: Test reproducible fixture-to-signed receipt experiment diagnostics
         run: python3 -m unittest discover -s tests -p test_m5_signed_fixture_experiment_report.py -v
       - name: Test native account-derived CPMM/AMM v4 two-leg quote parity and observed cost risk
@@ -226,6 +228,24 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/receipts"
           for shard in 0 1; do cp -a "$RUNNER_TEMP/shards/amm-v4-signed-receipts-$shard/." "$RUNNER_TEMP/receipts/"; done
+      - name: Download authenticated focused source fixture bundle for quote research
+        uses: actions/download-artifact@v4
+        with:
+          name: amm-v4-focused-source
+          path: ${{ runner.temp }}/source
+      - name: Assess CPMM and AMM v4 actual source fixture and signed receipt diagnostic pairs
+        run: |
+          python3 -m arb.m5_focused_signed_experiment_batch \
+            --fixture-dir "$RUNNER_TEMP/source/amm-v4-fixtures" \
+            --receipt-dir "$RUNNER_TEMP/receipts" \
+            --observed-unix "$(date +%s)" \
+            --output "$RUNNER_TEMP/m5-cpmm-v4-experiments.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: m5-cpmm-v4-source-quote-diagnostics
+          path: ${{ runner.temp }}/m5-cpmm-v4-experiments.json
+          if-no-files-found: warn
       - name: Independent acceptance; keep prior 30 strictly labeled historical
         run: python3 -m arb.focused_amm_v4_evidence --receipts "$RUNNER_TEMP/receipts" --output "$RUNNER_TEMP/amm-v4-audit.json"
       - name: Enforce all twelve signed atomic and rollback acceptances
