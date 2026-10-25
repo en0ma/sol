@@ -125,6 +125,10 @@ New \`arb/fixture_quote_execution_pipeline.py\` verifies source manifest, decode
 
 \`arb/fixture_pool_fundamentals.py\` now decodes both native classic SPL vaults for **all seven venue types** from the contextual manifest-verified account inventory, verifies mint, owner, authority and positive reserves, and extracts existing pool-native fee/price/liquidity fundamentals for Orca, CLMM, DAMM v2, DLMM, PumpSwap and AMM v4. This does **not** authenticate complete effective fees from separate configuration accounts, DLMM active bin contents, DAMM dynamic fee, PumpSwap fee program, AMM v4 OpenBook balances or exact seven-venue swap math. Until those account-specific decoders and signed reconciliation run, quote accuracy remains unverified. No mainnet broadcast.
 
+## M5 seven-venue auxiliary pricing checklist — October 25, 2026
+
+New \`arb/seven_venue_aux_pricing_requirements.py\` explicitly records missing authenticated fee, tick/bin, virtual-reserve, and OpenBook/PnL extraction prerequisites for **each of seven** quote models. This is a typed coverage and research safety integration, **not** those still-unimplemented auxiliary decoders. Every venue remains blocked for full account-derived quote accuracy until its prerequisites are independently decoded from manifest-captured accounts and signed Surfpool output parity is measured.
+
 ## 1. Mission and non-goals
 
 Build a Solana **simulation-only** research and verification system capable of discovering pools across seven active DEX venue implementations, authenticating their on-chain state, decoding them, constructing valid swap instructions, verifying each venue's signed standalone swap simulation, and proving **atomic, ordered, two-venue swaps** on a local Surfpool mainnet fork. Eventually use fresh pool coverage to study arbitrage opportunities, but **profitable discovery, trade execution, and live broadcasting are not acceptance criteria for the current implementation phase**.
