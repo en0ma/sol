@@ -42,7 +42,8 @@ def authenticated_registry(snapshot, *, now, max_age=60):
     return {"pools":pools,"rejected":rejected,"status":"AUTHENTICATED_SNAPSHOT_ONLY",**SAFETY}
 
 def run_cycle_pipeline(snapshot, *, now, quote_provider, cost_provider,
-                       simulate_provider=None, max_age=60, max_cycles=200):
+                       simulate_provider=None, max_age=60, max_cycles=200,
+                       initial_input=None):
     """Never infer signed proof from quote math; simulator must return receipts.
 
     Provider invocation is intentionally local/injected: this function cannot
@@ -50,6 +51,8 @@ def run_cycle_pipeline(snapshot, *, now, quote_provider, cost_provider,
     """
     if type(now)is not int or now<0 or type(max_age)is not int or max_age<1:
         raise ValueError("invalid freshness policy")
+    if initial_input is not None and (type(initial_input)is not int or not 0<initial_input<2**64):
+        raise ValueError("invalid initial exact-input amount")
     if not callable(quote_provider) or not callable(cost_provider):
         raise ValueError("quote and cost providers required")
     registry=authenticated_registry(snapshot,now=now,max_age=max_age)
@@ -63,7 +66,7 @@ def run_cycle_pipeline(snapshot, *, now, quote_provider, cost_provider,
         quotes=[];reason=None
         for leg in edges:
             try:
-                q=quote_provider(leg,quotes[-1]["amount_out"] if quotes else None)
+                q=quote_provider(leg,quotes[-1]["amount_out"] if quotes else initial_input)
                 if not isinstance(q,dict) or any(q.get(k)!=leg[k] for k in leg):
                     raise ValueError("provider quote identity mismatch")
                 if quotes and q.get("amount_in")!=quotes[-1].get("amount_out"):
@@ -96,7 +99,7 @@ def run_cycle_pipeline(snapshot, *, now, quote_provider, cost_provider,
                 result["simulation_audit"]={"status":"UNVERIFIED",
                     "failure_reasons":["signed simulator unavailable or route not two distinct venues"]}
         rows.append(result)
-    return {"status":"RESEARCH_ONLY","authenticated_pools":len(registry["pools"]),
+    return {"status":"RESEARCH_ONLY","initial_input_base_units":initial_input,"authenticated_pools":len(registry["pools"]),
             "rejected_pools":registry["rejected"],"graph_cycles":len(graph),
             "screened_routes":len(rows),"research_positive":sum(
                 x.get("research",{}).get("positive_after_declared_costs") is True for x in rows),
