@@ -42,6 +42,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_signed_three_venue_runner.py -v
       - name: Test read-only three-distinct-venue fixture export
         run: python3 -m unittest discover -s tests -p test_three_venue_fixture_export.py -v
+      - name: Test diversity-first source triangle selection
+        run: python3 -m unittest discover -s tests -p test_distinct_triangle_coverage_selection.py -v
       - name: Test real authenticated three-distinct-venue closed route discovery
         run: python3 -m unittest discover -s tests -p test_distinct_venue_triangle_discovery.py -v
       - name: Test source quote and signed execution blocker grouping

@@ -230,7 +230,7 @@ def probe(rpc, registry, *, batch=BATCH_10):
                        "candidate_count":len(combinations),
                        "signed_atomic_simulation_verified":False,
                        "rollback_failure_case_verified":False,**SAFETY})
-    triangles=authenticated_distinct_venue_triangles(pools)
+    triangles=select_distinct_triangle_coverage(authenticated_distinct_venue_triangles(pools,limit=100),maximum=30)
     return {"status":"READONLY_NEXT_TEN_FORK_POOL_AUTHENTICATION",
             "authenticated_distinct_venue_three_leg_candidates":triangles,
             "authenticated_distinct_venue_three_leg_candidate_count":len(triangles),
