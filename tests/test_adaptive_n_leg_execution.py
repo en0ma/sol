@@ -19,6 +19,7 @@ class Tests(unittest.TestCase):
             report=simulate_adaptive_n_leg_offline("http://127.0.0.1:8899",legs,
                 ["A","B","A"],{},{},"owner",["x","y","z"],100,lambda *x:None,MagicMock())
         self.assertEqual(report["status"],"NEGATIVE_CONTROL_MISSING")
+        self.assertEqual(report["initial_balances_base_units"],[100,0,0])
         self.assertFalse(report["signed_atomic_simulation_verified"])
     def test_reused_token_account_rejected(self):
         with self.assertRaises(ValueError):

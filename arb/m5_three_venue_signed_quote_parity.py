@@ -29,6 +29,18 @@ def compare(fixture,receipt,*,observed_unix):
             or len(before)!=4 or len(after)!=4):
         result["reason"]="SIGNED_CPI_HOPS_NOT_AVAILABLE"
         return result
+    if (any(type(x) is not int or x<0 for x in before+after)
+            or any(type(x) is not int or x<=0 for x in amounts)
+            or before[0]-after[0]!=amounts[0]
+            or any(before[i]!=0 or after[i]!=0 for i in (1,2))):
+        result["reason"]="SIGNED_SPL_ACCOUNT_RECONCILIATION_INVALID"
+        return result
+    if any(not isinstance(hops[i],dict) or hops[i].get("hop")!=i+1
+           or hops[i].get("received_base_units")!=amounts[i+1]
+           or hops[i].get("consumed_base_units")!=amounts[i+1]
+           for i in (0,1)):
+        result["reason"]="SIGNED_CPI_AMOUNT_CONSUMPTION_INVALID"
+        return result
     mints=fixture["route_mints"]
     venues=fixture["route_venues"]
     pools=fixture["route_pool_addresses"]

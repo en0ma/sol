@@ -37,6 +37,7 @@ def evaluate(fixture,receipt,*,observed_fee_lamports=None,
     if output<=0:
         report["reason"]="POSITIVE_TERMINAL_OUTPUT_MISSING"
         return report
+    report["observed_positive_compute_units"]=receipt.get("positive_units_consumed")
     report["gross_output_base_units"]=output
     report["gross_delta_start_mint_base_units"]=output-spent[0]
     if (type(observed_fee_lamports)is not int or observed_fee_lamports<0):
