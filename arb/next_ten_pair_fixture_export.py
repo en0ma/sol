@@ -237,14 +237,105 @@ def export(rpc,readiness,route_index,output,*,batch=BATCH_10):
             "first_venue":first,"second_venue":second,
             "account_count":len(accounts),"broadcast":False}
 
+
+def export_three_venue(rpc,readiness,route_index,output):
+    """Capture three genuine source pools and all dependent accounts in one context.
+
+    This extends fixture capture only; transaction construction still belongs
+    to the existing universal 2-6-leg coordinator, never a parallel engine.
+    """
+    local_rpc_only(rpc)
+    from arb.next_ten_fork_pool_probe import authenticated_distinct_venue_triangles
+    if readiness.get("source")!="READ_ONLY_MAINNET_BACKED_SURFPOOL":
+        raise ValueError("unsupported source provenance")
+    if type(route_index)is not int or route_index<0:
+        raise ValueError("invalid authenticated triangle index")
+    pools=readiness.get("authenticated_pools")
+    candidates=authenticated_distinct_venue_triangles(pools)
+    if route_index>=len(candidates):
+        raise ValueError("three-distinct-venue route candidate unavailable")
+    candidate=candidates[route_index]
+    venues=candidate["route_venues"]
+    addresses_by_leg=candidate["route_pool_addresses"]
+    mints=candidate["route_mints"]
+    if (len(venues)!=len(addresses_by_leg)!=3 or len(set(venues))!=3
+            or len(set(addresses_by_leg))!=3 or len(set(mints[:3]))!=3
+            or mints[0]!=mints[-1]):
+        raise ValueError("invalid three-venue closed candidate")
+    accounts_to_fetch=[]
+    evidence=[]
+    for i,(venue,pool) in enumerate(zip(venues,addresses_by_leg)):
+        # Re-authenticate each pool against upstream-backed local RPC.
+        proof=snapshot(rpc,pool,venue)
+        if (proof.get("authenticated") is not True or
+                proof.get("slot")!=candidate["source_slots"][i] or
+                set(proof["mints"])!={mints[i],mints[i+1]}):
+            raise ValueError("triangle source candidate changed before export")
+        extras,leg_proof=venue_accounts(rpc,venue,pool,mints[i:i+2])
+        accounts_to_fetch.extend(extras)
+        evidence.append({"venue":venue,"pool":pool,**leg_proof})
+    addresses=list(dict.fromkeys(accounts_to_fetch))
+    if not addresses or len(addresses)>128:
+        raise ValueError("three-pool state inventory outside bound")
+    # One contextual getMultipleAccounts call attests all non-program data.
+    contextual=call(rpc,"getMultipleAccounts",[
+        addresses,{"encoding":"base64","commitment":"confirmed"}])
+    slot=contextual.get("context",{}).get("slot")
+    values=contextual.get("value")
+    if (type(slot)is not int or slot<0 or not isinstance(values,list)
+            or len(values)!=len(addresses)
+            or any(not isinstance(value,dict) for value in values)):
+        raise ValueError("contextual three-pool account inventory incomplete")
+    accounts=dict(zip(addresses,values))
+    programs={PROGRAMS[v] for v in venues}
+    if "pumpswap" in venues:
+        from arb.pumpswap_fee_account import PROGRAM as FEE_PROGRAM
+        programs.add(FEE_PROGRAM)
+    accounts.update(program_data_accounts(rpc,programs))
+    if len(accounts)<=len(addresses):
+        raise ValueError("authenticated executable program data missing")
+    report={
+        "source":"READ_ONLY_MAINNET_BACKED_SURFPOOL",
+        "fixture_kind":"THREE_DISTINCT_VENUE_CLOSED_ROUTE",
+        "route_venues":venues,"route_pool_addresses":addresses_by_leg,
+        "route_mints":mints,"leg_evidence_by_index":evidence,
+        "source_candidate_slots":candidate["source_slots"],
+        "state_accounts_observed_slot":slot,
+        "state_account_count":len(addresses),
+        "state_account_addresses":addresses,
+        "state_account_manifest_sha256":digest(accounts,addresses,slot),
+        "full_source_snapshot_slot":None,
+        "accounts":accounts,
+        "signed_atomic_simulation_verified":False,
+        "rollback_failure_case_verified":False,
+        "actionable":False,"live_execution_approved":False,"broadcast":False}
+    from arb.source_snapshot_manifest import verify
+    verify(report)
+    Path(output).write_text(json.dumps(report,sort_keys=True,indent=2)+"\n")
+    return {"status":"AUTHENTICATED_THREE_VENUE_SOURCE_FIXTURE",
+            "route_venues":venues,"state_account_count":len(addresses),
+            "signed_atomic_simulation_verified":False,"broadcast":False}
+
 def main():
     p=argparse.ArgumentParser()
     p.add_argument("--rpc",default="http://127.0.0.1:8899")
+    p.add_argument("--triangle-index",type=int)
+    p.add_argument("--triangle-output")
     p.add_argument("--readiness",required=True)
-    p.add_argument("--output-dir",required=True)
+    p.add_argument("--output-dir")
     p.add_argument("--batch",choices=("first","next","remaining","non-v4"),default="first")
     p.add_argument("--only-venue",choices=("raydium_amm_v4",))
     args=p.parse_args()
+    if args.triangle_index is not None:
+        if not args.triangle_output:
+            p.error("--triangle-output required with --triangle-index")
+        ready=json.loads(Path(args.readiness).read_text())
+        Path(args.triangle_output).parent.mkdir(parents=True,exist_ok=True)
+        print(json.dumps(export_three_venue(args.rpc,ready,args.triangle_index,
+                                           args.triangle_output)))
+        return
+    if not args.output_dir:
+        p.error("--output-dir required without --triangle-index")
     root=Path(args.output_dir)
     root.mkdir(parents=True,exist_ok=True)
     ready=json.loads(Path(args.readiness).read_text())
