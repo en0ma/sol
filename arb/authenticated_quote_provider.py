@@ -1,4 +1,4 @@
-"""M5 authenticated CPMM, CLMM, Orca and PumpSwap exact-input models.
+"""M5 seven-venue indicative quote interface, requiring authenticated state.
 
 Other venues explicitly fail closed until their directional fee/liquidity
 models are integrated. No mock swap amounts, inferred fee tiers, or live RPC.
@@ -9,6 +9,7 @@ from arb.orca_spot_quote import quote_bounded_single_tick
 from arb.pumpswap_quote import quote_exact_input as quote_pumpswap_exact_input
 from arb.venue_quote_contract import validate
 from arb.market_state_registry import normalize
+from arb.remaining_venue_quotes import quote as quote_remaining
 
 def from_snapshot(snapshot,*,now,max_age=60,max_slot_skew=32):
     registry=normalize(snapshot,as_of_unix=now,max_age_seconds=max_age,
@@ -23,6 +24,20 @@ def from_snapshot(snapshot,*,now,max_age=60,max_slot_skew=32):
             raise ValueError("pool not in authenticated snapshot")
         if type(amount_in)is not int or not 0<amount_in<2**64:
             raise ValueError("exact-input amount required")
+        if venue in ("meteora_dlmm","meteora_damm_v2","raydium_amm_v4"):
+            output,fee,depth,model=quote_remaining(state,leg,amount_in)
+            result={"venue":venue,"pool":pool,"input_mint":leg["input_mint"],
+                "output_mint":leg["output_mint"],"amount_in":amount_in,
+                "amount_out":output,"fee_input_units":fee,
+                "liquidity_input_units":depth,
+                "price_impact_bps":min(10000,(amount_in*10000+depth-1)//depth),
+                "snapshot_slot":state["slot"],"observed_unix":state["observed_unix"],
+                "source_authenticated":True,"quote_source":"AUTHENTICATED_POOL_SNAPSHOT",
+                "quote_model":model,"protocol_exact_quote_verified":False}
+            check=validate(result,state,requested_input=amount_in,now=now,max_age=max_age)
+            if check["status"]!="VALIDATED_INDICATIVE_QUOTE":
+                raise ValueError("quote rejected: "+", ".join(check["reason_codes"]))
+            return result
         if venue=="pumpswap":
             if (state.get("trade_fee_authenticated") is not True or
                     state.get("effective_fee_verified") is not True or

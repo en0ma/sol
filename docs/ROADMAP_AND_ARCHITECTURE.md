@@ -63,6 +63,10 @@ quotes, continuous monitoring, or profitable opportunities. Do not promote
 mocked providers into production evidence. Full venue integration and data
 freshness remain the active M5 work.
 
+## M5 seven-venue quote dispatch — October 25, 2026
+
+Seven active venue branches now support indicative exact-input snapshot quote screening. Newly added: DLMM authenticated single-bin, DAMM v2 authenticated fixed-liquidity price segment, and AMM v4 OpenBook/PnL-adjusted net-reserve CPMM. These are strictly bounded models, not verified protocol-exact pricing or live authenticated refresh. All three fail closed without independently authenticated state, fees and directional limits. Actual cross-venue accuracy and profitability remain unverified until signed simulation reconciliation.
+
 ## 1. Mission and non-goals
 
 Build a Solana **simulation-only** research and verification system capable of discovering pools across seven active DEX venue implementations, authenticating their on-chain state, decoding them, constructing valid swap instructions, verifying each venue's signed standalone swap simulation, and proving **atomic, ordered, two-venue swaps** on a local Surfpool mainnet fork. Eventually use fresh pool coverage to study arbitrage opportunities, but **profitable discovery, trade execution, and live broadcasting are not acceptance criteria for the current implementation phase**.
