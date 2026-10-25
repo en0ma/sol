@@ -53,6 +53,10 @@
 - [ ] **C04 — Make existing discovery, market registry and opportunity graph supply candidates to the coordinator.** Existing: `arb/raydium_public_pool_discovery.py`, `arb/market_state_registry.py`, `arb/opportunity_graph.py`, `arb/research_engine_pipeline.py`. Wire and harden, don't rewrite.
 - [ ] **C05 — Continuous monitoring/indexing (M6)** deferred pending reliable M5 source-state and user's RPC/budget authorization.
 
+## C01 — Shared native CPMM/CLMM fee diagnostics
+
+The existing captured-fee/compute audit now consumes native Raydium CLMM fee configuration evidence via the *existing* `decode_native_config_fee`, alongside CPMM, without inventing a CLMM creator fee field. Captured CLMM tick-spacing/config inconsistencies are explicitly blocked; the source-blocker aggregator distinguishes malformed native configuration and unverified CLMM fees. This is account-derived fee-field research only, **not** full tick-array liquidity, independent source attestation, protocol-exact output parity, or measured lamport costs. CI status pending.
+
 ## C01/C03 — Native CPMM fee evidence and signed compute headroom
 
 The existing native CPMM auxiliary-config diagnostic now retains the account-derived **effective quote fee** only when authenticated (e.g., creator fee zero), and keeps it `null` where creator-fee placement remains unresolved. The signed compute diagnostic reports exact observed CU headroom relative to the protocol ceiling, with `null` when no credible CU evidence exists. Neither compute headroom nor source fee fields are converted into unmeasured lamports/start-mint profits. Empty configuration bytes fail closed. CI evidence pending.

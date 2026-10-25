@@ -27,6 +27,30 @@ class Tests(unittest.TestCase):
         self.assertFalse(result["network_fee_lamports_verified"])
         self.assertFalse(result["start_mint_fee_cost_verified"])
         self.assertFalse(result["broadcast"])
+    def test_clmm_native_fee_evidence_preserved_without_quote_claim(self):
+        f=fixture()
+        state=[{"venue":"raydium_clmm","address":"pool","snapshot_slot":30,
+                "decoded_pool_state":{"amm_config":"clmmcfg","tick_spacing":16}}]
+        fee={"config_address":"clmmcfg","trade_fee_ppm":2500,
+             "trade_fee_authenticated":True,"total_effective_fee_authenticated":True,
+             "effective_quote_fee_ppm":2500}
+        with patch("arb.m5_captured_fee_compute_audit.extract_pool_states",return_value=state),patch(
+             "arb.m5_captured_fee_compute_audit.decode_native_config_fee",return_value=fee) as decoder:
+            result=diagnose(f,{"positive_units_consumed":150000})
+        decoder.assert_called_once_with("raydium_clmm",state[0]["decoded_pool_state"],f)
+        self.assertEqual(result["fee_rows"][0]["effective_quote_fee_ppm"],2500)
+        self.assertIsNone(result["fee_rows"][0]["creator_fee_ppm"])
+        self.assertFalse(result["quote_accuracy_verified"])
+        self.assertFalse(result["start_mint_fee_cost_verified"])
+    def test_clmm_invalid_config_cannot_be_authenticated(self):
+        f=fixture()
+        state=[{"venue":"raydium_clmm","address":"pool","snapshot_slot":30,
+                "decoded_pool_state":{"amm_config":"clmmcfg"}}]
+        with patch("arb.m5_captured_fee_compute_audit.extract_pool_states",return_value=state),patch(
+             "arb.m5_captured_fee_compute_audit.decode_native_config_fee",side_effect=ValueError("invalid tick spacing")):
+            result=diagnose(f,{})
+        self.assertFalse(result["fee_rows"][0]["total_effective_fee_authenticated"])
+        self.assertIn("INVALID",result["fee_rows"][0]["blocker"])
     def test_missing_compute_is_not_zero(self):
         with patch("arb.m5_captured_fee_compute_audit.extract_pool_states",return_value=[]):
             result=diagnose(fixture(),{})

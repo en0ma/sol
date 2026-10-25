@@ -12,24 +12,24 @@ def diagnose(fixture,receipt):
             "start_mint_fee_cost_verified":False,
             "quote_accuracy_verified":False,**SAFE}
     for row in extract_pool_states(fixture):
-        if row["venue"]!="raydium_cpmm":
+        if row["venue"] not in ("raydium_cpmm","raydium_clmm"):
             continue
         item={"venue":row["venue"],"pool":row["address"],
               "source_slot":row["snapshot_slot"],
               "total_effective_fee_authenticated":False}
         try:
-            fee=decode_native_config_fee("raydium_cpmm",row["decoded_pool_state"],fixture)
+            fee=decode_native_config_fee(row["venue"],row["decoded_pool_state"],fixture)
             item.update(config_address=fee["config_address"],
                         trade_fee_ppm=fee["trade_fee_ppm"],
-                        creator_fee_ppm=fee["creator_fee_ppm"],
+                        creator_fee_ppm=fee.get("creator_fee_ppm"),
                         trade_fee_authenticated=fee["trade_fee_authenticated"],
                         total_effective_fee_authenticated=fee["total_effective_fee_authenticated"],
-                        creator_fee_placement_verified=fee["creator_fee_placement_verified"],
+                        creator_fee_placement_verified=fee.get("creator_fee_placement_verified"),
                         effective_quote_fee_ppm=fee.get("effective_quote_fee_ppm"))
             if not fee["total_effective_fee_authenticated"]:
-                item["blocker"]="CPMM_CREATOR_FEE_PLACEMENT_UNVERIFIED"
+                item["blocker"]=("CPMM_CREATOR_FEE_PLACEMENT_UNVERIFIED" if row["venue"]=="raydium_cpmm" else "CLMM_EFFECTIVE_FEE_UNVERIFIED")
         except (ValueError,KeyError,TypeError) as exc:
-            item["blocker"]="CPMM_CAPTURED_CONFIG_INVALID: "+str(exc)[:160]
+            item["blocker"]=row["venue"].upper()+"_CAPTURED_CONFIG_INVALID: "+str(exc)[:160]
         result["fee_rows"].append(item)
     if isinstance(receipt,dict):
         units=receipt.get("positive_units_consumed")

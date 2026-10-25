@@ -49,8 +49,15 @@ def summarize(rows):
             add("CAPTURED_COST_EVIDENCE_MISSING",route)
         else:
             for fee in captured.get("fee_rows",[]):
-                if fee.get("blocker")=="CPMM_CREATOR_FEE_PLACEMENT_UNVERIFIED":
+                if not isinstance(fee,dict):
+                    raise ValueError("invalid native fee diagnostic")
+                blocker=fee.get("blocker")
+                if blocker=="CPMM_CREATOR_FEE_PLACEMENT_UNVERIFIED":
                     add("CPMM_CREATOR_FEE_PLACEMENT_UNVERIFIED",route)
+                elif blocker=="CLMM_EFFECTIVE_FEE_UNVERIFIED":
+                    add("CLMM_EFFECTIVE_FEE_UNVERIFIED",route)
+                elif isinstance(blocker,str) and blocker.startswith(("RAYDIUM_CPMM_CAPTURED_CONFIG_INVALID:","RAYDIUM_CLMM_CAPTURED_CONFIG_INVALID:")):
+                    add("SOURCE_NATIVE_FEE_CONFIG_INVALID",route)
             if captured.get("positive_units_consumed") is None:
                 add("SIGNED_COMPUTE_MISSING",route)
     issues={key:sorted(set(routes)) for key,routes in sorted(issues.items())}
@@ -58,7 +65,8 @@ def summarize(rows):
         "SOURCE_FIXTURE_MISSING","SIGNED_RECEIPT_MISSING",
         "ATOMIC_PROOF_NOT_VERIFIED","SIGNED_SPL_EVIDENCE_MISSING",
         "SOURCE_PROVENANCE_UNVERIFIED","CPMM_CREATOR_FEE_PLACEMENT_UNVERIFIED",
-        "CPMM_EFFECTIVE_PRICING_BLOCKED","ACCOUNT_SOURCE_QUOTE_BLOCKED",
+        "CPMM_EFFECTIVE_PRICING_BLOCKED","CLMM_EFFECTIVE_FEE_UNVERIFIED",
+        "SOURCE_NATIVE_FEE_CONFIG_INVALID","ACCOUNT_SOURCE_QUOTE_BLOCKED",
         "OBSERVED_INPUT_QUOTE_PROBE_BLOCKED","QUOTE_AMOUNT_CONTINUITY_MISMATCH",
         "QUOTE_TO_SIGNED_UNRECONCILED","CAPTURED_COST_EVIDENCE_MISSING",
         "SIGNED_COMPUTE_MISSING"]
