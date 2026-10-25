@@ -52,6 +52,9 @@ def reconcile(route,quotes,receipt,*,tolerance_bps=100):
         reasons.append("executed input differs from quoted input")
     received=receipt.get("first_leg_intermediate_received_base_units")
     observed_intermediate_spent=None
+    if (type(received)is not int or received<=0 or len(outputs)!=2 or
+            type(outputs[0])is not int or received!=outputs[0]):
+        reasons.append("signed first-leg SPL intermediate output differs from quoted first output")
     if (type(received)is int and received>0 and isinstance(initial,list) and
             isinstance(final,list) and len(initial)==3 and len(final)==3 and
             all(type(x)is int and x>=0 for x in initial+final)):
@@ -71,6 +74,7 @@ def reconcile(route,quotes,receipt,*,tolerance_bps=100):
             "reasons":reasons,"quoted_final_output_base_units":outputs[-1] if len(outputs)==2 else None,
             "simulated_final_output_base_units":observed_output,
             "quote_deviation_bps":deviation,
-            "signed_intermediate_consumed_base_units":observed_intermediate_spent,"signed_atomic_evidence_status":proof["status"],
+            "signed_intermediate_consumed_base_units":observed_intermediate_spent,
+            "signed_first_leg_intermediate_received_base_units":received if type(received)is int else None,"signed_atomic_evidence_status":proof["status"],
             "route_snapshot_consistent":not any("provenance" in r for r in reasons),
             "simulation_only":True,"profitability_confirmed":False,**SAFETY}
