@@ -20,10 +20,10 @@ class Tests(unittest.TestCase):
     with self.assertRaisesRegex(ValueError,"fee not authenticated"):
         quote({"venue":"raydium_cpmm","pool":"pool-1","input_mint":"A","output_mint":"B"},1000)
  def test_reject_other_venue_without_invented_model(self):
-    s=dict(S,venue="orca")
+    s=dict(S,venue="meteora_dlmm")
     quote,_=from_snapshot([s],now=1001)
     with self.assertRaisesRegex(ValueError,"not integrated"):
-        quote({"venue":"orca","pool":"pool-1","input_mint":"A","output_mint":"B"},1000)
+        quote({"venue":"meteora_dlmm","pool":"pool-1","input_mint":"A","output_mint":"B"},1000)
  def test_reject_stale_snapshot(self):
     quote,registry=from_snapshot([dict(S,observed_unix=800)],now=1001)
     self.assertEqual(registry["pool_count"],0)
