@@ -22,20 +22,26 @@ def compare(fixture,receipt,*,observed_unix):
     result["signed_execution_accepted"]=True
     amounts=receipt["planned_inputs"]
     hops=receipt.get("cpi_hops")
-    if not isinstance(hops,list) or len(hops)!=3:
+    before=receipt.get("initial_balances_base_units")
+    after=receipt.get("positive_post_balances_base_units")
+    if (not isinstance(hops,list) or len(hops)!=2
+            or not isinstance(before,list) or not isinstance(after,list)
+            or len(before)!=4 or len(after)!=4):
         result["reason"]="SIGNED_CPI_HOPS_NOT_AVAILABLE"
         return result
     mints=fixture["route_mints"]
     venues=fixture["route_venues"]
     pools=fixture["route_pool_addresses"]
-    for i,hop in enumerate(hops):
+    for i in range(3):
         row={"leg_index":i,"venue":venues[i],"pool":pools[i],
              "signed_input_base_units":amounts[i],
              "signed_output_base_units":None,"quoted_output_base_units":None,
              "deviation_bps":None,"quote_verified":False,**SAFE}
         # The coordinator's CPI audit emits per-hop receipt evidence;
         # never infer outputs from an indicative sequential quote chain.
-        received=hop.get("received_base_units") if isinstance(hop,dict) else None
+        received=(hops[i].get("received_base_units") if isinstance(hops[i],dict)
+                  and hops[i].get("hop")==i+1 else None) if i<2 else (
+                  after[3]-before[3] if all(type(x)is int for x in before+after) else None)
         if type(received) is not int or received<=0:
             row["reason"]="SIGNED_HOP_OUTPUT_FIELD_NOT_INDEPENDENTLY_RESOLVED"
             result["leg_comparisons"].append(row)
