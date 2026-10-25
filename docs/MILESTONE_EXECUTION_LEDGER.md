@@ -53,6 +53,10 @@
 - [ ] **C04 — Make existing discovery, market registry and opportunity graph supply candidates to the coordinator.** Existing: `arb/raydium_public_pool_discovery.py`, `arb/market_state_registry.py`, `arb/opportunity_graph.py`, `arb/research_engine_pipeline.py`. Wire and harden, don't rewrite.
 - [ ] **C05 — Continuous monitoring/indexing (M6)** deferred pending reliable M5 source-state and user's RPC/budget authorization.
 
+## CI follow-up: synthetic cumulative prefix fixture
+
+Focused CI #40220902547 failed at `test_prefix_observes_each_signed_cumulative_output`: the mocked SPL decoder incorrectly reused its global account index on the second signed prefix simulation and returned a wrong mint. This is a regression fixture defect, not a reason to weaken the stronger production prefix account-identity checks. Fixture decoder now wraps per signed prefix touched-account count; rerun remains pending.
+
 ## Signed cumulative prefix full-account consistency (B01b/A03)
 
 The default signed prefix observer now verifies *every touched* simulated SPL account, not only the next output: input debit matches its signed exact amount, earlier intermediate user balances are fully consumed, and the next output is positive and mint/authority-authenticated. Untouched future accounts may be null, consistent with Solana simulation. This closes a gap where a nonzero earlier residual or incorrect initial debit could silently flow into a later compiled input. Unit regressions cover both. CI validation pending; source-exact quote parity still unverified.

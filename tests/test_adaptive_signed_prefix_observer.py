@@ -28,9 +28,11 @@ class Tests(unittest.TestCase):
         decode_index=[0]
         def decode(raw):
             slot=call_count[0]-1
-            index=decode_index[0];decode_index[0]+=1
-            if index==slot+2:
-                index=0
+            index=decode_index[0]
+            decode_index[0]+=1
+            # Decode call count accumulates across separate signed prefix
+            # simulations; each next RPC result restarts its account indices.
+            index=index % (slot+2)
             return {"mint":["A","B","C"][index],"authority":"owner",
                     "amount_base_units":(0 if index<=slot else signed_outputs[slot])}
         with patch("arb.damm_cpmm_atomic_offline._post",return_value=balances),patch(
