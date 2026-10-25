@@ -4,7 +4,7 @@ from pathlib import Path
 from arb.m5_three_distinct_venue_signed_acceptance import verify
 from arb.m5_three_venue_signed_quote_parity import compare
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
-def check(source_dir,receipt_dir,*,minimum_unique=2,observed_unix=0):
+def check(source_dir,receipt_dir,*,minimum_unique=3,observed_unix=0):
     src=Path(source_dir);dst=Path(receipt_dir)
     index=json.loads((src/"summary.json").read_text())
     summary=json.loads((dst/"summary.json").read_text())

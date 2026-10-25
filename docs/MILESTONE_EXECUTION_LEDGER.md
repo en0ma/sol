@@ -57,6 +57,10 @@
 
 Focused CI #40229037828 failed two newly introduced fee source identity tests because the captured native fee diagnostic had not actually enforced the decoded pool configuration address and venue linkage. Added these checks *before* any native fee claim is accepted, alongside explicit authenticated trade-rate type/range validation. On error all intermediate decoded values are discarded, as the prior C01 evidence rule requires. Regression tests now cover contradictory identities and malformed native trade rates. The unrelated signed execution and rollback audit jobs in #101 succeeded. New commit CI remains pending.
 
+## M5-B01 — Raise hard genuine signed venue diversity gate
+
+Following CI #118's independent three-triple CPI/rollback evidence and successful full CI #121, the focused CI's multi-route acceptance threshold now requires **three unique distinct venue triples**, not two. The per-route independent signed acceptance still verifies source pools, SPL CPI and last-hop rollback before a venue triple counts. The eight-source-candidate bound remains a discovery budget, not evidence of eight successful routes. New CI must prove the expanded minimum again.
+
 ## M5-B01/C02/C03 — Signed-route break-even economics and parity observability
 
 Extended the **actual signed** three-venue economics pipeline to derive a break-even total fee/slippage budget denominated in start-mint base units, an empirical gross return in basis points, and fee-free downside break-even budgets. It uses only starting and terminal signed SPL balance deltas (not quotes), preserves unverified cost and price conversion gates, and never marks profit authenticated. The signed per-leg parity report now retains terminal signed output and gross delta with input-aligned probe counts. Route CI summary carries priced/blocked leg counts and break-even budgets per accepted route. These are *observable costs that a route could afford*, not real spent transaction fees; missing SOL conversion and protocol-exact quoting remain blockers.
