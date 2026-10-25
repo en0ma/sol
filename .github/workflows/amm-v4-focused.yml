@@ -16,6 +16,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install builder dependency
         run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Test signed N-leg SPL amount and rollback reconciliation
+        run: python3 -m unittest discover -s tests -p test_adaptive_n_leg_balances.py -v
       - name: Test adaptive signed observation into existing coordinator
         run: python3 -m unittest discover -s tests -p test_adaptive_runner_coordinator.py -v
       - name: Test generic adaptive coordinator and existing venue compiler

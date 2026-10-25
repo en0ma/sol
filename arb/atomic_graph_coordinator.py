@@ -121,6 +121,31 @@ def sign_atomic_offline(rpc,instructions,signer,*,programs,intermediate,lookup=N
     check=verify_v0_order(tx,lookup,programs[0],programs[1],intermediate)
     return tx,lookup,check
 
+def audit_n_leg_balances(amounts, before, after, *, rollback_balances=None, later_instruction_failed=False):
+    """Check actual signed N-leg SPL balances, never inferred preflight output."""
+    n=len(amounts) if isinstance(amounts,(list,tuple)) else 0
+    if not 2<=n<=MAX_ATOMIC_LEGS or not isinstance(before,(list,tuple)) or not isinstance(after,(list,tuple)) or len(before)!=n+1 or len(after)!=n+1:
+        raise ValueError("2-6 hop signed balance inventory required")
+    if any(type(x)is not int or not 0<=x<2**64 for x in list(before)+list(after)+list(amounts)) or any(x<=0 for x in amounts):
+        raise ValueError("invalid signed SPL amount")
+    failures=[]
+    if before[0]-after[0]!=amounts[0]:
+        failures.append("initial signed exact input mismatch")
+    for i in range(1,n):
+        if before[i]!=after[i]:
+            failures.append("intermediate residual at hop "+str(i))
+    if after[-1]<=before[-1]:
+        failures.append("positive terminal output missing")
+    if rollback_balances is None or list(rollback_balances)!=list(before):
+        failures.append("negative persistent rollback unmatched")
+    if later_instruction_failed is not True:
+        failures.append("negative later instruction failure not proved")
+    return {"status":"N_LEG_BALANCES_AND_ROLLBACK_RECONCILED" if not failures else "UNVERIFIED",
+            "legs":n,"failure_reasons":failures,
+            "signed_cpi_per_leg_verified":False,
+            "source_rpc_independently_attested":False,
+            "actionable":False,"live_execution_approved":False,"broadcast":False}
+
 def simulation_decision(*,simulation_verified,rollback_verified,net_profit_base_units=None,
                         live_execution_approved=False):
     # Execution is unavailable during this integration phase, irrespective of
