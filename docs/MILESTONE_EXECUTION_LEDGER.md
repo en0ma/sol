@@ -53,6 +53,10 @@
 - [ ] **C04 — Make existing discovery, market registry and opportunity graph supply candidates to the coordinator.** Existing: `arb/raydium_public_pool_discovery.py`, `arb/market_state_registry.py`, `arb/opportunity_graph.py`, `arb/research_engine_pipeline.py`. Wire and harden, don't rewrite.
 - [ ] **C05 — Continuous monitoring/indexing (M6)** deferred pending reliable M5 source-state and user's RPC/budget authorization.
 
+## Three-hop execution blocker from actual CI evidence
+
+CI #40211600343 completed green, but **both** trial receipts in `m5-three-hop-actual-signed-receipts` were BLOCKED with `missing three-account local token snapshot`. That message came from legacy `_post`, which strictly expected three SPL accounts while the real trial provisioned four. Widened the existing synchronized account reader to 3–7 unique aligned accounts, preserving mint/authority, owner and slot checks. A green workflow does not mean three-hop passed. Rerun trial to locate the next actual execution boundary.
+
 ## Actual authenticated three-hop research trial
 
 The pre-existing CPMM/v4 pair fixtures now drive A→B→A→B signed three-swap trials in both directions, reusing the first authenticated venue pool on leg three. This uses four distinct ephemeral SPL accounts, the cumulative signed prefix observer and generic N-leg signer/CPI/rollback engine. Evidence artifact: `m5-three-hop-actual-signed-receipts`. Trial execution and acceptance are not yet confirmed; do not promote the route count without signed receipts.

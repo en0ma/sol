@@ -150,25 +150,29 @@ def _simulate(rpc, tx, addresses):
 
 
 def _post(rpc, addresses, mints, owner):
-    """Read exactly three SPL accounts from one synchronized fork snapshot."""
+    """Read aligned 3–7 SPL accounts from one synchronized fork snapshot."""
     from arb.token_vaults import decode_token_account
+    if (not isinstance(addresses,(list,tuple)) or not 3<=len(addresses)<=7
+            or not isinstance(mints,(list,tuple)) or len(mints)!=len(addresses)
+            or len(set(addresses))!=len(addresses)):
+        raise ValueError("invalid aligned 3-7 account local token snapshot")
     response=call(rpc,"getMultipleAccounts",[
         list(addresses),{"encoding":"base64","commitment":"confirmed"}])
     values=response.get("value") if isinstance(response,dict) else None
     slot=response.get("context",{}).get("slot") if isinstance(response,dict) else None
     if (type(slot) is not int or slot<0 or not isinstance(values,list)
-            or len(values)!=3):
-        raise ValueError("missing three-account local token snapshot")
+            or len(values)!=len(addresses)):
+        raise ValueError("missing aligned local token snapshot")
     amounts=[]
     for entry,mint in zip(values,mints):
         if not isinstance(entry,dict) or entry.get("owner")!=TOKEN_PROGRAM or entry.get("executable") is not False:
-            raise ValueError("untrusted three-account SPL snapshot")
+            raise ValueError("untrusted aligned SPL snapshot")
         data=entry.get("data")
         if not isinstance(data,list) or len(data)!=2 or data[1]!="base64":
-            raise ValueError("three-account SPL encoding mismatch")
+            raise ValueError("aligned SPL encoding mismatch")
         decoded=decode_token_account(base64.b64decode(data[0],validate=True))
         if decoded["mint"]!=mint or decoded["authority"]!=owner:
-            raise ValueError("three-account mint/authority mismatch")
+            raise ValueError("aligned mint/authority mismatch")
         amounts.append(decoded["amount_base_units"])
     return amounts
 
