@@ -16,6 +16,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install builder dependency
         run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Test actual manifest-captured CPMM and CLMM configuration fee decoding
+        run: python3 -m unittest discover -s tests -p test_fixture_aux_fee_decoder.py -v
       - name: Test seven-venue auxiliary pricing requirements and no unsupported verification promotion
         run: python3 -m unittest discover -s tests -p test_seven_venue_aux_pricing_requirements.py -v
       - name: Test native pool fee derivation and conservative missing auxiliary-account gates
