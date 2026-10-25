@@ -113,6 +113,10 @@ hardening, not measured quote-vs-execution accuracy.
 
 A deterministic SHA-256 digest now binds the exported source-state account inventory and observed contextual slot. Offline hydration verifies the manifest before applying any source accounts. This checks fixture integrity, **not** the upstream RPC's authenticity or the missing protocol-exact quote accuracy. Older pre-manifest fixtures remain usable only as historical atomic evidence. Signed receipts carry the manifest checksum; no mainnet transaction is sent.
 
+## M5 manifest-bound indicative quote identity — October 25, 2026
+
+\`arb/fixture_quote_binding.py\` now demands that each indicative quote's directional venue, pool, mint identities and snapshot slot match the manifest-verified source fixture exactly, including quote amount continuity. This is a **binding/checking interface**; source account bytes have not yet been decoded into the shared seven-venue quote models here. Neither authenticated chain provenance nor signed swap-output accuracy follows from the check alone.
+
 ## 1. Mission and non-goals
 
 Build a Solana **simulation-only** research and verification system capable of discovering pools across seven active DEX venue implementations, authenticating their on-chain state, decoding them, constructing valid swap instructions, verifying each venue's signed standalone swap simulation, and proving **atomic, ordered, two-venue swaps** on a local Surfpool mainnet fork. Eventually use fresh pool coverage to study arbitrage opportunities, but **profitable discovery, trade execution, and live broadcasting are not acceptance criteria for the current implementation phase**.

@@ -16,6 +16,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install builder dependency
         run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Test quote-to-source-fixture identity and exact slot/manifest matching
+        run: python3 -m unittest discover -s tests -p test_fixture_quote_binding.py -v
       - name: Verify contextual source-state account checksum integrity
         run: python3 -m unittest discover -s tests -p test_source_snapshot_manifest.py -v
       - name: Verify signed receipt provenance extension never self-certifies quote accuracy
