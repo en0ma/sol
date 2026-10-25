@@ -389,7 +389,7 @@ def main():
     p=argparse.ArgumentParser()
     p.add_argument("--fixture-dir",required=True)
     p.add_argument("--output-dir",required=True)
-    p.add_argument("--batch",choices=("first","next","remaining"),default="first")
+    p.add_argument("--batch",choices=("first","next","remaining","non-v4"),default="first")
     p.add_argument("--shard-index",type=int,default=0)
     p.add_argument("--shard-count",type=int,default=1)
     p.add_argument("--only-venue",choices=("raydium_amm_v4",))

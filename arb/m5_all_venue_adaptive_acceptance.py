@@ -33,7 +33,7 @@ def main():
     p=argparse.ArgumentParser()
     p.add_argument("--receipts",type=Path,required=True)
     p.add_argument("--output",type=Path,required=True)
-    p.add_argument("--batch",choices=("first","next","remaining"),default="remaining")
+    p.add_argument("--batch",choices=("first","next","remaining","non-v4"),default="remaining")
     args=p.parse_args()
     result=audit(args.receipts,batch=args.batch)
     args.output.write_text(json.dumps(result,indent=2,sort_keys=True)+"\n")

@@ -37,6 +37,7 @@ def route_batch(name):
     if name=="first":return BATCH_10
     if name=="next":return NEXT_10
     if name=="all":return ALL_42
+    if name=="non-v4":return NON_V4_30
     if name=="remaining":return REMAINING_42
     raise ValueError("unknown atomic route batch")
 
@@ -55,3 +56,6 @@ def pair_shards(*,batch="remaining",shards=4):
     routes=route_batch(batch)
     return tuple(tuple(route for i,route in enumerate(routes) if i%shards==shard)
                  for shard in range(shards))
+
+NON_V4_30=tuple(pair for pair in ALL_42 if "raydium_amm_v4" not in pair)
+assert len(NON_V4_30)==30 and len(set(NON_V4_30))==30

@@ -242,7 +242,7 @@ def main():
     p.add_argument("--rpc",default="http://127.0.0.1:8899")
     p.add_argument("--readiness",required=True)
     p.add_argument("--output-dir",required=True)
-    p.add_argument("--batch",choices=("first","next","remaining"),default="first")
+    p.add_argument("--batch",choices=("first","next","remaining","non-v4"),default="first")
     p.add_argument("--only-venue",choices=("raydium_amm_v4",))
     args=p.parse_args()
     root=Path(args.output_dir)
