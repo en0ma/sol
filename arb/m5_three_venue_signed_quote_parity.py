@@ -1,0 +1,81 @@
+"""Evidence-first diagnostic of each signed leg in a real three-venue triangle.
+
+No RPC, no transaction submission and no implied independently verified quote.
+"""
+import json
+import sys
+from pathlib import Path
+from arb.m5_three_distinct_venue_signed_acceptance import verify as accept
+from arb.fixture_config_quote_projection import quote_cpmm_only
+from arb.raydium_amm_v4_fixture_quote import quote_from_fixture
+SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
+
+def compare(fixture,receipt,*,observed_unix):
+    result={"status":"BLOCKED","route_venues":fixture.get("route_venues"),
+            "signed_execution_accepted":False,
+            "independently_validated_quote_samples":0,"leg_comparisons":[],**SAFE}
+    try:
+        accept(fixture,receipt)
+    except (ValueError,KeyError,TypeError) as exc:
+        result["reason"]="SIGNED_THREE_VENUE_RECEIPT_NOT_ACCEPTED: "+str(exc)[:160]
+        return result
+    result["signed_execution_accepted"]=True
+    amounts=receipt["planned_inputs"]
+    hops=receipt.get("cpi_hops")
+    if not isinstance(hops,list) or len(hops)!=3:
+        result["reason"]="SIGNED_CPI_HOPS_NOT_AVAILABLE"
+        return result
+    mints=fixture["route_mints"]
+    venues=fixture["route_venues"]
+    pools=fixture["route_pool_addresses"]
+    for i,hop in enumerate(hops):
+        row={"leg_index":i,"venue":venues[i],"pool":pools[i],
+             "signed_input_base_units":amounts[i],
+             "signed_output_base_units":None,"quoted_output_base_units":None,
+             "deviation_bps":None,"quote_verified":False,**SAFE}
+        # The coordinator's CPI audit emits per-hop receipt evidence;
+        # never infer outputs from an indicative sequential quote chain.
+        received=hop.get("received_base_units") if isinstance(hop,dict) else None
+        if type(received) is not int or received<=0:
+            row["reason"]="SIGNED_HOP_OUTPUT_FIELD_NOT_INDEPENDENTLY_RESOLVED"
+            result["leg_comparisons"].append(row)
+            continue
+        row["signed_output_base_units"]=received
+        try:
+            if venues[i]=="raydium_cpmm":
+                leg={"venue":venues[i],"pool":pools[i],"input_mint":mints[i],
+                     "output_mint":mints[i+1]}
+                q=quote_cpmm_only(fixture,observed_unix=observed_unix,
+                                  leg=leg,amount_in=amounts[i])["quote"]
+            elif venues[i]=="raydium_amm_v4":
+                q=quote_from_fixture(fixture,pool=pools[i],input_mint=mints[i],
+                    amount_in=amounts[i],observed_unix=observed_unix)["quote"]
+            else:
+                raise ValueError("protocol directional fee/liquidity quote not independently implemented")
+            if (q.get("venue")!=venues[i] or q.get("pool")!=pools[i]
+                    or q.get("input_mint")!=mints[i] or
+                    q.get("output_mint")!=mints[i+1] or
+                    q.get("amount_in")!=amounts[i] or
+                    q.get("snapshot_slot")!=fixture["state_accounts_observed_slot"]
+                    or type(q.get("amount_out")) is not int or q["amount_out"]<=0):
+                raise ValueError("account-derived quote source or direction mismatch")
+            row["quoted_output_base_units"]=q["amount_out"]
+            row["deviation_bps"]=abs(q["amount_out"]-received)*10000//received
+            row["reason"]="INDICATIVE_ONLY_SOURCE_EXECUTION_PROVENANCE_NOT_INDEPENDENTLY_VERIFIED"
+        except (ValueError,TypeError,KeyError,ImportError,ArithmeticError) as exc:
+            row["reason"]="SOURCE_EXACT_QUOTE_BLOCKED: "+str(exc)[:160]
+        result["leg_comparisons"].append(row)
+    result["status"]="SIGNED_EXECUTION_WITH_PER_LEG_PARITY_DIAGNOSTICS"
+    return result
+
+def main():
+    if len(sys.argv)!=5:
+        raise SystemExit("usage: source.json receipt.json observed_unix output.json")
+    fixture=json.loads(Path(sys.argv[1]).read_text())
+    receipt=json.loads(Path(sys.argv[2]).read_text())
+    report=compare(fixture,receipt,observed_unix=int(sys.argv[3]))
+    Path(sys.argv[4]).write_text(json.dumps(report,indent=2,sort_keys=True)+"\n")
+    print(json.dumps({"status":report["status"],
+       "compared":sum(x["deviation_bps"] is not None for x in report["leg_comparisons"]),
+       "independently_validated_quote_samples":0,"broadcast":False}))
+if __name__=="__main__":main()
