@@ -1,7 +1,7 @@
 # Sol — Agreed architecture, acceptance criteria and milestone roadmap
 
 **Status:** design intent and engineering targets, not a claim of production readiness.  
-**Last consolidated:** 2026-10-23.  
+**Last consolidated:** 2026-10-25.  
 **Applies to:** all subsequent contributors, coding agents and conversations. Read with root [AGENTS.md](../AGENTS.md).
 
 ## Scope decision — 2026-10-23 (supersedes earlier eight-venue requirements)
@@ -13,6 +13,26 @@
 **Revised acceptance:** 7 pool decoder and builder implementations, seven onchain-authenticated venue snapshots, seven signed standalone local-fork swap proofs, and **42 ordered cross-venue atomic directions** (21 unordered pairs), each subject to shared-token route feasibility, successful X→Y→Z evidence, and negative rollback tests. Missing compatible routes must be reported distinctly from broken adapters. Do not upgrade historical success or mocked unit-test gates.
 
 Earlier sections below describing **eight** venues, **56** ordered pairs, or Orca v1 mandatory discovery are **historical superseded requirements**. The source of truth for active targets is `arb/execution_target_matrix.py`. All work stays simulation-only with `actionable=false`, `live_execution_approved=false`, `broadcast=false`.
+
+## Milestone transition — 2026-10-25
+
+**M4 completed:** Signed, isolated Surfpool execution and independent rollback evidence
+were accepted for all 42 active ordered venue pairs in a single CI run
+([strict full regression #40147853880](https://github.com/en0ma/sol/actions/runs/40147853880)).
+This is simulation-only and not live profitability evidence.
+
+**M5 now active — opportunity research, not execution.**
+Build fresh mint-agnostic pool candidate coverage, amount-aware quotes per venue,
+common-start-mint fee/compute/slippage cost conversion, stale quote rejection,
+depth/price-impact checks, and compare quoted outcomes with fresh atomic simulation
+before accepting *research candidates*. The initial `arb/opportunity_research.py`
+is a conservative, pure boundary checker: it cannot originate real quotes,
+does not prove profitability, and refuses incomplete or mismatched cost units.
+A positive declared-cost estimate is NOT execution approval.
+No mainnet transaction broadcasts or funded execution wallets.
+
+**M6 remains deferred:** stronger RPC and production indexing must follow M5
+evidence and an explicit budget/authorization decision.
 
 ## 1. Mission and non-goals
 
