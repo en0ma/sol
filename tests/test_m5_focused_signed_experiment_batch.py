@@ -27,6 +27,16 @@ class BatchTests(unittest.TestCase):
         self.assertEqual(f.call_count,2)
         self.assertEqual(report["signed_receipts_with_evidence"],2)
         self.assertEqual(report["independently_validated_quote_samples"],0)
+    def test_missing_optional_decoder_dependency_fails_closed(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);(root/"fixtures").mkdir();(root/"receipts").mkdir()
+            name=PAIRS[0]+".json"
+            (root/"fixtures"/name).write_text("{}")
+            (root/"receipts"/name).write_text("{}")
+            with patch("arb.m5_focused_signed_experiment_batch.evaluate",side_effect=ModuleNotFoundError("solders")):
+                report=audit(root/"fixtures",root/"receipts",observed_unix=1)
+        self.assertTrue(report["routes"][0]["reason_codes"][0].startswith("EXPERIMENT_INPUT_OR_DECODER_BLOCKED"))
+        self.assertEqual(report["independently_validated_quote_samples"],0)
     def test_malformed_json_is_reported(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);(root/"fixtures").mkdir();(root/"receipts").mkdir()

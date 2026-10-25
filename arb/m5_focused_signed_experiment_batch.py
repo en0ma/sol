@@ -28,7 +28,7 @@ def audit(fixture_dir, receipt_dir, *, observed_unix):
                 fixture = json.loads(fixture_path.read_text())
                 receipt = json.loads(receipt_path.read_text())
                 row.update(evaluate(fixture, receipt, observed_unix=observed_unix))
-            except (ValueError, TypeError, KeyError, OSError) as exc:
+            except (ValueError, TypeError, KeyError, OSError, ImportError, ArithmeticError) as exc:
                 row["reason_codes"].append("EXPERIMENT_INPUT_OR_DECODER_BLOCKED: " + str(exc)[:160])
         rows.append(row)
     return {"status": "OFFLINE_DIAGNOSTICS_ONLY", "routes": rows,
