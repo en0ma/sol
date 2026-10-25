@@ -16,6 +16,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install builder dependency
         run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Test independent adaptive signed amount-continuity acceptance
+        run: python3 -m unittest discover -s tests -p test_m5_adaptive_signed_acceptance.py -v
       - name: Test signed first-leg adaptive amount preflight
         run: python3 -m unittest discover -s tests -p test_m5_adaptive_cpmm_v4.py -v
       - name: Test empirical signed quote and creator-fee blocker summary
@@ -248,6 +250,20 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/receipts"
           for shard in 0 1; do cp -a "$RUNNER_TEMP/shards/amm-v4-signed-receipts-$shard/." "$RUNNER_TEMP/receipts/"; done
+      - name: Download adaptive CPMM-v4 signed research receipts
+        uses: actions/download-artifact@v4
+        with:
+          name: m5-adaptive-cpmm-v4-receipts
+          path: ${{ runner.temp }}/adaptive-receipts
+      - name: Independently enforce both adaptive signed amount-continuity and rollback routes
+        run: |
+          python3 -m arb.m5_adaptive_signed_acceptance --receipts "$RUNNER_TEMP/adaptive-receipts" --output "$RUNNER_TEMP/m5-adaptive-acceptance.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: m5-adaptive-signed-acceptance
+          path: ${{ runner.temp }}/m5-adaptive-acceptance.json
+          if-no-files-found: warn
       - name: Download authenticated focused source fixture bundle for quote research
         uses: actions/download-artifact@v4
         with:
