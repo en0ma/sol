@@ -157,6 +157,10 @@ CI run 40189091912 failed **independent-amm-v4-audit** at 11/12; \`meteora_dlmm_
 
 Run 40189576841 **passed all five jobs**, including 12/12 independent AMM v4 signed atomic acceptance; this recovers the preceding run's 11/12 flake but does not imply full 42/42 freshly repeated nor quote parity. The risk report now rejects PnL inferred solely from unsigned or unverified before/after balances; tick coverage enumerates **every** missing intermediate array start rather than only one per gap. Source-authenticated quote parity, full bin/dynamic-fee coverage and real profitability remain outstanding.
 
+## M5 consolidated signed experiment assessment — October 25, 2026
+
+\`arb/m5_experiment_acceptance.py\` combines existing signed amount-parity diagnostics, captured concentrated-liquidity coverage and downside risk on the **same experiment**. It blocks risk output on failed signed evidence, incomplete cost declarations or missing SPL balances. Even apparently matching reports do not validate independent source/receipt provenance or permit trading. CI run 40190968965 passed all five jobs (12/12 focused route audit). The next validation milestone is a genuinely generated fixture-to-signed-quote matched dataset, not more scaffolding.
+
 ## 1. Mission and non-goals
 
 Build a Solana **simulation-only** research and verification system capable of discovering pools across seven active DEX venue implementations, authenticating their on-chain state, decoding them, constructing valid swap instructions, verifying each venue's signed standalone swap simulation, and proving **atomic, ordered, two-venue swaps** on a local Surfpool mainnet fork. Eventually use fresh pool coverage to study arbitrage opportunities, but **profitable discovery, trade execution, and live broadcasting are not acceptance criteria for the current implementation phase**.
