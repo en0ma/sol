@@ -44,6 +44,13 @@ def evaluate(fixture, receipt, *, observed_unix, costs=None):
         ]
     else:
         result["reason_codes"].append("SIGNED_SPL_BALANCES_UNAVAILABLE")
+    if result["observed_legs"]:
+        first, second = result["observed_legs"]
+        if second["input"] != first["output"]:
+            result["reason_codes"].append("OBSERVED_INTERMEDIATE_UNCONSUMED")
+            result["intermediate_amount_gap_base_units"] = first["output"] - second["input"]
+        else:
+            result["intermediate_amount_gap_base_units"] = 0
     amount = result["observed_legs"][0]["input"] if result["observed_legs"] else None
     if type(amount) is not int or amount <= 0:
         result["reason_codes"].append("SIGNED_EXACT_INPUT_UNAVAILABLE")
@@ -52,8 +59,10 @@ def evaluate(fixture, receipt, *, observed_unix, costs=None):
         study = quote_experiment(fixture, receipt, amount_in=amount,
                                  observed_unix=observed_unix,
                                  costs_start_mint_units=costs)
-    except (ValueError, KeyError, TypeError, ArithmeticError) as exc:
+    except (ValueError, KeyError, TypeError, ArithmeticError, ImportError) as exc:
         result["reason_codes"].append("ACCOUNT_DERIVED_QUOTE_BLOCKED: " + str(exc)[:160])
+        if "CPMM source fee/reserves unavailable" in str(exc):
+            result["reason_codes"].append("CPMM_EFFECTIVE_FEE_OR_RESERVES_UNAVAILABLE")
         return result
     result["quoted_legs"] = [{"input": q["amount_in"], "output": q["amount_out"]} for q in study["quotes"]]
     accuracy = study["accuracy"]
@@ -63,8 +72,6 @@ def evaluate(fixture, receipt, *, observed_unix, costs=None):
     result["reconciliation_status"] = accuracy["reconciliation_status"]
     risk = study["observed_risk"]
     result["net_after_costs"] = risk.get("observed_net_after_declared_costs_start_mint_units") if risk else None
-    if result["observed_legs"][1]["input"] != result["observed_legs"][0]["output"]:
-        result["reason_codes"].append("OBSERVED_INTERMEDIATE_UNCONSUMED")
     if result["quoted_legs"][1]["input"] != result["observed_legs"][1]["input"]:
         result["reason_codes"].append("SIGNED_SECOND_LEG_INPUT_DIFFERS_FROM_QUOTE")
     if accuracy["reconciliation_status"] != "RECONCILED_SIGNED_SIMULATION":
