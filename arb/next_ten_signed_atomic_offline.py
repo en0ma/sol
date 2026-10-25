@@ -130,6 +130,10 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache
     if any(type(n)is not int or not 0<n<2**64 for n in (amount_in,amount_intermediate)):
         raise ValueError("invalid atomic amounts")
     hydrate(rpc,fixture,program_cache=program_cache,batch=batch)
+    hydration_readback=None
+    if "state_account_manifest_sha256" in fixture:
+        from arb.hydrated_fork_state_audit import verify_hydrated_state
+        hydration_readback=verify_hydrated_state(rpc,fixture)
     first,second=fixture["first_venue"],fixture["second_venue"]
     mints=fixture["route_mints"]
     if (len(mints)!=3 or mints[0]!=mints[2] or mints[0]==mints[1]):
@@ -237,7 +241,8 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache
             "signed_packet_bytes":packet,
             "route_mints":mints,
             "route_pool_addresses":[legs[0][1],legs[1][1]],
-            "source_snapshot_slot":None,  # Companion accounts not proven same-slot.
+            "source_snapshot_slot":None,  # Fork readback != source mainnet attestation.
+            "hydrated_fork_state_readback":hydration_readback,
             "paired_pool_observed_slot":fixture.get("paired_pool_observed_slot"),
             "state_accounts_observed_slot":fixture.get("state_accounts_observed_slot"),
             "state_account_count":fixture.get("state_account_count"),
