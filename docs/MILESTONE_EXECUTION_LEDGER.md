@@ -61,7 +61,7 @@
 4. Execute **C01–C04** in parallel when source state and test cases exist.
 5. Every meaningful commit: mark only supported checkboxes, cite SHA/run/artifact, record failure or evidence gap in the PR. No more reporting-only "blocker" modules while executable acceptance remains open.
 
-## Current independent evidence links
+## Current signed N-leg packet regression\n\nCI #40207778125 failed in the synthetic three-hop account-linkage fixture: its mocked account indexes pointed to the wrong slots. Fixed mock instruction indices to match the test account-key table, preserving strict production linkage validation. Re-run CI before marking B04 complete.\n\n## Current independent evidence links
 
 - Historical 42/42 signed atomic: https://github.com/en0ma/sol/actions/runs/40147853880
 - CPMM/v4 adaptive 2/2 actual receipts: https://github.com/en0ma/sol/actions/runs/40200874067

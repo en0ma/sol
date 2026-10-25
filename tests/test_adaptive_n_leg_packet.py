@@ -13,7 +13,7 @@ class FakeIx:
     def __init__(self,p,accounts):self.program_id_index=p;self.accounts=accounts
 class FakeMsg:
     account_keys=[FakePub(x) for x in ("payer","prog1","prog2","prog3","in1","in2")]
-    instructions=[FakeIx(1,[3]),FakeIx(2,[3,4]),FakeIx(3,[4])]
+    instructions=[FakeIx(1,[4]),FakeIx(2,[4,5]),FakeIx(3,[5])]
 class FakeTx:
     message=FakeMsg()
     def verify(self):pass
