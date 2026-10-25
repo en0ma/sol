@@ -82,7 +82,12 @@ def evaluate(fixture,receipt,*,initial_input,as_of_unix,derive_pricing_state,
     # simply copying it from the fixture is forbidden. No quote proof
     # unless a separately authenticated signed receipt has that field.
     result=reconcile(route,quoted,receipt,tolerance_bps=tolerance_bps)
-    return {"status":result["status"],"decoded_venues":[x["venue"] for x in decoded],
+    # An injected callback can manufacture fees, bin bounds or effective
+    # reserves. Until a trusted source-account decoder is independently
+    # verified, even coincidentally matching signed output is NOT accuracy proof.
+    return {"status":"UNVERIFIED_PRICING_SOURCE","decoded_venues":[x["venue"] for x in decoded],
             "quotes":quoted,"source_binding":identity,"reconciliation":result,
+            "observed_comparison_diagnostic_only":True,
+            "underlying_signed_receipt_validated":result["signed_atomic_evidence_status"]=="VERIFIED",
             "actual_pricing_state_decoder_validated":False,
             "complete_seven_venue_accuracy_verified":False,**SAFE}

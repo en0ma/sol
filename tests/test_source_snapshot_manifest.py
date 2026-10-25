@@ -5,7 +5,7 @@ class TestManifest(unittest.TestCase):
     x={"one":{"data":["AQ==","base64"],"owner":"owner","lamports":9},
        "two":{"data":["Ag==","base64"],"owner":"owner","lamports":10}}
     return {"accounts":x,"state_account_addresses":["one","two"],
-       "state_accounts_observed_slot":123,
+       "state_accounts_observed_slot":123,"state_account_count":2,
        "state_account_manifest_sha256":digest(x,["one","two"],123)}
  def test_hash_is_order_independent(self):
     f=self.fixture()
@@ -20,6 +20,9 @@ class TestManifest(unittest.TestCase):
     f=self.fixture();f["state_accounts_observed_slot"]=124
     with self.assertRaises(ValueError):verify(f)
     f=self.fixture();f["state_account_addresses"]=["one"]
+    with self.assertRaises(ValueError):verify(f)
+ def test_invalid_inventory_count_rejected(self):
+    f=self.fixture();f["state_account_count"]=1
     with self.assertRaises(ValueError):verify(f)
  def test_missing_checksum_rejected(self):
     f=self.fixture();del f["state_account_manifest_sha256"]

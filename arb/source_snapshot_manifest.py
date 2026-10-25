@@ -16,6 +16,10 @@ def verify(fixture):
     keys=fixture.get("state_account_addresses")
     slot=fixture.get("state_accounts_observed_slot")
     claimed=fixture.get("state_account_manifest_sha256")
+    if type(fixture.get("state_account_count")) is not int or fixture["state_account_count"]!=len(keys or []):
+        raise ValueError("source state inventory count mismatch")
+    if not isinstance(keys,list) or set(keys)!={k for k in keys}:
+        raise ValueError("source state inventory addresses invalid")
     if not isinstance(claimed,str) or len(claimed)!=64 or digest(fixture.get("accounts"),keys,slot)!=claimed:
         raise ValueError("source state manifest checksum mismatch")
     return True
