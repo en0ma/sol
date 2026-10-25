@@ -13,6 +13,7 @@ from arb.pumpswap_local_simulation import local_rpc_only
 from arb.next_ten_fork_pool_probe import PROGRAMS, snapshot
 from arb.next_ten_atomic_routes import BATCH_10,route_batch
 from arb.damm_cpmm_atomic_offline import _fetch, LOADER
+from arb.source_snapshot_manifest import digest
 
 def program_data_accounts(rpc, programs):
     found={}
@@ -223,6 +224,8 @@ def export(rpc,readiness,route_index,output,*,batch=BATCH_10):
                  "paired_pool_observed_slot":paired_slot,
                  "state_accounts_observed_slot":state_slot,
                  "state_account_count":len(addresses),
+                 "state_account_addresses":addresses,
+                 "state_account_manifest_sha256":digest(accounts,addresses,state_slot),
                  "full_source_snapshot_slot":None,
                  "route_mints":[mints[0],mints[1],mints[0]],
                  "first_pool":choice["first_pool"],"second_pool":choice["second_pool"],

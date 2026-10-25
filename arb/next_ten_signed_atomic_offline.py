@@ -62,6 +62,11 @@ def hydrate(rpc, fixture, *, program_cache=None, batch=BATCH_10):
     route=(fixture.get("first_venue"),fixture.get("second_venue"))
     if route not in batch:
         raise ValueError("non-batch ordered pair")
+    # New contextual fixtures are checked before any hydration/write.
+    # Older fixtures remain legacy atomic evidence only, not M5 provenance.
+    if "state_account_manifest_sha256" in fixture:
+        from arb.source_snapshot_manifest import verify
+        verify(fixture)
     programs={PROGRAMS[route[0]],PROGRAMS[route[1]]}
     if "pumpswap" in route:
         from arb.pumpswap_fee_account import PROGRAM as FEE_PROGRAM
@@ -236,6 +241,7 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache
             "paired_pool_observed_slot":fixture.get("paired_pool_observed_slot"),
             "state_accounts_observed_slot":fixture.get("state_accounts_observed_slot"),
             "state_account_count":fixture.get("state_account_count"),
+            "state_account_manifest_sha256":fixture.get("state_account_manifest_sha256"),
             "quote_accuracy_verified":False,
             "positive_logs":positive.get("logs") or [],
             "positive_error":str(positive.get("err")),

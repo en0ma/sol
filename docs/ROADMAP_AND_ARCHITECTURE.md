@@ -109,6 +109,10 @@ bound to a quote. Therefore `source_snapshot_slot` remains null and
 quote reconciliation still fails closed. This is source consistency
 hardening, not measured quote-vs-execution accuracy.
 
+## M5 source-state manifest integrity — October 25, 2026
+
+A deterministic SHA-256 digest now binds the exported source-state account inventory and observed contextual slot. Offline hydration verifies the manifest before applying any source accounts. This checks fixture integrity, **not** the upstream RPC's authenticity or the missing protocol-exact quote accuracy. Older pre-manifest fixtures remain usable only as historical atomic evidence. Signed receipts carry the manifest checksum; no mainnet transaction is sent.
+
 ## 1. Mission and non-goals
 
 Build a Solana **simulation-only** research and verification system capable of discovering pools across seven active DEX venue implementations, authenticating their on-chain state, decoding them, constructing valid swap instructions, verifying each venue's signed standalone swap simulation, and proving **atomic, ordered, two-venue swaps** on a local Surfpool mainnet fork. Eventually use fresh pool coverage to study arbitrage opportunities, but **profitable discovery, trade execution, and live broadcasting are not acceptance criteria for the current implementation phase**.
