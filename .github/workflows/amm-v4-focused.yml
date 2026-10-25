@@ -16,6 +16,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install builder dependency
         run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Test reproducible fixture-to-signed receipt experiment diagnostics
+        run: python3 -m unittest discover -s tests -p test_m5_signed_fixture_experiment_report.py -v
       - name: Test native account-derived CPMM/AMM v4 two-leg quote parity and observed cost risk
         run: python3 -m unittest discover -s tests -p test_cpmm_ammv4_signed_experiment.py -v
       - name: Validate consolidated three-priority signed experiment acceptance gates
