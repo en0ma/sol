@@ -77,6 +77,26 @@ class Tests(unittest.TestCase):
         self.assertEqual(probes[1]["signed_input"],80)
         self.assertEqual(probes[1]["deviation_bps"],0)
         self.assertFalse(result["actionable"])
+    def test_explicit_second_leg_amount_and_surplus(self):
+        r=receipt()
+        r["declared_first_leg_input_base_units"]=100
+        r["declared_second_leg_input_base_units"]=70
+        r["positive_post_balances_base_units"]=[0,10,110]
+        with patch("arb.m5_signed_fixture_experiment_report.quote_experiment",
+                   side_effect=ValueError("CPMM source fee/reserves unavailable")):
+            result=evaluate(fixture(),r,observed_unix=1)
+        self.assertTrue(result["second_leg_declared_to_actual_match"])
+        self.assertFalse(result["full_intermediate_consumption_observed"])
+        self.assertEqual(result["intermediate_amount_gap_base_units"],10)
+        self.assertEqual(result["signed_declared_amounts"]["second_input"],70)
+    def test_declared_amount_disagreement_is_not_accepted(self):
+        r=receipt()
+        r["declared_second_leg_input_base_units"]=79
+        with patch("arb.m5_signed_fixture_experiment_report.quote_experiment",
+                   side_effect=ValueError("CPMM source fee/reserves unavailable")):
+            result=evaluate(fixture(),r,observed_unix=1)
+        self.assertIn("DECLARED_SECOND_INPUT_VS_SPL_CONSUMPTION_MISMATCH",result["reason_codes"])
+        self.assertFalse(result["second_leg_declared_to_actual_match"])
     def test_invalid_manifest_blocks_quote(self):
         f=fixture();f["state_account_manifest_sha256"]="bad"
         with patch("arb.m5_signed_fixture_experiment_report.quote_experiment") as mock:

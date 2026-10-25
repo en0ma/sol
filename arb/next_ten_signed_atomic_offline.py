@@ -239,6 +239,10 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache
             "signed_transaction_verified":True,
             "transaction_signature":str(tx.signatures[0]),
             "signed_packet_bytes":packet,
+            "declared_first_leg_input_base_units":amount_in,
+            "declared_second_leg_input_base_units":amount_intermediate,
+            "declared_first_leg_minimum_output_base_units":amount_intermediate,
+            "declared_second_leg_minimum_output_base_units":1,
             "route_mints":mints,
             "route_pool_addresses":[legs[0][1],legs[1][1]],
             "source_snapshot_slot":None,  # Fork readback != source mainnet attestation.
@@ -288,7 +292,9 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache
         result["status"]="POST_SWAP_BALANCE_RECONCILIATION_FAILED"
         return result
     result.update(flow,positive_post_balances_base_units=amounts,
-                  initial_balances_base_units=before)
+                  initial_balances_base_units=before,
+                  signed_intermediate_surplus_base_units=amounts[1],
+                  signed_second_leg_consumes_full_first_output=(amounts[1]==0))
     if _post(rpc,keys,mints,owner)!=before:
         raise ValueError("simulation mutated persistent source balances")
     from arb.venue_swap_adapter import build_leg

@@ -53,6 +53,27 @@ def evaluate(fixture, receipt, *, observed_unix, costs=None):
             result["intermediate_amount_gap_base_units"] = first["output"] - second["input"]
         else:
             result["intermediate_amount_gap_base_units"] = 0
+    result["signed_declared_amounts"] = {
+        "first_input": receipt.get("declared_first_leg_input_base_units"),
+        "second_input": receipt.get("declared_second_leg_input_base_units"),
+        "first_minimum_output": receipt.get("declared_first_leg_minimum_output_base_units"),
+        "second_minimum_output": receipt.get("declared_second_leg_minimum_output_base_units")}
+    if result["observed_legs"]:
+        first, second = result["observed_legs"]
+        declared_second = result["signed_declared_amounts"]["second_input"]
+        if type(declared_second) is int and declared_second > 0:
+            if declared_second != second["input"]:
+                result["reason_codes"].append("DECLARED_SECOND_INPUT_VS_SPL_CONSUMPTION_MISMATCH")
+            result["second_leg_declared_to_actual_match"] = declared_second == second["input"]
+        else:
+            result["reason_codes"].append("SIGNED_DECLARED_SECOND_INPUT_UNAVAILABLE")
+            result["second_leg_declared_to_actual_match"] = None
+        result["full_intermediate_consumption_observed"] = (
+            first["output"] > 0 and second["input"] == first["output"])
+        if first["output"] <= 0 or second["input"] <= 0:
+            result["reason_codes"].append("NONPOSITIVE_SIGNED_LEG_FLOW")
+        if second["input"] > first["output"]:
+            result["reason_codes"].append("SIGNED_INTERMEDIATE_OVERSPENT")
     amount = result["observed_legs"][0]["input"] if result["observed_legs"] else None
     # Per-leg probes use *observed*, not guessed, signed inputs. They are
     # diagnostics, NOT a matched two-leg quote chain, and cannot validate

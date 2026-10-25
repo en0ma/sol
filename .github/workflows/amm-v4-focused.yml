@@ -16,6 +16,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install builder dependency
         run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Test signed declared input versus actual SPL token consumption
+        run: python3 -m unittest discover -s tests -p test_m5_signed_amount_declarations.py -v
       - name: Test source-derived CPMM creator-fee and observed compute evidence
         run: python3 -m unittest discover -s tests -p test_m5_captured_fee_compute_audit.py -v
       - name: Test focused real-source fixture receipt batch assessment

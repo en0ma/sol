@@ -41,6 +41,8 @@ def audit(fixture_dir, receipt_dir, *, observed_unix):
     return {"status": "OFFLINE_DIAGNOSTICS_ONLY", "routes": rows,
             "attempted": len(rows),
             "signed_receipts_with_evidence": sum(r["signed_proof_status"] == "VERIFIED" for r in rows),
+            "full_intermediate_consumption_observed": sum(
+                r.get("full_intermediate_consumption_observed") is True for r in rows),
             "independently_validated_quote_samples": 0,
             "independent_source_authentication_verified": False,
             "profitability_confirmed": False, **SAFE}
