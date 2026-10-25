@@ -9,8 +9,10 @@ from arb.m5_adaptive_signed_acceptance import check
 from arb.next_ten_atomic_routes import route_batch
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
 
-def audit(root,*,batch="remaining"):
-    routes=route_batch(batch)
+def audit(root,*,batch="remaining",only_venue=None):
+    routes=tuple(route for route in route_batch(batch) if only_venue is None or only_venue in route)
+    if not routes:
+        raise ValueError("adaptive route selection empty")
     rows=[]
     for route in routes:
         path=Path(root)/("__".join(route)+".json")
@@ -32,10 +34,11 @@ def audit(root,*,batch="remaining"):
 def main():
     p=argparse.ArgumentParser()
     p.add_argument("--receipts",type=Path,required=True)
+    p.add_argument("--only-venue",choices=("raydium_amm_v4",))
     p.add_argument("--output",type=Path,required=True)
     p.add_argument("--batch",choices=("first","next","remaining","non-v4"),default="remaining")
     args=p.parse_args()
-    result=audit(args.receipts,batch=args.batch)
+    result=audit(args.receipts,batch=args.batch,only_venue=args.only_venue)
     args.output.write_text(json.dumps(result,indent=2,sort_keys=True)+"\n")
     print(json.dumps({"adaptive_verified":result["verified"],"target":result["target"],**SAFE}))
     return 0 if result["verified"]==result["target"] else 1

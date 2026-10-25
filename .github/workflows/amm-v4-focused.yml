@@ -279,7 +279,7 @@ jobs:
           for shard in 0 1; do cp -a "$RUNNER_TEMP/adaptive-shards/m5-all-venue-adaptive-receipts-$shard/." "$RUNNER_TEMP/all-adaptive-receipts/"; done
       - name: Enforce all-venue adaptive research gate for twelve focused routes
         run: |
-          python3 -m arb.m5_all_venue_adaptive_acceptance --batch remaining --receipts "$RUNNER_TEMP/all-adaptive-receipts" --output "$RUNNER_TEMP/m5-all-adaptive.json"
+          python3 -m arb.m5_all_venue_adaptive_acceptance --batch remaining --only-venue raydium_amm_v4 --receipts "$RUNNER_TEMP/all-adaptive-receipts" --output "$RUNNER_TEMP/m5-all-adaptive.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

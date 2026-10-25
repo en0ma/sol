@@ -30,7 +30,7 @@
 
 ### M5-A — Repair/complete existing adaptive two-leg coverage (priority 0)
 
-- [ ] **A01 — Confirm exact per-route adaptive counts using both actual CI JSON acceptance artifacts.** CI #40202601743 non-v4 strict audit succeeded; CI #40202601761 focused AMM-v4 independent job **failed** at all-venue adaptive acceptance. Inspect failed rows, distinguish 12/12 adaptive outcomes from old 12/12 atomic, fix the execution root cause. Never report all 42 adaptive passes until both strict artifacts support that.
+- [ ] **A01 — Confirm exact per-route adaptive counts using both actual CI JSON acceptance artifacts.** CI #40202601743 non-v4 strict audit succeeded; CI #40205085522 focused AMM-v4 job failed because acceptance mistakenly selected **24** `remaining` pairs but all 12 AMM-v4 receipts passed (12/24). Fixed selection to only the 12 AMM-v4 pairs; fresh CI rerun pending. Do not conflate the filtered denominator with evidence of other routes. Never report all 42 adaptive passes until both strict artifacts support that.
 - [ ] **A02 — Make the generic adaptive route coordinator the default research path.** Eliminate production/research reliance on legacy fixed 1,000 intermediate amount for any newly planned adaptive route. Preserve legacy mode only for labelled historical regression. Use per-leg observed-output planning; fail closed when the preflight state changes or amounts diverge.
 - [ ] **A03 — Enforce signed post-execution continuity for every intermediate account.** The actual two-leg gate already exists in `arb/m5_adaptive_signed_acceptance.py`; reuse it. For N hops check each intermediate pair, signed CPI deltas and final balances; verify rollback with a negative control. Do not treat preflight output as in-transaction dynamic binding.
 

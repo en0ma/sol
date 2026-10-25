@@ -4,6 +4,14 @@ from pathlib import Path
 from unittest.mock import patch
 from arb.m5_all_venue_adaptive_acceptance import audit
 class Tests(unittest.TestCase):
+    def test_focused_selection_targets_twelve_not_full_remaining_batch(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            result=audit(Path(d),batch="remaining",only_venue="raydium_amm_v4")
+        self.assertEqual(result["target"],12)
+        self.assertEqual(result["verified"],0)
+        self.assertEqual(len(result["routes"]),12)
+        self.assertTrue(all("raydium_amm_v4" in row["route"] for row in result["routes"]))
     def test_missing_all_route_receipts_not_promoted(self):
         with tempfile.TemporaryDirectory() as d:
             result=audit(Path(d),batch="remaining")
