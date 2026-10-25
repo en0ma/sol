@@ -16,6 +16,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install builder dependency
         run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Test source-captured AMM v4 OpenOrders market balances and adjusted reserves
+        run: python3 -m unittest discover -s tests -p test_raydium_amm_v4_open_orders_reserves.py -v
       - name: Test account-derived CPMM and CLMM quote projections and safety gates
         run: python3 -m unittest discover -s tests -p test_fixture_config_quote_projection.py -v
       - name: Test actual manifest-captured CPMM and CLMM configuration fee decoding

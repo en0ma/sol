@@ -133,6 +133,10 @@ New \`arb/seven_venue_aux_pricing_requirements.py\` explicitly records missing a
 
 \`arb/fixture_aux_fee_decoder.py\` now decodes Raydium CPMM AmmConfig and Raydium CLMM AmmConfig from already context-captured accounts, checks owner, pool-linked config address, protocol discriminator, trading fee bounds, and CLMM tick spacing. A nonzero CPMM creator fee blocks complete effective-fee claims because fee placement is not independently verified. These are account-backed components, not full seven-venue auxiliary decoding or swap accuracy proof. Five venue auxiliary fee decoders and all signed quote comparisons remain pending.
 
+## M5 Raydium AMM v4 OpenOrders reserve derivation — October 25, 2026
+
+\`arb/raydium_amm_v4_open_orders_reserves.py\` extracts Serum/OpenBook v3 OpenOrders free and total base/quote balances from manifest-captured bytes, validates the linked market and authority, and derives net CPMM reserves as vault + OpenOrders totals - AMM pending PnL. This is bounded to legacy v3 layout; authority identity must be independently checked by the caller, as must market-role account correctness. It is not validated swap-price parity nor broad live state ingestion.
+
 ## 1. Mission and non-goals
 
 Build a Solana **simulation-only** research and verification system capable of discovering pools across seven active DEX venue implementations, authenticating their on-chain state, decoding them, constructing valid swap instructions, verifying each venue's signed standalone swap simulation, and proving **atomic, ordered, two-venue swaps** on a local Surfpool mainnet fork. Eventually use fresh pool coverage to study arbitrage opportunities, but **profitable discovery, trade execution, and live broadcasting are not acceptance criteria for the current implementation phase**.
