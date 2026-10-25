@@ -246,6 +246,16 @@ jobs:
           name: m5-all-venue-adaptive-receipts-${{ matrix.shard }}
           path: ${{ runner.temp }}/amm-v4-all-adaptive/
           if-no-files-found: warn
+      - name: Trial actual three-hop signed CPMM-v4-CPMM and reverse
+        if: ${{ matrix.shard == 0 }}
+        run: |
+          python3 -m arb.next_ten_signed_atomic_offline --batch remaining --only-cpmm-v4 --adaptive-three-hop --fixture-dir "$RUNNER_TEMP/amm-v4-fixtures" --output-dir "$RUNNER_TEMP/amm-v4-three-hop"
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() && matrix.shard == 0 }}
+        with:
+          name: m5-three-hop-actual-signed-receipts
+          path: ${{ runner.temp }}/amm-v4-three-hop/
+          if-no-files-found: warn
       - name: Run separate adaptive CPMM-v4 signed amount-continuity research
         if: ${{ matrix.shard == 0 }}
         run: |

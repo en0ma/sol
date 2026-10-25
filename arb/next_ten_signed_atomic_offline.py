@@ -166,10 +166,14 @@ def preflight_first_leg_output(rpc,ix1,signer,keys,mints,owner,before):
             "standalone_signed":True,**SAFETY}
 
 def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache=None,batch=BATCH_10,
-        adaptive_cpmm_v4=False, adaptive_all_venues=False):
+        adaptive_cpmm_v4=False, adaptive_all_venues=False, adaptive_three_hop=False):
     local_rpc_only(rpc)
     if any(type(n)is not int or not 0<n<2**64 for n in (amount_in,amount_intermediate)):
         raise ValueError("invalid atomic amounts")
+    if adaptive_three_hop and {fixture.get("first_venue"),fixture.get("second_venue")}!={"raydium_cpmm","raydium_amm_v4"}:
+        raise ValueError("three-hop signed trial needs CPMM/v4 authenticated source")
+    if adaptive_three_hop and (adaptive_cpmm_v4 or adaptive_all_venues):
+        raise ValueError("three-hop trial independent from two-hop mode")
     if adaptive_cpmm_v4 and adaptive_all_venues:
         raise ValueError("choose one adaptive research mode")
     adaptive_enabled=adaptive_cpmm_v4 or adaptive_all_venues
@@ -181,9 +185,11 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache
         from arb.hydrated_fork_state_audit import verify_hydrated_state
         hydration_readback=verify_hydrated_state(rpc,fixture)
     first,second=fixture["first_venue"],fixture["second_venue"]
-    mints=fixture["route_mints"]
+    mints=list(fixture["route_mints"])
     if (len(mints)!=3 or mints[0]!=mints[2] or mints[0]==mints[1]):
         raise ValueError("invalid closed token route")
+    if adaptive_three_hop:
+        mints.append(mints[1])
     legs=[(first,fixture["first_pool"]),(second,fixture["second_pool"])]
     states=[]
     for venue,pool in legs:
@@ -193,7 +199,7 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache
         states.append(state)
     signer=Keypair()
     owner=str(signer.pubkey())
-    keys=[str(Keypair().pubkey()) for _ in range(3)]
+    keys=[str(Keypair().pubkey()) for _ in range(len(mints))]
     call(rpc,"surfnet_setAccount",[owner,{"lamports":1000000000,
         "data":"","owner":SYSTEM,"executable":False}])
     for i,(key,mint) in enumerate(zip(keys,mints)):
@@ -202,7 +208,7 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache
             "data":token_account_bytes(mint,owner,amount_in if i==0 else 0).hex(),
             "owner":TOKEN_PROGRAM,"executable":False}])
     before=_post(rpc,keys,mints,owner)
-    if before!=[amount_in,0,0]:
+    if before!=[amount_in]+[0]*(len(mints)-1):
         raise ValueError("ephemeral funding mismatch")
     evidence=fixture["leg_evidence"]
     if "pumpswap" in (first,second):
@@ -272,6 +278,24 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache
                (second,legs[1][1]):evidence[second]}
     # Aligned SPL accounts retain distinct input and terminal token accounts
     # even though their mint identities are the same.
+    if adaptive_three_hop:
+        from arb.atomic_graph_coordinator import simulate_adaptive_n_leg_offline
+        from arb.venue_swap_adapter import build_leg
+        route=graph+[dict(graph[0],input_mint=mints[2],output_mint=mints[3])]
+        def negative(instructions,amounts):
+            last=build_leg(first,legs[0][1],states[0],evidence[first],owner,
+                keys[2],keys[3],mints[2],mints[3],amounts[2],2**64-1)
+            return list(instructions[:-1])+[last]
+        output=simulate_adaptive_n_leg_offline(
+            rpc,route,mints,state_map,proof_map,owner,keys,amount_in,None,
+            signer,negative_instructions=negative,require_closed=False)
+        output.update(first_venue=first,second_venue=second,
+                      route_venues=[first,second,first],
+                      route_pool_addresses=[legs[0][1],legs[1][1],legs[0][1]],
+                      route_mints=mints,source_snapshot_slot=None,
+                      execution_environment="ISOLATED_SURFPOOL_OFFLINE",
+                      quote_accuracy_verified=False,**SAFETY)
+        return output
     adaptive_plan=None
     if adaptive_enabled:
         def observed_first_leg(i,leg,n):
@@ -410,6 +434,7 @@ def main():
     p.add_argument("--only-venue",choices=("raydium_amm_v4",))
     p.add_argument("--adaptive-cpmm-v4",action="store_true")
     p.add_argument("--adaptive-all-venues",action="store_true")
+    p.add_argument("--adaptive-three-hop",action="store_true")
     p.add_argument("--only-cpmm-v4",action="store_true")
     args=p.parse_args()
     local_rpc_only("http://127.0.0.1:8899")
@@ -439,7 +464,8 @@ def main():
                 out=run("http://127.0.0.1:8899",json.loads(path.read_text()),
                         program_cache=program_cache,batch=route_batch(args.batch),
                         adaptive_cpmm_v4=args.adaptive_cpmm_v4,
-                        adaptive_all_venues=args.adaptive_all_venues)
+                        adaptive_all_venues=args.adaptive_all_venues,
+                        adaptive_three_hop=args.adaptive_three_hop)
             except Exception as exc:
                 out.update(status="ISOLATED_SIGNED_ATOMIC_BLOCKED",
                            error_class=type(exc).__name__,diagnostic=str(exc)[:500])
