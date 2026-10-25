@@ -250,6 +250,8 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache
             "quote_accuracy_verified":False,
             "positive_logs":positive.get("logs") or [],
             "positive_error":str(positive.get("err")),
+            "positive_units_consumed":positive.get("unitsConsumed"),
+            "positive_failure_diagnostic":positive.get("err") if positive.get("err") is not None else None,
             "instruction_order_verified":check["instruction_order_verified"],
             "signed_atomic_simulation_verified":False,
             "intermediate_intra_transaction_consumption_verified":False,

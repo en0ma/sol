@@ -149,6 +149,10 @@ Priority 1: \`arb/signed_quote_parity_portfolio.py\` batches observed two-leg qu
 
 Priority 1: signed offline quote diagnostic portfolio is correlated with per-route observed SPL deltas. Priority 2: \`fixture_missing_tick_arrays\` enumerates bounded missing Orca/CLMM tick-array starts, **not** fabricated bins or decoded liquidity. Priority 3: \`observed_signed_risk\` and \`signed_parity_risk_report\` calculate offline gross return and net of mandatory user-supplied same-start-mint costs; they do not verify actual compute charges, execution probability, profitable trading or source RPC authenticity. All approval/broadcast gates remain false.
 
+## M5 three priorities and current CI regression — October 25, 2026
+
+CI run 40189091912 failed **independent-amm-v4-audit** at 11/12; \`meteora_dlmm__raydium_amm_v4\` reported POSITIVE_SIGNED_ATOMIC_FAILED while the other four jobs passed. This is a **real regression**, not successful 12/12 evidence; investigate the signed receipt's original error and logs before claiming coverage restored. Newly persisted \`positive_units_consumed\` and \`positive_failure_diagnostic\` aid next-run triage. Priority 2 parses captured PumpSwap FeeConfig via the existing parser, without guessing its effective mode/PDA. Priority 3 computes observed-PnL sensitivity to additional adverse output slippage. Priority 1 remains signed source-consistent quote parity, not demonstrated. Safety gates stay false.
+
 ## 1. Mission and non-goals
 
 Build a Solana **simulation-only** research and verification system capable of discovering pools across seven active DEX venue implementations, authenticating their on-chain state, decoding them, constructing valid swap instructions, verifying each venue's signed standalone swap simulation, and proving **atomic, ordered, two-venue swaps** on a local Surfpool mainnet fork. Eventually use fresh pool coverage to study arbitrage opportunities, but **profitable discovery, trade execution, and live broadcasting are not acceptance criteria for the current implementation phase**.

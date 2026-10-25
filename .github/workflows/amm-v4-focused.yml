@@ -16,6 +16,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install builder dependency
         run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Test captured PumpSwap fee parsing and observed downside sensitivity
+        run: python3 -m unittest discover -s tests -p test_m5_pump_fee_and_risk_sensitivity.py -v
       - name: Test three-priority signed risk, quote parity and missing tick source request planning
         run: python3 -m unittest discover -s tests -p test_m5_parallel_three_priorities.py -v
       - name: Test empirical two-leg parity portfolio and conservative cost accounting
