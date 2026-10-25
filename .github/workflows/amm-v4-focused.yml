@@ -16,6 +16,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install builder dependency
         run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Test authenticated PumpSwap directional reserve and fee quote adapter
+        run: python3 -m unittest discover -s tests -p test_authenticated_pumpswap_quote_provider.py -v
       - name: Test authenticated Orca Whirlpool bounded in-tick quote adapter
         run: python3 -m unittest discover -s tests -p test_authenticated_orca_quote_provider.py -v
       - name: Test authenticated Raydium CLMM within-tick quote adapter

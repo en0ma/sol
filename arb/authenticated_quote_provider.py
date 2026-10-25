@@ -1,4 +1,4 @@
-"""M5 authenticated CPMM, CLMM and Orca within-tick exact-input models.
+"""M5 authenticated CPMM, CLMM, Orca and PumpSwap exact-input models.
 
 Other venues explicitly fail closed until their directional fee/liquidity
 models are integrated. No mock swap amounts, inferred fee tiers, or live RPC.
@@ -6,6 +6,7 @@ models are integrated. No mock swap amounts, inferred fee tiers, or live RPC.
 from arb.cpmm_quote import quote_exact_input
 from arb.raydium_clmm_within_tick_quote import quote_within_tick
 from arb.orca_spot_quote import quote_bounded_single_tick
+from arb.pumpswap_quote import quote_exact_input as quote_pumpswap_exact_input
 from arb.venue_quote_contract import validate
 from arb.market_state_registry import normalize
 
@@ -22,6 +23,41 @@ def from_snapshot(snapshot,*,now,max_age=60,max_slot_skew=32):
             raise ValueError("pool not in authenticated snapshot")
         if type(amount_in)is not int or not 0<amount_in<2**64:
             raise ValueError("exact-input amount required")
+        if venue=="pumpswap":
+            if (state.get("trade_fee_authenticated") is not True or
+                    state.get("effective_fee_verified") is not True or
+                    state.get("fee_verified_onchain") is not True):
+                raise ValueError("PumpSwap effective fee not authenticated")
+            if (state.get("base_mint"),state.get("quote_mint"))!=tuple(state["mints"]):
+                raise ValueError("PumpSwap pool mint orientation mismatch")
+            if (leg.get("input_mint"),leg.get("output_mint")) not in (
+                (state["mints"][0],state["mints"][1]),
+                (state["mints"][1],state["mints"][0])):
+                raise ValueError("PumpSwap route direction mismatch")
+            fee=state.get("trade_fee_ppm")
+            if type(fee)is not int or not 0<=fee<1000000:
+                raise ValueError("PumpSwap authenticated effective fee rate missing")
+            raw=quote_pumpswap_exact_input(
+                state,leg["input_mint"],amount_in,verified_total_fee_ppm=fee)
+            from_base=leg["input_mint"]==state["base_mint"]
+            priced=raw["effective_quote_reserve"]
+            spendable=raw["spendable_quote_reserve"]
+            size=state["base_reserve"] if from_base else priced
+            if from_base and raw["estimated_output_base_units"]>spendable:
+                raise ValueError("PumpSwap output exceeds spendable quote reserves")
+            result={"venue":venue,"pool":pool,"input_mint":leg["input_mint"],
+                "output_mint":leg["output_mint"],"amount_in":amount_in,
+                "amount_out":raw["estimated_output_base_units"],
+                "fee_input_units":(amount_in*fee+999999)//1000000,
+                "liquidity_input_units":size,
+                "price_impact_bps":min(10000,(amount_in*10000+size-1)//size),
+                "snapshot_slot":state["slot"],"observed_unix":state["observed_unix"],
+                "source_authenticated":True,"quote_source":"AUTHENTICATED_POOL_SNAPSHOT",
+                "quote_model":"PUMPSWAP_AUTHENTICATED_RESERVE_INDICATIVE"}
+            assessment=validate(result,state,requested_input=amount_in,now=now,max_age=max_age)
+            if assessment["status"]!="VALIDATED_INDICATIVE_QUOTE":
+                raise ValueError("PumpSwap quote rejected: "+", ".join(assessment["reason_codes"]))
+            return result
         if venue=="orca":
             if state.get("tick_bounds_authenticated") is not True or state.get("trade_fee_authenticated") is not True:
                 raise ValueError("Orca tick bounds and fee must be authenticated")
