@@ -32,6 +32,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_native_clmm_config_fee_integrity.py -v
       - name: Test independently bound native fee decoder identities
         run: python3 -m unittest discover -s tests -p test_native_fee_source_identity.py -v
+      - name: Test actual three-pool source-backed quote input extraction
+        run: python3 -m unittest discover -s tests -p test_three_venue_source_quote_extraction.py -v
       - name: Test fixture quote projection source identity joins and fee proof boundaries
         run: python3 -m unittest discover -s tests -p test_fixture_quote_projection_identity.py -v
       - name: Test evidence-based multi-venue distinct triple acceptance and costs
