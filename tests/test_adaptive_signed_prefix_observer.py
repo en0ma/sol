@@ -20,6 +20,7 @@ class Tests(unittest.TestCase):
         signed_outputs=[40,25]
         def simulate(rpc,tx,keys):
             slot=call_count[0];call_count[0]+=1
+            decode_index[0]=0
             rows=[None]*4
             for index in range(slot+2):
                 rows[index]={"owner":"token","data":["YQ==","base64"]}
@@ -30,9 +31,7 @@ class Tests(unittest.TestCase):
             slot=call_count[0]-1
             index=decode_index[0]
             decode_index[0]+=1
-            # Decode call count accumulates across separate signed prefix
-            # simulations; each next RPC result restarts its account indices.
-            index=index % (slot+2)
+            # Each signed simulation has a fresh ordered SPL account snapshot.
             return {"mint":["A","B","C"][index],"authority":"owner",
                     "amount_base_units":(0 if index<=slot else signed_outputs[slot])}
         with patch("arb.damm_cpmm_atomic_offline._post",return_value=balances),patch(
@@ -52,6 +51,22 @@ class Tests(unittest.TestCase):
         self.assertEqual([out1["output_base_units"],out2["output_base_units"]],[40,25])
         self.assertEqual(builder.call_count,2)
         self.assertEqual(builder.call_args_list[1].args[-2],40)
+    def test_failed_simulation_does_not_advance_observer(self):
+        legs=self.legs()
+        with patch("arb.damm_cpmm_atomic_offline._post",return_value=[100,0,0,0]),patch(
+             "arb.atomic_graph_coordinator.build_leg",return_value="ix"),patch(
+             "arb.rpc.call",return_value={"value":{"blockhash":"fake"}}),patch(
+             "solders.hash.Hash.from_string",return_value=MagicMock()),patch(
+             "solders.transaction.Transaction",FakeFactory),patch(
+             "arb.damm_cpmm_atomic_offline._simulate",side_effect=[
+                ({"err":{"InstructionError":[0,"Custom"]}},200),
+                ({"err":{"InstructionError":[0,"Custom"]}},200)]):
+            observer=signed_prefix_observer("http://127.0.0.1:8899",legs,
+                ["A","B","C","A"],{("orca","one"):{}},{("orca","one"):{}},
+                "owner",["a","b","c","d"],FakeSigner(),initial_amount=100)
+            for _ in range(2):
+                with self.assertRaisesRegex(ValueError,"signed prefix simulation failed"):
+                    observer(0,legs[0],100)
     def test_repeated_index_rejected(self):
         legs=self.legs()
         with patch("arb.damm_cpmm_atomic_offline._post",return_value=[100,0,0,0]):

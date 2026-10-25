@@ -53,6 +53,10 @@
 - [ ] **C04 — Make existing discovery, market registry and opportunity graph supply candidates to the coordinator.** Existing: `arb/raydium_public_pool_discovery.py`, `arb/market_state_registry.py`, `arb/opportunity_graph.py`, `arb/research_engine_pipeline.py`. Wire and harden, don't rewrite.
 - [ ] **C05 — Continuous monitoring/indexing (M6)** deferred pending reliable M5 source-state and user's RPC/budget authorization.
 
+## CI hardening: signed prefix atomic planner state
+
+CI #40222691178 confirmed the preceding synthetic decoder fix still failed because its per-simulation account index was not reset before the second signed simulation. The corrected mock explicitly resets at each RPC result. The production cumulative observer now commits its planned instruction, amount and next expected index **only after** signing, simulation, all signed touched SPL identity/balance checks and persistent-fork no-mutation verification succeed. This prevents failed prefix probes from leaving partial state and invalidating a retry. A regression repeats a failed index to verify consistent fail-closed behavior. CI confirmation pending.
+
 ## CI follow-up: synthetic cumulative prefix fixture
 
 Focused CI #40220902547 failed at `test_prefix_observes_each_signed_cumulative_output`: the mocked SPL decoder incorrectly reused its global account index on the second signed prefix simulation and returned a wrong mint. This is a regression fixture defect, not a reason to weaken the stronger production prefix account-identity checks. Fixture decoder now wraps per signed prefix touched-account count; rerun remains pending.

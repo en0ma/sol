@@ -315,27 +315,30 @@ def signed_prefix_observer(rpc,legs,tokens,states,evidence,owner,accounts,signer
         nonlocal last_index
         if i!=last_index+1 or i>=n-1 or leg!=legs[i]:
             raise ValueError("signed prefix observer out of sequence")
-        last_index=i
+        # Do not advance the observer or retain an instruction until the
+        # entire signed prefix has succeeded, including SPL reconciliation.
         ix=build_leg(leg["venue"],leg["pool"],
             states[(leg["venue"],leg["pool"])],
             evidence[(leg["venue"],leg["pool"])],owner,
             accounts[i],accounts[i+1],tokens[i],tokens[i+1],amount,1)
-        prefix.append(ix)
+        candidate=prefix+[ix]
         blockhash=Hash.from_string(call(rpc,"getLatestBlockhash")["value"]["blockhash"])
-        tx=Transaction.new_signed_with_payer(prefix,signer.pubkey(),[signer],blockhash)
+        tx=Transaction.new_signed_with_payer(candidate,signer.pubkey(),[signer],blockhash)
         tx.verify()
         if len(bytes(tx))>1232:
-            if len(prefix)==1:
+            if len(candidate)==1:
                 raise ValueError("single-leg signed prefix exceeds packet limit")
-            tx,_=sign_v0_offline(rpc,prefix,signer,blockhash)
+            tx,_=sign_v0_offline(rpc,candidate,signer,blockhash)
         simulated,_=_simulate(rpc,tx,accounts)
         if simulated.get("err") is not None:
             raise ValueError("signed prefix simulation failed: "+str(simulated["err"])[:160])
-        planned_inputs.append(amount)
         output=verify_signed_prefix_balances(
-            simulated,tokens,owner,initial_amount,planned_inputs,i)
+            simulated,tokens,owner,initial_amount,planned_inputs+[amount],i)
         if _post(rpc,accounts,tokens,owner)!=initial:
             raise ValueError("signed prefix mutated persistent token state")
+        prefix.append(ix)
+        planned_inputs.append(amount)
+        last_index=i
         return {"signed_offline_observed":True,"output_base_units":output,
                 "compute_units":simulated.get("unitsConsumed")}
     return observe
