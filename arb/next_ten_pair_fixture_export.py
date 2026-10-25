@@ -245,13 +245,13 @@ def export_three_venue(rpc,readiness,route_index,output):
     to the existing universal 2-6-leg coordinator, never a parallel engine.
     """
     local_rpc_only(rpc)
-    from arb.next_ten_fork_pool_probe import authenticated_distinct_venue_triangles
+    from arb.next_ten_fork_pool_probe import authenticated_distinct_venue_triangles,select_distinct_triangle_coverage
     if readiness.get("source")!="READ_ONLY_MAINNET_BACKED_SURFPOOL":
         raise ValueError("unsupported source provenance")
     if type(route_index)is not int or route_index<0:
         raise ValueError("invalid authenticated triangle index")
     pools=readiness.get("authenticated_pools")
-    candidates=authenticated_distinct_venue_triangles(pools)
+    candidates=select_distinct_triangle_coverage(authenticated_distinct_venue_triangles(pools,limit=100),maximum=30)
     if route_index>=len(candidates):
         raise ValueError("three-distinct-venue route candidate unavailable")
     candidate=candidates[route_index]
