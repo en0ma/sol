@@ -166,11 +166,17 @@ def preflight_first_leg_output(rpc,ix1,signer,keys,mints,owner,before):
             "standalone_signed":True,**SAFETY}
 
 def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache=None,batch=BATCH_10,
-        adaptive_cpmm_v4=False, adaptive_all_venues=False, adaptive_three_hop=False):
+        adaptive_cpmm_v4=False, adaptive_all_venues=False, adaptive_three_hop=False, adaptive_hops=None):
     local_rpc_only(rpc)
     if any(type(n)is not int or not 0<n<2**64 for n in (amount_in,amount_intermediate)):
         raise ValueError("invalid atomic amounts")
-    if adaptive_three_hop and {fixture.get("first_venue"),fixture.get("second_venue")}!={"raydium_cpmm","raydium_amm_v4"}:
+    if adaptive_hops is not None:
+        if type(adaptive_hops)is not int or not 3<=adaptive_hops<=6:
+            raise ValueError("adaptive hops must be 3-6")
+        if adaptive_three_hop or adaptive_cpmm_v4 or adaptive_all_venues:
+            raise ValueError("select exactly one adaptive execution mode")
+    trial_hops=adaptive_hops if adaptive_hops is not None else (3 if adaptive_three_hop else None)
+    if trial_hops is not None and {fixture.get("first_venue"),fixture.get("second_venue")}!={"raydium_cpmm","raydium_amm_v4"}:
         raise ValueError("three-hop signed trial needs CPMM/v4 authenticated source")
     if adaptive_three_hop and (adaptive_cpmm_v4 or adaptive_all_venues):
         raise ValueError("three-hop trial independent from two-hop mode")
@@ -188,8 +194,8 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache
     mints=list(fixture["route_mints"])
     if (len(mints)!=3 or mints[0]!=mints[2] or mints[0]==mints[1]):
         raise ValueError("invalid closed token route")
-    if adaptive_three_hop:
-        mints.append(mints[1])
+    if trial_hops is not None:
+        mints=[mints[0] if i%2==0 else mints[1] for i in range(trial_hops+1)]
     legs=[(first,fixture["first_pool"]),(second,fixture["second_pool"])]
     states=[]
     for venue,pool in legs:
@@ -278,20 +284,23 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache
                (second,legs[1][1]):evidence[second]}
     # Aligned SPL accounts retain distinct input and terminal token accounts
     # even though their mint identities are the same.
-    if adaptive_three_hop:
+    if trial_hops is not None:
         from arb.atomic_graph_coordinator import simulate_adaptive_n_leg_offline
         from arb.venue_swap_adapter import build_leg
-        route=graph+[dict(graph[0],input_mint=mints[2],output_mint=mints[3])]
+        route=[dict(graph[i%2],input_mint=mints[i],output_mint=mints[i+1]) for i in range(trial_hops)]
         def negative(instructions,amounts):
-            last=build_leg(first,legs[0][1],states[0],evidence[first],owner,
-                keys[2],keys[3],mints[2],mints[3],amounts[2],2**64-1)
+            index=trial_hops-1
+            venue,pool=legs[index%2]
+            last=build_leg(venue,pool,states[index%2],evidence[venue],owner,
+                keys[index],keys[index+1],mints[index],mints[index+1],
+                amounts[index],2**64-1)
             return list(instructions[:-1])+[last]
         output=simulate_adaptive_n_leg_offline(
             rpc,route,mints,state_map,proof_map,owner,keys,amount_in,None,
             signer,negative_instructions=negative,require_closed=False)
         output.update(first_venue=first,second_venue=second,
-                      route_venues=[first,second,first],
-                      route_pool_addresses=[legs[0][1],legs[1][1],legs[0][1]],
+                      route_venues=[legs[i%2][0] for i in range(trial_hops)],
+                      route_pool_addresses=[legs[i%2][1] for i in range(trial_hops)],
                       route_mints=mints,source_snapshot_slot=None,
                       execution_environment="ISOLATED_SURFPOOL_OFFLINE",
                       quote_accuracy_verified=False,**SAFETY)
@@ -435,6 +444,7 @@ def main():
     p.add_argument("--adaptive-cpmm-v4",action="store_true")
     p.add_argument("--adaptive-all-venues",action="store_true")
     p.add_argument("--adaptive-three-hop",action="store_true")
+    p.add_argument("--adaptive-hops",type=int,choices=(3,4,5,6))
     p.add_argument("--only-cpmm-v4",action="store_true")
     args=p.parse_args()
     local_rpc_only("http://127.0.0.1:8899")
@@ -465,7 +475,8 @@ def main():
                         program_cache=program_cache,batch=route_batch(args.batch),
                         adaptive_cpmm_v4=args.adaptive_cpmm_v4,
                         adaptive_all_venues=args.adaptive_all_venues,
-                        adaptive_three_hop=args.adaptive_three_hop)
+                        adaptive_three_hop=args.adaptive_three_hop,
+                        adaptive_hops=args.adaptive_hops)
             except Exception as exc:
                 out.update(status="ISOLATED_SIGNED_ATOMIC_BLOCKED",
                            error_class=type(exc).__name__,diagnostic=str(exc)[:500])

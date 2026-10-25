@@ -53,6 +53,10 @@
 - [ ] **C04 — Make existing discovery, market registry and opportunity graph supply candidates to the coordinator.** Existing: `arb/raydium_public_pool_discovery.py`, `arb/market_state_registry.py`, `arb/opportunity_graph.py`, `arb/research_engine_pipeline.py`. Wire and harden, don't rewrite.
 - [ ] **C05 — Continuous monitoring/indexing (M6)** deferred pending reliable M5 source-state and user's RPC/budget authorization.
 
+## Four-to-six signed offline exploratory trials
+
+The same source-backed CPMM/v4 runner now accepts `--adaptive-hops 3|4|5|6`, alternates the two source-authenticated pools/mints, uses N+1 distinct SPL token accounts, and builds a last-leg failure instruction on the correct parity without duplicating the engine. CI records 4-, 5-, and 6-leg exploratory receipts separately under `m5-four-to-six-hop-signed-trial-receipts`; these are **not** independently accepted and may fail packet limits or shared-pool state constraints. No success or profitability credit before inspecting artifacts.
+
 ## Three-hop verified signed runtime — October 25, 2026
 
 CI [#40212458787](https://github.com/en0ma/sol/actions/runs/40212458787) produced two genuine signed offline **three-hop** receipts with `SIGNED_N_LEG_ATOMIC_AND_ROLLBACK_VERIFIED`. CPMM→v4→CPMM consumed 8,203,755 then 80,666,106 intermediate units, ending with 4,653,406 terminal units; reverse v4→CPMM→v4 consumed 10,119,208 then 80,718,247, ending with 8,168,031 terminal units. Both had zero user intermediate SPL residuals and failed their signed negative controls at instruction index 2. These are A→B→A→B **interoperability paths**, not closed arbitrage nor quote accuracy, and their upstream source slot is not independently attested.
