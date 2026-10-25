@@ -247,6 +247,73 @@ def audit_n_leg_balances(amounts, before, after, *, rollback_balances=None, late
             "source_rpc_independently_attested":False,
             "actionable":False,"live_execution_approved":False,"broadcast":False}
 
+def signed_prefix_observer(rpc,legs,tokens,states,evidence,owner,accounts,signer,
+                           *,initial_amount):
+    """Build and signed-simulate each growing route prefix to observe next input.
+
+    Never treat a quote as an observed amount. Every prefix is simulated on
+    the same unchanged disposable fork; previous legs are included so pool
+    price impact and account state are replayed for the observed output.
+    One intermediate SPL output account is mandatory in the RPC response.
+    """
+    import base64
+    from solders.hash import Hash
+    from solders.transaction import Transaction
+    from arb.rpc import call
+    from arb.damm_cpmm_atomic_offline import _simulate,_post
+    from arb.token_vaults import TOKEN_PROGRAM,decode_token_account
+    from arb.atomic_v0_lookup import sign_v0_offline
+    local_rpc_only(rpc)
+    n=len(legs)
+    if (not 2<=n<=6 or len(tokens)!=n+1 or len(accounts)!=n+1
+            or len(set(accounts))!=n+1):
+        raise ValueError("invalid adaptive prefix account inventory")
+    initial=_post(rpc,accounts,tokens,owner)
+    if initial!=[initial_amount]+[0]*n:
+        raise ValueError("signed prefix initial SPL state mismatch")
+    prefix=[]
+    last_index=-1
+    def observe(i,leg,amount):
+        nonlocal last_index
+        if i!=last_index+1 or i>=n-1 or leg!=legs[i]:
+            raise ValueError("signed prefix observer out of sequence")
+        last_index=i
+        ix=build_leg(leg["venue"],leg["pool"],
+            states[(leg["venue"],leg["pool"])],
+            evidence[(leg["venue"],leg["pool"])],owner,
+            accounts[i],accounts[i+1],tokens[i],tokens[i+1],amount,1)
+        prefix.append(ix)
+        blockhash=Hash.from_string(call(rpc,"getLatestBlockhash")["value"]["blockhash"])
+        tx=Transaction.new_signed_with_payer(prefix,signer.pubkey(),[signer],blockhash)
+        tx.verify()
+        if len(bytes(tx))>1232:
+            if len(prefix)==1:
+                raise ValueError("single-leg signed prefix exceeds packet limit")
+            tx,_=sign_v0_offline(rpc,prefix,signer,blockhash)
+        simulated,_=_simulate(rpc,tx,accounts)
+        if simulated.get("err") is not None:
+            raise ValueError("signed prefix simulation failed: "+str(simulated["err"])[:160])
+        rows=simulated.get("accounts")
+        if not isinstance(rows,list) or len(rows)!=len(accounts):
+            raise ValueError("signed prefix SPL accounts missing")
+        row=rows[i+1]
+        if not isinstance(row,dict) or row.get("owner")!=TOKEN_PROGRAM:
+            raise ValueError("signed prefix output SPL owner missing")
+        data=row.get("data")
+        if not isinstance(data,list) or len(data)!=2 or data[1]!="base64":
+            raise ValueError("signed prefix output SPL bytes missing")
+        token=decode_token_account(base64.b64decode(data[0],validate=True))
+        if token["mint"]!=tokens[i+1] or token["authority"]!=owner:
+            raise ValueError("signed prefix output mint or authority mismatch")
+        output=token["amount_base_units"]-initial[i+1]
+        if type(output)is not int or not 0<output<2**64:
+            raise ValueError("signed prefix output invalid")
+        if _post(rpc,accounts,tokens,owner)!=initial:
+            raise ValueError("signed prefix mutated persistent token state")
+        return {"signed_offline_observed":True,"output_base_units":output,
+                "compute_units":simulated.get("unitsConsumed")}
+    return observe
+
 def signed_n_leg_post_balances(simulation, accounts, mints, authority):
     """Decode all returned user token accounts, never infer zero leftovers."""
     import base64
@@ -286,6 +353,9 @@ def simulate_adaptive_n_leg_offline(rpc, legs, tokens, states, evidence, owner,
     before=_post(rpc,accounts,tokens,owner)
     if before!=[initial_amount]+[0]*n:
         raise ValueError("untrusted initial user SPL balance inventory")
+    if observe is None:
+        observe=signed_prefix_observer(rpc,legs,tokens,states,evidence,owner,
+                                       accounts,signer,initial_amount=initial_amount)
     planned=compile_adaptive_route(legs,tokens,states,evidence,owner,accounts,
                                    initial_amount,observe,require_closed=require_closed)
     programs=[PROGRAMS[leg["venue"]] for leg in legs]
