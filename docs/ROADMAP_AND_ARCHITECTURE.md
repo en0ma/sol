@@ -161,6 +161,10 @@ Run 40189576841 **passed all five jobs**, including 12/12 independent AMM v4 sig
 
 \`arb/m5_experiment_acceptance.py\` combines existing signed amount-parity diagnostics, captured concentrated-liquidity coverage and downside risk on the **same experiment**. It blocks risk output on failed signed evidence, incomplete cost declarations or missing SPL balances. Even apparently matching reports do not validate independent source/receipt provenance or permit trading. CI run 40190968965 passed all five jobs (12/12 focused route audit). The next validation milestone is a genuinely generated fixture-to-signed-quote matched dataset, not more scaffolding.
 
+## M5 actual account-derived two-leg pricing experiment — October 25, 2026
+
+\`arb/cpmm_ammv4_signed_experiment.py\` now invokes existing source-captured native CPMM and AMM-v4 quote adapters for a complete **CPMM↔AMM v4** closed two-leg cycle. The second leg uses exactly the first quote's integer output. It compares to an independently supplied signed Surfpool receipt and optionally computes declared-cost offline PnL only when signed evidence passes. No runtime fixture/receipt dataset was generated in this commit; raw source authentication, signed quote accuracy and live profitability remain unverified. CI run 40191710198 passed all five jobs at prior HEAD.
+
 ## 1. Mission and non-goals
 
 Build a Solana **simulation-only** research and verification system capable of discovering pools across seven active DEX venue implementations, authenticating their on-chain state, decoding them, constructing valid swap instructions, verifying each venue's signed standalone swap simulation, and proving **atomic, ordered, two-venue swaps** on a local Surfpool mainnet fork. Eventually use fresh pool coverage to study arbitrage opportunities, but **profitable discovery, trade execution, and live broadcasting are not acceptance criteria for the current implementation phase**.
