@@ -1,10 +1,11 @@
-"""M5 authenticated Raydium CPMM and within-tick CLMM exact-input models.
+"""M5 authenticated CPMM, CLMM and Orca within-tick exact-input models.
 
 Other venues explicitly fail closed until their directional fee/liquidity
 models are integrated. No mock swap amounts, inferred fee tiers, or live RPC.
 """
 from arb.cpmm_quote import quote_exact_input
 from arb.raydium_clmm_within_tick_quote import quote_within_tick
+from arb.orca_spot_quote import quote_bounded_single_tick
 from arb.venue_quote_contract import validate
 from arb.market_state_registry import normalize
 
@@ -21,6 +22,36 @@ def from_snapshot(snapshot,*,now,max_age=60,max_slot_skew=32):
             raise ValueError("pool not in authenticated snapshot")
         if type(amount_in)is not int or not 0<amount_in<2**64:
             raise ValueError("exact-input amount required")
+        if venue=="orca":
+            if state.get("tick_bounds_authenticated") is not True or state.get("trade_fee_authenticated") is not True:
+                raise ValueError("Orca tick bounds and fee must be authenticated")
+            if (state.get("token_mint_a"),state.get("token_mint_b"))!=tuple(state["mints"]):
+                raise ValueError("Orca onchain mint orientation mismatch")
+            if (leg.get("input_mint"),leg.get("output_mint")) not in (
+                (state["mints"][0],state["mints"][1]),(state["mints"][1],state["mints"][0])):
+                raise ValueError("Orca route mint direction invalid")
+            fee=state.get("fee_rate_hundredths_bps")
+            lower,upper=state.get("lower_sqrt_x64"),state.get("upper_sqrt_x64")
+            if type(fee)is not int or not 0<=fee<1000000 or type(lower)is not int or type(upper)is not int:
+                raise ValueError("Orca authenticated fee and tick price bounds required")
+            sizes=state.get("max_within_tick_input_by_mint")
+            if not isinstance(sizes,dict) or type(sizes.get(leg["input_mint"])) is not int or sizes[leg["input_mint"]]<=0:
+                raise ValueError("Orca authenticated directional input budget missing")
+            raw=quote_bounded_single_tick(state,leg["input_mint"],amount_in,
+                lower_sqrt_x64=lower,upper_sqrt_x64=upper)
+            result={"venue":venue,"pool":pool,"input_mint":leg["input_mint"],
+                "output_mint":leg["output_mint"],"amount_in":amount_in,
+                "amount_out":raw["estimated_output_base_units"],
+                "fee_input_units":(amount_in*fee+999999)//1000000,
+                "liquidity_input_units":sizes[leg["input_mint"]],
+                "price_impact_bps":min(10000,(amount_in*10000+sizes[leg["input_mint"]]-1)//sizes[leg["input_mint"]]),
+                "snapshot_slot":state["slot"],"observed_unix":state["observed_unix"],
+                "source_authenticated":True,"quote_source":"AUTHENTICATED_POOL_SNAPSHOT",
+                "quote_model":"ORCA_WHIRLPOOL_AUTHENTICATED_WITHIN_TICK_INDICATIVE"}
+            assessment=validate(result,state,requested_input=amount_in,now=now,max_age=max_age)
+            if assessment["status"]!="VALIDATED_INDICATIVE_QUOTE":
+                raise ValueError("Orca quote rejected: "+", ".join(assessment["reason_codes"]))
+            return result
         if venue=="raydium_clmm":
             if state.get("trade_fee_authenticated") is not True or state.get("tick_boundary_authenticated") is not True:
                 raise ValueError("CLMM fee and directional tick boundary must be authenticated")
