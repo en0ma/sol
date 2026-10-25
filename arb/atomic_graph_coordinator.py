@@ -247,6 +247,81 @@ def audit_n_leg_balances(amounts, before, after, *, rollback_balances=None, late
             "source_rpc_independently_attested":False,
             "actionable":False,"live_execution_approved":False,"broadcast":False}
 
+def simulate_adaptive_n_leg_offline(rpc, legs, tokens, states, evidence, owner,
+                                    accounts, initial_amount, observe, signer,
+                                    *, negative_instructions=None, require_closed=True):
+    """Execute signed offline 2–6-leg adaptive route with CPI and rollback gates.
+
+    The supplied observer must independently sign/simulate prefix legs on the
+    disposable fork. No broadcast is available. A negative-control builder
+    must break the final swap while preserving all earlier instructions.
+    """
+    from arb.damm_cpmm_atomic_offline import _simulate, _post
+    from arb.next_ten_signed_atomic_offline import top_level_events
+    from arb.next_ten_fork_pool_probe import PROGRAMS
+    local_rpc_only(rpc)
+    n=len(legs)
+    if not 2<=n<=6 or len(accounts)!=n+1 or len(set(accounts))!=n+1:
+        raise ValueError("2-6 legs and distinct N+1 user token accounts required")
+    before=_post(rpc,accounts,tokens,owner)
+    if before!=[initial_amount]+[0]*n:
+        raise ValueError("untrusted initial user SPL balance inventory")
+    planned=compile_adaptive_route(legs,tokens,states,evidence,owner,accounts,
+                                   initial_amount,observe,require_closed=require_closed)
+    programs=[PROGRAMS[leg["venue"]] for leg in legs]
+    tx,lookup,order=sign_adaptive_n_leg_offline(
+        rpc,planned["instructions"],signer,programs=programs,intermediates=accounts[1:-1])
+    positive,packet=_simulate(rpc,tx,accounts)
+    receipt={"status":"UNVERIFIED","legs":n,"planned_inputs":planned["amounts"],
+             "signed_packet_bytes":packet,"positive_error":str(positive.get("err")),
+             "signed_cpi_per_leg_verified":False,"rollback_failure_case_verified":False,
+             "signed_atomic_simulation_verified":False,"quote_accuracy_verified":False,
+             "actionable":False,"live_execution_approved":False,"broadcast":False}
+    if positive.get("err") is not None:
+        return receipt
+    expected=[event for p in programs for event in ([p,"invoke"],[p,"success"])]
+    if top_level_events(positive.get("logs") or [],set(programs))!=expected:
+        receipt["status"]="POSITIVE_ORDER_UNVERIFIED"
+        return receipt
+    try:
+        flow=audit_n_leg_cpi(tx,positive,accounts,planned["amounts"],lookup=lookup)
+    except ValueError as exc:
+        receipt["status"]="CPI_CONTINUITY_UNVERIFIED"
+        receipt["reason"]=str(exc)[:160]
+        return receipt
+    receipt["cpi_hops"]=flow["hops"]
+    receipt["signed_cpi_per_leg_verified"]=True
+    if _post(rpc,accounts,tokens,owner)!=before:
+        raise ValueError("positive simulation mutated persistent fork accounts")
+    if negative_instructions is None:
+        receipt["status"]="NEGATIVE_CONTROL_MISSING"
+        return receipt
+    bad_ix=negative_instructions(planned["instructions"],planned["amounts"])
+    if not isinstance(bad_ix,(tuple,list)) or len(bad_ix)!=n:
+        raise ValueError("negative instruction list malformed")
+    if any(bytes(a)!=bytes(b) for a,b in zip(planned["instructions"][:-1],bad_ix[:-1])):
+        raise ValueError("negative control modified earlier swap instructions")
+    from solders.transaction import Transaction
+    from arb.atomic_v0_lookup import sign_v0_with_lookup
+    blockhash=tx.message.recent_blockhash
+    if lookup is None:
+        bad_tx=Transaction.new_signed_with_payer(bad_ix,signer.pubkey(),[signer],blockhash)
+        bad_tx.verify()
+    else:
+        bad_tx=sign_v0_with_lookup(bad_ix,signer,blockhash,lookup)
+    failure,bad_packet=_simulate(rpc,bad_tx,accounts)
+    error=failure.get("err")
+    idx=error.get("InstructionError",[None])[0] if isinstance(error,dict) else None
+    fail_expected=[event for p in programs[:-1] for event in ([p,"invoke"],[p,"success"])]
+    fail_expected.extend(([programs[-1],"invoke"],[programs[-1],"failed"]))
+    rollback=(idx==n-1 and top_level_events(failure.get("logs") or [],set(programs))==fail_expected
+              and _post(rpc,accounts,tokens,owner)==before)
+    receipt.update(negative_error=str(error),negative_packet_bytes=bad_packet,
+                   rollback_failure_case_verified=rollback,
+                   signed_atomic_simulation_verified=rollback,
+                   status="SIGNED_N_LEG_ATOMIC_AND_ROLLBACK_VERIFIED" if rollback else "ROLLBACK_UNVERIFIED")
+    return receipt
+
 def simulation_decision(*,simulation_verified,rollback_verified,net_profit_base_units=None,
                         live_execution_approved=False):
     # Execution is unavailable during this integration phase, irrespective of
