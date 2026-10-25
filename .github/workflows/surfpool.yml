@@ -786,6 +786,20 @@ jobs:
           python3 -m arb.forty_two_atomic_evidence \
             --evidence-dirs "$RUNNER_TEMP/next-ten-signed-evidence" "$RUNNER_TEMP/following-ten-signed-evidence" "$RUNNER_TEMP/remaining-24-signed-evidence" \
             --output "$RUNNER_TEMP/forty-two-ordered-atomic-acceptance.json"
+      - name: Require all 42 freshly verified ordered atomic pairs before full CI can pass
+        run: |
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          report=json.loads((Path(os.environ["RUNNER_TEMP"])/"forty-two-ordered-atomic-acceptance.json").read_text())
+          assert report["ordered_pair_target"]==42, "unexpected full coverage target"
+          missing=[row["first_venue"]+"__"+row["second_venue"]
+                   for row in report["routes"] if row["status"]!="VERIFIED"]
+          assert len(report["routes"])==42, "missing full-route audit rows"
+          assert report["ordered_pair_verified"]==42 and not missing, "full regression failures: "+str(missing)
+          assert report["broadcast"] is False
+          print("Fresh single-run signed atomic and rollback acceptance: 42/42")
+          PY
       - name: Enforce accepted first-five venue pair regression floor
         run: |
           python3 - <<'PY'
