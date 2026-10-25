@@ -57,6 +57,10 @@
 
 Focused CI #40229037828 failed two newly introduced fee source identity tests because the captured native fee diagnostic had not actually enforced the decoded pool configuration address and venue linkage. Added these checks *before* any native fee claim is accepted, alongside explicit authenticated trade-rate type/range validation. On error all intermediate decoded values are discarded, as the prior C01 evidence rule requires. Regression tests now cover contradictory identities and malformed native trade rates. The unrelated signed execution and rollback audit jobs in #101 succeeded. New commit CI remains pending.
 
+## M5-B01/C02/C03 — Direct execution evidence gates instead of more false completion claims
+
+Added a per-signed-route source-pricing/economics gate that requires all three quote comparisons to exist, requires each to be independently verified rather than merely indicative, and requires separately observed fee provenance, authenticated SOL→start-mint conversion, and net-profit evidence. It attaches precise route-and-venue blockers to the existing signed batch artifact, without changing or duplicating the compiler. Signed CPI/rollback success is recorded independently and is **never interpreted as pricing accuracy or realized economic profit**. Pricing across seven venues remains an open substantial protocol implementation task, and isolated Surfpool cannot prove paid transaction network fees.
+
 ## M5-B01 — Raise hard genuine signed venue diversity gate
 
 Following CI #118's independent three-triple CPI/rollback evidence and successful full CI #121, the focused CI's multi-route acceptance threshold now requires **three unique distinct venue triples**, not two. The per-route independent signed acceptance still verifies source pools, SPL CPI and last-hop rollback before a venue triple counts. The eight-source-candidate bound remains a discovery budget, not evidence of eight successful routes. New CI must prove the expanded minimum again.
