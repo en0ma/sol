@@ -212,6 +212,20 @@ jobs:
       - name: Authenticate only AMM v4 ordered pool-pair candidates
         run: |
           python3 -m arb.next_ten_fork_pool_probe --batch remaining --only-venue raydium_amm_v4 --registry "$RUNNER_TEMP/venues.json" --output "$RUNNER_TEMP/amm-v4-ready.json"
+      - name: Capture first authenticated closed three-distinct-venue source candidate
+        run: |
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          report=json.loads((Path(os.environ["RUNNER_TEMP"])/"amm-v4-ready.json").read_text())
+          candidates=report.get("authenticated_distinct_venue_three_leg_candidates",[])
+          print(json.dumps({"authenticated_closed_three_venue_candidates":len(candidates),
+                            "signed_execution_verified":False,"broadcast":False}))
+          (Path(os.environ["RUNNER_TEMP"])/"three-venue-candidate-count.txt").write_text(str(len(candidates)))
+          PY
+          if [ "$(cat "$RUNNER_TEMP/three-venue-candidate-count.txt")" -gt 0 ]; then
+            python3 -m arb.next_ten_pair_fixture_export --readiness "$RUNNER_TEMP/amm-v4-ready.json" --triangle-index 0 --triangle-output "$RUNNER_TEMP/three-venue-source.json"
+          fi
       - name: Export twelve authenticated AMM v4 fixtures only
         run: |
           python3 -m arb.next_ten_pair_fixture_export --batch remaining --only-venue raydium_amm_v4 --readiness "$RUNNER_TEMP/amm-v4-ready.json" --output-dir "$RUNNER_TEMP/amm-v4-fixtures"
@@ -222,6 +236,8 @@ jobs:
           path: |
             ${{ runner.temp }}/amm-v4-fixtures/
             ${{ runner.temp }}/amm-v4-ready.json
+            ${{ runner.temp }}/three-venue-source.json
+            ${{ runner.temp }}/three-venue-candidate-count.txt
             ${{ runner.temp }}/venues.json
           if-no-files-found: error
       - name: Shut down upstream-backed fork before offline account writes
@@ -264,6 +280,31 @@ jobs:
               except Exception:time.sleep(2)
           else:raise SystemExit("offline RPC unavailable")
           PY
+      - name: Attempt actual three-distinct-venue signed closed route and last-hop rollback
+        if: ${{ matrix.shard == 0 }}
+        run: |
+          if [ -f "$RUNNER_TEMP/three-venue-source.json" ]; then
+            python3 -m arb.next_ten_signed_atomic_offline --three-venue-fixture "$RUNNER_TEMP/three-venue-source.json" --output-dir "$RUNNER_TEMP/three-venue-trial"
+          else
+            mkdir -p "$RUNNER_TEMP/three-venue-trial"
+            printf '%s\n' '{"status":"NO_AUTHENTICATED_CLOSED_THREE_VENUE_SOURCE_CANDIDATE","signed_atomic_simulation_verified":false,"rollback_failure_case_verified":false,"actionable":false,"live_execution_approved":false,"broadcast":false}' > "$RUNNER_TEMP/three-venue-trial/three-venue.json"
+          fi
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          r=json.loads((Path(os.environ["RUNNER_TEMP"])/"three-venue-trial/three-venue.json").read_text())
+          print(json.dumps({"three_distinct_venue_signed_trial_status":r["status"],
+                            "diagnostic":r.get("diagnostic"),
+                            "signed_atomic_simulation_verified":r.get("signed_atomic_simulation_verified",False),
+                            "rollback_failure_case_verified":r.get("rollback_failure_case_verified",False),
+                            "broadcast":False}))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() && matrix.shard == 0 }}
+        with:
+          name: m5-three-distinct-venue-signed-trial
+          path: ${{ runner.temp }}/three-venue-trial/
+          if-no-files-found: error
       - name: Execute only target AMM v4 routes with signed positive and rollback checks
         run: |
           python3 -m arb.next_ten_signed_atomic_offline --batch remaining --only-venue raydium_amm_v4 --shard-count 2 --shard-index ${{ matrix.shard }} --fixture-dir "$RUNNER_TEMP/amm-v4-fixtures" --output-dir "$RUNNER_TEMP/amm-v4-receipts"
