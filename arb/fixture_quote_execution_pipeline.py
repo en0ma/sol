@@ -21,8 +21,21 @@ def extract_pool_states(fixture):
     addresses=fixture["state_account_addresses"]
     accounts=fixture["accounts"]
     rows=[]
-    for key in ("first","second"):
-        venue=fixture[key+"_venue"];pool=fixture[key+"_pool"]
+    if fixture.get("fixture_kind")=="THREE_DISTINCT_VENUE_CLOSED_ROUTE":
+        venues=fixture.get("route_venues")
+        pools=fixture.get("route_pool_addresses")
+        route_mints=fixture.get("route_mints")
+        if (not isinstance(venues,list) or not isinstance(pools,list)
+                or not isinstance(route_mints,list) or len(venues)!=3
+                or len(pools)!=3 or len(route_mints)!=4
+                or len(set(venues))!=3 or len(set(pools))!=3
+                or route_mints[0]!=route_mints[-1]):
+            raise ValueError("invalid authenticated three-venue fixture topology")
+        entries=list(zip(venues,pools))
+    else:
+        entries=[(fixture[key+"_venue"],fixture[key+"_pool"]) for key in ("first","second")]
+        route_mints=fixture["route_mints"]
+    for index,(venue,pool) in enumerate(entries):
         if venue not in PROGRAMS or pool not in addresses:
             raise ValueError("route pool absent from authenticated source inventory")
         acct=accounts[pool]
@@ -33,7 +46,7 @@ def extract_pool_states(fixture):
             raise ValueError("source pool is not base64 encoded")
         state=DECODERS[venue](base64.b64decode(encoded[0],validate=True))
         mints=[state[x] for x in MINT_KEYS[venue]]
-        if len(set(mints))!=2 or set(mints)!=set(fixture["route_mints"][:2]):
+        if len(set(mints))!=2 or set(mints)!={route_mints[index],route_mints[index+1]}:
             raise ValueError("decoded pool mints mismatch route")
         rows.append({"venue":venue,"address":pool,"mints":mints,
                      "decoded_pool_state":state,

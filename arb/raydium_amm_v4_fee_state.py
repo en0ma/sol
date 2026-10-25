@@ -27,8 +27,15 @@ def derive_v4(fixture):
     rows=extract_pool_states(fixture)
     funds=extract(fixture)["fundamentals"]
     results=[]
-    for row,f in zip(rows,funds):
+    lookup={(fund["venue"],fund["address"]):fund for fund in funds}
+    if len(lookup)!=len(funds):
+        raise ValueError("duplicate native liquidity source")
+    for row in rows:
         if row["venue"]!="raydium_amm_v4":continue
+        f=lookup.get((row["venue"],row["address"]))
+        if (not f or f["mints"]!=row["mints"] or
+                f["snapshot_slot"]!=row["snapshot_slot"]):
+            raise ValueError("AMM v4 quote native source binding mismatch")
         addr=row["address"]
         raw=base64.b64decode(fixture["accounts"][addr]["data"][0],validate=True)
         fee=fee_from_raw_pool(raw)

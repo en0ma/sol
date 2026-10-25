@@ -15,11 +15,12 @@ def derive(fixture,*,observed_unix):
         raise ValueError("valid observed time required")
     pool_states=extract_pool_states(fixture)
     native=extract(fixture)["fundamentals"]
-    if len(native)!=2 or len(pool_states)!=2:
-        raise ValueError("two source-bound pools required")
+    n=3 if fixture.get("fixture_kind")=="THREE_DISTINCT_VENUE_CLOSED_ROUTE" else 2
+    if len(native)!=n or len(pool_states)!=n:
+        raise ValueError("source-bound pool inventory size mismatch")
     source_ids=[(item["venue"],item["address"]) for item in pool_states]
     native_ids=[(item["venue"],item["address"]) for item in native]
-    if len(set(source_ids))!=2 or len(set(native_ids))!=2 or set(source_ids)!=set(native_ids):
+    if len(set(source_ids))!=n or len(set(native_ids))!=n or set(source_ids)!=set(native_ids):
         raise ValueError("native vault fundamentals and decoded pool identities diverge")
     native_by_id={(item["venue"],item["address"]):item for item in native}
     outputs=[];blocked=[]
@@ -77,7 +78,7 @@ def quote_cpmm_only(fixture,*,observed_unix,leg,amount_in):
                 if (s["venue"],s["address"])==(leg.get("venue"),leg.get("pool"))),None)
     if state is None or state["venue"]!="raydium_cpmm" or state.get("trade_fee_authenticated") is not True:
         raise ValueError("CPMM source fee/reserves unavailable")
-    provider,registry=from_snapshot(report["snapshots"],now=observed_unix)
+    provider,registry=from_snapshot([state],now=observed_unix)
     quoted=provider(leg,amount_in)
     return {"status":"ACCOUNT_DERIVED_CPMM_INDICATIVE_ONLY",
             "quote":quoted,"protocol_exact_verified":False,
