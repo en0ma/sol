@@ -268,7 +268,7 @@ def export_three_venue(rpc,readiness,route_index,output):
         # Re-authenticate each pool against upstream-backed local RPC.
         proof=snapshot(rpc,pool,venue)
         if (proof.get("authenticated") is not True or
-                proof.get("slot")!=candidate["source_slots"][i] or
+                type(proof.get("slot")) is not int or proof["slot"]<0 or
                 set(proof["mints"])!={mints[i],mints[i+1]}):
             raise ValueError("triangle source candidate changed before export")
         extras,leg_proof=venue_accounts(rpc,venue,pool,mints[i:i+2])
@@ -287,6 +287,17 @@ def export_three_venue(rpc,readiness,route_index,output):
             or any(not isinstance(value,dict) for value in values)):
         raise ValueError("contextual three-pool account inventory incomplete")
     accounts=dict(zip(addresses,values))
+    from arb.next_ten_fork_pool_probe import DECODERS,MINT_KEYS
+    for i,(venue,pool) in enumerate(zip(venues,addresses_by_leg)):
+        entry=accounts[pool]
+        if entry.get("owner")!=PROGRAMS[venue] or entry.get("executable") is not False:
+            raise ValueError("contextual third-venue pool owner changed")
+        encoded=entry.get("data")
+        if not isinstance(encoded,list) or len(encoded)!=2 or encoded[1]!="base64":
+            raise ValueError("contextual third-venue pool bytes missing")
+        state=DECODERS[venue](base64.b64decode(encoded[0],validate=True))
+        if set(state[k] for k in MINT_KEYS[venue])!={mints[i],mints[i+1]}:
+            raise ValueError("contextual third-venue pool mint topology changed")
     programs={PROGRAMS[v] for v in venues}
     if "pumpswap" in venues:
         from arb.pumpswap_fee_account import PROGRAM as FEE_PROGRAM

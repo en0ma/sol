@@ -26,15 +26,24 @@ class Tests(unittest.TestCase):
         def rpc_call(rpc,method,args):
             self.assertEqual(method,"getMultipleAccounts")
             return {"context":{"slot":17},"value":[
-                {"owner":"source","data":["AQ==","base64"],"lamports":1,"executable":False}
-                for _ in args[0]]}
+                {"owner": next((__import__("arb.next_ten_fork_pool_probe",fromlist=["PROGRAMS"]).PROGRAMS[v]
+                    for v,items in r["authenticated_pools"].items()
+                    if any(x["pool"]==address for x in items)), "source"),
+                 "data":["AQ==","base64"],"lamports":1,"executable":False}
+                for address in args[0]]}
+        #
         with tempfile.TemporaryDirectory() as folder,patch(
              "arb.next_ten_pair_fixture_export.snapshot",side_effect=snapshot),patch(
              "arb.next_ten_pair_fixture_export.venue_accounts",side_effect=extras),patch(
              "arb.next_ten_pair_fixture_export.call",side_effect=rpc_call),patch(
              "arb.next_ten_pair_fixture_export.program_data_accounts",
              return_value={"executable":{"data":["AQ==","base64"]}}),patch(
-             "arb.source_snapshot_manifest.verify",return_value=None):
+             "arb.source_snapshot_manifest.verify",return_value=None),patch(
+             "arb.next_ten_fork_pool_probe.DECODERS",
+             {v:(lambda raw, v=v: {"token_0_mint":"A","token_1_mint":"B"} if v=="raydium_cpmm"
+                  else {"token_mint_a":"B","token_mint_b":"C"} if v=="orca"
+                  else {"base_mint":"C","quote_mint":"A"})
+              for v in ("raydium_cpmm","orca","raydium_amm_v4")}):
             path=Path(folder)/"triangle.json"
             result=export_three_venue("http://127.0.0.1:8899",r,chosen,path)
             import json

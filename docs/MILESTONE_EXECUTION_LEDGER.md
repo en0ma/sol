@@ -57,6 +57,10 @@
 
 Focused CI #40229037828 failed two newly introduced fee source identity tests because the captured native fee diagnostic had not actually enforced the decoded pool configuration address and venue linkage. Added these checks *before* any native fee claim is accepted, alongside explicit authenticated trade-rate type/range validation. On error all intermediate decoded values are discarded, as the prior C01 evidence rule requires. Regression tests now cover contradictory identities and malformed native trade rates. The unrelated signed execution and rollback audit jobs in #101 succeeded. New commit CI remains pending.
 
+## B01 — Source triangle drift diagnosed in real CI #107
+
+Focused CI #40235192608 genuinely discovered 30 three-distinct-venue mint triangles, but source fixture export rejected the first because the second source probe reported a different observed slot. Pool snapshots are collected at different RPC contexts; identical discovery and reprobe slot is not a valid invariant. The exporter now rechecks live pool mint/venue identity and decodes each pool's bytes from the **single contextual companion-account snapshot**, refusing drift there. Candidate slots remain recorded for provenance but are not required to equal the later contextual slot. Actual signed triangle success still unverified; code must be exercised in CI.
+
 ## B01 — Real source triangle trial in focused CI
 
 The AMM-v4 focused upstream-backed source job now exports the first authenticated three-distinct-venue closed triangle (if one is available) using the existing read-only probe/exporter; it publishes both the fixture and count. The shard-zero isolated offline Surfpool job consumes this fixture through the signed universal coordinator, prints the actual signed/rollback status and uploads a dedicated route receipt. Missing source graph emits an explicit non-success receipt; a failed signed trial likewise cannot be counted verified. This exploratory path remains non-gating until a real three-distinct-venue receipt is accepted. **No claim of three-venue signed success until the new CI artifact is inspected.**
