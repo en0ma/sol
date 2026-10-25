@@ -13,8 +13,12 @@ from arb.raydium_clmm import PROGRAM as CLMM_PROGRAM
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
 
 def _config_bytes(fixture,address,owner):
+    if not isinstance(address,str) or not address:
+        raise ValueError("invalid pool-referenced config address")
     if address not in fixture["state_account_addresses"]:
         raise ValueError("configuration not in contextual source inventory")
+    if fixture["state_account_addresses"].count(address)!=1:
+        raise ValueError("duplicate source configuration inventory")
     info=fixture["accounts"].get(address)
     if not isinstance(info,dict) or info.get("owner")!=owner or info.get("executable") is not False:
         raise ValueError("configuration account owner not authenticated")
@@ -30,6 +34,11 @@ def decode_native_config_fee(venue,state,fixture):
     if venue=="raydium_cpmm":
         address=state["amm_config"]
         cfg=decode_amm_config(_config_bytes(fixture,address,CPMM_PROGRAM))
+        if (type(cfg["trade_fee_rate_ppm"]) is not int or
+                type(cfg["creator_fee_rate_ppm"]) is not int or
+                not 0<=cfg["trade_fee_rate_ppm"]<1_000_000 or
+                not 0<=cfg["creator_fee_rate_ppm"]<1_000_000):
+            raise ValueError("CPMM source config fee ppm invalid")
         # Creator fee treatment is version/direction dependent; refuse
         # false effective-fee authentication even when trade fee is decoded.
         return {"venue":venue,"config_address":address,
