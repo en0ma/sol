@@ -19,7 +19,7 @@ class Tests(unittest.TestCase):
         signer=type("Signer",(),{"pubkey":lambda self:"unused"})()
         with patch("arb.next_ten_signed_atomic_offline.call",return_value={"value":{"blockhash":"11111111111111111111111111111111"}}), \
              patch("arb.next_ten_signed_atomic_offline.Transaction") as transaction, \
-             patch("arb.next_ten_signed_atomic_offline._simulate",return_value=({"err":None,"accounts":[account(0,0),account(1,42),account(2,0)],"unitsConsumed":500},100)), \
+             patch("arb.next_ten_signed_atomic_offline._simulate",return_value=({"err":None,"accounts":[account(0,0),account(1,42),None],"unitsConsumed":500},100)), \
              patch("arb.next_ten_signed_atomic_offline._post",return_value=[100,0,0]):
             transaction.new_signed_with_payer.return_value=DummyTx()
             result=preflight_first_leg_output("http://127.0.0.1:8899",None,signer,["a","b","c"],mints,"11111111111111111111111111111111",[100,0,0])

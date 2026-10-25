@@ -139,6 +139,13 @@ def preflight_first_leg_output(rpc,ix1,signer,keys,mints,owner,before):
         raise ValueError("standalone signed SPL post accounts missing")
     values=[]
     for i,entry in enumerate(accounts):
+        # A standalone first-leg transaction need not load its future
+        # terminal token account. Surfpool may return null for that unused
+        # address; the separately checked persistent before-snapshot must
+        # remain unchanged. Input and intermediate accounts are mandatory.
+        if i==2 and entry is None:
+            values.append(before[i])
+            continue
         if not isinstance(entry,dict) or entry.get("owner")!=TOKEN_PROGRAM:
             raise ValueError("standalone signed SPL owner mismatch")
         raw=entry.get("data")
