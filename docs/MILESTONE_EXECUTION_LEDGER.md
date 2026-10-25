@@ -53,6 +53,10 @@
 - [ ] **C04 — Make existing discovery, market registry and opportunity graph supply candidates to the coordinator.** Existing: `arb/raydium_public_pool_discovery.py`, `arb/market_state_registry.py`, `arb/opportunity_graph.py`, `arb/research_engine_pipeline.py`. Wire and harden, don't rewrite.
 - [ ] **C05 — Continuous monitoring/indexing (M6)** deferred pending reliable M5 source-state and user's RPC/budget authorization.
 
+## C01/C03 — Native CPMM fee evidence and signed compute headroom
+
+The existing native CPMM auxiliary-config diagnostic now retains the account-derived **effective quote fee** only when authenticated (e.g., creator fee zero), and keeps it `null` where creator-fee placement remains unresolved. The signed compute diagnostic reports exact observed CU headroom relative to the protocol ceiling, with `null` when no credible CU evidence exists. Neither compute headroom nor source fee fields are converted into unmeasured lamports/start-mint profits. Empty configuration bytes fail closed. CI evidence pending.
+
 ## C01/C02 — Evidence-grounded source-blocker prioritization and compute-bound regression
 
 The focused quote/fee research report now includes deterministic `prioritized_blockers`, containing actual affected route IDs and de-duplicated counts, ranked by missing source receipts, provenance, protocol fee/pricing state and quote continuity. This is a diagnostic queue rather than proof that unknown fees or stale source states are resolved. The captured signed compute diagnostic's stricter `SIGNED_POSITIVE_COMPUTE_MISSING_OR_OVER_LIMIT` sentinel is now correctly asserted by existing tests; added boundary regressions for bogus and valid compute values. CI confirmation pending; quote parity remains zero verified samples.

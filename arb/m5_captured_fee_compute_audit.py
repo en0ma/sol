@@ -24,7 +24,8 @@ def diagnose(fixture,receipt):
                         creator_fee_ppm=fee["creator_fee_ppm"],
                         trade_fee_authenticated=fee["trade_fee_authenticated"],
                         total_effective_fee_authenticated=fee["total_effective_fee_authenticated"],
-                        creator_fee_placement_verified=fee["creator_fee_placement_verified"])
+                        creator_fee_placement_verified=fee["creator_fee_placement_verified"],
+                        effective_quote_fee_ppm=fee.get("effective_quote_fee_ppm"))
             if not fee["total_effective_fee_authenticated"]:
                 item["blocker"]="CPMM_CREATOR_FEE_PLACEMENT_UNVERIFIED"
         except (ValueError,KeyError,TypeError) as exc:
@@ -37,6 +38,12 @@ def diagnose(fixture,receipt):
             result["compute_source"]="SIGNED_OFFLINE_SIMULATE_TRANSACTION_RECEIPT"
         else:
             result["compute_blocker"]="SIGNED_POSITIVE_COMPUTE_MISSING_OR_OVER_LIMIT"
+    # Capture a comparable quantity only in units actually measured by the
+    # signed RPC simulation. Compute units are not lamports or token costs.
+    result["compute_limit_units"]=1_400_000
+    result["compute_headroom_units"]=(
+        1_400_000-result["positive_units_consumed"]
+        if result["positive_units_consumed"] is not None else None)
     # Units consumed do not determine a paid fee; no conversion to start
     # token units is possible without measured fee prices and mint conversion.
     result["priority_fee_lamports_verified"]=False

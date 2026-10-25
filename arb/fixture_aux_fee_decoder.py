@@ -21,7 +21,10 @@ def _config_bytes(fixture,address,owner):
     data=info.get("data")
     if not isinstance(data,list) or len(data)!=2 or data[1]!="base64":
         raise ValueError("invalid configuration account encoding")
-    return base64.b64decode(data[0],validate=True)
+    raw=base64.b64decode(data[0],validate=True)
+    if not raw:
+        raise ValueError("empty authenticated configuration")
+    return raw
 
 def decode_native_config_fee(venue,state,fixture):
     if venue=="raydium_cpmm":

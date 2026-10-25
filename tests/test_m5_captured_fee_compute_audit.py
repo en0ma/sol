@@ -21,6 +21,8 @@ class Tests(unittest.TestCase):
         self.assertEqual(result["fee_rows"][0]["creator_fee_ppm"],100)
         self.assertEqual(result["fee_rows"][0]["blocker"],"CPMM_CREATOR_FEE_PLACEMENT_UNVERIFIED")
         self.assertEqual(result["positive_units_consumed"],12345)
+        self.assertEqual(result["compute_headroom_units"],1_400_000-12345)
+        self.assertIsNone(result["fee_rows"][0]["effective_quote_fee_ppm"])
         self.assertEqual(result["compute_source"],"SIGNED_OFFLINE_SIMULATE_TRANSACTION_RECEIPT")
         self.assertFalse(result["network_fee_lamports_verified"])
         self.assertFalse(result["start_mint_fee_cost_verified"])
@@ -29,6 +31,7 @@ class Tests(unittest.TestCase):
         with patch("arb.m5_captured_fee_compute_audit.extract_pool_states",return_value=[]):
             result=diagnose(fixture(),{})
         self.assertIsNone(result["positive_units_consumed"])
+        self.assertIsNone(result["compute_headroom_units"])
         self.assertEqual(result["compute_blocker"],"SIGNED_POSITIVE_COMPUTE_MISSING_OR_OVER_LIMIT")
     def test_positive_compute_budget_bounds(self):
         with patch("arb.m5_captured_fee_compute_audit.extract_pool_states",return_value=[]):
