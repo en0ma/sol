@@ -14,7 +14,9 @@ def report(cases,*,as_of_unix,tolerance_bps=100):
         final=receipt.get("positive_post_balances_base_units")
         costs=case.get("costs_start_mint_units")
         r=None
-        if (isinstance(initial,list) and isinstance(final,list) and
+        # A failed/missing signed atomic proof cannot support observed PnL.
+        signed_ok=metric.get("signed_atomic_evidence_status")=="VERIFIED"
+        if (signed_ok and isinstance(initial,list) and isinstance(final,list) and
            len(initial)==len(final)==3 and
            all(type(x)is int and x>=0 for x in initial+final) and
            type(initial[0]-final[0])is int and initial[0]>final[0] and
@@ -26,7 +28,7 @@ def report(cases,*,as_of_unix,tolerance_bps=100):
             except (ValueError,KeyError,TypeError):
                 pass
         rows.append({**metric,"observed_risk":r,
-             "signed_observation_supported":metric["signed_atomic_evidence_status"]=="VERIFIED",
+             "signed_observation_supported":signed_ok,
              "real_profitability_verified":False,**SAFE})
     return {"status":"SIGNED_OFFLINE_RESEARCH_DIAGNOSTIC",
             "rows":rows,"sample_count":len(rows),

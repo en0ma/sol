@@ -18,7 +18,8 @@ def coverage(fixture,*,max_arrays=24):
         span=width*spacing
         starts=sorted(a["start_tick"] for a in p["tick_arrays"])
         current=p["tick_current"]//span*span
-        gaps=[starts[i]+span for i in range(len(starts)-1) if starts[i+1]!=starts[i]+span]
+        gaps=[missing for a,b in zip(starts,starts[1:]) for missing in range(a+span,b,span)]
+        if len(gaps)>512:raise ValueError("too many missing tick arrays")
         rows.append({"venue":p["venue"],"pool":p["pool"],
            "captured_array_count":len(starts),
            "current_array_captured":current in starts,
