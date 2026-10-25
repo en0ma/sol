@@ -53,6 +53,10 @@
 - [ ] **C04 — Make existing discovery, market registry and opportunity graph supply candidates to the coordinator.** Existing: `arb/raydium_public_pool_discovery.py`, `arb/market_state_registry.py`, `arb/opportunity_graph.py`, `arb/research_engine_pipeline.py`. Wire and harden, don't rewrite.
 - [ ] **C05 — Continuous monitoring/indexing (M6)** deferred pending reliable M5 source-state and user's RPC/budget authorization.
 
+## B05 — Signed compute evidence and protocol ceiling
+
+The generic signed adaptive observer and final multi-leg simulator now require positive integer `unitsConsumed` from signed `simulateTransaction` receipts, rejecting missing, boolean, nonnumeric, zero and values above the Solana 1,400,000 CU transaction cap. Observed compute units are retained on positive signed N-leg receipts. No synthetic compute allowance, profitability, priority fee or external source quote claim is inferred. CI regression tests added; commit CI pending.
+
 ## CI hardening: signed prefix atomic planner state
 
 CI #40222691178 confirmed the preceding synthetic decoder fix still failed because its per-simulation account index was not reset before the second signed simulation. The corrected mock explicitly resets at each RPC result. The production cumulative observer now commits its planned instruction, amount and next expected index **only after** signing, simulation, all signed touched SPL identity/balance checks and persistent-fork no-mutation verification succeed. This prevents failed prefix probes from leaving partial state and invalidating a retry. A regression repeats a failed index to verify consistent fail-closed behavior. CI confirmation pending.

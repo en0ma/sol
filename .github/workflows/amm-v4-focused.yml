@@ -26,6 +26,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_n_leg_snapshot.py -v
       - name: Test repeatable signed observer failure without partial plan mutation
         run: python3 -m unittest discover -s tests -p test_adaptive_signed_prefix_observer.py -v
+      - name: Test signed simulation compute unit caps for all route lengths
+        run: python3 -m unittest discover -s tests -p test_signed_compute_budget.py -v
       - name: Test signed cumulative prefix full token-balance continuity
         run: python3 -m unittest discover -s tests -p test_signed_prefix_balance_integrity.py -v
       - name: Test sequential cumulative signed prefix amount observations

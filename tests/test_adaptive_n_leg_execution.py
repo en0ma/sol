@@ -10,7 +10,7 @@ class Tests(unittest.TestCase):
             "instructions":["one","two"],"amounts":[100,80]}),patch(
             "arb.atomic_graph_coordinator.sign_adaptive_n_leg_offline",
             return_value=(MagicMock(),None,{"instruction_order_verified":True})),patch(
-            "arb.damm_cpmm_atomic_offline._simulate",return_value=({"err":None,"logs":[]},250)),patch(
+            "arb.damm_cpmm_atomic_offline._simulate",return_value=({"err":None,"logs":[],"unitsConsumed":120000},250)),patch(
             "arb.next_ten_signed_atomic_offline.top_level_events",return_value=[
             ["cpmm","invoke"],["cpmm","success"],["orca","invoke"],["orca","success"]]),patch(
             "arb.atomic_graph_coordinator.audit_n_leg_cpi",return_value={"hops":[{"hop":1}]}),patch(

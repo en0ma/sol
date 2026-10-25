@@ -24,7 +24,7 @@ class Tests(unittest.TestCase):
             rows=[None]*4
             for index in range(slot+2):
                 rows[index]={"owner":"token","data":["YQ==","base64"]}
-            return {"err":None,"accounts":rows},200
+            return {"err":None,"accounts":rows,"unitsConsumed":100000},200
         call_count=[0]
         decode_index=[0]
         def decode(raw):

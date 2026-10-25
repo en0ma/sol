@@ -247,6 +247,15 @@ def audit_n_leg_balances(amounts, before, after, *, rollback_balances=None, late
             "source_rpc_independently_attested":False,
             "actionable":False,"live_execution_approved":False,"broadcast":False}
 
+MAX_SOLANA_COMPUTE_UNITS=1_400_000
+
+def verify_signed_compute_budget(simulated, *, stage):
+    """Fail closed on missing or over-limit signed simulation compute evidence."""
+    consumed=simulated.get("unitsConsumed") if isinstance(simulated,dict) else None
+    if type(consumed)is not int or not 0<consumed<=MAX_SOLANA_COMPUTE_UNITS:
+        raise ValueError("invalid signed "+stage+" compute units")
+    return consumed
+
 def verify_signed_prefix_balances(simulated, tokens, owner, initial_amount,
                                   planned_inputs, prefix_index):
     """Verify all touched SPL accounts after a signed cumulative prefix.
@@ -332,6 +341,7 @@ def signed_prefix_observer(rpc,legs,tokens,states,evidence,owner,accounts,signer
         simulated,_=_simulate(rpc,tx,accounts)
         if simulated.get("err") is not None:
             raise ValueError("signed prefix simulation failed: "+str(simulated["err"])[:160])
+        units=verify_signed_compute_budget(simulated,stage="prefix")
         output=verify_signed_prefix_balances(
             simulated,tokens,owner,initial_amount,planned_inputs+[amount],i)
         if _post(rpc,accounts,tokens,owner)!=initial:
@@ -340,7 +350,7 @@ def signed_prefix_observer(rpc,legs,tokens,states,evidence,owner,accounts,signer
         planned_inputs.append(amount)
         last_index=i
         return {"signed_offline_observed":True,"output_base_units":output,
-                "compute_units":simulated.get("unitsConsumed")}
+                "compute_units":units}
     return observe
 
 def signed_n_leg_post_balances(simulation, accounts, mints, authority):
@@ -397,6 +407,13 @@ def simulate_adaptive_n_leg_offline(rpc, legs, tokens, states, evidence, owner,
              "signed_atomic_simulation_verified":False,"quote_accuracy_verified":False,
              "actionable":False,"live_execution_approved":False,"broadcast":False}
     if positive.get("err") is not None:
+        return receipt
+    try:
+        receipt["positive_units_consumed"]=verify_signed_compute_budget(
+            positive,stage="atomic")
+    except ValueError as exc:
+        receipt["status"]="SIGNED_COMPUTE_BUDGET_UNVERIFIED"
+        receipt["reason"]=str(exc)
         return receipt
     expected=[event for p in programs for event in ([p,"invoke"],[p,"success"])]
     if top_level_events(positive.get("logs") or [],set(programs))!=expected:
