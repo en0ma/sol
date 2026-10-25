@@ -16,6 +16,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install builder dependency
         run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Test signed first-leg adaptive amount preflight
+        run: python3 -m unittest discover -s tests -p test_m5_adaptive_cpmm_v4.py -v
       - name: Test empirical signed quote and creator-fee blocker summary
         run: python3 -m unittest discover -s tests -p test_m5_experiment_blocker_summary.py -v
       - name: Test signed declared input versus actual SPL token consumption
@@ -213,6 +215,16 @@ jobs:
       - name: Execute only target AMM v4 routes with signed positive and rollback checks
         run: |
           python3 -m arb.next_ten_signed_atomic_offline --batch remaining --only-venue raydium_amm_v4 --shard-count 2 --shard-index ${{ matrix.shard }} --fixture-dir "$RUNNER_TEMP/amm-v4-fixtures" --output-dir "$RUNNER_TEMP/amm-v4-receipts"
+      - name: Run separate adaptive CPMM-v4 signed amount-continuity research
+        if: ${{ matrix.shard == 0 }}
+        run: |
+          python3 -m arb.next_ten_signed_atomic_offline --batch remaining --only-cpmm-v4 --adaptive-cpmm-v4 --fixture-dir "$RUNNER_TEMP/amm-v4-fixtures" --output-dir "$RUNNER_TEMP/amm-v4-adaptive"
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() && matrix.shard == 0 }}
+        with:
+          name: m5-adaptive-cpmm-v4-receipts
+          path: ${{ runner.temp }}/amm-v4-adaptive/
+          if-no-files-found: warn
       - uses: actions/upload-artifact@v4
         if: always()
         with:

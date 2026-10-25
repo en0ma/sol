@@ -125,10 +125,46 @@ def clmm_direction_evidence(state,mint_in,directional,source_accounts):
         raise ValueError("CLMM directional arrays absent from authenticated source fixture")
     return {"tick_arrays":arrays,"tick_arrays_authenticated":True}
 
-def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache=None,batch=BATCH_10):
+def preflight_first_leg_output(rpc,ix1,signer,keys,mints,owner,before):
+    """Plan the final atomic second input from a signed isolated first leg."""
+    local_rpc_only(rpc)
+    blockhash=Hash.from_string(call(rpc,"getLatestBlockhash")["value"]["blockhash"])
+    tx=Transaction.new_signed_with_payer([ix1],signer.pubkey(),[signer],blockhash)
+    tx.verify()
+    simulation,_=_simulate(rpc,tx,keys)
+    if simulation.get("err") is not None:
+        raise ValueError("signed isolated first leg failed: "+str(simulation["err"])[:160])
+    accounts=simulation.get("accounts")
+    if not isinstance(accounts,list) or len(accounts)!=3:
+        raise ValueError("standalone signed SPL post accounts missing")
+    values=[]
+    for i,entry in enumerate(accounts):
+        if not isinstance(entry,dict) or entry.get("owner")!=TOKEN_PROGRAM:
+            raise ValueError("standalone signed SPL owner mismatch")
+        raw=entry.get("data")
+        if not isinstance(raw,list) or len(raw)!=2 or raw[1]!="base64":
+            raise ValueError("standalone signed SPL encoding missing")
+        token=decode_token_account(base64.b64decode(raw[0],validate=True))
+        if token["mint"]!=mints[i] or token["authority"]!=owner:
+            raise ValueError("standalone signed SPL identity mismatch")
+        values.append(token["amount_base_units"])
+    output=values[1]-before[1]
+    if not (type(output)is int and 0<output<2**64 and values[0]<before[0]
+            and values[2]==before[2]):
+        raise ValueError("standalone signed first-leg SPL output invalid")
+    if _post(rpc,keys,mints,owner)!=before:
+        raise ValueError("standalone simulation mutated fork balances")
+    return {"planned_second_input":output,
+            "standalone_compute_units":simulation.get("unitsConsumed"),
+            "standalone_signed":True,**SAFETY}
+
+def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache=None,batch=BATCH_10,
+        adaptive_cpmm_v4=False):
     local_rpc_only(rpc)
     if any(type(n)is not int or not 0<n<2**64 for n in (amount_in,amount_intermediate)):
         raise ValueError("invalid atomic amounts")
+    if adaptive_cpmm_v4 and {fixture.get("first_venue"),fixture.get("second_venue")}!={"raydium_cpmm","raydium_amm_v4"}:
+        raise ValueError("adaptive amount research only supports CPMM and AMM v4")
     hydrate(rpc,fixture,program_cache=program_cache,batch=batch)
     hydration_readback=None
     if "state_account_manifest_sha256" in fixture:
@@ -226,8 +262,15 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache
                (second,legs[1][1]):evidence[second]}
     # Aligned SPL accounts retain distinct input and terminal token accounts
     # even though their mint identities are the same.
+    adaptive_plan=None
+    if adaptive_cpmm_v4:
+        first_ix,_=compile_route(graph,mints,state_map,proof_map,owner,keys,
+                                [amount_in,amount_intermediate],[1,1])
+        adaptive_plan=preflight_first_leg_output(rpc,first_ix,signer,keys,mints,owner,before)
+        amount_intermediate=adaptive_plan["planned_second_input"]
     ix1,ix2=compile_route(graph,mints,state_map,proof_map,owner,keys,
-                          [amount_in,amount_intermediate],[amount_intermediate,1])
+                          [amount_in,amount_intermediate],
+                          [1 if adaptive_cpmm_v4 else amount_intermediate,1])
     from arb.atomic_graph_coordinator import sign_atomic_offline
     tx,lookup,check=sign_atomic_offline(
         rpc,[ix1,ix2],signer,programs=[PROGRAMS[first],PROGRAMS[second]],
@@ -243,6 +286,8 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache
             "declared_second_leg_input_base_units":amount_intermediate,
             "declared_first_leg_minimum_output_base_units":amount_intermediate,
             "declared_second_leg_minimum_output_base_units":1,
+            "adaptive_cpmm_v4_amount_planning":adaptive_plan,
+            "adaptive_second_input_verified_against_atomic_output":False,
             "route_mints":mints,
             "route_pool_addresses":[legs[0][1],legs[1][1]],
             "source_snapshot_slot":None,  # Fork readback != source mainnet attestation.
@@ -291,6 +336,9 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache
             amounts[1]==flow["first_leg_intermediate_received_base_units"]-amount_intermediate):
         result["status"]="POST_SWAP_BALANCE_RECONCILIATION_FAILED"
         return result
+    result["adaptive_second_input_verified_against_atomic_output"]=(
+        adaptive_plan is not None and
+        flow["first_leg_intermediate_received_base_units"]==amount_intermediate)
     result.update(flow,positive_post_balances_base_units=amounts,
                   initial_balances_base_units=before,
                   signed_intermediate_surplus_base_units=amounts[1],
@@ -335,6 +383,8 @@ def main():
     p.add_argument("--shard-index",type=int,default=0)
     p.add_argument("--shard-count",type=int,default=1)
     p.add_argument("--only-venue",choices=("raydium_amm_v4",))
+    p.add_argument("--adaptive-cpmm-v4",action="store_true")
+    p.add_argument("--only-cpmm-v4",action="store_true")
     args=p.parse_args()
     local_rpc_only("http://127.0.0.1:8899")
     root=Path(args.output_dir)
@@ -344,6 +394,8 @@ def main():
     program_cache={}
     for index,(first,second) in enumerate(route_batch(args.batch)):
         if args.only_venue and args.only_venue not in (first,second):
+            continue
+        if args.only_cpmm_v4 and {first,second}!={"raydium_cpmm","raydium_amm_v4"}:
             continue
         if index%args.shard_count!=args.shard_index:
             continue
@@ -359,7 +411,8 @@ def main():
         if path.is_file():
             try:
                 out=run("http://127.0.0.1:8899",json.loads(path.read_text()),
-                        program_cache=program_cache,batch=route_batch(args.batch))
+                        program_cache=program_cache,batch=route_batch(args.batch),
+                        adaptive_cpmm_v4=args.adaptive_cpmm_v4)
             except Exception as exc:
                 out.update(status="ISOLATED_SIGNED_ATOMIC_BLOCKED",
                            error_class=type(exc).__name__,diagnostic=str(exc)[:500])
