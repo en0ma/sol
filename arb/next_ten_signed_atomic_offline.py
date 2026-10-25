@@ -59,15 +59,22 @@ def hydrate(rpc, fixture, *, program_cache=None, batch=BATCH_10):
         raise ValueError("isolated Surfpool explicit offline gate required")
     if fixture.get("source")!="READ_ONLY_MAINNET_BACKED_SURFPOOL":
         raise ValueError("untrusted source fixture")
-    route=(fixture.get("first_venue"),fixture.get("second_venue"))
-    if route not in batch:
-        raise ValueError("non-batch ordered pair")
+    triangle=fixture.get("fixture_kind")=="THREE_DISTINCT_VENUE_CLOSED_ROUTE"
+    if triangle:
+        route=fixture.get("route_venues")
+        if (not isinstance(route,list) or len(route)!=3 or
+                len(set(route))!=3 or any(v not in PROGRAMS for v in route)):
+            raise ValueError("invalid three-distinct-venue source fixture")
+    else:
+        route=(fixture.get("first_venue"),fixture.get("second_venue"))
+        if route not in batch:
+            raise ValueError("non-batch ordered pair")
     # New contextual fixtures are checked before any hydration/write.
     # Older fixtures remain legacy atomic evidence only, not M5 provenance.
     if "state_account_manifest_sha256" in fixture:
         from arb.source_snapshot_manifest import verify
         verify(fixture)
-    programs={PROGRAMS[route[0]],PROGRAMS[route[1]]}
+    programs={PROGRAMS[v] for v in route}
     if "pumpswap" in route:
         from arb.pumpswap_fee_account import PROGRAM as FEE_PROGRAM
         programs.add(FEE_PROGRAM)
@@ -433,9 +440,85 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache
                          else "SECOND_LEG_ATOMIC_ABORT_NOT_VERIFIED")
     return result
 
+
+def run_three_venue(rpc,fixture,*,amount_in=100_000_000,program_cache=None):
+    """Three distinct real source pools through the existing signed N-leg engine."""
+    from arb.atomic_graph_coordinator import simulate_adaptive_n_leg_offline
+    from arb.venue_swap_adapter import build_leg
+    from arb.source_snapshot_manifest import verify
+    local_rpc_only(rpc)
+    if (fixture.get("fixture_kind")!="THREE_DISTINCT_VENUE_CLOSED_ROUTE" or
+            fixture.get("source")!="READ_ONLY_MAINNET_BACKED_SURFPOOL"):
+        raise ValueError("authenticated three-venue fixture required")
+    verify(fixture)
+    venues=fixture.get("route_venues")
+    pools=fixture.get("route_pool_addresses")
+    mints=fixture.get("route_mints")
+    proofs=fixture.get("leg_evidence_by_index")
+    if (not all(isinstance(x,list) for x in (venues,pools,mints,proofs))
+            or len(venues)!=len(pools)!=len(proofs)!=3 or len(mints)!=4
+            or len(set(venues))!=3 or len(set(pools))!=3
+            or len(set(mints[:3]))!=3 or mints[-1]!=mints[0]
+            or any(v not in PROGRAMS for v in venues)
+            or type(amount_in)is not int or not 0<amount_in<2**64):
+        raise ValueError("invalid three-venue route topology or amount")
+    if any(not isinstance(proof,dict) or proof.get("venue")!=venues[i]
+           or proof.get("pool")!=pools[i] for i,proof in enumerate(proofs)):
+        raise ValueError("three-venue source leg evidence identity mismatch")
+    hydrate(rpc,fixture,program_cache=program_cache)
+    from arb.hydrated_fork_state_audit import verify_hydrated_state
+    readback=verify_hydrated_state(rpc,fixture)
+    states={}
+    evidence={}
+    route=[]
+    for i,(venue,pool) in enumerate(zip(venues,pools)):
+        state=_pool(rpc,pool,PROGRAMS[venue],DECODERS[venue])
+        if set(state[k] for k in MINT_KEYS[venue])!={mints[i],mints[i+1]}:
+            raise ValueError("hydrated third-venue pool mint identity changed")
+        proof=dict(proofs[i])
+        if venue=="raydium_clmm":
+            proof.update(clmm_direction_evidence(
+                state,mints[i],proof.get("tick_arrays_by_direction"),fixture["accounts"]))
+        if venue=="pumpswap":
+            raise ValueError("three-venue PumpSwap requires source account resolver integration")
+        states[(venue,pool)]=state
+        evidence[(venue,pool)]=proof
+        route.append({"venue":venue,"pool":pool,
+                      "input_mint":mints[i],"output_mint":mints[i+1]})
+    signer=Keypair()
+    owner=str(signer.pubkey())
+    keys=[str(Keypair().pubkey()) for _ in mints]
+    call(rpc,"surfnet_setAccount",[owner,{"lamports":1_000_000_000,
+        "data":"","owner":SYSTEM,"executable":False}])
+    for i,(key,mint) in enumerate(zip(keys,mints)):
+        call(rpc,"surfnet_setAccount",[key,{"lamports":2_039_280,
+            "data":token_account_bytes(mint,owner,amount_in if i==0 else 0).hex(),
+            "owner":TOKEN_PROGRAM,"executable":False}])
+    if _post(rpc,keys,mints,owner)!=[amount_in,0,0,0]:
+        raise ValueError("three-venue ephemeral SPL initial snapshot mismatch")
+    def negative(instructions,amounts):
+        ix=build_leg(venues[-1],pools[-1],states[(venues[-1],pools[-1])],
+                     evidence[(venues[-1],pools[-1])],owner,
+                     keys[-2],keys[-1],mints[-2],mints[-1],
+                     amounts[-1],2**64-1)
+        return list(instructions[:-1])+[ix]
+    receipt=simulate_adaptive_n_leg_offline(
+        rpc,route,mints,states,evidence,owner,keys,amount_in,None,signer,
+        negative_instructions=negative,require_closed=True)
+    receipt.update(route_venues=venues,route_pool_addresses=pools,route_mints=mints,
+        fixture_kind=fixture["fixture_kind"],
+        source_snapshot_slot=None,
+        state_accounts_observed_slot=fixture["state_accounts_observed_slot"],
+        state_account_manifest_sha256=fixture["state_account_manifest_sha256"],
+        hydrated_fork_state_readback=readback,
+        execution_environment="ISOLATED_SURFPOOL_OFFLINE",
+        independently_validated_quote_samples=0,**SAFETY)
+    return receipt
+
 def main():
     p=argparse.ArgumentParser()
-    p.add_argument("--fixture-dir",required=True)
+    p.add_argument("--fixture-dir")
+    p.add_argument("--three-venue-fixture")
     p.add_argument("--output-dir",required=True)
     p.add_argument("--batch",choices=("first","next","remaining","non-v4"),default="first")
     p.add_argument("--shard-index",type=int,default=0)
@@ -450,6 +533,21 @@ def main():
     local_rpc_only("http://127.0.0.1:8899")
     root=Path(args.output_dir)
     root.mkdir(parents=True,exist_ok=True)
+    if args.three_venue_fixture:
+        path=Path(args.three_venue_fixture)
+        result={"status":"THREE_VENUE_SIGNED_EXECUTION_BLOCKED",**SAFETY}
+        (root/"three-venue.json").write_text(json.dumps(result,indent=2)+"\\n")
+        try:
+            result=run_three_venue("http://127.0.0.1:8899",
+                                   json.loads(path.read_text()),program_cache={})
+        except Exception as exc:
+            result.update(error_class=type(exc).__name__,diagnostic=str(exc)[:500])
+        (root/"three-venue.json").write_text(json.dumps(result,indent=2)+"\\n")
+        print(json.dumps({"route":"three-distinct-venues","status":result["status"],
+                          "broadcast":False}),flush=True)
+        return
+    if not args.fixture_dir:
+        p.error("--fixture-dir required for pair trials")
     if not 1<=args.shard_count<=42 or not 0<=args.shard_index<args.shard_count:
         raise ValueError("invalid deterministic offline work shard")
     program_cache={}
