@@ -1,5 +1,5 @@
 import unittest
-from arb.raydium_amm_v4_open_orders_reserves import decode_open_orders
+from arb.raydium_amm_v4_open_orders_reserves import decode_open_orders,adjusted_reserves
 from arb.orca_whirlpool import b58
 MARKET=b58(bytes([1])*32);OWNER=b58(bytes([2])*32)
 def sample():
@@ -22,6 +22,11 @@ class Tests(unittest.TestCase):
   with self.assertRaises(ValueError):decode_open_orders(bytes(b),market=MARKET,owner=OWNER)
   b=sample();b[77:85]=(101).to_bytes(8,"little")
   with self.assertRaises(ValueError):decode_open_orders(bytes(b),market=MARKET,owner=OWNER)
+ def test_owner_must_come_from_pool_nonce_not_caller(self):
+  import inspect
+  self.assertNotIn("open_orders_owner",inspect.signature(adjusted_reserves).parameters)
+  with self.assertRaises(ValueError):
+   adjusted_reserves({},{"venue":"raydium_amm_v4"})
  def test_missing_padding_fails(self):
   b=sample();b[:5]=b"hello"
   with self.assertRaises(ValueError):decode_open_orders(bytes(b),market=MARKET,owner=OWNER)

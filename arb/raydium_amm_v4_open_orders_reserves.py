@@ -22,10 +22,23 @@ def decode_open_orders(raw,*,market,owner):
         raise ValueError("OpenOrders free balance exceeds total")
     return {"base_token_total":base_total,"quote_token_total":quote_total,
             "base_token_free":base_free,"quote_token_free":quote_free}
-def adjusted_reserves(fixture,pool,*,open_orders_owner):
+def adjusted_reserves(fixture,pool):
+    from arb.source_snapshot_manifest import verify
+    verify(fixture)
     if pool.get("venue")!="raydium_amm_v4":
         raise ValueError("requires Raydium AMM v4 fundamental")
     state=pool["decoded_pool_state"]
+    if pool.get("address") not in fixture["state_account_addresses"]:
+        raise ValueError("pool missing from contextual source inventory")
+    # Derive the AMM authority from pool nonce and fixed program ID, not
+    # from an untrusted caller argument. The OpenOrders authority must match.
+    from solders.pubkey import Pubkey
+    from arb.raydium_amm_v4_preflight import PROGRAM
+    nonce=state.get("nonce")
+    if type(nonce)is not int or not 0<=nonce<=255:
+        raise ValueError("AMM v4 authority nonce invalid")
+    open_orders_owner=str(Pubkey.create_program_address(
+        [b"amm authority",bytes([nonce])],Pubkey.from_string(PROGRAM)))
     address=state["open_orders"]
     if address not in fixture["state_account_addresses"]:
         raise ValueError("OpenOrders missing from same-slot inventory")
@@ -45,6 +58,7 @@ def adjusted_reserves(fixture,pool,*,open_orders_owner):
     if any(type(v)is not int or not 0<v<2**64 for v in net):
         raise ValueError("invalid net AMM v4 reserves")
     return {"effective_reserves_base_units":net,
+            "open_orders_authority":open_orders_owner,
             "market_accounts_authenticated":True,
             "effective_reserves_authenticated":True,
             "source":"MANIFEST_CAPTURED_SERUM_V3_OPENORDERS_AND_POOL_PNL",

@@ -135,7 +135,7 @@ New \`arb/seven_venue_aux_pricing_requirements.py\` explicitly records missing a
 
 ## M5 Raydium AMM v4 OpenOrders reserve derivation — October 25, 2026
 
-\`arb/raydium_amm_v4_open_orders_reserves.py\` extracts Serum/OpenBook v3 OpenOrders free and total base/quote balances from manifest-captured bytes, validates the linked market and authority, and derives net CPMM reserves as vault + OpenOrders totals - AMM pending PnL. This is bounded to legacy v3 layout; authority identity must be independently checked by the caller, as must market-role account correctness. It is not validated swap-price parity nor broad live state ingestion.
+\`arb/raydium_amm_v4_open_orders_reserves.py\` extracts Serum/OpenBook v3 OpenOrders free and total base/quote balances from manifest-captured bytes, validates the linked market and authority, and derives net CPMM reserves as vault + OpenOrders totals - AMM pending PnL. This is bounded to legacy v3 layout; OpenOrders authority is independently derived from the pool nonce and fixed AMM program PDA rather than accepted from a caller, as must market-role account correctness. It is not validated swap-price parity nor broad live state ingestion.
 
 ## 1. Mission and non-goals
 
