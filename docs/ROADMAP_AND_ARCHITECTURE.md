@@ -34,6 +34,29 @@ No mainnet transaction broadcasts or funded execution wallets.
 **M6 remains deferred:** stronger RPC and production indexing must follow M5
 evidence and an explicit budget/authorization decision.
 
+## Agreed operating pipeline — 2026-10-25
+
+Maintain these **distinct**, cooperating engines in this order:
+1. Pool discovery engine (all seven active venue feeds, bounded and mint-agnostic).
+2. Live pool-state registry (source-authenticated pools, token mints, liquidity, fees, reserves, prices, ticks/bins, slots and freshness).
+3. Graph and route builder (tokens as vertices, specific pools as directed edges, connected cycles).
+4. Atomic swap engine (venue-specific instruction builders; shared legacy/v0 transaction packing).
+5. Signed simulation and independent verification (SPL balances, fees, compute, slippage, ordered top-level invocation and rollback).
+6. Execution decision (deliberately **disabled** under current simulation-only authorization).
+7. Continuous discovery, refresh and research evaluation (later monitored service).
+
+**Pre-atomic research stage:** amount-aware venue quotes and conservative common-mint
+net-cost screening rank candidates *before* invoking the expensive signed
+simulation stage. Quote ranking is not execution authorization.
+
+**Current implementation boundary:** `arb/research_engine_pipeline.py` is
+an offline dependency-injected integration skeleton over authenticated snapshots,
+`arb.opportunity_graph`, quote screening and the existing independent receipt
+assessor. It does not claim real-time feeds, persistent registry, all-venue
+quotes, continuous monitoring, or profitable opportunities. Do not promote
+mocked providers into production evidence. Full venue integration and data
+freshness remain the active M5 work.
+
 ## 1. Mission and non-goals
 
 Build a Solana **simulation-only** research and verification system capable of discovering pools across seven active DEX venue implementations, authenticating their on-chain state, decoding them, constructing valid swap instructions, verifying each venue's signed standalone swap simulation, and proving **atomic, ordered, two-venue swaps** on a local Surfpool mainnet fork. Eventually use fresh pool coverage to study arbitrage opportunities, but **profitable discovery, trade execution, and live broadcasting are not acceptance criteria for the current implementation phase**.
