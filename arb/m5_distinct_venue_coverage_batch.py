@@ -23,7 +23,7 @@ def source_batch(rpc,readiness,directory,*,maximum=4):
             status=export_three_venue(rpc,readiness,i,path)
             rows.append({"index":i,"status":status["status"],"venues":candidates[i]["route_venues"],
                          "fixture":path.name,**SAFE})
-        except (ValueError,TypeError,KeyError) as exc:
+        except (ValueError,TypeError,KeyError,RuntimeError) as exc:
             rows.append({"index":i,"status":"SOURCE_FIXTURE_BLOCKED",
                          "venues":candidates[i]["route_venues"],
                          "reason":str(exc)[:240],**SAFE})
