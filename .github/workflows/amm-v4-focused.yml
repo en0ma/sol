@@ -16,6 +16,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install builder dependency
         run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Test native pool fee derivation and conservative missing auxiliary-account gates
+        run: python3 -m unittest discover -s tests -p test_fixture_native_quote_state.py -v
       - name: Verify all seven venue pool vaults, native liquidity and price fields from captured SPL accounts
         run: python3 -m unittest discover -s tests -p test_fixture_pool_fundamentals.py -v
       - name: Prevent injected pricing-state providers from self-certifying measured accuracy
