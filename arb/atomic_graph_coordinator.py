@@ -247,6 +247,26 @@ def audit_n_leg_balances(amounts, before, after, *, rollback_balances=None, late
             "source_rpc_independently_attested":False,
             "actionable":False,"live_execution_approved":False,"broadcast":False}
 
+def signed_n_leg_post_balances(simulation, accounts, mints, authority):
+    """Decode all returned user token accounts, never infer zero leftovers."""
+    import base64
+    from arb.token_vaults import TOKEN_PROGRAM,decode_token_account
+    rows=simulation.get("accounts") if isinstance(simulation,dict) else None
+    if not isinstance(rows,list) or len(rows)!=len(accounts) or len(rows)!=len(mints):
+        raise ValueError("signed positive N-leg token account inventory missing")
+    balances=[]
+    for i,row in enumerate(rows):
+        if not isinstance(row,dict) or row.get("owner")!=TOKEN_PROGRAM:
+            raise ValueError("signed SPL owner mismatch at index "+str(i))
+        data=row.get("data")
+        if not isinstance(data,list) or len(data)!=2 or data[1]!="base64":
+            raise ValueError("invalid signed SPL encoding")
+        token=decode_token_account(base64.b64decode(data[0],validate=True))
+        if token["mint"]!=mints[i] or token["authority"]!=authority:
+            raise ValueError("signed SPL mint/authority mismatch at index "+str(i))
+        balances.append(token["amount_base_units"])
+    return balances
+
 def simulate_adaptive_n_leg_offline(rpc, legs, tokens, states, evidence, owner,
                                     accounts, initial_amount, observe, signer,
                                     *, negative_instructions=None, require_closed=True):
@@ -291,6 +311,19 @@ def simulate_adaptive_n_leg_offline(rpc, legs, tokens, states, evidence, owner,
         return receipt
     receipt["cpi_hops"]=flow["hops"]
     receipt["signed_cpi_per_leg_verified"]=True
+    try:
+        posted=signed_n_leg_post_balances(positive,accounts,tokens,owner)
+    except ValueError as exc:
+        receipt["status"]="SIGNED_POST_BALANCES_UNVERIFIED"
+        receipt["reason"]=str(exc)[:160]
+        return receipt
+    receipt["positive_post_balances_base_units"]=posted
+    # Check signed positive input/output movement and zero residual before
+    # treating the later negative rollback control as useful evidence.
+    if posted[0]!=before[0]-planned["amounts"][0] or any(
+            posted[i]!=before[i] for i in range(1,n)) or posted[-1]<=before[-1]:
+        receipt["status"]="SIGNED_POST_BALANCE_CONTINUITY_FAILED"
+        return receipt
     if _post(rpc,accounts,tokens,owner)!=before:
         raise ValueError("positive simulation mutated persistent fork accounts")
     if negative_instructions is None:

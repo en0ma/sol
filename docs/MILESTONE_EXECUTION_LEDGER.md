@@ -61,6 +61,10 @@
 4. Execute **C01–C04** in parallel when source state and test cases exist.
 5. Every meaningful commit: mark only supported checkboxes, cite SHA/run/artifact, record failure or evidence gap in the PR. No more reporting-only "blocker" modules while executable acceptance remains open.
 
+## Current signed N-leg runtime integrity
+
+The integrated simulator now validates the actual positive signed post-transaction SPL account snapshots for every boundary, verifies mint/authority identities, exact initial debit, zero intermediate remainder, and positive terminal credit **before** checking negative rollback. Missing simulated account data is rejected; standalone preflights and CPI-only evidence cannot replace terminal reconciliation. Synthetic CPI test corrected to distinguish the pool vault source from the user's intermediate token account. Actual signed three-to-six-leg runtime evidence still pending.
+
 ## Current signed N-leg packet regression\n\nCI #40207778125 failed in the synthetic three-hop account-linkage fixture: its mocked account indexes pointed to the wrong slots. Fixed mock instruction indices to match the test account-key table, preserving strict production linkage validation. Re-run CI before marking B04 complete.\n\n## Current independent evidence links
 
 - Historical 42/42 signed atomic: https://github.com/en0ma/sol/actions/runs/40147853880

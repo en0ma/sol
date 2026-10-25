@@ -14,8 +14,8 @@ class Tests(unittest.TestCase):
         def transfer(row,keys,token):return tuple(row)
         rows={"innerInstructions":[
           {"index":0,"instructions":[("A","B",90)]},
-          {"index":1,"instructions":[("B","C",81)]},
-          {"index":2,"instructions":[("C","D",70)]}]}
+          {"index":1,"instructions":[("pool","C",81)]},
+          {"index":2,"instructions":[("pool","D",70)]}]}
         # In real CPI the second leg includes its input debit and output credit.
         rows["innerInstructions"][1]["instructions"].insert(0,("B","pool",90))
         rows["innerInstructions"][2]["instructions"].insert(0,("C","pool",81))
