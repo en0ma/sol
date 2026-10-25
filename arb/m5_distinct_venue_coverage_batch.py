@@ -46,6 +46,7 @@ def offline_batch(rpc,fixtures,directory,*,observed_unix):
         path=src/row["fixture"]
         target=root/row["fixture"]
         result={"status":"SIGNED_TRIANGLE_BLOCKED",**SAFE}
+        fixture=None
         parity=None
         economics=None
         try:
@@ -64,6 +65,9 @@ def offline_batch(rpc,fixtures,directory,*,observed_unix):
         if economics is not None:
             (root/("economics-%02d.json"%row["index"])).write_text(json.dumps(economics,indent=2)+"\n")
         rows.append({"index":row["index"],"status":result["status"],
+                     "route_venues":fixture.get("route_venues") if isinstance(fixture,dict) else None,
+                     "observed_compute_units":result.get("positive_units_consumed"),
+                     "gross_start_mint_delta":economics.get("gross_delta_start_mint_base_units") if economics else None,
                      "independent_signed_accepted":parity is not None and parity["signed_execution_accepted"],
                      "independently_validated_quote_samples":0,
                      "economics_status":economics["status"] if economics is not None else "UNAVAILABLE",

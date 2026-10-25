@@ -40,6 +40,14 @@ def evaluate(fixture,receipt,*,observed_fee_lamports=None,
     report["observed_positive_compute_units"]=receipt.get("positive_units_consumed")
     report["gross_output_base_units"]=output
     report["gross_delta_start_mint_base_units"]=output-spent[0]
+    if (not isinstance(downside_bps,(list,tuple)) or
+            any(type(n)is not int or not 0<=n<=10_000 for n in downside_bps)):
+        raise ValueError("invalid downside scenarios")
+    # Gross signed downside is measurable without pretending offline fees
+    # were paid; net scenario fields require both independent fee and FX proof.
+    report["downside_scenarios"]=[{"output_haircut_bps":n,
+        "gross_delta_start_mint_base_units":output*(10_000-n)//10_000-spent[0],
+        "net_delta_start_mint_base_units":None} for n in downside_bps]
     if (type(observed_fee_lamports)is not int or observed_fee_lamports<0):
         report["reason"]="OBSERVED_TRANSACTION_FEE_LAMPORTS_MISSING"
         return report
@@ -50,18 +58,15 @@ def evaluate(fixture,receipt,*,observed_fee_lamports=None,
             start_mint_base_units_per_sol<=0 or conversion_authenticated is not True):
         report["reason"]="START_MINT_SOL_CONVERSION_NOT_AUTHENTICATED"
         return report
-    if (not isinstance(downside_bps,(list,tuple)) or
-            any(type(n)is not int or not 0<=n<=10_000 for n in downside_bps)):
-        raise ValueError("invalid downside scenarios")
     fee=(observed_fee_lamports*start_mint_base_units_per_sol+
          LAMPORTS_PER_SOL-1)//LAMPORTS_PER_SOL
     report["fee_start_mint_base_units"]=fee
     report["fee_source_verified"]=True
     report["conversion_authenticated"]=True
     report["net_delta_start_mint_base_units"]=output-spent[0]-fee
-    report["downside_scenarios"]=[{"output_haircut_bps":n,
-        "net_delta_start_mint_base_units":output*(10_000-n)//10_000-spent[0]-fee}
-        for n in downside_bps]
+    report["downside_scenarios"]=[{**scenario,
+        "net_delta_start_mint_base_units":scenario["gross_delta_start_mint_base_units"]-fee}
+        for scenario in report["downside_scenarios"]]
     report["status"]="COST_OBSERVATIONS_ACCOUNTED_SIMULATION_ONLY"
     # Fee claims and pricing input provenance are not independent economic
     # verification even when manually supplied; never approve a trade.

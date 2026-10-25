@@ -83,6 +83,11 @@ def compare(fixture,receipt,*,observed_unix):
         except (ValueError,TypeError,KeyError,ImportError,ArithmeticError) as exc:
             row["reason"]="SOURCE_EXACT_QUOTE_BLOCKED: "+str(exc)[:160]
         result["leg_comparisons"].append(row)
+    result["quoted_leg_count"]=sum(r["quoted_output_base_units"] is not None for r in result["leg_comparisons"])
+    result["blocked_leg_count"]=len(result["leg_comparisons"])-result["quoted_leg_count"]
+    result["maximum_observed_deviation_bps"]=max(
+        (r["deviation_bps"] for r in result["leg_comparisons"] if r["deviation_bps"] is not None),
+        default=None)
     result["status"]="SIGNED_EXECUTION_WITH_PER_LEG_PARITY_DIAGNOSTICS"
     return result
 

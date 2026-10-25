@@ -239,7 +239,7 @@ jobs:
           python3 -m arb.next_ten_pair_fixture_export --readiness "$RUNNER_TEMP/amm-v4-ready.json" --triangle-index 0 --triangle-output "$RUNNER_TEMP/three-venue-source.json"
       - name: Export diverse distinct-venue source triangle fixture batch
         run: |
-          python3 -m arb.m5_distinct_venue_coverage_batch --mode source --readiness "$RUNNER_TEMP/amm-v4-ready.json" --output-dir "$RUNNER_TEMP/three-venue-source-batch" --maximum 4
+          python3 -m arb.m5_distinct_venue_coverage_batch --mode source --readiness "$RUNNER_TEMP/amm-v4-ready.json" --output-dir "$RUNNER_TEMP/three-venue-source-batch" --maximum 8
       - name: Export twelve authenticated AMM v4 fixtures only
         run: |
           python3 -m arb.next_ten_pair_fixture_export --batch remaining --only-venue raydium_amm_v4 --readiness "$RUNNER_TEMP/amm-v4-ready.json" --output-dir "$RUNNER_TEMP/amm-v4-fixtures"
