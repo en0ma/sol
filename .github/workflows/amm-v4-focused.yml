@@ -16,6 +16,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install builder dependency
         run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Test signed intermediate SPL consumption against quoted second-leg input
+        run: python3 -m unittest discover -s tests -p test_signed_intermediate_quote_parity.py -v
       - name: Test contextual hydrated fork account byte equality
         run: python3 -m unittest discover -s tests -p test_hydrated_fork_state_audit.py -v
       - name: Verify signed fixture receipt identity and prevent manufactured execution slot claims
