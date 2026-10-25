@@ -8,10 +8,10 @@ from arb.pumpswap_local_simulation import local_rpc_only
 
 MAX_ATOMIC_LEGS=6
 
-def compile_route(legs,tokens,states,evidence,owner,token_accounts,amounts,floors):
+def compile_route(legs,tokens,states,evidence,owner,token_accounts,amounts,floors,*,require_closed=True):
     if (not isinstance(legs,list) or not 2<=len(legs)<=MAX_ATOMIC_LEGS
             or not isinstance(tokens,list) or len(tokens)!=len(legs)+1
-            or tokens[0]!=tokens[-1]):
+            or (require_closed and tokens[0]!=tokens[-1])):
         raise ValueError("connected closed token graph with 2–6 legs required")
     if (not isinstance(amounts,(list,tuple)) or not isinstance(floors,(list,tuple))
             or len(amounts)!=len(legs) or len(floors)!=len(legs)):
@@ -54,6 +54,25 @@ def compile_route(legs,tokens,states,evidence,owner,token_accounts,amounts,floor
             (token_accounts[i+1] if not isinstance(token_accounts,dict) else token_accounts[tokens[i+1]]),
             tokens[i],tokens[i+1],amounts[i],floors[i]))
     return compiled
+
+def compile_adaptive_route(legs,tokens,states,evidence,owner,token_accounts,
+                           initial_amount,observe,*,floors=None,require_closed=True):
+    """Reuse signed-observation planner and existing seven-venue builder."""
+    from arb.adaptive_route_amount_planner import plan
+    if (not isinstance(legs,list) or not isinstance(tokens,list)
+            or len(tokens)!=len(legs)+1
+            or any(not isinstance(leg,dict) or leg.get("input_mint")!=tokens[i]
+                   or leg.get("output_mint")!=tokens[i+1]
+                   for i,leg in enumerate(legs))):
+        raise ValueError("invalid adaptive token connectivity")
+    planned=plan(legs,initial_amount,observe,require_closed=require_closed)
+    minimums=[1]*len(legs) if floors is None else floors
+    instructions=compile_route(legs,tokens,states,evidence,owner,token_accounts,
+                               planned["amounts"],minimums,require_closed=require_closed)
+    return {"status":"ADAPTIVE_INSTRUCTIONS_COMPILED_NOT_EXECUTION_VERIFIED",
+            "amounts":planned["amounts"],"observations":planned["observations"],
+            "instructions":instructions,"atomic_execution_verified":False,
+            "actionable":False,"live_execution_approved":False,"broadcast":False}
 
 def signed_packet(rpc,instructions,signer):
     local_rpc_only(rpc)

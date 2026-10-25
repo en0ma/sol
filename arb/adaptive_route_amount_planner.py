@@ -5,7 +5,7 @@ SPL output. The graph is rebuilt and signed afterward; observed preflights
 alone do not prove exact atomic flow or rollback and cannot authorize trading.
 """
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
-def plan(legs,first_input,observe):
+def plan(legs,first_input,observe,*,require_closed=True):
     if not isinstance(legs,(tuple,list)) or not 2<=len(legs)<=6:
         raise ValueError("2-6 legs required")
     if type(first_input)is not int or not 0<first_input<2**64 or not callable(observe):
@@ -26,7 +26,7 @@ def plan(legs,first_input,observe):
         evidence.append({"index":i,"venue":leg["venue"],"pool":leg["pool"],
                          "amount_in":current,"observed_output":output})
         current=output
-    if legs[0]["input_mint"]!=legs[-1]["output_mint"]:
+    if require_closed and legs[0]["input_mint"]!=legs[-1]["output_mint"]:
         raise ValueError("route is not closed")
     return {"status":"SIGNED_PREFLIGHT_AMOUNTS_ONLY","amounts":amounts,
             "observations":evidence,"atomic_execution_verified":False,
