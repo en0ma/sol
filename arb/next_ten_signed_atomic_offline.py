@@ -166,10 +166,13 @@ def preflight_first_leg_output(rpc,ix1,signer,keys,mints,owner,before):
             "standalone_signed":True,**SAFETY}
 
 def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache=None,batch=BATCH_10,
-        adaptive_cpmm_v4=False):
+        adaptive_cpmm_v4=False, adaptive_all_venues=False):
     local_rpc_only(rpc)
     if any(type(n)is not int or not 0<n<2**64 for n in (amount_in,amount_intermediate)):
         raise ValueError("invalid atomic amounts")
+    if adaptive_cpmm_v4 and adaptive_all_venues:
+        raise ValueError("choose one adaptive research mode")
+    adaptive_enabled=adaptive_cpmm_v4 or adaptive_all_venues
     if adaptive_cpmm_v4 and {fixture.get("first_venue"),fixture.get("second_venue")}!={"raydium_cpmm","raydium_amm_v4"}:
         raise ValueError("adaptive amount research only supports CPMM and AMM v4")
     hydrate(rpc,fixture,program_cache=program_cache,batch=batch)
@@ -270,14 +273,14 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache
     # Aligned SPL accounts retain distinct input and terminal token accounts
     # even though their mint identities are the same.
     adaptive_plan=None
-    if adaptive_cpmm_v4:
+    if adaptive_enabled:
         first_ix,_=compile_route(graph,mints,state_map,proof_map,owner,keys,
                                 [amount_in,amount_intermediate],[1,1])
         adaptive_plan=preflight_first_leg_output(rpc,first_ix,signer,keys,mints,owner,before)
         amount_intermediate=adaptive_plan["planned_second_input"]
     ix1,ix2=compile_route(graph,mints,state_map,proof_map,owner,keys,
                           [amount_in,amount_intermediate],
-                          [1 if adaptive_cpmm_v4 else amount_intermediate,1])
+                          [1 if adaptive_enabled else amount_intermediate,1])
     from arb.atomic_graph_coordinator import sign_atomic_offline
     tx,lookup,check=sign_atomic_offline(
         rpc,[ix1,ix2],signer,programs=[PROGRAMS[first],PROGRAMS[second]],
@@ -391,6 +394,7 @@ def main():
     p.add_argument("--shard-count",type=int,default=1)
     p.add_argument("--only-venue",choices=("raydium_amm_v4",))
     p.add_argument("--adaptive-cpmm-v4",action="store_true")
+    p.add_argument("--adaptive-all-venues",action="store_true")
     p.add_argument("--only-cpmm-v4",action="store_true")
     args=p.parse_args()
     local_rpc_only("http://127.0.0.1:8899")
@@ -419,7 +423,8 @@ def main():
             try:
                 out=run("http://127.0.0.1:8899",json.loads(path.read_text()),
                         program_cache=program_cache,batch=route_batch(args.batch),
-                        adaptive_cpmm_v4=args.adaptive_cpmm_v4)
+                        adaptive_cpmm_v4=args.adaptive_cpmm_v4,
+                        adaptive_all_venues=args.adaptive_all_venues)
             except Exception as exc:
                 out.update(status="ISOLATED_SIGNED_ATOMIC_BLOCKED",
                            error_class=type(exc).__name__,diagnostic=str(exc)[:500])
