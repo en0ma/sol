@@ -21,7 +21,7 @@ from arb.next_ten_atomic_routes import BATCH_10,route_batch
 from arb.orca_swap_v2_offline_provision import token_account_bytes
 from arb.token_vaults import TOKEN_PROGRAM,decode_token_account
 from arb.pumpswap_local_simulation import local_rpc_only
-from arb.atomic_graph_coordinator import compile_route, signed_packet, simulation_decision
+from arb.atomic_graph_coordinator import compile_route, compile_adaptive_route, signed_packet, simulation_decision
 
 SYSTEM="11111111111111111111111111111111"
 
@@ -274,13 +274,28 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache
     # even though their mint identities are the same.
     adaptive_plan=None
     if adaptive_enabled:
-        first_ix,_=compile_route(graph,mints,state_map,proof_map,owner,keys,
-                                [amount_in,amount_intermediate],[1,1])
-        adaptive_plan=preflight_first_leg_output(rpc,first_ix,signer,keys,mints,owner,before)
-        amount_intermediate=adaptive_plan["planned_second_input"]
-    ix1,ix2=compile_route(graph,mints,state_map,proof_map,owner,keys,
-                          [amount_in,amount_intermediate],
-                          [1 if adaptive_enabled else amount_intermediate,1])
+        def observed_first_leg(i,leg,n):
+            # Signed standalone observation. The coordinator uses this for
+            # the next input; the final leg requires no fabricated observation.
+            standalone_first=compile_route(graph,mints,state_map,proof_map,
+                owner,keys,[amount_in,amount_intermediate],[1,1])[0]
+            measured=preflight_first_leg_output(
+                rpc,standalone_first,signer,keys,mints,owner,before)
+            return {"signed_offline_observed":measured["standalone_signed"],
+                    "output_base_units":measured["planned_second_input"],
+                    "compute_units":measured["standalone_compute_units"]}
+        assembled=compile_adaptive_route(
+            graph,mints,state_map,proof_map,owner,keys,amount_in,observed_first_leg)
+        ix1,ix2=assembled["instructions"]
+        amount_intermediate=assembled["amounts"][1]
+        observation=assembled["observations"][0]
+        adaptive_plan={"planned_second_input":amount_intermediate,
+                       "standalone_signed":True,
+                       "standalone_compute_units":observation.get("compute_units"),
+                       "planner_status":assembled["status"]}
+    else:
+        ix1,ix2=compile_route(graph,mints,state_map,proof_map,owner,keys,
+                              [amount_in,amount_intermediate],[amount_intermediate,1])
     from arb.atomic_graph_coordinator import sign_atomic_offline
     tx,lookup,check=sign_atomic_offline(
         rpc,[ix1,ix2],signer,programs=[PROGRAMS[first],PROGRAMS[second]],

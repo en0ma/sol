@@ -17,6 +17,8 @@ def plan(legs,first_input,observe,*,require_closed=True):
         if i and legs[i-1]["output_mint"]!=leg["input_mint"]:
             raise ValueError("disconnected graph")
         amounts.append(current)
+        if i==len(legs)-1:
+            break  # no next leg: do not demand a synthetic terminal observation
         result=observe(i,leg,current)
         if not isinstance(result,dict) or result.get("signed_offline_observed") is not True:
             raise ValueError("missing signed standalone observation")
@@ -24,7 +26,8 @@ def plan(legs,first_input,observe,*,require_closed=True):
         if type(output)is not int or not 0<output<2**64:
             raise ValueError("invalid signed observed output")
         evidence.append({"index":i,"venue":leg["venue"],"pool":leg["pool"],
-                         "amount_in":current,"observed_output":output})
+                         "amount_in":current,"observed_output":output,
+                         "compute_units":result.get("compute_units") if type(result.get("compute_units")) is int else None})
         current=output
     if require_closed and legs[0]["input_mint"]!=legs[-1]["output_mint"]:
         raise ValueError("route is not closed")

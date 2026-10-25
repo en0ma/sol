@@ -6,6 +6,17 @@ class Tests(unittest.TestCase):
         p=plan(legs,100,lambda i,leg,n:{"signed_offline_observed":True,"output_base_units":n+i+1})
         self.assertEqual(p["amounts"],[100,101,103,106,110,115])
         self.assertFalse(p["atomic_execution_verified"])
+    def test_final_leg_requires_no_fake_observation(self):
+        legs=[{"venue":"a","pool":"a","input_mint":"x","output_mint":"y"},
+              {"venue":"b","pool":"b","input_mint":"y","output_mint":"x"}]
+        calls=[]
+        def observe(i,leg,amount):
+            calls.append(i)
+            return {"signed_offline_observed":True,"output_base_units":22}
+        p=plan(legs,11,observe)
+        self.assertEqual(p["amounts"],[11,22])
+        self.assertEqual(calls,[0])
+        self.assertEqual(len(p["observations"]),1)
     def test_two_legs(self):
         legs=[{"venue":"v1","pool":"a","input_mint":"x","output_mint":"y"},
               {"venue":"v2","pool":"b","input_mint":"y","output_mint":"x"}]
