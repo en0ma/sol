@@ -13,6 +13,6 @@ class Tests(unittest.TestCase):
     import inspect
     source=inspect.getsource(extract)
     self.assertIn('"effective_trade_fee_authenticated":False',source)
-    self.assertIn('"openbook_adjusted_reserves_verified=False',source)
-    self.assertIn('"active_bin_account_pricing_verified=False',source)
+    self.assertIn('openbook_adjusted_reserves_verified=False',source)
+    self.assertIn('active_bin_account_pricing_verified=False',source)
 if __name__=="__main__":unittest.main()
