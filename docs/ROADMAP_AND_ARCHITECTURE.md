@@ -67,6 +67,10 @@ freshness remain the active M5 work.
 
 Seven active venue branches now support indicative exact-input snapshot quote screening. Newly added: DLMM authenticated single-bin, DAMM v2 authenticated fixed-liquidity price segment, and AMM v4 OpenBook/PnL-adjusted net-reserve CPMM. These are strictly bounded models, not verified protocol-exact pricing or live authenticated refresh. All three fail closed without independently authenticated state, fees and directional limits. Actual cross-venue accuracy and profitability remain unverified until signed simulation reconciliation.
 
+## M5 quote-to-simulation accuracy gate — October 25, 2026
+
+`arb/quote_simulation_reconciliation.py` checks indicative exact-input route quotes against an independently accepted signed Surfpool atomic/rollback receipt. It requires exact venue/pool/mint identities, same source snapshot slot and actual SPL input and output deltas. Missing source-bound pool identities in older 42/42 receipts are **not** silently promoted into quote accuracy evidence. The current tests exercise synthetic but strict receipts only; real source-bound quote-vs-swap accuracy is still pending. Indicative screening does not imply profitability or live execution.
+
 ## 1. Mission and non-goals
 
 Build a Solana **simulation-only** research and verification system capable of discovering pools across seven active DEX venue implementations, authenticating their on-chain state, decoding them, constructing valid swap instructions, verifying each venue's signed standalone swap simulation, and proving **atomic, ordered, two-venue swaps** on a local Surfpool mainnet fork. Eventually use fresh pool coverage to study arbitrage opportunities, but **profitable discovery, trade execution, and live broadcasting are not acceptance criteria for the current implementation phase**.

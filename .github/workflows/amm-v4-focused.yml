@@ -16,6 +16,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install builder dependency
         run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Test quote accuracy against independently signed atomic receipts and source identity
+        run: python3 -m unittest discover -s tests -p test_quote_simulation_reconciliation.py -v
       - name: Test seven venue indicative quote adapters and missing-state safety gates
         run: python3 -m unittest discover -s tests -p test_remaining_venue_quote_provider.py -v
       - name: Test reproducible offline research JSON evidence and conservative provenance
