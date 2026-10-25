@@ -53,6 +53,10 @@
 - [ ] **C04 — Make existing discovery, market registry and opportunity graph supply candidates to the coordinator.** Existing: `arb/raydium_public_pool_discovery.py`, `arb/market_state_registry.py`, `arb/opportunity_graph.py`, `arb/research_engine_pipeline.py`. Wire and harden, don't rewrite.
 - [ ] **C05 — Continuous monitoring/indexing (M6)** deferred pending reliable M5 source-state and user's RPC/budget authorization.
 
+## Signed four-to-six actual evidence and independent acceptance — 2026-10-25
+
+CI #40214148620 produced six positive signed atomic plus failed-final-leg rollback receipts across CPMM↔AMM-v4 **four, five and six swap** trials (two start directions each). All six receipts carry `SIGNED_N_LEG_ATOMIC_AND_ROLLBACK_VERIFIED`, signed CPI intermediate checks, and positive terminal balances; this is authenticated two-pool *alternating interoperability*, not seven-venue route evidence, on-chain runtime-variable inputs, closed arbitrage, or verified quote accuracy. A new independent strict acceptance gate validates all six receipt files and is required to pass in future CI; at commit time its run is not confirmed.
+
 ## Four-to-six signed offline exploratory trials
 
 The same source-backed CPMM/v4 runner now accepts `--adaptive-hops 3|4|5|6`, alternates the two source-authenticated pools/mints, uses N+1 distinct SPL token accounts, and builds a last-leg failure instruction on the correct parity without duplicating the engine. CI records 4-, 5-, and 6-leg exploratory receipts separately under `m5-four-to-six-hop-signed-trial-receipts`; these are **not** independently accepted and may fail packet limits or shared-pool state constraints. No success or profitability credit before inspecting artifacts.
