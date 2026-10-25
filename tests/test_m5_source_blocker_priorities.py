@@ -15,6 +15,8 @@ class Tests(unittest.TestCase):
         self.assertEqual(out["issue_counts"]["ACCOUNT_SOURCE_QUOTE_BLOCKED"],1)
         self.assertEqual(out["issue_counts"]["OBSERVED_INPUT_QUOTE_PROBE_BLOCKED"],1)
         self.assertEqual(out["independently_validated_quote_samples"],0)
+        self.assertEqual(out["prioritized_blockers"][0]["code"],"SOURCE_PROVENANCE_UNVERIFIED")
+        self.assertFalse(out["profitability_confirmed"])
         self.assertFalse(out["broadcast"])
     def test_duplicate_reasons_count_once_per_route(self):
         out=summarize([{"route":"A","reason_codes":["SOURCE_FIXTURE_MISSING","SOURCE_FIXTURE_MISSING"],

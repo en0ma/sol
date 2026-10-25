@@ -29,7 +29,17 @@ class Tests(unittest.TestCase):
         with patch("arb.m5_captured_fee_compute_audit.extract_pool_states",return_value=[]):
             result=diagnose(fixture(),{})
         self.assertIsNone(result["positive_units_consumed"])
-        self.assertEqual(result["compute_blocker"],"POSITIVE_COMPUTE_UNAVAILABLE")
+        self.assertEqual(result["compute_blocker"],"SIGNED_POSITIVE_COMPUTE_MISSING_OR_OVER_LIMIT")
+    def test_positive_compute_budget_bounds(self):
+        with patch("arb.m5_captured_fee_compute_audit.extract_pool_states",return_value=[]):
+            for candidate in (None,0,-1,True,1_400_001,"1200"):
+                with self.subTest(candidate=candidate):
+                    result=diagnose(fixture(),{"positive_units_consumed":candidate})
+                    self.assertIsNone(result["positive_units_consumed"])
+                    self.assertEqual(result["compute_blocker"],"SIGNED_POSITIVE_COMPUTE_MISSING_OR_OVER_LIMIT")
+            for candidate in (1,1_400_000):
+                result=diagnose(fixture(),{"positive_units_consumed":candidate})
+                self.assertEqual(result["positive_units_consumed"],candidate)
     def test_invalid_source_manifest_not_accepted(self):
         f=fixture();f["state_account_manifest_sha256"]="bad"
         with self.assertRaises(ValueError):diagnose(f,{})

@@ -5,6 +5,8 @@ def summarize(rows):
     if not isinstance(rows,list):
         raise ValueError("diagnostic rows required")
     issues={}
+    # Only evidence-backed issues qualify; unknown reason codes remain on the
+    # underlying row for review but are never silently promoted to fact.
     known={"SOURCE_FIXTURE_MISSING":"SOURCE_FIXTURE_MISSING",
            "SIGNED_RECEIPT_MISSING":"SIGNED_RECEIPT_MISSING",
            "SIGNED_SPL_BALANCES_UNAVAILABLE":"SIGNED_SPL_EVIDENCE_MISSING",
@@ -52,7 +54,20 @@ def summarize(rows):
             if captured.get("positive_units_consumed") is None:
                 add("SIGNED_COMPUTE_MISSING",route)
     issues={key:sorted(set(routes)) for key,routes in sorted(issues.items())}
-    return {"status":"BLOCKERS_REMAIN_UNVERIFIED",
+    priorities=[
+        "SOURCE_FIXTURE_MISSING","SIGNED_RECEIPT_MISSING",
+        "ATOMIC_PROOF_NOT_VERIFIED","SIGNED_SPL_EVIDENCE_MISSING",
+        "SOURCE_PROVENANCE_UNVERIFIED","CPMM_CREATOR_FEE_PLACEMENT_UNVERIFIED",
+        "CPMM_EFFECTIVE_PRICING_BLOCKED","ACCOUNT_SOURCE_QUOTE_BLOCKED",
+        "OBSERVED_INPUT_QUOTE_PROBE_BLOCKED","QUOTE_AMOUNT_CONTINUITY_MISMATCH",
+        "QUOTE_TO_SIGNED_UNRECONCILED","CAPTURED_COST_EVIDENCE_MISSING",
+        "SIGNED_COMPUTE_MISSING"]
+    ordered=[{"code":code,"affected_routes":issues[code],
+              "affected_count":len(issues[code])}
+             for code in priorities if code in issues]
+    ordered.extend({"code":code,"affected_routes":routes,"affected_count":len(routes)}
+                   for code,routes in issues.items() if code not in priorities)
+    return {"status":"BLOCKERS_REMAIN_UNVERIFIED","prioritized_blockers":ordered,
             "issue_routes":issues,"issue_counts":{k:len(v) for k,v in issues.items()},
             "total_routes":len(rows),"independently_validated_quote_samples":0,
             "profitability_confirmed":False,**SAFE}
