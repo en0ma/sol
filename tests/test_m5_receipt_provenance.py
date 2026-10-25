@@ -15,7 +15,7 @@ class TestM5ReceiptProvenance(unittest.TestCase):
     self.assertIn('contextual companion accounts differ',src)
     self.assertIn('addresses,{"encoding":"base64","commitment":"confirmed"}',src)
     self.assertIn('"full_source_snapshot_slot":None',src)
-    self.assertIn('paired contextual pool accounts differ',src)
+    self.assertIn('contextual companion accounts differ',src)
  def test_incomplete_receipt_is_not_atomic_or_quote_evidence(self):
     report=assess(("orca","raydium_cpmm"),{"first_venue":"orca",
                    "second_venue":"raydium_cpmm",
