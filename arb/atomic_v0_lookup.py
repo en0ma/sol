@@ -46,8 +46,8 @@ def sign_v0_offline(rpc,instructions,signer,recent_blockhash):
     from solders.message import MessageV0
     from solders.transaction import VersionedTransaction
     local_rpc_only(rpc)
-    if len(instructions)!=2:
-        raise ValueError("v0 atomic fallback requires exactly two swap instructions")
+    if not 2<=len(instructions)<=6:
+        raise ValueError("v0 atomic fallback requires two through six swap instructions")
     addresses=eligible_addresses(instructions,signer.pubkey())
     table=provision_offline_table(rpc,addresses)
     lookup=AddressLookupTableAccount(table,addresses)

@@ -121,6 +121,51 @@ def sign_atomic_offline(rpc,instructions,signer,*,programs,intermediate,lookup=N
     check=verify_v0_order(tx,lookup,programs[0],programs[1],intermediate)
     return tx,lookup,check
 
+def sign_adaptive_n_leg_offline(rpc,instructions,signer,*,programs,intermediates):
+    """Sign 2–6 ordered venue swaps using existing legacy/v0 packers.
+
+    Validates venue program order and adjacent intermediate-account sharing
+    without requiring distinct venue identities. Does not simulate, attest
+    CPI token amounts, establish price parity, or authorize submission.
+    """
+    from solders.hash import Hash
+    from solders.transaction import Transaction
+    from solders.pubkey import Pubkey
+    from arb.rpc import call
+    from arb.atomic_v0_lookup import sign_v0_offline,resolved_v0_keys
+    local_rpc_only(rpc)
+    n=len(instructions) if isinstance(instructions,(list,tuple)) else 0
+    if not 2<=n<=MAX_ATOMIC_LEGS or len(programs)!=n or len(intermediates)!=n-1:
+        raise ValueError("2-6 instructions and N-1 intermediate SPL accounts required")
+    if any(not isinstance(p,str) or not p for p in programs):
+        raise ValueError("expected venue program identities")
+    blockhash=Hash.from_string(call(rpc,"getLatestBlockhash")["value"]["blockhash"])
+    tx=Transaction.new_signed_with_payer(instructions,signer.pubkey(),[signer],blockhash)
+    tx.verify()
+    lookup=None
+    if len(bytes(tx))>1232:
+        tx,lookup=sign_v0_offline(rpc,instructions,signer,blockhash)
+        keys=resolved_v0_keys(tx.message,lookup)
+    else:
+        keys=list(tx.message.account_keys)
+    compiled=tx.message.instructions
+    if len(compiled)!=n:
+        raise ValueError("signed instruction count mismatch")
+    actual=[str(keys[i.program_id_index]) for i in compiled]
+    if actual!=list(programs):
+        raise ValueError("signed N-leg venue ordering mismatch")
+    for i,account in enumerate(intermediates):
+        mid=Pubkey.from_string(account)
+        if mid not in keys:
+            raise ValueError("intermediate SPL account missing at hop "+str(i+1))
+        key_index=keys.index(mid)
+        if key_index not in compiled[i].accounts or key_index not in compiled[i+1].accounts:
+            raise ValueError("intermediate SPL account not linked across hops "+str(i+1))
+    return tx,lookup,{"instruction_order_verified":True,
+                      "intermediate_account_linkage_verified":True,
+                      "legs":n,"actionable":False,
+                      "live_execution_approved":False,"broadcast":False}
+
 def audit_n_leg_balances(amounts, before, after, *, rollback_balances=None, later_instruction_failed=False):
     """Check actual signed N-leg SPL balances, never inferred preflight output."""
     n=len(amounts) if isinstance(amounts,(list,tuple)) else 0
