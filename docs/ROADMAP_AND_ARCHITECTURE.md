@@ -83,6 +83,17 @@ reconciler **must reject** these receipts until synchronized source account
 capture and authentic quote derivation are implemented. Historical 42/42 proof
 remains valid *for atomicity*, never quote accuracy. No broadcast.
 
+## M5 source account contextual checks — October 25, 2026
+
+The source fixture exporter now additionally reads both selected pool accounts
+in one read-only `getMultipleAccounts` response, checks its context slot,
+and verifies both account replies match the existing authenticated account
+inventory. It records `paired_pool_observed_slot`; this is **not** a
+complete same-slot quote snapshot because companion accounts and program data
+were fetched independently. Signed receipts carry the pool-pair observation,
+but `source_snapshot_slot` remains null, so the independent quote-to-simulation
+checker still refuses an unsupported full provenance claim.
+
 ## 1. Mission and non-goals
 
 Build a Solana **simulation-only** research and verification system capable of discovering pools across seven active DEX venue implementations, authenticating their on-chain state, decoding them, constructing valid swap instructions, verifying each venue's signed standalone swap simulation, and proving **atomic, ordered, two-venue swaps** on a local Surfpool mainnet fork. Eventually use fresh pool coverage to study arbitrage opportunities, but **profitable discovery, trade execution, and live broadcasting are not acceptance criteria for the current implementation phase**.

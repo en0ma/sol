@@ -6,7 +6,13 @@ class TestM5ReceiptProvenance(unittest.TestCase):
     src=Path("arb/next_ten_signed_atomic_offline.py").read_text()
     self.assertIn('"route_pool_addresses":[legs[0][1],legs[1][1]]',src)
     self.assertIn('"source_snapshot_slot":None',src)
+    self.assertIn('"paired_pool_observed_slot":fixture.get("paired_pool_observed_slot")',src)
     self.assertIn('"quote_accuracy_verified":False',src)
+ def test_contextual_pool_pair_is_not_full_source_quote_attestation(self):
+    src=Path("arb/next_ten_pair_fixture_export.py").read_text()
+    self.assertIn('paired_pool_observed_slot',src)
+    self.assertIn('"full_source_snapshot_slot":None',src)
+    self.assertIn('paired contextual pool accounts differ',src)
  def test_incomplete_receipt_is_not_atomic_or_quote_evidence(self):
     report=assess(("orca","raydium_cpmm"),{"first_venue":"orca",
                    "second_venue":"raydium_cpmm",
