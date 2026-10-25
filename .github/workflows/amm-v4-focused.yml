@@ -225,9 +225,8 @@ jobs:
                             "signed_execution_verified":False,"broadcast":False}))
           (Path(os.environ["RUNNER_TEMP"])/"three-venue-candidate-count.txt").write_text(str(len(candidates)))
           PY
-          if [ "$(cat "$RUNNER_TEMP/three-venue-candidate-count.txt")" -gt 0 ]; then
-            python3 -m arb.next_ten_pair_fixture_export --readiness "$RUNNER_TEMP/amm-v4-ready.json" --triangle-index 0 --triangle-output "$RUNNER_TEMP/three-venue-source.json"
-          fi
+          test "$(cat "$RUNNER_TEMP/three-venue-candidate-count.txt")" -gt 0
+          python3 -m arb.next_ten_pair_fixture_export --readiness "$RUNNER_TEMP/amm-v4-ready.json" --triangle-index 0 --triangle-output "$RUNNER_TEMP/three-venue-source.json"
       - name: Export twelve authenticated AMM v4 fixtures only
         run: |
           python3 -m arb.next_ten_pair_fixture_export --batch remaining --only-venue raydium_amm_v4 --readiness "$RUNNER_TEMP/amm-v4-ready.json" --output-dir "$RUNNER_TEMP/amm-v4-fixtures"
@@ -285,12 +284,8 @@ jobs:
       - name: Attempt actual three-distinct-venue signed closed route and last-hop rollback
         if: ${{ matrix.shard == 0 }}
         run: |
-          if [ -f "$RUNNER_TEMP/three-venue-source.json" ]; then
-            python3 -m arb.next_ten_signed_atomic_offline --three-venue-fixture "$RUNNER_TEMP/three-venue-source.json" --output-dir "$RUNNER_TEMP/three-venue-trial"
-          else
-            mkdir -p "$RUNNER_TEMP/three-venue-trial"
-            printf '%s\n' '{"status":"NO_AUTHENTICATED_CLOSED_THREE_VENUE_SOURCE_CANDIDATE","signed_atomic_simulation_verified":false,"rollback_failure_case_verified":false,"actionable":false,"live_execution_approved":false,"broadcast":false}' > "$RUNNER_TEMP/three-venue-trial/three-venue.json"
-          fi
+          test -s "$RUNNER_TEMP/three-venue-source.json"
+          python3 -m arb.next_ten_signed_atomic_offline --three-venue-fixture "$RUNNER_TEMP/three-venue-source.json" --output-dir "$RUNNER_TEMP/three-venue-trial"
           python3 - <<'PY'
           import json,os
           from pathlib import Path
@@ -301,9 +296,7 @@ jobs:
                             "rollback_failure_case_verified":r.get("rollback_failure_case_verified",False),
                             "broadcast":False}))
           PY
-          if [ -f "$RUNNER_TEMP/three-venue-source.json" ]; then
-            python3 -m arb.m5_three_distinct_venue_signed_acceptance "$RUNNER_TEMP/three-venue-source.json" "$RUNNER_TEMP/three-venue-trial/three-venue.json"
-          fi
+          python3 -m arb.m5_three_distinct_venue_signed_acceptance "$RUNNER_TEMP/three-venue-source.json" "$RUNNER_TEMP/three-venue-trial/three-venue.json"
       - uses: actions/upload-artifact@v4
         if: ${{ always() && matrix.shard == 0 }}
         with:
