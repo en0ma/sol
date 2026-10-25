@@ -11,9 +11,14 @@ def diagnose(fixture,receipt):
             "fee_rows":[],"positive_units_consumed":None,
             "start_mint_fee_cost_verified":False,
             "quote_accuracy_verified":False,**SAFE}
+    seen=set()
     for row in extract_pool_states(fixture):
         if row["venue"] not in ("raydium_cpmm","raydium_clmm"):
             continue
+        identity=(row["venue"],row["address"])
+        if identity in seen:
+            raise ValueError("duplicate captured native fee pool identity")
+        seen.add(identity)
         item={"venue":row["venue"],"pool":row["address"],
               "source_slot":row["snapshot_slot"],
               "total_effective_fee_authenticated":False}
@@ -26,6 +31,12 @@ def diagnose(fixture,receipt):
                         total_effective_fee_authenticated=fee["total_effective_fee_authenticated"],
                         creator_fee_placement_verified=fee.get("creator_fee_placement_verified"),
                         effective_quote_fee_ppm=fee.get("effective_quote_fee_ppm"))
+            effective=fee.get("effective_quote_fee_ppm")
+            if (fee["total_effective_fee_authenticated"] is True and
+                    (type(effective) is not int or not 0<=effective<1_000_000)):
+                raise ValueError("authenticated effective fee has invalid ppm")
+            if fee["total_effective_fee_authenticated"] is not True and effective is not None:
+                raise ValueError("unauthenticated effective fee must be absent")
             if not fee["total_effective_fee_authenticated"]:
                 item["blocker"]=("CPMM_CREATOR_FEE_PLACEMENT_UNVERIFIED" if row["venue"]=="raydium_cpmm" else "CLMM_EFFECTIVE_FEE_UNVERIFIED")
         except (ValueError,KeyError,TypeError) as exc:

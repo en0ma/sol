@@ -51,6 +51,34 @@ class Tests(unittest.TestCase):
             result=diagnose(f,{})
         self.assertFalse(result["fee_rows"][0]["total_effective_fee_authenticated"])
         self.assertIn("INVALID",result["fee_rows"][0]["blocker"])
+    def test_unverified_fee_must_not_publish_effective_ppm(self):
+        f=fixture()
+        state=[{"venue":"raydium_cpmm","address":"pool","snapshot_slot":30,"decoded_pool_state":{}}]
+        fee={"config_address":"cfg","trade_fee_ppm":2500,"creator_fee_ppm":100,
+             "trade_fee_authenticated":True,"total_effective_fee_authenticated":False,
+             "creator_fee_placement_verified":False,"effective_quote_fee_ppm":2600}
+        with patch("arb.m5_captured_fee_compute_audit.extract_pool_states",return_value=state),patch(
+             "arb.m5_captured_fee_compute_audit.decode_native_config_fee",return_value=fee):
+            report=diagnose(f,{})
+        self.assertIn("INVALID",report["fee_rows"][0]["blocker"])
+        self.assertFalse(report["fee_rows"][0]["total_effective_fee_authenticated"])
+    def test_authenticated_fee_must_have_numeric_ppm(self):
+        f=fixture()
+        state=[{"venue":"raydium_clmm","address":"pool","snapshot_slot":30,"decoded_pool_state":{}}]
+        fee={"config_address":"cfg","trade_fee_ppm":2500,
+             "trade_fee_authenticated":True,"total_effective_fee_authenticated":True,
+             "effective_quote_fee_ppm":None}
+        with patch("arb.m5_captured_fee_compute_audit.extract_pool_states",return_value=state),patch(
+             "arb.m5_captured_fee_compute_audit.decode_native_config_fee",return_value=fee):
+            report=diagnose(f,{})
+        self.assertFalse(report["fee_rows"][0]["total_effective_fee_authenticated"])
+        self.assertIn("INVALID",report["fee_rows"][0]["blocker"])
+    def test_duplicate_pool_fee_source_rejected(self):
+        f=fixture()
+        state={"venue":"raydium_cpmm","address":"pool","snapshot_slot":30,"decoded_pool_state":{}}
+        with patch("arb.m5_captured_fee_compute_audit.extract_pool_states",return_value=[state,state]):
+            with self.assertRaisesRegex(ValueError,"duplicate"):
+                diagnose(f,{})
     def test_missing_compute_is_not_zero(self):
         with patch("arb.m5_captured_fee_compute_audit.extract_pool_states",return_value=[]):
             result=diagnose(fixture(),{})
