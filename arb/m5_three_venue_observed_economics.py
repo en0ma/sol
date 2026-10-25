@@ -40,6 +40,11 @@ def evaluate(fixture,receipt,*,observed_fee_lamports=None,
     report["observed_positive_compute_units"]=receipt.get("positive_units_consumed")
     report["gross_output_base_units"]=output
     report["gross_delta_start_mint_base_units"]=output-spent[0]
+    # Break-even is an observable upper bound on *total* fees/slippage
+    # denominated in the starting mint, NOT an assumption about paid fees.
+    report["maximum_affordable_total_cost_start_mint_base_units"]=max(0,output-spent[0])
+    report["minimum_output_to_break_even_without_fees_base_units"]=spent[0]
+    report["gross_return_bps"]=(output-spent[0])*10_000//spent[0]
     if (not isinstance(downside_bps,(list,tuple)) or
             any(type(n)is not int or not 0<=n<=10_000 for n in downside_bps)):
         raise ValueError("invalid downside scenarios")
@@ -47,6 +52,7 @@ def evaluate(fixture,receipt,*,observed_fee_lamports=None,
     # were paid; net scenario fields require both independent fee and FX proof.
     report["downside_scenarios"]=[{"output_haircut_bps":n,
         "gross_delta_start_mint_base_units":output*(10_000-n)//10_000-spent[0],
+        "maximum_affordable_total_cost_start_mint_base_units":max(0,output*(10_000-n)//10_000-spent[0]),
         "net_delta_start_mint_base_units":None} for n in downside_bps]
     if (type(observed_fee_lamports)is not int or observed_fee_lamports<0):
         report["reason"]="OBSERVED_TRANSACTION_FEE_LAMPORTS_MISSING"

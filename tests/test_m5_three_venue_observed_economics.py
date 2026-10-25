@@ -18,6 +18,8 @@ class Tests(unittest.TestCase):
         r=evaluate(self.source(),self.receipt(),observed_fee_lamports=5000,
                    start_mint_base_units_per_sol=1_000_000,conversion_authenticated=True)
         self.assertEqual(r["fee_start_mint_base_units"],5)
+        self.assertEqual(r["maximum_affordable_total_cost_start_mint_base_units"],20)
+        self.assertEqual(r["gross_return_bps"],2000)
         self.assertEqual(r["net_delta_start_mint_base_units"],15)
         self.assertEqual(r["downside_scenarios"][0]["net_delta_start_mint_base_units"],15)
         self.assertFalse(r["profitability_verified"])
