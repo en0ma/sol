@@ -8,6 +8,8 @@ import json
 from pathlib import Path
 from arb.cpmm_ammv4_signed_experiment import run as quote_experiment
 from arb.source_snapshot_manifest import verify
+from arb.fixture_config_quote_projection import quote_cpmm_only
+from arb.raydium_amm_v4_fixture_quote import quote_from_fixture
 
 SAFE = {"actionable": False, "live_execution_approved": False, "broadcast": False}
 
@@ -52,6 +54,46 @@ def evaluate(fixture, receipt, *, observed_unix, costs=None):
         else:
             result["intermediate_amount_gap_base_units"] = 0
     amount = result["observed_legs"][0]["input"] if result["observed_legs"] else None
+    # Per-leg probes use *observed*, not guessed, signed inputs. They are
+    # diagnostics, NOT a matched two-leg quote chain, and cannot validate
+    # pricing against a different intermediate amount.
+    result["observed_input_quote_probes"] = []
+    for i, leg in enumerate(result["observed_legs"]):
+        venue = result["route_venues"][i]
+        pool = result["route_pools"][i]
+        mints = fixture.get("route_mints")
+        probe = {"leg_index": i, "venue": venue, "pool": pool,
+                 "signed_input": leg["input"], "signed_output": leg["output"],
+                 "quote_output": None, "deviation_bps": None,
+                 "status": "UNVERIFIED", **SAFE}
+        if (not isinstance(mints, list) or len(mints) != 3
+                or type(leg["input"]) is not int or leg["input"] <= 0):
+            probe["reason"] = "INVALID_SIGNED_LEG_INPUT"
+        else:
+            try:
+                if venue == "raydium_cpmm":
+                    edge = {"venue":venue, "pool":pool,
+                            "input_mint":mints[i], "output_mint":mints[i+1]}
+                    quote = quote_cpmm_only(fixture, observed_unix=observed_unix,
+                                            leg=edge, amount_in=leg["input"])["quote"]
+                elif venue == "raydium_amm_v4":
+                    quote = quote_from_fixture(fixture,pool=pool,input_mint=mints[i],
+                         amount_in=leg["input"],observed_unix=observed_unix)["quote"]
+                else:
+                    raise ValueError("unsupported venue for account-derived probe")
+                if (any(quote.get(k) != v for k,v in
+                        (("venue",venue),("pool",pool),("input_mint",mints[i]),
+                         ("output_mint",mints[i+1]),("amount_in",leg["input"]),
+                         ("snapshot_slot",fixture["state_accounts_observed_slot"])))
+                        or type(quote.get("amount_out")) is not int
+                        or quote["amount_out"] <= 0):
+                    raise ValueError("source-bound directional quote identity mismatch")
+                probe["quote_output"] = quote["amount_out"]
+                probe["deviation_bps"] = abs(quote["amount_out"]-leg["output"])*10000//quote["amount_out"]
+                probe["status"] = "INDICATIVE_OBSERVED_INPUT_COMPARISON"
+            except (ValueError, KeyError, TypeError, ImportError, ArithmeticError) as exc:
+                probe["reason"] = "ACCOUNT_PRICING_BLOCKED: " + str(exc)[:160]
+        result["observed_input_quote_probes"].append(probe)
     if type(amount) is not int or amount <= 0:
         result["reason_codes"].append("SIGNED_EXACT_INPUT_UNAVAILABLE")
         return result
