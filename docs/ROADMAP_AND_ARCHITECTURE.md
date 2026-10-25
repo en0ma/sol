@@ -145,6 +145,10 @@ The seven **pool decoders** were completed earlier: these parse pool-account ide
 
 Priority 1: \`arb/signed_quote_parity_portfolio.py\` batches observed two-leg quote deviations against signed isolated receipts, groups distinct source manifests and includes mandatory common-mint cost budgets for indicative risk screening. It reports zero validated quote-accuracy samples until state/source attestation exists. Priority 2: \`arb/fixture_tick_coverage.py\` audits contiguous captured Orca and Raydium CLMM arrays and records missing array starts, never inferring nonexistent liquidity. Priority 3: risk-cost modeling is re-used through \`arb/opportunity_research.py\`; no profitability certification or mainnet broadcasting.
 
+## Three-priority integrated research — October 25, 2026
+
+Priority 1: signed offline quote diagnostic portfolio is correlated with per-route observed SPL deltas. Priority 2: \`fixture_missing_tick_arrays\` enumerates bounded missing Orca/CLMM tick-array starts, **not** fabricated bins or decoded liquidity. Priority 3: \`observed_signed_risk\` and \`signed_parity_risk_report\` calculate offline gross return and net of mandatory user-supplied same-start-mint costs; they do not verify actual compute charges, execution probability, profitable trading or source RPC authenticity. All approval/broadcast gates remain false.
+
 ## 1. Mission and non-goals
 
 Build a Solana **simulation-only** research and verification system capable of discovering pools across seven active DEX venue implementations, authenticating their on-chain state, decoding them, constructing valid swap instructions, verifying each venue's signed standalone swap simulation, and proving **atomic, ordered, two-venue swaps** on a local Surfpool mainnet fork. Eventually use fresh pool coverage to study arbitrage opportunities, but **profitable discovery, trade execution, and live broadcasting are not acceptance criteria for the current implementation phase**.
