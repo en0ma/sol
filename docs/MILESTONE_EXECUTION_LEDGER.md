@@ -53,6 +53,10 @@
 - [ ] **C04 — Make existing discovery, market registry and opportunity graph supply candidates to the coordinator.** Existing: `arb/raydium_public_pool_discovery.py`, `arb/market_state_registry.py`, `arb/opportunity_graph.py`, `arb/research_engine_pipeline.py`. Wire and harden, don't rewrite.
 - [ ] **C05 — Continuous monitoring/indexing (M6)** deferred pending reliable M5 source-state and user's RPC/budget authorization.
 
+## C01 — Repair source-binding assertion order after CI #101
+
+Focused CI #40229037828 failed two newly introduced fee source identity tests because the captured native fee diagnostic had not actually enforced the decoded pool configuration address and venue linkage. Added these checks *before* any native fee claim is accepted, alongside explicit authenticated trade-rate type/range validation. On error all intermediate decoded values are discarded, as the prior C01 evidence rule requires. Regression tests now cover contradictory identities and malformed native trade rates. The unrelated signed execution and rollback audit jobs in #101 succeeded. New commit CI remains pending.
+
 ## C01 — Native CLMM fee bytes and source binding independent test gate
 
 New focused CI tests exercise the real native CLMM decoder with constructed config-layout bytes, owner verification, on-chain fee bounds and pool/config tick-spacing agreement. The captured fee audit additionally rejects any decoder's returned configuration address that differs from the actual decoded pool reference or returned venue that differs from the source pool venue, then discards partially validated fees. New regression suites are **wired into the fast-safety CI job**, including the previously unconnected CPMM source-fee tests. The evidence remains offline account-layout/fixture evidence; quote accuracy remains zero independent signed comparisons. CI confirmation pending.

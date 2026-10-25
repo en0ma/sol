@@ -31,6 +31,15 @@ def diagnose(fixture,receipt):
                         total_effective_fee_authenticated=fee["total_effective_fee_authenticated"],
                         creator_fee_placement_verified=fee.get("creator_fee_placement_verified"),
                         effective_quote_fee_ppm=fee.get("effective_quote_fee_ppm"))
+            if fee.get("venue") not in (None,row["venue"]):
+                raise ValueError("native fee venue mismatches authenticated pool")
+            if fee.get("config_address")!=row["decoded_pool_state"]["amm_config"]:
+                raise ValueError("native fee configuration mismatches pool reference")
+            if fee.get("trade_fee_authenticated") is not True:
+                raise ValueError("native trade fee authentication missing")
+            rate=fee.get("trade_fee_ppm")
+            if type(rate) is not int or not 0<=rate<1_000_000:
+                raise ValueError("native trade fee ppm invalid")
             effective=fee.get("effective_quote_fee_ppm")
             if (fee["total_effective_fee_authenticated"] is True and
                     (type(effective) is not int or not 0<=effective<1_000_000)):

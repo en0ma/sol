@@ -89,6 +89,23 @@ class Tests(unittest.TestCase):
         self.assertFalse(row["total_effective_fee_authenticated"])
         self.assertNotIn("trade_fee_ppm",row)
         self.assertIsNone(row["effective_quote_fee_ppm"])
+    def test_bogus_native_trade_rate_does_not_escape_validation(self):
+        f=fixture()
+        state=[{"venue":"raydium_cpmm","address":"pool","snapshot_slot":30,
+                "decoded_pool_state":{"amm_config":"cfg"}}]
+        for rate in (None,True,-1,1_000_000,"2500"):
+            with self.subTest(rate=rate),patch(
+                "arb.m5_captured_fee_compute_audit.extract_pool_states",return_value=state),patch(
+                "arb.m5_captured_fee_compute_audit.decode_native_config_fee",
+                return_value={"venue":"raydium_cpmm","config_address":"cfg",
+                    "trade_fee_ppm":rate,"creator_fee_ppm":0,
+                    "trade_fee_authenticated":True,
+                    "total_effective_fee_authenticated":True,
+                    "effective_quote_fee_ppm":2500}):
+                row=diagnose(f,{})["fee_rows"][0]
+                self.assertFalse(row["trade_fee_authenticated"])
+                self.assertIsNone(row["effective_quote_fee_ppm"])
+                self.assertIn("INVALID",row["blocker"])
     def test_duplicate_pool_fee_source_rejected(self):
         f=fixture()
         state={"venue":"raydium_cpmm","address":"pool","snapshot_slot":30,"decoded_pool_state":{}}
