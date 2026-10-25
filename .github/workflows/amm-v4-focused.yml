@@ -16,6 +16,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install builder dependency
         run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Test isolated authenticated market-state registry and common quote evidence boundary
+        run: python3 -m unittest discover -s tests -p test_market_state_and_quote_contract.py -v
       - name: Test agreed discovery-to-verification research engine orchestration
         run: python3 -m unittest discover -s tests -p test_research_engine_pipeline.py -v
       - name: Test M5 conservative observed quote route integration

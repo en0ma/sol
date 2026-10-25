@@ -49,6 +49,12 @@ Maintain these **distinct**, cooperating engines in this order:
 net-cost screening rank candidates *before* invoking the expensive signed
 simulation stage. Quote ranking is not execution authorization.
 
+**Separate market-state and quote boundaries:** `arb/market_state_registry.py`
+rejects stale, unauthenticated, duplicated or cross-slot-skewed snapshots.
+`arb/venue_quote_contract.py` enforces exact-input quotes with same-slot
+provenance, fee, depth and price-impact fields. These are validation boundaries,
+not yet connected to real venue-wide feed collectors or quote mathematics.
+
 **Current implementation boundary:** `arb/research_engine_pipeline.py` is
 an offline dependency-injected integration skeleton over authenticated snapshots,
 `arb.opportunity_graph`, quote screening and the existing independent receipt
