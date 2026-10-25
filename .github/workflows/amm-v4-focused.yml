@@ -16,6 +16,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install builder dependency
         run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Verify signed fixture receipt identity and prevent manufactured execution slot claims
+        run: python3 -m unittest discover -s tests -p test_signed_fixture_provenance_gate.py -v
       - name: Test end-to-end AMM v4 fixture fee and adjusted-reserve quote adapter
         run: python3 -m unittest discover -s tests -p test_raydium_amm_v4_fixture_quote.py -v
       - name: Test source-derived AMM v4 trade fee and adjusted-reserve integration
