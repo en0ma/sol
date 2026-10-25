@@ -7,6 +7,7 @@ import argparse
 import json
 from pathlib import Path
 from arb.m5_signed_fixture_experiment_report import evaluate, SAFE
+from arb.m5_captured_fee_compute_audit import diagnose
 
 PAIRS = ("raydium_cpmm__raydium_amm_v4", "raydium_amm_v4__raydium_cpmm")
 
@@ -27,6 +28,7 @@ def audit(fixture_dir, receipt_dir, *, observed_unix):
             try:
                 fixture = json.loads(fixture_path.read_text())
                 receipt = json.loads(receipt_path.read_text())
+                row["captured_fee_and_compute"] = diagnose(fixture, receipt)
                 row.update(evaluate(fixture, receipt, observed_unix=observed_unix))
             except (ValueError, TypeError, KeyError, OSError, ImportError, ArithmeticError) as exc:
                 row["reason_codes"].append("EXPERIMENT_INPUT_OR_DECODER_BLOCKED: " + str(exc)[:160])
