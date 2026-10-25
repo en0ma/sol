@@ -10,6 +10,7 @@ from arb.next_ten_signed_atomic_offline import run_three_venue
 from arb.m5_three_distinct_venue_signed_acceptance import verify as accept
 from arb.m5_three_venue_signed_quote_parity import compare
 from arb.m5_three_venue_observed_economics import evaluate as evaluate_economics
+from arb.m5_research_evidence_rollup import summarize as rollup
 from arb.next_ten_fork_pool_probe import authenticated_distinct_venue_triangles,select_distinct_triangle_coverage
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
 
@@ -39,6 +40,8 @@ def offline_batch(rpc,fixtures,directory,*,observed_unix):
     src=Path(fixtures)
     listing=json.loads((src/"summary.json").read_text())
     rows=[]
+    parity_reports=[]
+    economics_reports=[]
     for row in listing["routes"]:
         if row["status"]!="AUTHENTICATED_THREE_VENUE_SOURCE_FIXTURE":
             rows.append({"index":row["index"],"status":"SOURCE_FIXTURE_BLOCKED",**SAFE})
@@ -61,8 +64,10 @@ def offline_batch(rpc,fixtures,directory,*,observed_unix):
             result["acceptance_error"]=str(exc)[:240]
         target.write_text(json.dumps(result,indent=2)+"\n")
         if parity is not None:
+            parity_reports.append(parity)
             (root/("parity-%02d.json"%row["index"])).write_text(json.dumps(parity,indent=2)+"\n")
         if economics is not None:
+            economics_reports.append(economics)
             (root/("economics-%02d.json"%row["index"])).write_text(json.dumps(economics,indent=2)+"\n")
         rows.append({"index":row["index"],"status":result["status"],
                      "route_venues":fixture.get("route_venues") if isinstance(fixture,dict) else None,
@@ -75,6 +80,8 @@ def offline_batch(rpc,fixtures,directory,*,observed_unix):
     report={"attempted":len(rows),
             "independent_signed_accepted":sum(r.get("independent_signed_accepted") is True for r in rows),
             "independently_validated_quote_samples":0,"routes":rows,**SAFE}
+    evidence=rollup(listing,report,parity_reports,economics_reports)
+    (root/"evidence-rollup.json").write_text(json.dumps(evidence,indent=2)+"\n")
     (root/"summary.json").write_text(json.dumps(report,indent=2)+"\n")
     return report
 
