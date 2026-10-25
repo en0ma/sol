@@ -16,6 +16,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install builder dependency
         run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Test observed signed two-leg quote deviation diagnostic without accuracy self-certification
+        run: python3 -m unittest discover -s tests -p test_signed_quote_accuracy_report.py -v
       - name: Test captured Orca and CLMM initialized tick array extraction
         run: python3 -m unittest discover -s tests -p test_fixture_concentrated_ticks.py -v
       - name: Test signed intermediate SPL consumption against quoted second-leg input
