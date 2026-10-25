@@ -41,8 +41,15 @@ def assess(route,receipt):
         errors.append("final signed SPL balances unverified")
     if type(receipt.get("signed_packet_bytes")) is not int or not 100<=receipt["signed_packet_bytes"]<=1232:
         errors.append("invalid signed packet bytes")
-    if not isinstance(receipt.get("negative_error"),str) or "InstructionError" not in receipt["negative_error"]:
-        errors.append("negative third-leg error missing")
+    import ast
+    try:
+        failed_index=ast.literal_eval(receipt.get("negative_error",""))["InstructionError"][0]
+    except (ValueError,TypeError,KeyError,IndexError,SyntaxError,AttributeError):
+        failed_index=None
+    if type(failed_index)is not int or failed_index!=2 or (
+            receipt.get("negative_failure_instruction_index") is not None and
+            receipt["negative_failure_instruction_index"]!=2):
+        errors.append("negative control must fail at final instruction")
     pools=receipt.get("route_pool_addresses")
     if not isinstance(pools,list) or len(pools)!=3 or pools[0]!=pools[2] or not all(isinstance(x,str) and x for x in pools):
         errors.append("authenticated three-hop pools missing")

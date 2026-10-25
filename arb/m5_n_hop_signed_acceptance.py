@@ -46,8 +46,15 @@ def assess(pair,n,r):
         reasons.append("connected two-mint route identity")
     size=r.get("signed_packet_bytes")
     if type(size)is not int or not 100<=size<=1232:reasons.append("signed packet size")
-    if "InstructionError" not in str(r.get("negative_error","")):
-        reasons.append("missing negative last-leg instruction error")
+    import ast
+    try:
+        parsed_index=ast.literal_eval(r.get("negative_error",""))["InstructionError"][0]
+    except (ValueError,TypeError,KeyError,IndexError,SyntaxError,AttributeError):
+        parsed_index=None
+    if type(parsed_index)is not int or parsed_index!=n-1 or (
+            r.get("negative_failure_instruction_index") is not None and
+            r["negative_failure_instruction_index"]!=parsed_index):
+        reasons.append("negative control did not fail at final instruction")
     return {"route":"__".join(pair),"legs":n,
             "status":"VERIFIED_SIGNED_N_HOP" if not reasons else "UNVERIFIED",
             "failure_reasons":reasons,**SAFE}

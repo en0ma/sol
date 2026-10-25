@@ -22,10 +22,20 @@ class Tests(unittest.TestCase):
                 "actionable":False,"live_execution_approved":False,"broadcast":False}
     def test_every_length(self):
         for n in (4,5,6):
-            self.assertEqual(assess(PAIRS[0],n,self.receipt(n))["status"],"VERIFIED_SIGNED_N_HOP")
+            r=self.receipt(n)
+            r["negative_error"]=str({"InstructionError":[n-1,"Custom"]})
+            self.assertEqual(assess(PAIRS[0],n,r)["status"],"VERIFIED_SIGNED_N_HOP")
     def test_missing_intermediate_consumption(self):
         r=self.receipt(6);r["cpi_hops"][3]["consumed_base_units"]-=1
         self.assertEqual(assess(PAIRS[0],6,r)["status"],"UNVERIFIED")
+    def test_earlier_instruction_failure_not_accepted(self):
+        r=self.receipt(6)
+        r["negative_error"]="{'InstructionError': [2, 'Custom']}"
+        self.assertEqual(assess(PAIRS[0],6,r)["status"],"UNVERIFIED")
+    def test_contradictory_error_index_not_accepted(self):
+        r=self.receipt(5)
+        r["negative_failure_instruction_index"]=1
+        self.assertEqual(assess(PAIRS[0],5,r)["status"],"UNVERIFIED")
     def test_missing_rollback(self):
         r=self.receipt(4);r["rollback_failure_case_verified"]=False
         self.assertEqual(assess(PAIRS[0],4,r)["status"],"UNVERIFIED")

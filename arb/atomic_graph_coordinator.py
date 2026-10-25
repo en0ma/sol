@@ -419,7 +419,7 @@ def simulate_adaptive_n_leg_offline(rpc, legs, tokens, states, evidence, owner,
     fail_expected.extend(([programs[-1],"invoke"],[programs[-1],"failed"]))
     rollback=(idx==n-1 and top_level_events(failure.get("logs") or [],set(programs))==fail_expected
               and _post(rpc,accounts,tokens,owner)==before)
-    receipt.update(negative_error=str(error),negative_packet_bytes=bad_packet,
+    receipt.update(negative_error=str(error),negative_failure_instruction_index=idx,negative_packet_bytes=bad_packet,
                    rollback_failure_case_verified=rollback,
                    signed_atomic_simulation_verified=rollback,
                    status="SIGNED_N_LEG_ATOMIC_AND_ROLLBACK_VERIFIED" if rollback else "ROLLBACK_UNVERIFIED")
