@@ -17,8 +17,17 @@ def derive(fixture,*,observed_unix):
     native=extract(fixture)["fundamentals"]
     if len(native)!=2 or len(pool_states)!=2:
         raise ValueError("two source-bound pools required")
+    source_ids=[(item["venue"],item["address"]) for item in pool_states]
+    native_ids=[(item["venue"],item["address"]) for item in native]
+    if len(set(source_ids))!=2 or len(set(native_ids))!=2 or set(source_ids)!=set(native_ids):
+        raise ValueError("native vault fundamentals and decoded pool identities diverge")
+    native_by_id={(item["venue"],item["address"]):item for item in native}
     outputs=[];blocked=[]
-    for item,fundamentals in zip(pool_states,native):
+    for item in pool_states:
+        fundamentals=native_by_id[(item["venue"],item["address"])]
+        if (fundamentals["mints"]!=item["mints"] or
+                fundamentals["snapshot_slot"]!=item["snapshot_slot"]):
+            raise ValueError("native fundamentals source mint or slot mismatch")
         venue=item["venue"]
         row={"venue":venue,"address":item["address"],
              "mints":item["mints"],"slot":item["snapshot_slot"],
@@ -29,6 +38,15 @@ def derive(fixture,*,observed_unix):
              "vault_base_units":fundamentals["vault_base_units"]}
         if venue in ("raydium_cpmm","raydium_clmm"):
             fee=decode_native_config_fee(venue,item["decoded_pool_state"],fixture)
+            if (fee.get("venue")!=venue or
+                    fee.get("config_address")!=item["decoded_pool_state"]["amm_config"]):
+                raise ValueError("source fee config not bound to decoded pool")
+            effective=fee.get("effective_quote_fee_ppm")
+            if fee.get("total_effective_fee_authenticated") is True:
+                if type(effective) is not int or not 0<=effective<1_000_000:
+                    raise ValueError("authenticated effective fee ppm missing")
+            elif effective is not None:
+                raise ValueError("unverified effective fee cannot be projected")
             if fee["total_effective_fee_authenticated"] is True:
                 row.update(trade_fee_ppm=fee["effective_quote_fee_ppm"],
                            trade_fee_authenticated=True)
