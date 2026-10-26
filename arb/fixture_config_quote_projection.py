@@ -9,7 +9,7 @@ from arb.fixture_quote_execution_pipeline import extract_pool_states
 from arb.fixture_aux_fee_decoder import decode_native_config_fee
 from arb.authenticated_quote_provider import from_snapshot
 from arb.cpmm_quote import quote_fee_rounding_interval,quote_native_fee_candidates
-from arb.cpmm_creator_fee_quote import calculate as creator_quote
+from arb.cpmm_creator_fee_quote import calculate as creator_quote, effective_reserves
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
 
 def derive(fixture,*,observed_unix):
@@ -51,6 +51,8 @@ def derive(fixture,*,observed_unix):
             elif effective is not None:
                 raise ValueError("unverified effective fee cannot be projected")
             if venue=="raydium_cpmm":
+                row["cpmm_effective_reserves_base_units"]=effective_reserves(
+                    item["decoded_pool_state"],fundamentals["vault_base_units"])
                 row["native_trade_fee_ppm"]=fee.get("trade_fee_ppm")
                 row["native_creator_fee_ppm"]=fee.get("creator_fee_ppm")
                 row["creator_fee_enabled"]=fee.get("creator_fee_enabled")
@@ -115,7 +117,7 @@ def quote_cpmm_creator_fee_source(fixture,*,observed_unix,leg,amount_in):
     if leg.get("output_mint")!=mints[1-idx]:raise ValueError("invalid CPMM output mint")
     if type(state.get("creator_fee_enabled")) is not bool:
         raise ValueError("CPMM onchain creator fee flag not authenticated")
-    reserves=state["vault_base_units"]
+    reserves=state["cpmm_effective_reserves_base_units"]
     detail=creator_quote(reserves[idx],reserves[1-idx],amount_in,
         state["native_trade_fee_ppm"],state["native_creator_fee_ppm"],
         state["creator_fee_on"],idx,enabled=state["creator_fee_enabled"])

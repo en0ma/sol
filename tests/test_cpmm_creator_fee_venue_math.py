@@ -13,6 +13,7 @@ class Tests(unittest.TestCase):
  def test_authenticated_pool_direction_quote(self,derive):
   derive.return_value={"snapshots":[{"venue":"raydium_cpmm","address":"p",
    "mints":["A","B"],"slot":7,"vault_base_units":[100000,200000],
+   "cpmm_effective_reserves_base_units":[99900,199800],
    "native_trade_fee_ppm":2500,"native_creator_fee_ppm":1000,
    "creator_fee_enabled":True,"creator_fee_on":1}]}
   report=quote_cpmm_creator_fee_source({},observed_unix=1,
