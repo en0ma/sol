@@ -49,11 +49,39 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix):
             q={**leg,"amount_in":amount_in,
                "amount_out":native["estimated_output_base_units"],
                "snapshot_slot":row["snapshot_slot"]}
+        elif v=="raydium_clmm":
+            from arb.fixture_aux_fee_decoder import decode_native_config_fee
+            from arb.raydium_clmm_tick_decode import initialized_ticks,next_boundary
+            from arb.raydium_clmm_within_tick_quote import quote_within_tick
+            from arb.orca_tick_math import sqrt_price_from_tick_index
+            import base64
+            from arb.raydium_clmm_ticks import SIZE,DISC
+            state=row["decoded_pool_state"]
+            fee=decode_native_config_fee(v,state,fixture)["trade_fee_ppm"]
+            downward=leg["input_mint"]==state["token_mint_0"]
+            candidates=[]
+            for address in fixture["state_account_addresses"]:
+                account=fixture["accounts"].get(address,{})
+                if account.get("owner")!="CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK" or account.get("executable") is not False:
+                    continue
+                data=account.get("data")
+                if not isinstance(data,list) or len(data)!=2 or data[1]!="base64":continue
+                raw=base64.b64decode(data[0],validate=True)
+                if len(raw)!=SIZE or raw[:8]!=DISC:continue
+                from arb.orca_whirlpool import b58
+                if b58(raw[8:40])!=pool:continue
+                start=int.from_bytes(raw[40:44],"little",signed=True)
+                candidates.extend(initialized_ticks(raw,start,state["tick_spacing"]))
+            index=next_boundary(candidates,state["tick_current"],downward)
+            native=quote_within_tick(state,leg["input_mint"],amount_in,fee,
+                sqrt_price_from_tick_index(index))
+            q={**leg,"amount_in":amount_in,
+               "amount_out":native["estimated_output_base_units"],
+               "snapshot_slot":row["snapshot_slot"]}
         else:
             # These venues require explicit same-slot auxiliary accounts; raw
             # vaults are not protocol-native dynamic fee/bin/tick evidence.
             missing={
-             "raydium_clmm":"authenticated next initialized tick array and native fee",
              "meteora_dlmm":"decoded active and traversed bin arrays and live variable fee",
              "meteora_damm_v2":"decoded fee scheduler and pool curve configuration",
              "pumpswap":"decoded dynamic effective fee tier and fee vault buckets"}[v]
