@@ -9,6 +9,7 @@ from arb.fixture_quote_execution_pipeline import extract_pool_states
 from arb.fixture_aux_fee_decoder import decode_native_config_fee
 from arb.authenticated_quote_provider import from_snapshot
 from arb.cpmm_quote import quote_fee_rounding_interval,quote_native_fee_candidates
+from arb.cpmm_creator_fee_quote import calculate as creator_quote
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
 
 def derive(fixture,*,observed_unix):
@@ -49,6 +50,11 @@ def derive(fixture,*,observed_unix):
                     raise ValueError("authenticated effective fee ppm missing")
             elif effective is not None:
                 raise ValueError("unverified effective fee cannot be projected")
+            if venue=="raydium_cpmm":
+                row["native_trade_fee_ppm"]=fee["trade_fee_ppm"]
+                row["native_creator_fee_ppm"]=fee["creator_fee_ppm"]
+                row["creator_fee_enabled"]=fee.get("creator_fee_enabled")
+                row["creator_fee_on"]=fee.get("creator_fee_on")
             if fee["total_effective_fee_authenticated"] is True:
                 row.update(trade_fee_ppm=fee["effective_quote_fee_ppm"],
                            trade_fee_authenticated=True)
@@ -95,3 +101,27 @@ def quote_cpmm_only(fixture,*,observed_unix,leg,amount_in):
             "native_fee_rounding_reference":fee_interval,
             "quote":quoted,"protocol_exact_verified":False,
             "signed_execution_reconciled":False,**SAFE}
+
+def quote_cpmm_creator_fee_source(fixture,*,observed_unix,leg,amount_in):
+    """CPMM-only source-bound creator fee diagnostic; remains indicative."""
+    report=derive(fixture,observed_unix=observed_unix)
+    matching=[s for s in report["snapshots"]
+              if s["venue"]=="raydium_cpmm" and s["address"]==leg.get("pool")]
+    if len(matching)!=1:raise ValueError("CPMM source pool missing")
+    state=matching[0]
+    mints=state["mints"]
+    if leg.get("input_mint") not in mints:raise ValueError("invalid CPMM input mint")
+    idx=mints.index(leg["input_mint"])
+    if leg.get("output_mint")!=mints[1-idx]:raise ValueError("invalid CPMM output mint")
+    if type(state.get("creator_fee_enabled")) is not bool:
+        raise ValueError("CPMM onchain creator fee flag not authenticated")
+    reserves=state["vault_base_units"]
+    detail=creator_quote(reserves[idx],reserves[1-idx],amount_in,
+        state["native_trade_fee_ppm"],state["native_creator_fee_ppm"],
+        state["creator_fee_on"],idx,enabled=state["creator_fee_enabled"])
+    return {"status":"SOURCE_BOUND_CPMM_CREATOR_FEE_INDICATIVE",
+            "quote":{"venue":"raydium_cpmm","pool":leg["pool"],
+                "input_mint":leg["input_mint"],"output_mint":leg["output_mint"],
+                "amount_in":amount_in,"amount_out":detail["estimated_output_base_units"],
+                "snapshot_slot":state["slot"]},
+            "venue_fee_detail":detail,"protocol_exact_verified":False,**SAFE}
