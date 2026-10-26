@@ -63,7 +63,7 @@ def offline_batch(rpc,fixtures,directory,*,observed_unix,fee_observations=None):
             result=run_three_venue(rpc,fixture)
             accept(fixture,result)
             parity=compare(fixture,result,observed_unix=observed_unix)
-            experiment=measure_signed_quote(fixture,result,observed_unix=observed_unix)
+            experiment=measure_signed_quote(fixture,result,observed_unix=observed_unix,parity_report=parity)
             experimental_samples.extend(experiment["venue_samples"])
             (root/("signed-price-experiment-%02d.json"%row["index"])).write_text(
                 json.dumps(experiment,indent=2)+"\n")
@@ -115,7 +115,7 @@ def offline_batch(rpc,fixtures,directory,*,observed_unix,fee_observations=None):
             summary["exact" if sample["exact_integer_match"] else "mismatch"]+=1
     report["signed_price_evidence_by_venue"]=by_venue
     (root/"signed-price-experiments.json").write_text(json.dumps(
-        {"samples":experimental_samples,"by_venue":by_venue,**SAFE},indent=2)+"\\n")
+        {"samples":experimental_samples,"by_venue":by_venue,**SAFE},indent=2)+"\n")
     evidence=rollup(listing,report,parity_reports,economics_reports)
     (root/"evidence-rollup.json").write_text(json.dumps(evidence,indent=2)+"\n")
     (root/"summary.json").write_text(json.dumps(report,indent=2)+"\n")
