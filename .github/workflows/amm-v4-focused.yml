@@ -54,6 +54,8 @@ jobs:
       - name: Compile four-venue manifest-owned auxiliary fee and liquidity extraction
         run: |
           python3 -m py_compile arb/fixture_native_aux_inventory.py arb/fixture_all_venue_signed_quotes.py arb/m5_distinct_venue_coverage_batch.py
+      - name: Test bounded Whirlpool native tick prices
+        run: python3 -m unittest discover -s tests -p test_orca_native_tick_range_guard.py -v
       - name: Test authenticated CLMM tick source availability blockers
         run: python3 -m unittest discover -s tests -p test_source_tick_bin_pda_guards.py -v
       - name: Test all-seven native source quote dispatch and signed leg parity wiring
