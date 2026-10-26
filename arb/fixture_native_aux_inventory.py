@@ -62,6 +62,29 @@ def inspect(fixture):
                 "sqrt_price_x64":pool["sqrt_price"],"liquidity":pool["liquidity"]})
             record["missing"].append("decoded_dynamic_fee_scheduler_and_curve_config")
         else:
+            from arb.fixture_pool_fundamentals import extract as native_fundamentals
+            fundamentals=next((x for x in native_fundamentals(fixture)["fundamentals"]
+                if x["venue"]=="pumpswap" and x["address"]==row["address"]),None)
+            if fundamentals is None:
+                raise ValueError("PumpSwap source SPL vault state unavailable")
+            base,quote=fundamentals["vault_base_units"]
+            protocol=pool.get("protocol_fees")
+            creator=pool.get("creator_fees")
+            virtual=pool.get("virtual_quote_reserves")
+            if all(type(n)is int for n in (base,quote,protocol,creator,virtual)):
+                spendable=quote-protocol-creator
+                priced=quote+virtual
+                if base<=0 or quote<=0 or spendable<=0 or priced<=0:
+                    raise ValueError("PumpSwap accrued fee buckets exhaust liquidity")
+                record["decoded_auxiliary"].append({"type":"pool_net_quote_liquidity",
+                    "base_vault_base_units":base,"quote_vault_base_units":quote,
+                    "protocol_fee_liability_base_units":protocol,
+                    "creator_fee_liability_base_units":creator,
+                    "virtual_quote_reserves_base_units":virtual,
+                    "spendable_quote_base_units":spendable,
+                    "priced_quote_base_units":priced})
+            else:
+                record["missing"].append("pool_accrued_fee_bucket_fields")
             # Pump fee rates cannot be treated as effective without PDA
             # derivation, market-cap selection and fee-mode authentication.
             from arb.pumpswap_fee_config import DISC,decode
