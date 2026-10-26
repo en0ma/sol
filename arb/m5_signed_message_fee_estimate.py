@@ -12,6 +12,9 @@ def estimate_signed_message_fee(rpc,transaction):
     local_rpc_only(rpc)
     if not hasattr(transaction,"signatures") or not transaction.signatures:
         raise ValueError("signed transaction signatures required")
+    # Verify the signed packet itself before attributing a fee quote to it.
+    if hasattr(transaction,"verify"):
+        transaction.verify()
     msg=bytes(transaction.message)
     if not msg:
         raise ValueError("empty signed message")
@@ -34,5 +37,7 @@ def estimate_signed_message_fee(rpc,transaction):
     return {"status":"SIGNED_MESSAGE_FEE_ESTIMATE_ONLY",
             "signed_message_sha256":digest,
             "estimated_fee_lamports":value,
-            "paid_fee_verified":False,"source":"getFeeForMessage",
+            "paid_fee_verified":False,"fee_payer_asset":"SOL",
+            "swap_output_debited_for_network_fee":False,
+            "source":"getFeeForMessage",
             **SAFE}
