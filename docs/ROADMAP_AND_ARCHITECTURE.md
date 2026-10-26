@@ -4,6 +4,12 @@
 **Last consolidated:** 2026-10-25.  
 **Applies to:** all subsequent contributors, coding agents and conversations. Read with root [AGENTS.md](../AGENTS.md).
 
+## Active overriding M5 delivery priority — 2026-10-26
+
+**M5 — Working Seven-Venue Arbitrage Opportunity Discovery and Offline Verification.** This is the user's primary next outcome, above incremental C01/C02 fee-perfecting tasks or additional reporting-only work. Keep the existing seven-venue architecture and all established acceptance/safety checks. Audit the complete codebase and latest CI before selecting implementation tasks. Join the existing discovery, source-state registry, token/pool graph, venue-owned quoting, opportunity ranking, and independent signed isolated Surfpool verification into one repeatable end-to-end research run. Emit concrete candidate/rejection counts and source-backed signed evidence, including an honest empty result. Do not label opportunities as executable or profitable merely from quotes; SOL fee payer remains separate. No broadcast/live execution.
+
+**Delivery discipline:** batch broad, meaningful vertical-slice changes with tests; normally at least three substantive commits per engineering push rather than narrow single-fix pushes. Existing modules must be audited and reused, not recreated. Update the ledger for evidence and missing integrations. CI-green or more model diagnostics alone does not complete M5.
+
 ## Current engineering checklist — 2026-10-25
 
 **Primary active work tracking:** [MILESTONE_EXECUTION_LEDGER.md](MILESTONE_EXECUTION_LEDGER.md). This ledger audits completed venue adapters, atomic execution, historical 42/42 evidence and generic compiler; it tracks outstanding adaptive multi-leg coordination, per-venue effective pricing, observed costs, and CI acceptance. Do not redo completed infrastructure. This section supersedes any older roadmap phrasing suggesting the primary adapters or atomic engine are still missing.

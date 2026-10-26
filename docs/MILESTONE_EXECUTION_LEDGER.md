@@ -5,6 +5,15 @@
 **Status:** authoritative checklist for next PR changes. Read before proposing implementation.  
 **Safety:** research and isolated signed simulation ONLY. Never broadcast a transaction or approve trading.
 
+## Highest-priority user delivery gate — 2026-10-26
+
+**M5 — Working Seven-Venue Arbitrage Opportunity Discovery and Offline Verification** is now the lead engineering priority. The historical A/B/C checklist below is retained as dependency tracking, not a mandate to finish every narrow price-model issue before a useful end-to-end run. **Audit existing code and CI first** under `AGENTS.md`; then implement the highest-leverage disconnected integration. Avoid narrow/test-only pushes; normally batch at least three substantive commits per engineering push. No progress claim based solely on a commit or report.
+
+- [ ] **M5-E2E-01 — Complete current-codebase integration audit.** Read and classify existing seven-venue discovery, registry, opportunity graph, venue quote boundary, candidate research, coordinator/signed runner and CI as wired/disconnected/missing/failing/unverified. Record actual interface gaps and prioritize a runnable research path; do not assume modules are missing just because acceptance is pending.
+- [ ] **M5-E2E-02 — End-to-end real-source candidate discovery.** Run fresh mint-agnostic discovery across seven venue feeds where accessible, authenticate candidates, form connected token/pool routes, derive venue-owned amounts and comparable gross/estimated economics. Persist real source slots, candidate/ranking/rejection counts and explicit gaps. A truthful zero-opportunity result is valid output, but synthetic fixtures alone are not completion.
+- [ ] **M5-E2E-03 — Isolated signed route verification.** Send eligible candidates through the *existing* generic signed Surfpool simulation and independent CPI/SPL/negative rollback acceptance; persist genuine attempts/acceptances/rejections and safe flags. Preserve historical proofs separately; do not broadcast.
+- [ ] **M5-E2E-04 — Repeatable operating entry point and regression CI.** Make the end-to-end process runnable from a documented command/workflow with machine-readable evidence; test incomplete venues, stale state, unconvertible costs, empty candidates, simulated failures and all safety gates. Inspect CI jobs/artifacts at the exact pushed SHA before claiming an accepted milestone.
+
 ## Rules that stop duplicate work
 
 - **Inspect existing implementation and latest CI artifact before opening a work item.** "Not fully validated" does not mean "not implemented".
