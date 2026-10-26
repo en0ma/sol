@@ -28,6 +28,12 @@ def summarize(samples,*,strict=False):
         row=rows[s["venue"]]
         status=s.get("sample_status")
         if status=="SAMPLE_BLOCKED":
+            # Never accept a supposed blocked observation that also asserts
+            # integer parity or a protocol-exact pricing verdict.
+            if (s.get("exact_integer_match") is not None or
+                    s.get("integer_delta_base_units") is not None or
+                    s.get("source_exact_protocol_verified") is True):
+                raise ValueError("blocked venue sample contains forged parity evidence")
             row["blocked"]+=1
             reason=s.get("reason") or "UNKNOWN_NATIVE_SOURCE_BLOCKER"
             reason=str(reason)[:160]
@@ -35,6 +41,8 @@ def summarize(samples,*,strict=False):
             continue
         if status!="SIGNED_FORK_QUOTE_COMPARISON":
             raise ValueError("unsupported signed pricing sample status")
+        if s.get("actionable",False) is not False or s.get("broadcast",False) is not False:
+            raise ValueError("unsafe signed experiment row")
         if s.get("signed_simulation_accepted") is not True:
             raise ValueError("unaccepted signed simulation cannot be counted")
         observed=s.get("signed_output_base_units")
@@ -49,7 +57,8 @@ def summarize(samples,*,strict=False):
                 not isinstance(manifest,str) or len(manifest)!=64):
             raise ValueError("comparison missing source-bound signed integer provenance")
         delta=observed-predicted
-        if (s.get("integer_delta_base_units")!=delta or
+        if (s.get("absolute_integer_error_base_units") not in (None,abs(delta)) or
+                s.get("integer_delta_base_units")!=delta or
                 s.get("exact_integer_match") is not (delta==0) or
                 s.get("source_exact_protocol_verified") is not False):
             raise ValueError("comparison delta or protocol exactness misrepresented")
