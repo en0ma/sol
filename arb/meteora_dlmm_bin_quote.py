@@ -53,6 +53,12 @@ def quote_bins(*,amount_in,swap_x_for_y,bins,total_fee_rate,max_bins=32):
         if prior is not None and (idx>=prior if swap_x_for_y else idx<=prior):
             raise ValueError("DLMM bin walk direction invalid")
         prior=idx
+        # Dynamic fees may evolve between bin crossings. When independently
+        # decoded per-bin rates are available, use each rather than assuming
+        # the initial active-bin fee remains valid throughout traversal.
+        rate=b.get("effective_fee_rate",total_fee_rate)
+        if type(rate)is not int or not 0<=rate<DEN:
+            raise ValueError("DLMM invalid per-bin effective fee rate")
         capacity=b["amount_y"] if swap_x_for_y else b["amount_x"]
         price=b["price_q64"]
         if not 0<price<1<<128 or min(b["amount_x"],b["amount_y"])<0:
@@ -63,20 +69,21 @@ def quote_bins(*,amount_in,swap_x_for_y,bins,total_fee_rate,max_bins=32):
         lo,hi=0,remaining
         while lo<hi:
             mid=(lo+hi+1)//2
-            fee=(mid*total_fee_rate+DEN-1)//DEN
+            fee=(mid*rate+DEN-1)//DEN
             net=mid-fee
             out=net*price//Q if swap_x_for_y else net*Q//price
             if out<=capacity:lo=mid
             else:hi=mid-1
         used=lo
         if used==0:continue
-        fee=(used*total_fee_rate+DEN-1)//DEN
+        fee=(used*rate+DEN-1)//DEN
         net=used-fee
         got=net*price//Q if swap_x_for_y else net*Q//price
         if got<=0:continue
         remaining-=used;output+=got;fees+=fee
         consumed.append({"bin_id":idx,"gross_input_base_units":used,
-                         "fee_input_base_units":fee,"output_base_units":got})
+                         "fee_input_base_units":fee,"output_base_units":got,
+                         "effective_fee_rate":rate})
         if remaining==0:break
     if remaining or not output:
         raise ValueError("DLMM bin inventory cannot fill complete exact input")
