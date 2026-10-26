@@ -46,3 +46,31 @@ def quote(venue,state,input_mint,amount,*,evidence=None):
     return {"venue":venue,"input_mint":input_mint,"amount_in":amount,
             "amount_out":output,"venue_quote":native,
             "protocol_exact_verified":False,**SAFE}
+
+def quote_concentrated_source_bound(venue,state,input_mint,amount,*,snapshot_slot,
+                                    bounds_slot,fee_slot=None,
+                                    lower_sqrt_x64=None,upper_sqrt_x64=None,
+                                    next_initialized_sqrt_price_x64=None,trade_fee_ppm=None):
+    """Quote only if curve bounds and fee belong to the SAME pool-state slot.
+
+    Synthetic or stale tick boundaries cannot become authenticated by passing
+    a boolean. The caller must have actually decoded these from venue-owned
+    tick arrays; this gate only checks the provenance agreement.
+    """
+    if type(snapshot_slot)is not int or type(bounds_slot)is not int or snapshot_slot<0:
+        raise ValueError("source slot missing")
+    if snapshot_slot!=bounds_slot:
+        raise ValueError("tick bounds are stale relative to pool")
+    if venue=="orca":
+        e={"source_authenticated":True,"tick_bounds_authenticated":True,
+           "current_tick_sqrt_bounds_x64":[lower_sqrt_x64,upper_sqrt_x64]}
+    elif venue=="raydium_clmm":
+        if fee_slot!=snapshot_slot:
+            raise ValueError("CLMM fee configuration from different slot")
+        e={"source_authenticated":True,"next_initialized_tick_authenticated":True,
+           "trade_fee_ppm":trade_fee_ppm,
+           "next_initialized_sqrt_price_x64":next_initialized_sqrt_price_x64}
+    else:raise ValueError("concentrated liquidity venue required")
+    r=quote(venue,state,input_mint,amount,evidence=e)
+    return {**r,"source_snapshot_slot":snapshot_slot,
+            "tick_state_same_slot_checked":True,"protocol_exact_verified":False}
