@@ -33,14 +33,25 @@ def quote(venue,state,input_mint,amount,*,evidence=None):
                 state.get("snapshot_slot")!=evidence.get("bin_snapshot_slot")
                 or state.get("snapshot_slot")!=evidence.get("fee_snapshot_slot")):
             raise ValueError("DLMM bin state and dynamic fee must share source slot")
-        x=quote_one_bin(amount_in=amount,
-            swap_x_for_y=input_mint==state["token_x_mint"],
-            price_q64=evidence["active_bin_price_q64"],
-            bin_x=evidence["active_bin_amount_x"],
-            bin_y=evidence["active_bin_amount_y"],
-            total_fee_rate=evidence["total_fee_rate"],
-            active_bin_id=state["active_id"],
-            observed_bin_id=evidence["active_bin_id"])
+        if "authenticated_directional_bins" in evidence:
+            from arb.meteora_dlmm_bin_quote import quote_bins
+            bins=evidence["authenticated_directional_bins"]
+            if (not isinstance(bins,list) or not bins
+                    or bins[0].get("bin_id")!=state["active_id"]
+                    or evidence.get("bin_array_pda_authenticated") is not True):
+                raise ValueError("DLMM directional bin walk not anchored to active array")
+            x=quote_bins(amount_in=amount,
+                swap_x_for_y=input_mint==state["token_x_mint"],
+                bins=bins,total_fee_rate=evidence["total_fee_rate"])
+        else:
+            x=quote_one_bin(amount_in=amount,
+                swap_x_for_y=input_mint==state["token_x_mint"],
+                price_q64=evidence["active_bin_price_q64"],
+                bin_x=evidence["active_bin_amount_x"],
+                bin_y=evidence["active_bin_amount_y"],
+                total_fee_rate=evidence["total_fee_rate"],
+                active_bin_id=state["active_id"],
+                observed_bin_id=evidence["active_bin_id"])
         if input_mint not in (state["token_x_mint"],state["token_y_mint"]):
             raise ValueError("DLMM mint not in pool")
         native={"estimated_output_base_units":x["amount_out"],**x}
