@@ -59,6 +59,7 @@ def offline_batch(rpc,fixtures,directory,*,observed_unix,fee_observations=None):
         parity=None
         economics=None
         evidence=None
+        experiment=None
         try:
             fixture=json.loads(path.read_text())
             result=run_three_venue(rpc,fixture)
@@ -73,8 +74,14 @@ def offline_batch(rpc,fixtures,directory,*,observed_unix,fee_observations=None):
             (root/("native-aux-%02d.json"%row["index"])).write_text(
                 json.dumps(native_aux,indent=2)+"\n")
             parity=compare(fixture,result,observed_unix=observed_unix)
-            experiment=measure_signed_quote(fixture,result,observed_unix=observed_unix,parity_report=parity)
-            experimental_samples.extend(experiment["venue_samples"])
+            try:
+                experiment=measure_signed_quote(
+                    fixture,result,observed_unix=observed_unix,parity_report=parity)
+                experimental_samples.extend(experiment["venue_samples"])
+            except (ValueError,TypeError,KeyError,ArithmeticError) as pricing_error:
+                experiment={"status":"PRICE_MEASUREMENT_BLOCKED",
+                            "reason":str(pricing_error)[:240],
+                            "observed_compared_samples":0,"venue_samples":[],**SAFE}
             (root/("signed-price-experiment-%02d.json"%row["index"])).write_text(
                 json.dumps(experiment,indent=2)+"\n")
             # Simulation does not yield an independently assessed fee or
@@ -94,6 +101,7 @@ def offline_batch(rpc,fixtures,directory,*,observed_unix,fee_observations=None):
             economics_reports.append(economics)
             (root/("economics-%02d.json"%row["index"])).write_text(json.dumps(economics,indent=2)+"\n")
         rows.append({"index":row["index"],"status":result["status"],
+                     "price_measurement_status":experiment["status"] if experiment is not None else "UNAVAILABLE",
                      "route_venues":fixture.get("route_venues") if isinstance(fixture,dict) else None,
                      "observed_compute_units":result.get("positive_units_consumed"),
                      "gross_start_mint_delta":economics.get("gross_delta_start_mint_base_units") if economics else None,
