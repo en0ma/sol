@@ -63,6 +63,21 @@ def evaluate(fixture,receipt,*,observed_fee_lamports=None,
         "gross_delta_start_mint_base_units":output*(10_000-n)//10_000-spent[0],
         "maximum_affordable_total_cost_start_mint_base_units":max(0,output*(10_000-n)//10_000-spent[0]),
         "net_delta_start_mint_base_units":None} for n in downside_bps]
+    # Fee-for-message is a read-only quote, not a settled payment.
+    # In a WSOL-denominated closed route its base units map exactly to
+    # lamports, so publish a separate estimated-cost scenario.
+    if (fixture.get("route_mints",[None])[0]==WRAPPED_SOL_MINT
+            and type(report.get("exact_signed_message_fee_estimate_lamports")) is int):
+        message_fee=report["exact_signed_message_fee_estimate_lamports"]
+        report["estimated_net_delta_wsol_base_units"]=output-spent[0]-message_fee
+        report["estimated_fee_budget_remaining_wsol_base_units"]=(
+            output-spent[0]-message_fee)
+        report["estimated_fee_downside_scenarios"]=[
+            {"output_haircut_bps":s["output_haircut_bps"],
+             "estimated_net_delta_wsol_base_units":
+                s["gross_delta_start_mint_base_units"]-message_fee}
+            for s in report["downside_scenarios"]]
+        report["estimated_cost_is_paid_fee"]=False
     if fee_observation is not None:
         if (not isinstance(fee_observation,dict)
                 or fee_observation.get("kind")!="INDEPENDENT_OBSERVED_TRANSACTION_FEE"
