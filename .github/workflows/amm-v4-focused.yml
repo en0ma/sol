@@ -49,6 +49,10 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_signed_fee_break_even_haircut.py -v
       - name: Test exact signed-message RPC fee estimation without broadcast or paid-fee claim
         run: python3 -m unittest discover -s tests -p test_signed_message_fee_estimate.py -v
+      - name: Test all-seven native source quote dispatch and signed leg parity wiring
+        run: |
+          python3 -m py_compile arb/fixture_all_venue_signed_quotes.py arb/m5_three_venue_signed_quote_parity.py
+          python3 -m unittest discover -s tests -p test_fixture_all_venue_signed_quotes.py -v
       - name: Syntax-check signed fork comparison and venue batch artifacts
         run: python3 -m py_compile arb/venue_signed_quote_experiments.py arb/m5_distinct_venue_coverage_batch.py
       - name: Test actual signed Surfpool venue quote parity evidence accounting

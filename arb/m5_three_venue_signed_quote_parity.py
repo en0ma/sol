@@ -8,6 +8,7 @@ from pathlib import Path
 from arb.m5_three_distinct_venue_signed_acceptance import verify as accept
 from arb.fixture_config_quote_projection import quote_cpmm_only,quote_cpmm_creator_fee_source
 from arb.raydium_amm_v4_fixture_quote import quote_from_fixture
+from arb.fixture_all_venue_signed_quotes import quote_leg as source_native_quote
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
 
 def compare(fixture,receipt,*,observed_unix):
@@ -119,7 +120,16 @@ def compare(fixture,receipt,*,observed_unix):
                         row["native_fee_input_units_interval"]=[fee_min,fee_max]
                         row["native_fee_rounding_uncertainty_input_units"]=fee_max-fee_min
             else:
-                raise ValueError("protocol directional fee/liquidity quote not independently implemented")
+                native=source_native_quote(fixture,leg_index=i,
+                    amount_in=amounts[i],observed_unix=observed_unix)
+                row["venue_native_quote_status"]=native["quote_status"]
+                if native["quote_status"]!="SOURCE_BOUND_INDICATIVE":
+                    raise ValueError(native.get("reason","source native quote unavailable"))
+                q={"venue":venues[i],"pool":pools[i],
+                   "input_mint":mints[i],"output_mint":mints[i+1],
+                   "amount_in":amounts[i],
+                   "amount_out":native["predicted_output_base_units"],
+                   "snapshot_slot":native["source_slot"]}
             if (q.get("venue")!=venues[i] or q.get("pool")!=pools[i]
                     or q.get("input_mint")!=mints[i] or
                     q.get("output_mint")!=mints[i+1] or
