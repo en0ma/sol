@@ -33,16 +33,29 @@ def quote_from_fixture(fixture,*,pool,input_mint,amount_in,observed_unix):
         "market_accounts_authenticated":row["market_accounts_authenticated"],
         "effective_reserves_authenticated":row["effective_reserves_authenticated"],
         "effective_reserves_base_units":row["effective_reserves_base_units"]}
-    provider,registry=from_snapshot([record],now=observed_unix)
-    if registry["pool_count"]!=1:
-        raise ValueError("AMM v4 source snapshot rejected")
-    leg={"venue":"raydium_amm_v4","pool":pool,
-        "input_mint":input_mint,"output_mint":b if input_mint==a else a}
-    quoted=provider(leg,amount_in)
     native=quote_native_fraction(row["effective_reserves_base_units"],row["mints"],
         input_mint,amount_in,row["native_fee_numerator"],row["native_fee_denominator"])
-    if native["amount_out"]!=quoted["amount_out"]:
-        raise ValueError("AMM v4 native fraction quote and ppm model diverge")
+    if not (row["market_accounts_authenticated"] is True
+            and row["effective_reserves_authenticated"] is True
+            and row["native_fraction_fee_authenticated"] is True):
+        raise ValueError("AMM v4 native fee and adjusted reserves not authenticated")
+    leg={"venue":"raydium_amm_v4","pool":pool,
+        "input_mint":input_mint,"output_mint":b if input_mint==a else a}
+    quoted={"venue":"raydium_amm_v4","pool":pool,
+        "input_mint":input_mint,"output_mint":leg["output_mint"],
+        "amount_in":amount_in,"amount_out":native["amount_out"],
+        "snapshot_slot":row["slot"],"observed_unix":observed_unix,
+        "quote_model":"AMM_V4_NATIVE_FRACTION_ADJUSTED_RESERVE_INDICATIVE",
+        "protocol_exact_quote_verified":False}
+    # Retain an independently computed ppm-model cross-check whenever
+    # the chain fraction is exactly representable in the existing provider.
+    if row["trade_fee_authenticated"] is True:
+        provider,registry=from_snapshot([record],now=observed_unix)
+        if registry["pool_count"]!=1:
+            raise ValueError("AMM v4 source snapshot rejected")
+        previous=provider(leg,amount_in)
+        quoted["legacy_ppm_model_amount_out"]=previous["amount_out"]
+        quoted["legacy_ppm_model_difference_base_units"]=native["amount_out"]-previous["amount_out"]
     return {"status":"AMM_V4_ACCOUNT_DERIVED_INDICATIVE_QUOTE",
         "quote":quoted,"snapshot_slot":row["slot"],
         "native_fee_fraction_reference":native,

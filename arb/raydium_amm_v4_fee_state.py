@@ -66,11 +66,13 @@ def derive_v4(fixture):
         addr=row["address"]
         raw=base64.b64decode(fixture["accounts"][addr]["data"][0],validate=True)
         numerator,denominator=fee_fraction_from_raw_pool(raw)
-        fee=fee_from_raw_pool(raw)
+        exact_ppm=Fraction(numerator*1_000_000,denominator)
+        fee=exact_ppm.numerator if exact_ppm.denominator==1 else None
         reserve=adjusted_reserves(fixture,{**row,"vault_base_units":f["vault_base_units"]})
         results.append({"venue":"raydium_amm_v4","address":addr,"mints":row["mints"],
           "slot":row["snapshot_slot"],"trade_fee_ppm":fee,
           "native_fee_numerator":numerator,"native_fee_denominator":denominator,
-          "trade_fee_authenticated":True,**reserve})
+          "trade_fee_authenticated":fee is not None,
+          "native_fraction_fee_authenticated":True,**reserve})
     return {"status":"AMM_V4_ACCOUNT_DERIVED_INDICATIVE_PRICING",
         "pricing":results,"signed_quote_parity_verified":False,**SAFE}
