@@ -42,6 +42,8 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix):
             spacing=state["tick_spacing"]
             tick=state["tick_current_index"]
             boundary=(tick//spacing)*spacing
+            if spacing<=0 or not -443636<=boundary<boundary+spacing<=443636:
+                raise ValueError("Whirlpool tick span outside native protocol bounds")
             lower=sqrt_price_from_tick_index(boundary)
             upper=sqrt_price_from_tick_index(boundary+spacing)
             native=quote_bounded_single_tick(state,leg["input_mint"],amount_in,
