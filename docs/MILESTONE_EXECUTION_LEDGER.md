@@ -85,6 +85,10 @@ Extended the **actual signed** three-venue economics pipeline to derive a break-
 
 The multi-route isolated signed trial now generates `evidence-rollup.json` alongside the individual receipts. The rollup derives *accepted signed route and distinct venue counts* only from the independent acceptance output, counts **actual** indicative priced legs and missing quote blockers separately, and collects **observed gross start-mint deltas** and precise unavailable fee/conversion blocker counts. Pricing and economic acceptance remain deliberately zero when these gaps persist; broadened route attempts never promote a quote to protocol-exact or a gross delta to net profit. This makes the most consequential missing work visible per CI run without adding a parallel execution engine.
 
+## M5-C02 — Canonical concentrated-liquidity source account authentication
+
+Focused CI #198 and Non-v4 CI #128 passed before this change. Captured Raydium CLMM TickArrayState accounts now must resolve to their canonical tick-array PDAs and match the protocol tick spacing before quotation, while Meteora DLMM BinArray inventories require canonical pool-linked PDAs, valid version and an array containing the actual active bin. Absent required state remains quote-blocked and does not change signed CPI/rollback acceptance. These checks do not imply protocol-exact fee or tick math.
+
 ## M5-C02 — Signed fork quote measurement integrity and integer-error evidence
 
 Preceding CI focused #180 and non-v4 #110 passed. Three commits harden empirical quote comparison against mismatched leg identity, wrong signed delta and unaccepted CPI receipts; eliminate re-quoting the same signed batch twice and correct emitted aggregate JSON format; and add per-venue absolute integer price errors with maximum deviation. All observations still require the existing genuine signed Surfpool and rollback evidence. No protocol exactness is claimed from indicative parity alone. No coordinator modification or broadcast.
