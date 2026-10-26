@@ -71,7 +71,14 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix):
                 from arb.orca_whirlpool import b58
                 if b58(raw[8:40])!=pool:continue
                 start=int.from_bytes(raw[40:44],"little",signed=True)
+                from arb.raydium_clmm_ticks import tick_array_pda,start_tick
+                if address!=tick_array_pda(pool,start):
+                    raise ValueError("CLMM captured tick array has noncanonical PDA")
+                if start%(60*state["tick_spacing"])!=0:
+                    raise ValueError("CLMM source tick array start is misaligned")
                 candidates.extend(initialized_ticks(raw,start,state["tick_spacing"]))
+            if not candidates:
+                raise ValueError("CLMM initialized source ticks unavailable")
             index=next_boundary(candidates,state["tick_current"],downward)
             native=quote_within_tick(state,leg["input_mint"],amount_in,fee,
                 sqrt_price_from_tick_index(index))
