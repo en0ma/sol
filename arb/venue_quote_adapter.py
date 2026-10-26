@@ -27,9 +27,37 @@ def quote(venue,state,input_mint,amount,*,evidence=None):
         native=quote_within_tick(state,input_mint,amount,
             evidence["trade_fee_ppm"],evidence["next_initialized_sqrt_price_x64"])
     elif venue=="meteora_dlmm":
-        raise ValueError("DLMM active-bin liquidity and dynamic fee traversal not authenticated")
+        from arb.meteora_dlmm_bin_quote import quote_one_bin
+        if (evidence.get("bin_state_authenticated") is not True or
+                evidence.get("effective_dynamic_fee_authenticated") is not True or
+                state.get("snapshot_slot")!=evidence.get("bin_snapshot_slot")
+                or state.get("snapshot_slot")!=evidence.get("fee_snapshot_slot")):
+            raise ValueError("DLMM bin state and dynamic fee must share source slot")
+        x=quote_one_bin(amount_in=amount,
+            swap_x_for_y=input_mint==state["token_x_mint"],
+            price_q64=evidence["active_bin_price_q64"],
+            bin_x=evidence["active_bin_amount_x"],
+            bin_y=evidence["active_bin_amount_y"],
+            total_fee_rate=evidence["total_fee_rate"],
+            active_bin_id=state["active_id"],
+            observed_bin_id=evidence["active_bin_id"])
+        if input_mint not in (state["token_x_mint"],state["token_y_mint"]):
+            raise ValueError("DLMM mint not in pool")
+        native={"estimated_output_base_units":x["amount_out"],**x}
     elif venue=="meteora_damm_v2":
-        raise ValueError("DAMM v2 dynamic fee and liquidity range not authenticated")
+        from arb.meteora_damm_v2_quote import quote_exact_input
+        if (evidence.get("dynamic_fee_authenticated") is not True or
+                evidence.get("fee_collection_mode_authenticated") is not True or
+                state.get("snapshot_slot")!=evidence.get("fee_snapshot_slot")
+                or evidence.get("range_curve_compatible") is not True):
+            raise ValueError("DAMM fee and curve provenance unavailable")
+        if input_mint not in (state["token_a_mint"],state["token_b_mint"]):
+            raise ValueError("DAMM input mint not in pool")
+        x=quote_exact_input(state["vault_base_units"][0],state["vault_base_units"][1],
+            amount,input_is_a=input_mint==state["token_a_mint"],
+            effective_fee_ppm=evidence["effective_fee_ppm"],
+            fee_token_side=evidence["fee_token_side"])
+        native={"estimated_output_base_units":x["amount_out"],**x}
     elif venue=="pumpswap":
         from arb.pumpswap_quote import quote_exact_input
         if evidence.get("effective_fee_verified") is not True:

@@ -49,6 +49,11 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_signed_fee_break_even_haircut.py -v
       - name: Test exact signed-message RPC fee estimation without broadcast or paid-fee claim
         run: python3 -m unittest discover -s tests -p test_signed_message_fee_estimate.py -v
+      - name: Test Meteora DLMM bounded bin and DAMM v2 fee denomination models
+        run: |
+          python3 -m unittest discover -s tests -p test_meteora_dlmm_one_bin_quote.py -v
+          python3 -m unittest discover -s tests -p test_meteora_damm_v2_fee_quote.py -v
+          python3 -m unittest discover -s tests -p test_meteora_venue_quote_integration.py -v
       - name: Test independent venue quote adapters and same-slot fee and tick authentication
         run: |
           python3 -m unittest discover -s tests -p test_venue_quote_adapter.py -v
