@@ -43,7 +43,7 @@ def inspect(fixture,*,pool_filter=None):
             if not any(a["type"]=="tick_array" for a in record["decoded_auxiliary"]):
                 record["missing"].append("initialized_tick_array")
         elif venue=="meteora_dlmm":
-            from arb.meteora_dlmm_bin_preflight import BIN_ARRAY_DISC,BIN_ARRAY_SIZE
+            from arb.meteora_dlmm_bin_preflight import BIN_ARRAY_DISC,BIN_ARRAY_SIZE,bin_array_pda,active_bin_array_index
             from arb.meteora_dlmm import PROGRAM
             from arb.orca_whirlpool import b58
             for address in fixture["state_account_addresses"]:
@@ -53,10 +53,17 @@ def inspect(fixture,*,pool_filter=None):
                 if not isinstance(data,list) or len(data)!=2 or data[1]!="base64":continue
                 raw=base64.b64decode(data[0],validate=True)
                 if len(raw)>=56 and raw[:8]==BIN_ARRAY_DISC and b58(raw[24:56])==row["address"]:
+                    index=int.from_bytes(raw[8:16],"little",signed=True)
+                    if address!=bin_array_pda(row["address"],index):
+                        raise ValueError("DLMM source bin array has noncanonical PDA")
+                    if raw[16] not in (0,1,2):
+                        raise ValueError("DLMM bin array layout version unsupported")
                     record["decoded_auxiliary"].append({"type":"bin_array","account":address,
-                        "array_index":int.from_bytes(raw[8:16],"little",signed=True),
+                        "array_index":index,
+                        "contains_active_bin":index==active_bin_array_index(pool["active_id"]),
                         "array_size":BIN_ARRAY_SIZE})
-            if not any(a["type"]=="bin_array" for a in record["decoded_auxiliary"]):
+            if not any(a["type"]=="bin_array" and a["contains_active_bin"]
+                       for a in record["decoded_auxiliary"]):
                 record["missing"].append("active_bin_array")
             record["missing"].append("decoded_dynamic_fee_parameters")
         elif venue=="meteora_damm_v2":
