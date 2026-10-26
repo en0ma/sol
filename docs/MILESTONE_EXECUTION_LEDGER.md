@@ -14,6 +14,17 @@
 - [ ] **M5-E2E-03 — Isolated signed route verification.** Send eligible candidates through the *existing* generic signed Surfpool simulation and independent CPI/SPL/negative rollback acceptance; persist genuine attempts/acceptances/rejections and safe flags. Preserve historical proofs separately; do not broadcast.
 - [ ] **M5-E2E-04 — Repeatable operating entry point and regression CI.** Make the end-to-end process runnable from a documented command/workflow with machine-readable evidence; test incomplete venues, stale state, unconvertible costs, empty candidates, simulated failures and all safety gates. Inspect CI jobs/artifacts at the exact pushed SHA before claiming an accepted milestone.
 
+## M5-E2E — Integrated signed research runner checkpoint (2026-10-26)
+
+The `arb/m5_seven_venue_route_scan.py` entry point now composes existing read-only seven-venue authenticated pool probing and route graph construction with the **already built** `source_batch` source-triangle fixture exporter and `offline_batch` signed Surfpool execution/parity/economics/evidence rollup. Invocation modes are explicit and independently auditable:
+
+```sh
+python3 -m arb.m5_seven_venue_route_scan --rpc http://127.0.0.1:8899 --registry arb/pool_registry.json --output /tmp/m5-discovery.json
+SURFPOOL_EXPLICITLY_OFFLINE=1 python3 -m arb.m5_seven_venue_route_scan --rpc http://127.0.0.1:8899 --registry arb/pool_registry.json --source-dir /tmp/m5-fixtures --signed-dir /tmp/m5-signed --observed-unix "$(date +%s)" --output /tmp/m5-run.json
+```
+
+Requires an **already running isolated local mainnet-backed Surfpool fork**; this interface does not start/fund a live trading wallet or broadcast. The signed stage uses existing true signed three-distinct-venue source candidates, not a fabricated or pre-ranked graph candidate: graph topology and signed sample/economic evidence remain separate fields. No current live discovery totals, signed experiment results or profitable opportunities are established just by adding this command. The offline gate is mandatory for source export and signed trials. CI includes unit/integration control-plane tests; fresh actual run artifacts are required before completing M5-E2E-02/03. Next: capture real source-run artifacts, then attach source-verified multi-venue quoting/cost ranking to the candidate graph so selected opportunities (not only independent signed triangles) reach simulation.
+
 ## Rules that stop duplicate work
 
 - **Inspect existing implementation and latest CI artifact before opening a work item.** "Not fully validated" does not mean "not implemented".

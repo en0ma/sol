@@ -255,6 +255,11 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_authenticated_quote_provider.py -v
       - name: Test isolated authenticated market-state registry and common quote evidence boundary
         run: python3 -m unittest discover -s tests -p test_market_state_and_quote_contract.py -v
+      - name: Test M5 seven-venue discovery through source export and isolated signed Surfpool batch
+        run: |
+          python3 -m py_compile arb/m5_seven_venue_route_scan.py arb/m5_distinct_venue_coverage_batch.py
+          python3 -m unittest discover -s tests -p test_m5_seven_venue_route_scan.py -v
+          python3 -m unittest discover -s tests -p test_m5_research_full_fork_flow.py -v
       - name: Test agreed discovery-to-verification research engine orchestration
         run: python3 -m unittest discover -s tests -p test_research_engine_pipeline.py -v
       - name: Test M5 conservative observed quote route integration
