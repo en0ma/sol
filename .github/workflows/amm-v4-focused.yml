@@ -54,6 +54,8 @@ jobs:
       - name: Compile four-venue manifest-owned auxiliary fee and liquidity extraction
         run: |
           python3 -m py_compile arb/fixture_native_aux_inventory.py arb/fixture_all_venue_signed_quotes.py arb/m5_distinct_venue_coverage_batch.py
+      - name: Test seven venue price evidence anti-forgery and source safety
+        run: python3 -m unittest discover -s tests -p test_seven_venue_evidence_integrity.py -v
       - name: Test seven-venue signed-fork source parity matrix and exact integer accounting
         run: |
           python3 -m py_compile arb/seven_venue_signed_parity_gate.py arb/m5_distinct_venue_coverage_batch.py
