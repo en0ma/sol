@@ -36,10 +36,12 @@ def source_batch(rpc,readiness,directory,*,maximum=4):
     (root/"summary.json").write_text(json.dumps(report,indent=2)+"\n")
     return report
 
-def offline_batch(rpc,fixtures,directory,*,observed_unix):
+def offline_batch(rpc,fixtures,directory,*,observed_unix,fee_observations=None):
     root=Path(directory);root.mkdir(parents=True,exist_ok=True)
     src=Path(fixtures)
     listing=json.loads((src/"summary.json").read_text())
+    if fee_observations is not None and not isinstance(fee_observations,dict):
+        raise ValueError("fee observations must be keyed by route index")
     rows=[]
     parity_reports=[]
     economics_reports=[]
@@ -61,7 +63,8 @@ def offline_batch(rpc,fixtures,directory,*,observed_unix):
             parity=compare(fixture,result,observed_unix=observed_unix)
             # Simulation does not yield an independently assessed fee or
             # authenticated SOL→start-mint conversion; report the actual blocker.
-            economics=evaluate_economics(fixture,result)
+            observation=(fee_observations or {}).get(str(row["index"]))
+            economics=evaluate_economics(fixture,result,fee_observation=observation)
             evidence=evidence_gate(fixture,result,parity,economics)
         except (ValueError,TypeError,KeyError,RuntimeError) as exc:
             result["acceptance_error"]=str(exc)[:240]
@@ -103,6 +106,7 @@ def main():
     parser.add_argument("--output-dir",required=True)
     parser.add_argument("--maximum",type=int,default=4)
     parser.add_argument("--observed-unix",type=int)
+    parser.add_argument("--fee-observations")
     a=parser.parse_args()
     if not 1<=a.maximum<=12:parser.error("maximum must be 1-12")
     if a.mode=="source":
@@ -110,6 +114,8 @@ def main():
         result=source_batch(a.rpc,json.loads(Path(a.readiness).read_text()),a.output_dir,maximum=a.maximum)
     else:
         if not a.fixtures or a.observed_unix is None:parser.error("offline fixtures and observation timestamp required")
-        result=offline_batch(a.rpc,a.fixtures,a.output_dir,observed_unix=a.observed_unix)
+        observation_map=json.loads(Path(a.fee_observations).read_text()) if a.fee_observations else None
+        result=offline_batch(a.rpc,a.fixtures,a.output_dir,
+            observed_unix=a.observed_unix,fee_observations=observation_map)
     print(json.dumps(result))
 if __name__=="__main__":main()

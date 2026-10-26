@@ -40,6 +40,10 @@ jobs:
         run: |
           python3 -m unittest discover -s tests -p test_m5_three_venue_coverage_acceptance.py -v
           python3 -m unittest discover -s tests -p test_m5_three_venue_observed_economics.py -v
+      - name: Test signed-quote integer precision and independent fee provenance
+        run: |
+          python3 -m unittest discover -s tests -p test_signed_quote_integer_precision.py -v
+          python3 -m unittest discover -s tests -p test_signed_fee_provenance_economics.py -v
       - name: Test source-exact quote and observed fee/economics fail-closed gates
         run: python3 -m unittest discover -s tests -p test_m5_source_quote_economic_gate.py -v
       - name: Test signed route breadth, actual pricing gap and economic risk aggregation
