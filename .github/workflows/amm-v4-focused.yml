@@ -115,6 +115,10 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_m5_source_quote_economic_gate.py -v
       - name: Test signed route breadth, actual pricing gap and economic risk aggregation
         run: python3 -m unittest discover -s tests -p test_m5_research_evidence_rollup.py -v
+      - name: Test isolated native pricing account evidence across four venues
+        run: |
+          python3 -m py_compile arb/fixture_native_aux_inventory.py arb/m5_distinct_venue_coverage_batch.py
+          python3 -m unittest discover -s tests -p test_native_aux_isolation.py -v
       - name: Compile signed source experiment isolation and artifact emission
         run: python3 -m py_compile arb/m5_distinct_venue_coverage_batch.py arb/fixture_native_aux_inventory.py
       - name: Test multiple real three-venue source/receipt batch accounting
