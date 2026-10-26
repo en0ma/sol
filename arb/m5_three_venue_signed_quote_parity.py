@@ -63,8 +63,17 @@ def compare(fixture,receipt,*,observed_unix):
             if venues[i]=="raydium_cpmm":
                 leg={"venue":venues[i],"pool":pools[i],"input_mint":mints[i],
                      "output_mint":mints[i+1]}
-                q=quote_cpmm_only(fixture,observed_unix=observed_unix,
-                                  leg=leg,amount_in=amounts[i])["quote"]
+                cpmm_result=quote_cpmm_only(fixture,observed_unix=observed_unix,
+                                  leg=leg,amount_in=amounts[i])
+                q=cpmm_result["quote"]
+                interval=cpmm_result.get("native_fee_rounding_reference",{}).get(
+                    "output_interval_base_units")
+                if (isinstance(interval,list) and len(interval)==2
+                        and all(type(v) is int and v>=0 for v in interval)
+                        and interval[0]<=interval[1]):
+                    row["cpmm_source_fee_rounding_output_interval_base_units"]=interval
+                    row["signed_output_inside_cpmm_fee_rounding_interval"]=(
+                        interval[0]<=received<=interval[1])
             elif venues[i]=="raydium_amm_v4":
                 native_result=quote_from_fixture(fixture,pool=pools[i],input_mint=mints[i],
                     amount_in=amounts[i],observed_unix=observed_unix)
@@ -125,6 +134,9 @@ def compare(fixture,receipt,*,observed_unix):
         r.get("signed_quote_exact_integer_match") is True for r in result["leg_comparisons"])
     result["native_fraction_fee_rounding_uncertainty_input_units"]=sum(
         r.get("native_fee_rounding_uncertainty_input_units",0)
+        for r in result["leg_comparisons"])
+    result["cpmm_source_fee_rounding_signed_legs_compared"]=sum(
+        r.get("signed_output_inside_cpmm_fee_rounding_interval") is not None
         for r in result["leg_comparisons"])
     result["native_fraction_signed_legs_compared"]=sum(
         r.get("native_fee_fraction_authenticated_quote") is True
