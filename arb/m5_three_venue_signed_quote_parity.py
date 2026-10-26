@@ -87,9 +87,14 @@ def compare(fixture,receipt,*,observed_unix):
     result["signed_route_output_base_units"]=after[3]-before[3]
     result["quoted_leg_count"]=sum(r["quoted_output_base_units"] is not None for r in result["leg_comparisons"])
     result["blocked_leg_count"]=len(result["leg_comparisons"])-result["quoted_leg_count"]
+    result["minimum_observed_deviation_bps"]=min(
+        (r["deviation_bps"] for r in result["leg_comparisons"] if r["deviation_bps"] is not None),
+        default=None)
     result["maximum_observed_deviation_bps"]=max(
         (r["deviation_bps"] for r in result["leg_comparisons"] if r["deviation_bps"] is not None),
         default=None)
+    result["exact_integer_indicative_matches"]=sum(
+        r["deviation_bps"]==0 for r in result["leg_comparisons"])
     result["status"]="SIGNED_EXECUTION_WITH_PER_LEG_PARITY_DIAGNOSTICS"
     return result
 

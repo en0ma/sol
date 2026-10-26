@@ -22,6 +22,7 @@ def summarize(source_summary, signed_summary, parity_reports, economics_reports)
     quote_status=Counter()
     priced=0
     compared=0
+    exact_diagnostic_matches=0
     for report in parity_reports:
         if not isinstance(report,dict) or report.get("signed_execution_accepted") is not True:
             continue
@@ -31,6 +32,8 @@ def summarize(source_summary, signed_summary, parity_reports, economics_reports)
             compared+=1
             if leg.get("quoted_output_base_units") is not None:
                 priced+=1
+                if leg.get("deviation_bps")==0:
+                    exact_diagnostic_matches+=1
             else:
                 quote_status[str(leg.get("reason") or "UNSPECIFIED_QUOTE_BLOCKER").split(":")[0]]+=1
     gross=[]
@@ -49,6 +52,7 @@ def summarize(source_summary, signed_summary, parity_reports, economics_reports)
             "attempted_route_count":signed_summary.get("attempted"),
             "signed_quote_leg_count":compared,
             "indicative_priced_legs":priced,
+            "exact_integer_indicative_matches_not_proof":exact_diagnostic_matches,
             "missing_quote_leg_reasons":dict(quote_status),
             "signed_gross_start_mint_deltas":gross,
             "cost_blocker_counts":dict(economic_blockers),

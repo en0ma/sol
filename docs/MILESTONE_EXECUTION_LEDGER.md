@@ -65,6 +65,10 @@ Added a per-signed-route source-pricing/economics gate that requires all three q
 
 Following CI #118's independent three-triple CPI/rollback evidence and successful full CI #121, the focused CI's multi-route acceptance threshold now requires **three unique distinct venue triples**, not two. The per-route independent signed acceptance still verifies source pools, SPL CPI and last-hop rollback before a venue triple counts. The eight-source-candidate bound remains a discovery budget, not evidence of eight successful routes. New CI must prove the expanded minimum again.
 
+## M5-B01/C02 — Expand source trial breadth and measure parity without claiming provenance
+
+Increased the genuine source-authenticated distinct-triple CI exploration bound to ten candidates; independent signed CPI/rollback gate still requires at least three unique successful venue triples and does not count attempted candidates. Signed-input quote diagnostic now reports minimum/maximum observed deviations and exact integer matches across computed directional quotes, with explicit **indicative-not-validated** language; rollup separates these diagnostic matches from the zero independently source-validated quote samples. This provides directly measurable errors using real execution amounts, not fabricated source pricing.
+
 ## M5-C03 — Native wrapped-SOL denomination is an exact start-mint conversion
 
 The observed signed route economics function now recognizes an authenticated starting mint equal to the native wrapped-SOL mint and uses the exact SPL lamports-per-SOL unit equivalence, **not an inferred exchange rate**. When a separately observed lamport transaction fee is supplied, the cost can be converted exactly into WSOL base units without an external price oracle. Contradictory supplied conversion rates fail closed. For non-WSOL starting mints, an authenticated price conversion remains mandatory. Isolated Surfpool does not produce evidence of paid fees; offline batch leaves that input missing and still blocks actual net profitability.
