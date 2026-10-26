@@ -259,6 +259,10 @@ jobs:
         run: |
           python3 -m py_compile arb/m5_source_triangle_quote_ranking.py arb/m5_seven_venue_route_scan.py
           python3 -m unittest discover -s tests -p test_m5_source_triangle_quote_ranking.py -v
+      - name: Test bounded multi-size native source candidate sweep
+        run: |
+          python3 -m py_compile arb/m5_source_trade_size_sweep.py
+          python3 -m unittest discover -s tests -p test_m5_source_trade_size_sweep.py -v
       - name: Test source-native quote ranking joined to real signed acceptance artifacts
         run: |
           python3 -m py_compile arb/m5_existing_source_research.py
@@ -346,6 +350,19 @@ jobs:
       - name: Export diverse distinct-venue source triangle fixture batch
         run: |
           python3 -m arb.m5_distinct_venue_coverage_batch --mode source --readiness "$RUNNER_TEMP/amm-v4-ready.json" --output-dir "$RUNNER_TEMP/three-venue-source-batch" --maximum 10
+      - name: Produce actual multi-size native quote opportunity discovery evidence
+        run: |
+          python3 -m arb.m5_source_trade_size_sweep \
+            --source-dir "$RUNNER_TEMP/three-venue-source-batch" \
+            --sizes 10000,100000,1000000 \
+            --observed-unix "$(date +%s)" \
+            --output "$RUNNER_TEMP/m5-multi-size-source-opportunity-evidence.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: m5-multi-size-source-opportunity-evidence
+          path: ${{ runner.temp }}/m5-multi-size-source-opportunity-evidence.json
+          if-no-files-found: warn
       - name: Export twelve authenticated AMM v4 fixtures only
         run: |
           python3 -m arb.next_ten_pair_fixture_export --batch remaining --only-venue raydium_amm_v4 --readiness "$RUNNER_TEMP/amm-v4-ready.json" --output-dir "$RUNNER_TEMP/amm-v4-fixtures"
