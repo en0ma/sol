@@ -10,6 +10,7 @@ from arb.next_ten_signed_atomic_offline import run_three_venue
 from arb.m5_three_distinct_venue_signed_acceptance import verify as accept
 from arb.m5_three_venue_signed_quote_parity import compare
 from arb.venue_signed_quote_experiments import measure as measure_signed_quote
+from arb.seven_venue_signed_parity_gate import summarize as seven_venue_parity
 from arb.fixture_native_aux_inventory import inspect_isolated as inspect_native_aux
 from arb.m5_three_venue_observed_economics import evaluate as evaluate_economics
 from arb.m5_research_evidence_rollup import summarize as rollup
@@ -155,6 +156,11 @@ def offline_batch(rpc,fixtures,directory,*,observed_unix,fee_observations=None):
     (root/"native-aux-coverage.json").write_text(json.dumps(
         {"source_pool_observations":auxiliary_evidence,
          "coverage_by_venue":per_venue_aux,**SAFE},indent=2)+"\n")
+    seven=seven_venue_parity(experimental_samples)
+    report["seven_venue_signed_price_status"]=seven["status"]
+    report["seven_venue_signed_price_coverage"]=seven["venue_coverage_count"]
+    (root/"seven-venue-signed-parity.json").write_text(
+        json.dumps(seven,indent=2)+"\n")
     evidence=rollup(listing,report,parity_reports,economics_reports)
     (root/"evidence-rollup.json").write_text(json.dumps(evidence,indent=2)+"\n")
     (root/"summary.json").write_text(json.dumps(report,indent=2)+"\n")
