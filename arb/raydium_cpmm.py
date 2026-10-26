@@ -32,6 +32,12 @@ def decode(raw):
         "auth_bump":raw[328],"status":raw[329],
         "mint_0_decimals":raw[331],"mint_1_decimals":raw[332],
         "swap_enabled":not bool(raw[329]&4),
+        "protocol_fees_token_0":int.from_bytes(raw[341:349],"little"),
+        "protocol_fees_token_1":int.from_bytes(raw[349:357],"little"),
+        "fund_fees_token_0":int.from_bytes(raw[357:365],"little"),
+        "fund_fees_token_1":int.from_bytes(raw[365:373],"little"),
+        "creator_fees_token_0":int.from_bytes(raw[397:405],"little"),
+        "creator_fees_token_1":int.from_bytes(raw[405:413],"little"),
         "creator_fee_on":raw[389],
         "enable_creator_fee":bool(raw[390])}
 
