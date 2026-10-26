@@ -48,6 +48,7 @@ def offline_batch(rpc,fixtures,directory,*,observed_unix,fee_observations=None):
     parity_reports=[]
     economics_reports=[]
     experimental_samples=[]
+    auxiliary_evidence=[]
     for row in listing["routes"]:
         if row["status"]!="AUTHENTICATED_THREE_VENUE_SOURCE_FIXTURE":
             rows.append({"index":row["index"],"status":"SOURCE_FIXTURE_BLOCKED",**SAFE})
@@ -73,6 +74,7 @@ def offline_batch(rpc,fixtures,directory,*,observed_unix,fee_observations=None):
                     "reason":str(auxiliary_error)[:240],**SAFE}
             (root/("native-aux-%02d.json"%row["index"])).write_text(
                 json.dumps(native_aux,indent=2)+"\n")
+            auxiliary_evidence.extend(native_aux.get("venues",[]))
             parity=compare(fixture,result,observed_unix=observed_unix)
             try:
                 experiment=measure_signed_quote(
@@ -139,6 +141,20 @@ def offline_batch(rpc,fixtures,directory,*,observed_unix,fee_observations=None):
     report["signed_price_evidence_by_venue"]=by_venue
     (root/"signed-price-experiments.json").write_text(json.dumps(
         {"samples":experimental_samples,"by_venue":by_venue,**SAFE},indent=2)+"\n")
+    per_venue_aux={}
+    for item in auxiliary_evidence:
+        venue=item["venue"]
+        summary=per_venue_aux.setdefault(venue,{"pools":0,"fully_priced":0,
+                                                   "blocked":0,"missing":{}})
+        summary["pools"]+=1
+        if item.get("fully_priced") is True:summary["fully_priced"]+=1
+        else:summary["blocked"]+=1
+        for missing in item.get("missing",[]):
+            summary["missing"][missing]=summary["missing"].get(missing,0)+1
+    report["native_auxiliary_coverage_by_venue"]=per_venue_aux
+    (root/"native-aux-coverage.json").write_text(json.dumps(
+        {"source_pool_observations":auxiliary_evidence,
+         "coverage_by_venue":per_venue_aux,**SAFE},indent=2)+"\n")
     evidence=rollup(listing,report,parity_reports,economics_reports)
     (root/"evidence-rollup.json").write_text(json.dumps(evidence,indent=2)+"\n")
     (root/"summary.json").write_text(json.dumps(report,indent=2)+"\n")
