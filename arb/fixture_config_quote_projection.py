@@ -51,8 +51,14 @@ def derive(fixture,*,observed_unix):
             elif effective is not None:
                 raise ValueError("unverified effective fee cannot be projected")
             if venue=="raydium_cpmm":
-                row["cpmm_effective_reserves_base_units"]=effective_reserves(
-                    item["decoded_pool_state"],fundamentals["vault_base_units"])
+                # Legacy synthetic projection tests may omit fee liabilities.
+                # Never silently use unadjusted vaults in creator-fee quoting.
+                fee_state=item["decoded_pool_state"]
+                fee_keys=[f"{name}_token_{i}" for i in (0,1)
+                          for name in ("protocol_fees","fund_fees","creator_fees")]
+                row["cpmm_effective_reserves_base_units"]=(
+                    effective_reserves(fee_state,fundamentals["vault_base_units"])
+                    if all(key in fee_state for key in fee_keys) else None)
                 row["native_trade_fee_ppm"]=fee.get("trade_fee_ppm")
                 row["native_creator_fee_ppm"]=fee.get("creator_fee_ppm")
                 row["creator_fee_enabled"]=fee.get("creator_fee_enabled")
