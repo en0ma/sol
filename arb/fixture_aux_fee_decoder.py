@@ -44,6 +44,8 @@ def decode_native_config_fee(venue,state,fixture):
         return {"venue":venue,"config_address":address,
             "trade_fee_ppm":cfg["trade_fee_rate_ppm"],
             "creator_fee_ppm":cfg["creator_fee_rate_ppm"],
+            "creator_fee_enabled":state.get("enable_creator_fee"),
+            "creator_fee_on":state.get("creator_fee_on"),
             "trade_fee_authenticated":True,
             "total_effective_fee_authenticated":cfg["creator_fee_rate_ppm"]==0,
             "effective_quote_fee_ppm":cfg["trade_fee_rate_ppm"] if cfg["creator_fee_rate_ppm"]==0 else None,
