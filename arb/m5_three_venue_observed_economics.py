@@ -12,7 +12,8 @@ WRAPPED_SOL_MINT="So11111111111111111111111111111111111111112"
 
 def evaluate(fixture,receipt,*,observed_fee_lamports=None,
              start_mint_base_units_per_sol=None,conversion_authenticated=False,
-             downside_bps=(0,50,100,250)):
+             downside_bps=(0,50,100,250),
+             fee_observation=None):
     report={"status":"COST_EVIDENCE_BLOCKED","gross_output_base_units":None,
             "gross_delta_start_mint_base_units":None,
             "net_delta_start_mint_base_units":None,"fee_start_mint_base_units":None,
@@ -55,6 +56,22 @@ def evaluate(fixture,receipt,*,observed_fee_lamports=None,
         "gross_delta_start_mint_base_units":output*(10_000-n)//10_000-spent[0],
         "maximum_affordable_total_cost_start_mint_base_units":max(0,output*(10_000-n)//10_000-spent[0]),
         "net_delta_start_mint_base_units":None} for n in downside_bps]
+    if fee_observation is not None:
+        if (not isinstance(fee_observation,dict)
+                or fee_observation.get("kind")!="INDEPENDENT_OBSERVED_TRANSACTION_FEE"
+                or fee_observation.get("source") not in ("getTransaction", "getFeeForMessage")
+                or type(fee_observation.get("lamports")) is not int
+                or fee_observation["lamports"]<0
+                or not isinstance(fee_observation.get("signature_or_message_hash"),str)
+                or not fee_observation["signature_or_message_hash"]):
+            report["reason"]="INDEPENDENT_FEE_OBSERVATION_INVALID"
+            return report
+        if (observed_fee_lamports is not None
+                and observed_fee_lamports!=fee_observation["lamports"]):
+            report["reason"]="INDEPENDENT_FEE_OBSERVATION_CONFLICT"
+            return report
+        observed_fee_lamports=fee_observation["lamports"]
+        report["observed_fee_provenance"]=dict(fee_observation)
     if (type(observed_fee_lamports)is not int or observed_fee_lamports<0):
         report["reason"]="OBSERVED_TRANSACTION_FEE_LAMPORTS_MISSING"
         return report
@@ -79,13 +96,15 @@ def evaluate(fixture,receipt,*,observed_fee_lamports=None,
     fee=(observed_fee_lamports*start_mint_base_units_per_sol+
          LAMPORTS_PER_SOL-1)//LAMPORTS_PER_SOL
     report["fee_start_mint_base_units"]=fee
-    report["fee_source_verified"]=True
+    report["fee_source_verified"]=fee_observation is not None
     report["conversion_authenticated"]=True
     report["net_delta_start_mint_base_units"]=output-spent[0]-fee
     report["downside_scenarios"]=[{**scenario,
         "net_delta_start_mint_base_units":scenario["gross_delta_start_mint_base_units"]-fee}
         for scenario in report["downside_scenarios"]]
-    report["status"]="COST_OBSERVATIONS_ACCOUNTED_SIMULATION_ONLY"
+    report["status"]=("COST_OBSERVATIONS_ACCOUNTED_SIMULATION_ONLY"
+                      if fee_observation is not None else
+                      "COST_SCENARIO_WITH_UNVERIFIED_FEE_INPUT")
     # Fee claims and pricing input provenance are not independent economic
     # verification even when manually supplied; never approve a trade.
     return report
