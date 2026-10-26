@@ -40,6 +40,12 @@ jobs:
         run: |
           python3 -m unittest discover -s tests -p test_m5_three_venue_coverage_acceptance.py -v
           python3 -m unittest discover -s tests -p test_m5_three_venue_observed_economics.py -v
+      - name: Test exact signed-message RPC fee estimation without broadcast or paid-fee claim
+        run: python3 -m unittest discover -s tests -p test_signed_message_fee_estimate.py -v
+      - name: Test AMM v4 native fractional fee quoting and authentication
+        run: |
+          python3 -m unittest discover -s tests -p test_ammv4_native_fraction_quote.py -v
+          python3 -m unittest discover -s tests -p test_ammv4_nonppm_source_quote.py -v
       - name: Test signed-quote integer precision and independent fee provenance
         run: |
           python3 -m unittest discover -s tests -p test_signed_quote_integer_precision.py -v

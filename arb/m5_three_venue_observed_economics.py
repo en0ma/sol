@@ -40,6 +40,13 @@ def evaluate(fixture,receipt,*,observed_fee_lamports=None,
         report["reason"]="POSITIVE_TERMINAL_OUTPUT_MISSING"
         return report
     report["observed_positive_compute_units"]=receipt.get("positive_units_consumed")
+    estimate=receipt.get("signed_message_fee_estimate")
+    if isinstance(estimate,dict) and estimate.get("status")=="SIGNED_MESSAGE_FEE_ESTIMATE_ONLY":
+        fee=estimate.get("estimated_fee_lamports")
+        if type(fee)is int and fee>=0:
+            report["exact_signed_message_fee_estimate_lamports"]=fee
+            report["exact_signed_message_fee_sha256"]=estimate.get("signed_message_sha256")
+            report["estimated_fee_paid"]=False
     report["gross_output_base_units"]=output
     report["gross_delta_start_mint_base_units"]=output-spent[0]
     # Break-even is an observable upper bound on *total* fees/slippage

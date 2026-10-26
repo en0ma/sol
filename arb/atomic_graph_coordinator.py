@@ -400,10 +400,13 @@ def simulate_adaptive_n_leg_offline(rpc, legs, tokens, states, evidence, owner,
     programs=[PROGRAMS[leg["venue"]] for leg in legs]
     tx,lookup,order=sign_adaptive_n_leg_offline(
         rpc,planned["instructions"],signer,programs=programs,intermediates=accounts[1:-1])
+    from arb.m5_signed_message_fee_estimate import estimate_signed_message_fee
+    estimate=estimate_signed_message_fee(rpc,tx)
     positive,packet=_simulate(rpc,tx,accounts)
     receipt={"status":"UNVERIFIED","legs":n,"planned_inputs":planned["amounts"],
              "initial_balances_base_units":list(before),
              "signed_packet_bytes":packet,"positive_error":str(positive.get("err")),
+             "signed_message_fee_estimate":estimate,
              "signed_cpi_per_leg_verified":False,"rollback_failure_case_verified":False,
              "signed_atomic_simulation_verified":False,"quote_accuracy_verified":False,
              "actionable":False,"live_execution_approved":False,"broadcast":False}
