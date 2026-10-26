@@ -36,6 +36,9 @@ def run_cycle_pipeline(snapshot, *, now, quote_provider, cost_provider,
     registry=authenticated_registry(snapshot,now=now,max_age=max_age)
     graph=cycles(registry["pools"],max_cycles=max_cycles) if registry["pools"] else []
     rows=[]
+    metrics={"quote_attempted":0,"quote_blocked":0,"cost_screened":0,
+             "cost_blocked":0,"signed_attempted":0,"signed_accepted":0,
+             "signed_rejected":0,"signed_unavailable":0}
     for route in graph:
         edges=[{"venue":leg["venue"],"pool":leg["pool"],
                 "input_mint":leg["input"],"output_mint":leg["output"]}
@@ -43,6 +46,7 @@ def run_cycle_pipeline(snapshot, *, now, quote_provider, cost_provider,
         candidate={"start_mint":route["start_mint"],"legs":edges}
         quotes=[];reason=None
         for leg in edges:
+            metrics["quote_attempted"]+=1
             try:
                 q=quote_provider(leg,quotes[-1]["amount_out"] if quotes else initial_input)
                 if not isinstance(q,dict) or any(q.get(k)!=leg[k] for k in leg):
@@ -54,30 +58,51 @@ def run_cycle_pipeline(snapshot, *, now, quote_provider, cost_provider,
                 reason="quote unavailable: "+str(exc)[:200]
                 break
         if reason:
+            metrics["quote_blocked"]+=1
             rows.append({"route":candidate,"status":"UNASSESSABLE",
                          "reason_codes":[reason],**SAFETY})
             continue
         try:
+            metrics["cost_screened"]+=1
             costs=cost_provider(candidate,quotes)
             evaluation=screen(candidate,quotes,costs,now=now,max_age=max_age)
         except (ValueError,KeyError,TypeError) as exc:
             evaluation={"status":"UNASSESSABLE","reason_codes":["research screening failed: "+str(exc)[:200]],
                         "conservative_net_start_mint_units":None,**SAFETY}
+        if evaluation["status"]=="UNASSESSABLE":
+            metrics["cost_blocked"]+=1
         result={"route":candidate,"research":evaluation,"status":evaluation["status"],
                 "signed_simulation_verified":False,**SAFETY}
         if evaluation.get("status")=="RESEARCH_CANDIDATE_ONLY" and evaluation.get("positive_after_declared_costs"):
             # Distinct research and execution evidence: direct receipt must pass
             # the existing signed two-instruction assessor to qualify as proof.
             if len(edges)==2 and edges[0]["venue"]!=edges[1]["venue"] and callable(simulate_provider):
-                receipt=simulate_provider(candidate,quotes)
-                proof=assess((edges[0]["venue"],edges[1]["venue"]),receipt)
-                result["simulation_audit"]=proof
-                result["signed_simulation_verified"]=proof["status"]=="VERIFIED"
+                metrics["signed_attempted"]+=1
+                try:
+                    receipt=simulate_provider(candidate,quotes)
+                    proof=assess((edges[0]["venue"],edges[1]["venue"]),receipt)
+                    result["simulation_audit"]=proof
+                    result["signed_simulation_verified"]=proof["status"]=="VERIFIED"
+                    metrics["signed_accepted" if result["signed_simulation_verified"]
+                            else "signed_rejected"]+=1
+                except (ValueError,KeyError,TypeError) as exc:
+                    metrics["signed_rejected"]+=1
+                    metrics["signed_unavailable"]+=1
+                result["simulation_audit"]={"status":"UNVERIFIED",
+                        "failure_reasons":["signed simulation rejected: "+str(exc)[:160]]}
             else:
                 result["simulation_audit"]={"status":"UNVERIFIED",
                     "failure_reasons":["signed simulator unavailable or route not two distinct venues"]}
         rows.append(result)
-    return {"status":"RESEARCH_ONLY","initial_input_base_units":initial_input,"authenticated_pools":len(registry["pools"]),
+    ranked=sorted((r for r in rows if
+        r.get("research",{}).get("status")=="RESEARCH_CANDIDATE_ONLY"
+        and r["research"].get("positive_after_declared_costs") is True),
+        key=lambda r:r["research"]["conservative_net_start_mint_units"],
+        reverse=True)
+    return {"status":"RESEARCH_ONLY","metrics":metrics,
+            "ranked_research_candidates":ranked[:20],
+            "observed_profitable_opportunities":0,
+            "initial_input_base_units":initial_input,"authenticated_pools":len(registry["pools"]),
             "rejected_pools":registry["rejected"],"graph_cycles":len(graph),
             "screened_routes":len(rows),"research_positive":sum(
                 x.get("research",{}).get("positive_after_declared_costs") is True for x in rows),
