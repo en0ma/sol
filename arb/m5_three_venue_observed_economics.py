@@ -76,6 +76,22 @@ def evaluate(fixture,receipt,*,observed_fee_lamports=None,
         "gross_delta_start_mint_base_units":output*(10_000-n)//10_000-spent[0],
         "maximum_affordable_total_cost_start_mint_base_units":max(0,output*(10_000-n)//10_000-spent[0]),
         "net_delta_start_mint_base_units":None} for n in downside_bps]
+    # Explicit sensitivity for arbitrary start mints. A user-supplied conversion
+    # is not promoted to authenticated source evidence, even if the caller
+    # claims that it is; this is strictly a cost sensitivity scenario.
+    if (type(report.get("exact_signed_message_fee_estimate_lamports")) is int
+            and type(start_mint_base_units_per_sol) is int
+            and start_mint_base_units_per_sol>0):
+        quoted_lamports=report["exact_signed_message_fee_estimate_lamports"]
+        fee_converted=(quoted_lamports*start_mint_base_units_per_sol+
+            LAMPORTS_PER_SOL-1)//LAMPORTS_PER_SOL
+        report["external_fx_fee_sensitivity"]={
+            "conversion_base_units_per_sol":start_mint_base_units_per_sol,
+            "conversion_independently_authenticated":False,
+            "estimated_network_fee_in_start_mint_units":fee_converted,
+            "gross_profit_less_estimated_separate_sol_fee_start_mint_units":
+                output-spent[0]-fee_converted,
+            "not_paid_network_fee":True}
     # Fee-for-message is a read-only quote, not a settled payment.
     # In a WSOL-denominated closed route its base units map exactly to
     # lamports, so publish a separate estimated-cost scenario.
