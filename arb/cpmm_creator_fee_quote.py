@@ -29,3 +29,20 @@ def calculate(reserve_in,reserve_out,amount_in,trade_ppm,creator_ppm,mode,input_
             "creator_fee_base_units":creator_input+creator_output,
             "creator_fee_mint_side":"input" if side_input else "output",
             "protocol_exact_verified":False,"simulation_only":True}
+
+def effective_reserves(pool_state,vault_amounts):
+    """PoolState.vault_amount_without_fee: exclude accrued fee liabilities."""
+    if not isinstance(vault_amounts,list) or len(vault_amounts)!=2:
+        raise ValueError("two source vault amounts required")
+    out=[]
+    for i in (0,1):
+        vault=vault_amounts[i]
+        keys=[f"protocol_fees_token_{i}",f"fund_fees_token_{i}",
+              f"creator_fees_token_{i}"]
+        fees=[pool_state.get(k) for k in keys]
+        if type(vault)is not int or vault<=0 or any(type(n)is not int or n<0 for n in fees):
+            raise ValueError("accrued CPMM fee liabilities not authenticated")
+        net=vault-sum(fees)
+        if net<=0:raise ValueError("CPMM fees exhaust vault reserves")
+        out.append(net)
+    return out
