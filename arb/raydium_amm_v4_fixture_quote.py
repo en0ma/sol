@@ -59,5 +59,7 @@ def quote_from_fixture(fixture,*,pool,input_mint,amount_in,observed_unix):
     return {"status":"AMM_V4_ACCOUNT_DERIVED_INDICATIVE_QUOTE",
         "quote":quoted,"snapshot_slot":row["slot"],
         "native_fee_fraction_reference":native,
+        "integer_fee_rounding_quote_interval_base_units":
+            native["fee_rounding_output_interval_base_units"],
         "signed_swap_accuracy_verified":False,
         "source_rpc_provenance_independently_attested":False,**SAFE}

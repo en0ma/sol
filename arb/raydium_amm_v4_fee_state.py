@@ -38,7 +38,17 @@ def quote_native_fraction(reserves,mints,input_mint,amount_in,numerator,denomina
     output=reserves[1-i]*effective//(reserves[i]*denominator+effective)
     if not 0<output<reserves[1-i]:
         raise ValueError("AMM v4 native quote dust/empty pool")
+    fee_floor=amount_in*numerator//denominator
+    fee_ceil=(amount_in*numerator+denominator-1)//denominator
+    def cpmm_after_fee(fee):
+        adjusted=amount_in-fee
+        return reserves[1-i]*adjusted//(reserves[i]+adjusted)
+    floor_fee_output=cpmm_after_fee(fee_floor)
+    ceil_fee_output=cpmm_after_fee(fee_ceil)
     return {"amount_out":output,
+            "integer_fee_floor_quote_output":floor_fee_output,
+            "integer_fee_ceil_quote_output":ceil_fee_output,
+            "fee_rounding_output_interval_base_units":[ceil_fee_output,floor_fee_output],
             "fee_numerator":numerator,"fee_denominator":denominator,
             "fee_floor_input_units":amount_in*numerator//denominator,
             "fee_ceiling_input_units":(amount_in*numerator+denominator-1)//denominator}

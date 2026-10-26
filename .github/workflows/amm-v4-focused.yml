@@ -49,6 +49,11 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_signed_fee_break_even_haircut.py -v
       - name: Test exact signed-message RPC fee estimation without broadcast or paid-fee claim
         run: python3 -m unittest discover -s tests -p test_signed_message_fee_estimate.py -v
+      - name: Test native AMM v4 floor/ceiling fee output interval and non-WSOL economics
+        run: |
+          python3 -m unittest discover -s tests -p test_ammv4_native_fee_output_interval.py -v
+          python3 -m unittest discover -s tests -p test_nonwsol_fee_sensitivity.py -v
+          python3 -m unittest discover -s tests -p test_invalid_signed_message_fee_rejection.py -v
       - name: Test AMM v4 native fractional fee quoting and authentication
         run: |
           python3 -m unittest discover -s tests -p test_ammv4_native_fraction_quote.py -v

@@ -76,6 +76,13 @@ def compare(fixture,receipt,*,observed_unix):
                     row["native_fee_floor_input_units"]=fee_state.get("fee_floor_input_units")
                     row["native_fee_ceiling_input_units"]=fee_state.get("fee_ceiling_input_units")
                     row["native_adjusted_reserve_model"]=q.get("quote_model")
+                    interval=fee_state.get("fee_rounding_output_interval_base_units")
+                    if (isinstance(interval,list) and len(interval)==2
+                            and all(type(v)is int and v>=0 for v in interval)
+                            and interval[0]<=interval[1]):
+                        row["native_fee_rounding_output_interval_base_units"]=interval
+                        row["observed_output_within_fee_rounding_interval"]=(
+                            interval[0]<=received<=interval[1])
                     row["native_fee_fraction_authenticated_quote"]=True
                     fee_min=fee_state.get("fee_floor_input_units")
                     fee_max=fee_state.get("fee_ceiling_input_units")
