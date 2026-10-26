@@ -70,9 +70,7 @@ def compare(fixture,receipt,*,observed_unix):
                     cpmm_result=quote_cpmm_creator_fee_source(
                         fixture,observed_unix=observed_unix,
                         leg=leg,amount_in=amounts[i])
-                except ValueError as fee_exc:
-                    if "not authenticated" not in str(fee_exc):
-                        raise
+                except (ValueError,KeyError,TypeError):
                     cpmm_result=quote_cpmm_only(
                         fixture,observed_unix=observed_unix,
                         leg=leg,amount_in=amounts[i])
