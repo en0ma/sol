@@ -24,6 +24,16 @@ class Tests(unittest.TestCase):
         self.assertEqual(r["downside_scenarios"][0]["net_delta_start_mint_base_units"],15)
         self.assertFalse(r["profitability_verified"])
         self.assertFalse(r["broadcast"])
+    @patch("arb.m5_three_venue_observed_economics.accept",return_value={})
+    def test_wrapped_sol_start_mint_uses_exact_lamport_denominator(self,_):
+        f={"route_mints":["So11111111111111111111111111111111111111112","B","C","So11111111111111111111111111111111111111112"]}
+        r=evaluate(f,self.receipt(),observed_fee_lamports=5)
+        self.assertEqual(r["fee_start_mint_base_units"],5)
+        self.assertEqual(r["net_delta_start_mint_base_units"],15)
+        self.assertEqual(r["conversion_basis"],"WRAPPED_SOL_LAMPORT_DENOMINATION")
+        self.assertFalse(r["profitability_verified"])
+        r=evaluate(f,self.receipt(),observed_fee_lamports=5,start_mint_base_units_per_sol=5,conversion_authenticated=True)
+        self.assertEqual(r["status"],"COST_EVIDENCE_BLOCKED")
     @patch("arb.m5_three_venue_observed_economics.accept",side_effect=ValueError("fake"))
     def test_unaccepted_signed_receipt_blocks(self,_):
         self.assertEqual(evaluate({},self.receipt())["status"],"COST_EVIDENCE_BLOCKED")

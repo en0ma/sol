@@ -8,6 +8,7 @@ net profitability. Everything remains simulation-only.
 from arb.m5_three_distinct_venue_signed_acceptance import verify as accept
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
 LAMPORTS_PER_SOL=1_000_000_000
+WRAPPED_SOL_MINT="So11111111111111111111111111111111111111112"
 
 def evaluate(fixture,receipt,*,observed_fee_lamports=None,
              start_mint_base_units_per_sol=None,conversion_authenticated=False,
@@ -60,6 +61,17 @@ def evaluate(fixture,receipt,*,observed_fee_lamports=None,
     report["observed_fee_lamports"]=observed_fee_lamports
     # Fee amount must come from a separate observed fee receipt. CU is *not*
     # a fee, and simulated atomic logs alone do not prove fee assessment.
+    start_mint=fixture.get("route_mints",[None])[0]
+    if start_mint==WRAPPED_SOL_MINT:
+        # Native wrapped SOL SPL base units are lamports by token definition.
+        # This is a deterministic denomination equivalence, not a market FX oracle.
+        if (start_mint_base_units_per_sol not in (None,LAMPORTS_PER_SOL)
+                or conversion_authenticated is False and start_mint_base_units_per_sol is not None):
+            report["reason"]="WRAPPED_SOL_CONVERSION_CONTRADICTS_MINT_DENOMINATION"
+            return report
+        start_mint_base_units_per_sol=LAMPORTS_PER_SOL
+        conversion_authenticated=True
+        report["conversion_basis"]="WRAPPED_SOL_LAMPORT_DENOMINATION"
     if (type(start_mint_base_units_per_sol)is not int or
             start_mint_base_units_per_sol<=0 or conversion_authenticated is not True):
         report["reason"]="START_MINT_SOL_CONVERSION_NOT_AUTHENTICATED"
