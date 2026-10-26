@@ -33,6 +33,12 @@ class Tests(unittest.TestCase):
                  return_value={"signed_execution_accepted":True,"independently_validated_quote_samples":0,"leg_comparisons":[]}):
                 report=offline_batch("http://127.0.0.1:8899",source,output,observed_unix=100)
             self.assertEqual(report["independent_signed_accepted"],1)
+            self.assertEqual(report["routes"][0]["price_measurement_status"],"PRICE_MEASUREMENT_BLOCKED")
+            self.assertTrue((Path(output)/"native-aux-00.json").exists())
+            self.assertTrue((Path(output)/"signed-price-experiment-00.json").exists())
+            pricing=json.loads((Path(output)/"signed-price-experiment-00.json").read_text())
+            self.assertEqual(pricing["observed_compared_samples"],0)
+            self.assertFalse(pricing["broadcast"])
             self.assertEqual(report["independently_validated_quote_samples"],0)
             self.assertEqual(len(report["routes"]),2)
 if __name__=="__main__":unittest.main()
