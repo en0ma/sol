@@ -73,7 +73,8 @@ def scan_local_fork(rpc, registry, *, max_cycles=200):
 
 
 def run_m5_research(rpc, registry, *, max_cycles=200, source_dir=None,
-                    signed_dir=None, observed_unix=None, maximum=4):
+                    signed_dir=None, observed_unix=None, maximum=4,
+                    quote_input=None):
     """One explicitly offline, existing-engine source -> signed evidence path.
 
     Signed triangles are independent source-backed candidate probes, NOT
@@ -84,6 +85,10 @@ def run_m5_research(rpc, registry, *, max_cycles=200, source_dir=None,
     if (signed_dir is not None and (source_dir is None
             or type(observed_unix) is not int or observed_unix < 0)):
         raise ValueError("signed validation requires fixtures and observation time")
+    if quote_input is not None and (type(quote_input) is not int
+            or not 0<quote_input<2**64 or source_dir is None
+            or type(observed_unix) is not int or observed_unix<0):
+        raise ValueError("source quote ranking requires fixtures, amount and time")
     if type(maximum) is not int or not 1 <= maximum <= 12:
         raise ValueError("bounded three-venue trial count required")
     if (source_dir is not None or signed_dir is not None) and (
@@ -97,6 +102,7 @@ def run_m5_research(rpc, registry, *, max_cycles=200, source_dir=None,
     report["independently_signed_triangles_accepted"] = 0
     report["protocol_exact_quote_samples"] = 0
     report["source_triangles"] = {"status": "NOT_REQUESTED"}
+    report["source_quote_ranking"] = {"status": "NOT_REQUESTED"}
     report["signed_triangles"] = {"status": "NOT_REQUESTED"}
     if source_dir is not None:
         from arb.m5_distinct_venue_coverage_batch import source_batch
@@ -104,6 +110,23 @@ def run_m5_research(rpc, registry, *, max_cycles=200, source_dir=None,
         report["source_triangles"] = exported
         report["signed_triangle_source_attempts"] = exported["attempted"]
         report["signed_triangle_source_exported"] = exported["exported"]
+        if quote_input is not None:
+            from arb.m5_source_triangle_quote_ranking import rank
+            root = Path(source_dir)
+            fixtures = []
+            mapping = []
+            for row in exported["routes"]:
+                if row["status"] != "AUTHENTICATED_THREE_VENUE_SOURCE_FIXTURE":
+                    continue
+                fixtures.append(json.loads((root / row["fixture"]).read_text()))
+                mapping.append(row["index"])
+            ranking = rank(fixtures,amount_in=quote_input,
+                           observed_unix=observed_unix,maximum=maximum)
+            for line in ranking["all_results"]:
+                line["source_batch_route_index"] = mapping[line["index"]]
+            report["source_quote_ranking"] = ranking
+            report["quoted_candidates"] = ranking["fully_quoted"]
+            report["gross_positive_source_quote_routes"] = ranking["positive_gross"]
     if signed_dir is not None:
         from arb.m5_distinct_venue_coverage_batch import offline_batch
         signed = offline_batch(rpc, source_dir, signed_dir,
@@ -124,13 +147,15 @@ def main():
     parser.add_argument("--signed-dir")
     parser.add_argument("--observed-unix", type=int)
     parser.add_argument("--maximum", type=int, default=4)
+    parser.add_argument("--quote-input", type=int)
     args = parser.parse_args()
     if not 1 <= args.max_cycles <= 2000:
         parser.error("bounded maximum cycles must be 1..2000")
     registry = json.loads(Path(args.registry).read_text())
     report = run_m5_research(args.rpc, registry, max_cycles=args.max_cycles,
         source_dir=args.source_dir, signed_dir=args.signed_dir,
-        observed_unix=args.observed_unix, maximum=args.maximum)
+        observed_unix=args.observed_unix, maximum=args.maximum,
+        quote_input=args.quote_input)
     Path(args.output).write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
     print(json.dumps({key: report[key] for key in (
         "status", "venue_coverage", "authenticated_pool_count", "connected_cycles",
