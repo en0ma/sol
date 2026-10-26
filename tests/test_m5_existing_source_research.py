@@ -30,8 +30,24 @@ class ExistingSourceResearchTests(unittest.TestCase):
             self.assertEqual(result["ranked_routes"][0]["source_batch_route_index"],7)
             self.assertTrue(result["ranked_routes"][0]["signed_observation"]["independent_signed_accepted"])
             self.assertEqual(result["ranked_routes"][0]["signed_observation"]["gross_start_mint_delta"],6)
+            self.assertEqual(result["ranked_routes"][0]["signed_minus_quoted_gross_base_units"],-4)
+            self.assertEqual(result["signed_gross_sign_disagreements"],0)
             self.assertFalse(result["net_profit_verified"])
             self.assertFalse(result["broadcast"])
+
+    def test_signed_loss_rejects_positive_quoted_gross(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);src=root/"src";signed=root/"signed"
+            src.mkdir();signed.mkdir()
+            (src/"summary.json").write_text(json.dumps({"routes":[{"index":3,"status":"AUTHENTICATED_THREE_VENUE_SOURCE_FIXTURE","fixture":"triangle-03.json"}],**SAFE}))
+            (src/"triangle-03.json").write_text(json.dumps({"route_mints":["A","B","C","A"]}))
+            (signed/"summary.json").write_text(json.dumps({"routes":[{"index":3,"status":"VERIFIED","independent_signed_accepted":True,"gross_start_mint_delta":-7}],**SAFE}))
+            quoted={"fully_quoted":1,"blocked":0,"positive_gross":1,"ranked":[{"index":0,"gross_delta_start_mint_base_units":10}],"all_results":[{"index":0}]}
+            with patch("arb.m5_existing_source_research.rank",return_value=quoted):
+                result=evaluate(src,amount_in=100,observed_unix=123,signed_dir=signed)
+            self.assertEqual(result["signed_gross_sign_disagreements"],1)
+            self.assertEqual(result["ranked_routes"][0]["signed_minus_quoted_gross_base_units"],-17)
+            self.assertFalse(result["net_profit_verified"])
 
     def test_empty_source_manifest_is_truthful(self):
         with tempfile.TemporaryDirectory() as d:
