@@ -8,38 +8,16 @@ transaction broadcast, fabricated state or self-certified execution.
 from arb.opportunity_graph import cycles
 from arb.opportunity_quote_pipeline import screen
 from arb.next_ten_atomic_evidence import assess
-from arb.execution_target_matrix import TARGET_VENUES
+from arb.market_state_registry import normalize
 
 SAFETY={"actionable":False,"live_execution_approved":False,"broadcast":False}
 
 def authenticated_registry(snapshot, *, now, max_age=60):
-    if not isinstance(snapshot,list) or len(snapshot)>200:
-        raise ValueError("invalid bounded pool-state snapshot")
-    pools=[];rejected=[];seen=set()
-    for i,p in enumerate(snapshot):
-        reasons=[]
-        if not isinstance(p,dict):
-            rejected.append({"index":i,"reasons":["invalid pool record"]})
-            continue
-        identity=(p.get("venue"),p.get("address"))
-        if identity in seen:reasons.append("duplicate venue/pool")
-        seen.add(identity)
-        if p.get("venue") not in TARGET_VENUES:reasons.append("unsupported venue")
-        if not isinstance(p.get("address"),str) or not p["address"]:reasons.append("missing pool address")
-        mints=p.get("mints")
-        if not isinstance(mints,list) or len(mints)!=2 or any(
-            not isinstance(m,str) or not m for m in mints) or mints[0]==mints[1]:
-            reasons.append("invalid pool mint pair")
-        if p.get("source_authenticated") is not True or p.get("verified") is not True:
-            reasons.append("pool source authentication absent")
-        slot=p.get("slot")
-        if type(slot)is not int or slot<0:reasons.append("missing authenticated slot")
-        observed=p.get("observed_unix")
-        if type(observed)is not int or observed>now or observed<0 or now-observed>max_age:
-            reasons.append("stale pool snapshot")
-        if reasons:rejected.append({"index":i,"reasons":reasons})
-        else:pools.append(p)
-    return {"pools":pools,"rejected":rejected,"status":"AUTHENTICATED_SNAPSHOT_ONLY",**SAFETY}
+    """One canonical source/owner/slot authenticated registry across M5 paths."""
+    normalized = normalize(snapshot, as_of_unix=now, max_age_seconds=max_age)
+    return {"pools": normalized["pools"], "rejected": normalized["rejections"],
+            "status": normalized["status"], "max_slot": normalized["max_slot"],
+            **SAFETY}
 
 def run_cycle_pipeline(snapshot, *, now, quote_provider, cost_provider,
                        simulate_provider=None, max_age=60, max_cycles=200,
