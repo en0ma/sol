@@ -71,17 +71,66 @@ def scan_local_fork(rpc, registry, *, max_cycles=200):
     return analyze(readiness, max_cycles=max_cycles)
 
 
+
+def run_m5_research(rpc, registry, *, max_cycles=200, source_dir=None,
+                    signed_dir=None, observed_unix=None, maximum=4):
+    """One explicitly offline, existing-engine source -> signed evidence path.
+
+    Signed triangles are independent source-backed candidate probes, NOT
+    ranked opportunities from the unquoted graph. Never conflate the two.
+    """
+    import os
+    local_rpc_only(rpc)
+    if (signed_dir is not None and (source_dir is None
+            or type(observed_unix) is not int or observed_unix < 0)):
+        raise ValueError("signed validation requires fixtures and observation time")
+    if type(maximum) is not int or not 1 <= maximum <= 12:
+        raise ValueError("bounded three-venue trial count required")
+    if (source_dir is not None or signed_dir is not None) and (
+            os.environ.get("SURFPOOL_EXPLICITLY_OFFLINE") != "1"):
+        raise ValueError("explicit isolated fork gate required for fixture operations")
+    pairs = tuple((a, b) for a in ORDER for b in ORDER if a != b)
+    readiness = probe(rpc, registry, batch=pairs)
+    report = analyze(readiness, max_cycles=max_cycles)
+    report["signed_triangle_source_attempts"] = 0
+    report["signed_triangle_source_exported"] = 0
+    report["independently_signed_triangles_accepted"] = 0
+    report["protocol_exact_quote_samples"] = 0
+    report["source_triangles"] = {"status": "NOT_REQUESTED"}
+    report["signed_triangles"] = {"status": "NOT_REQUESTED"}
+    if source_dir is not None:
+        from arb.m5_distinct_venue_coverage_batch import source_batch
+        exported = source_batch(rpc, readiness, source_dir, maximum=maximum)
+        report["source_triangles"] = exported
+        report["signed_triangle_source_attempts"] = exported["attempted"]
+        report["signed_triangle_source_exported"] = exported["exported"]
+    if signed_dir is not None:
+        from arb.m5_distinct_venue_coverage_batch import offline_batch
+        signed = offline_batch(rpc, source_dir, signed_dir,
+                               observed_unix=observed_unix)
+        report["signed_triangles"] = signed
+        report["signed_simulation_attempts"] = signed["attempted"]
+        report["independently_signed_triangles_accepted"] = signed["independent_signed_accepted"]
+        report["protocol_exact_quote_samples"] = signed["independently_validated_quote_samples"]
+    return report
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--rpc", default="http://127.0.0.1:8899")
     parser.add_argument("--registry", default="arb/pool_registry.json")
     parser.add_argument("--max-cycles", type=int, default=200)
     parser.add_argument("--output", required=True)
+    parser.add_argument("--source-dir")
+    parser.add_argument("--signed-dir")
+    parser.add_argument("--observed-unix", type=int)
+    parser.add_argument("--maximum", type=int, default=4)
     args = parser.parse_args()
     if not 1 <= args.max_cycles <= 2000:
         parser.error("bounded maximum cycles must be 1..2000")
     registry = json.loads(Path(args.registry).read_text())
-    report = scan_local_fork(args.rpc, registry, max_cycles=args.max_cycles)
+    report = run_m5_research(args.rpc, registry, max_cycles=args.max_cycles,
+        source_dir=args.source_dir, signed_dir=args.signed_dir,
+        observed_unix=args.observed_unix, maximum=args.maximum)
     Path(args.output).write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
     print(json.dumps({key: report[key] for key in (
         "status", "venue_coverage", "authenticated_pool_count", "connected_cycles",
