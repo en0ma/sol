@@ -51,8 +51,17 @@ def evaluate(fixture,receipt,*,observed_fee_lamports=None,
     report["network_fee_charged_to_swap_output"]=False
     report["swap_output_network_fee_deduction_base_units"]=0
     report["network_fee_payment_source"]="SEPARATE_FEE_PAYER_SOL_ACCOUNT"
+    start_mint_for_ledger=fixture.get("route_mints",[None])[0]
+    report["economic_asset_ledger"]={
+        "swap_input":{"mint":start_mint_for_ledger,"base_units":spent[0]},
+        "swap_output":{"mint":start_mint_for_ledger,"base_units":output},
+        "gross_trade_profit":{"mint":start_mint_for_ledger,"base_units":output-spent[0]},
+        "network_fee":{"mint":"SOL","paid_lamports":None,"estimated_lamports":None},
+        "fee_payer_is_swap_output_account":False}
     report["gross_output_base_units"]=output
     report["gross_delta_start_mint_base_units"]=output-spent[0]
+    if type(report.get("exact_signed_message_fee_estimate_lamports")) is int:
+        report["economic_asset_ledger"]["network_fee"]["estimated_lamports"]=report["exact_signed_message_fee_estimate_lamports"]
     # Break-even is an observable upper bound on *total* fees/slippage
     # denominated in the starting mint, NOT an assumption about paid fees.
     report["maximum_affordable_total_cost_start_mint_base_units"]=max(0,output-spent[0])
@@ -116,6 +125,7 @@ def evaluate(fixture,receipt,*,observed_fee_lamports=None,
             return report
         observed_fee_lamports=fee_observation["lamports"]
         report["observed_fee_provenance"]=dict(fee_observation)
+        report["economic_asset_ledger"]["network_fee"]["paid_lamports"]=fee_observation["lamports"]
     if (type(observed_fee_lamports)is not int or observed_fee_lamports<0):
         report["reason"]="OBSERVED_TRANSACTION_FEE_LAMPORTS_MISSING"
         return report

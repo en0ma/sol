@@ -40,6 +40,11 @@ jobs:
         run: |
           python3 -m unittest discover -s tests -p test_m5_three_venue_coverage_acceptance.py -v
           python3 -m unittest discover -s tests -p test_m5_three_venue_observed_economics.py -v
+      - name: Test fee payer asset separation, signed AMM v4 fee rounding and multi-asset economics
+        run: |
+          python3 -m unittest discover -s tests -p test_fee_payer_separate_from_output.py -v
+          python3 -m unittest discover -s tests -p test_native_fraction_rounding_diagnostics.py -v
+          python3 -m unittest discover -s tests -p test_separate_sol_fee_asset_ledger.py -v
       - name: Test signed fee quote break-even stress threshold
         run: python3 -m unittest discover -s tests -p test_signed_fee_break_even_haircut.py -v
       - name: Test exact signed-message RPC fee estimation without broadcast or paid-fee claim
