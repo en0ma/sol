@@ -3,7 +3,7 @@ from unittest.mock import patch
 from arb.m5_three_venue_signed_quote_parity import compare
 class PrecisionTests(unittest.TestCase):
     @patch("arb.m5_three_venue_signed_quote_parity.accept",return_value=True)
-    @patch("arb.m5_three_venue_signed_quote_parity.quote_cpmm_only")
+    @patch("arb.m5_three_venue_signed_quote_parity.quote_cpmm_creator_fee_source")
     @patch("arb.m5_three_venue_signed_quote_parity.quote_from_fixture")
     def test_one_unit_mismatch_not_misrepresented_as_exact_match(self,v4,cpmm,_):
         source={"route_mints":["A","B","C","A"],
