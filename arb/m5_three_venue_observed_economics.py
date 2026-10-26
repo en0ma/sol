@@ -67,6 +67,11 @@ def evaluate(fixture,receipt,*,observed_fee_lamports=None,
     report["maximum_affordable_total_cost_start_mint_base_units"]=max(0,output-spent[0])
     report["minimum_output_to_break_even_without_fees_base_units"]=spent[0]
     report["gross_return_bps"]=(output-spent[0])*10_000//spent[0]
+    # A negative gross route cannot be rescued by any nonnegative SOL
+    # network fee; avoid displaying zero "cost budget" as break-even.
+    report["gross_trade_profitable_before_network_fee"]=output>spent[0]
+    report["nonnegative_sol_fee_can_restore_gross_loss"]=False
+    report["gross_break_even_output_deficit_base_units"]=max(0,spent[0]-output)
     if (not isinstance(downside_bps,(list,tuple)) or
             any(type(n)is not int or not 0<=n<=10_000 for n in downside_bps)):
         raise ValueError("invalid downside scenarios")
