@@ -77,6 +77,15 @@ def evaluate(fixture,receipt,*,observed_fee_lamports=None,
              "estimated_net_delta_wsol_base_units":
                 s["gross_delta_start_mint_base_units"]-message_fee}
             for s in report["downside_scenarios"]]
+        # Largest integer haircut (bps) that still covers the quoted base
+        # fee. This is a boundary on the *observed signed output*, not a
+        # forecast of future fills or evidence of settled network payment.
+        required=spent[0]+message_fee
+        report["estimated_fee_break_even_output_base_units"]=required
+        report["estimated_maximum_additional_output_haircut_bps"]=(
+            max(0,min(10_000,
+                (10_000*(output-required))//output))
+            if output>=required else None)
         report["estimated_cost_is_paid_fee"]=False
     if fee_observation is not None:
         if (not isinstance(fee_observation,dict)
