@@ -13,7 +13,7 @@ class Tests(unittest.TestCase):
                 "initial_balances_base_units":[100,0,0,0],
                 "positive_post_balances_base_units":[0,0,0,65]}
     @patch("arb.m5_three_venue_signed_quote_parity.accept",return_value={})
-    @patch("arb.m5_three_venue_signed_quote_parity.quote_cpmm_only",
+    @patch("arb.m5_three_venue_signed_quote_parity.quote_cpmm_creator_fee_source",
            return_value={"quote":{"venue":"raydium_cpmm","pool":"a",
            "input_mint":"A","output_mint":"B","amount_in":100,
            "snapshot_slot":9,"amount_out":79}})

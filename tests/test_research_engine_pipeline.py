@@ -1,7 +1,7 @@
 import unittest
 from arb.research_engine_pipeline import authenticated_registry,run_cycle_pipeline
 NOW=1000
-POOLS=[{"venue":"orca","address":"p-orca","mints":["A","B"],"verified":True,"source_authenticated":True,"slot":500,"observed_unix":990},
+POOLS=[{"venue":"orca","address":"p-orca","mints":["A","B"],"verified":True,"source_authenticated":True,"account_owner_verified":True,"snapshot_origin":"READ_ONLY_MAINNET_BACKED_SURFPOOL","slot":500,"observed_unix":990},
        {"venue":"raydium_cpmm","address":"p-cpmm","mints":["A","B"],"verified":True,"source_authenticated":True,"slot":500,"observed_unix":990}]
 COSTS={"network_fee":2,"priority_fee":2,"compute_cost":2,"slippage_buffer":5,"quote_uncertainty_buffer":5}
 class PipelineTests(unittest.TestCase):
@@ -22,6 +22,9 @@ class PipelineTests(unittest.TestCase):
     self.assertGreater(report["research_positive"],0)
     self.assertEqual(report["signed_simulated_candidates"],0)
     self.assertFalse(report["broadcast"])
+    self.assertGreater(report["metrics"]["quote_attempted"],0)
+    self.assertGreater(len(report["ranked_research_candidates"]),0)
+    self.assertEqual(report["metrics"]["signed_unavailable"],report["research_positive"])
  def test_provider_wrong_identity_fails_closed(self):
     report=run_cycle_pipeline(POOLS,now=NOW,
         quote_provider=lambda leg,amount:dict(leg,pool="fake"),
@@ -37,4 +40,16 @@ class PipelineTests(unittest.TestCase):
                               cost_provider=lambda *x:COSTS,
                               simulate_provider=lambda *x:{"signed_atomic_simulation_verified":True})
     self.assertEqual(report["signed_simulated_candidates"],0)
+    self.assertGreater(report["metrics"]["signed_attempted"],0)
+    self.assertGreater(report["metrics"]["signed_rejected"],0)
+ def test_requires_independent_owner_and_origin_attestation(self):
+    untrusted=dict(POOLS[0],account_owner_verified=False)
+    result=authenticated_registry([untrusted],now=NOW)
+    self.assertEqual(result["pools"],[])
+    self.assertTrue(result["rejected"])
+ def test_cross_slot_skew_excludes_old_pool(self):
+    old=dict(POOLS[0],slot=400)
+    result=authenticated_registry([old,POOLS[1]],now=NOW)
+    self.assertEqual(len(result["pools"]),1)
+    self.assertEqual(result["max_slot"],500)
 if __name__=="__main__":unittest.main()
