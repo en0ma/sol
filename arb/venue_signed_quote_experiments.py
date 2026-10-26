@@ -6,8 +6,19 @@ No fixture, mocked output or quote inference can masquerade as a swap sample.
 from arb.m5_three_venue_signed_quote_parity import compare
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
 
-def measure(fixture,receipt,*,observed_unix):
-    report=compare(fixture,receipt,observed_unix=observed_unix)
+def measure(fixture,receipt,*,observed_unix,parity_report=None):
+    # The caller can supply the parity computed for this exact signed batch.
+    # Never trust it without independently checking the signed receipt.
+    from arb.m5_three_distinct_venue_signed_acceptance import verify
+    verify(fixture,receipt)
+    report=parity_report if parity_report is not None else compare(
+        fixture,receipt,observed_unix=observed_unix)
+    if report.get("signed_execution_accepted") is not True:
+        raise ValueError("signed execution not accepted for price experiment")
+    if report.get("route_venues") not in (None,fixture.get("route_venues")):
+        raise ValueError("parity route venues disagree with source fixture")
+    if len(report.get("leg_comparisons",[]))!=3:
+        raise ValueError("three signed venue legs required")
     rows=[]
     for leg in report.get("leg_comparisons",[]):
         observed=leg.get("signed_output_base_units")
@@ -16,7 +27,11 @@ def measure(fixture,receipt,*,observed_unix):
                and type(observed) is int and observed>0
                and type(quoted) is int and quoted>0
                and type(leg.get("signed_input_base_units")) is int
-               and type(leg.get("signed_minus_quote_base_units")) is int)
+               and type(leg.get("signed_minus_quote_base_units")) is int
+               and leg["signed_minus_quote_base_units"]==observed-quoted
+               and leg.get("leg_index") in (0,1,2)
+               and leg.get("venue")==fixture["route_venues"][leg["leg_index"]]
+               and leg.get("pool")==fixture["route_pool_addresses"][leg["leg_index"]])
         row={"venue":leg.get("venue"),"pool":leg.get("pool"),
              "leg_index":leg.get("leg_index"),
              "source_manifest_sha256":fixture.get("state_account_manifest_sha256"),
