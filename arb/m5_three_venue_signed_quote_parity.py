@@ -78,7 +78,13 @@ def compare(fixture,receipt,*,observed_unix):
                     or type(q.get("amount_out")) is not int or q["amount_out"]<=0):
                 raise ValueError("account-derived quote source or direction mismatch")
             row["quoted_output_base_units"]=q["amount_out"]
-            row["deviation_bps"]=abs(q["amount_out"]-received)*10000//received
+            delta=q["amount_out"]-received
+            row["signed_minus_quote_base_units"]=-delta
+            row["signed_quote_exact_integer_match"]=(delta==0)
+            row["absolute_error_base_units"]=abs(delta)
+            # Integer bps truncation can be zero for real 1-unit errors.
+            row["deviation_bps"]=abs(delta)*10000//received
+            row["deviation_bps_ceiling"]=(abs(delta)*10000+received-1)//received
             row["reason"]="INDICATIVE_ONLY_SOURCE_EXECUTION_PROVENANCE_NOT_INDEPENDENTLY_VERIFIED"
         except (ValueError,TypeError,KeyError,ImportError,ArithmeticError) as exc:
             row["reason"]="SOURCE_EXACT_QUOTE_BLOCKED: "+str(exc)[:160]
@@ -94,7 +100,10 @@ def compare(fixture,receipt,*,observed_unix):
         (r["deviation_bps"] for r in result["leg_comparisons"] if r["deviation_bps"] is not None),
         default=None)
     result["exact_integer_indicative_matches"]=sum(
-        r["deviation_bps"]==0 for r in result["leg_comparisons"])
+        r.get("signed_quote_exact_integer_match") is True for r in result["leg_comparisons"])
+    result["nonzero_errors_hidden_by_truncated_bps"]=sum(
+        r.get("deviation_bps")==0 and r.get("absolute_error_base_units",0)>0
+        for r in result["leg_comparisons"])
     result["status"]="SIGNED_EXECUTION_WITH_PER_LEG_PARITY_DIAGNOSTICS"
     return result
 
