@@ -47,6 +47,10 @@ def evaluate(fixture,receipt,*,observed_fee_lamports=None,
             report["exact_signed_message_fee_estimate_lamports"]=fee
             report["exact_signed_message_fee_sha256"]=estimate.get("signed_message_sha256")
             report["estimated_fee_paid"]=False
+    report["network_fee_payer_asset"]="SOL"
+    report["network_fee_charged_to_swap_output"]=False
+    report["swap_output_network_fee_deduction_base_units"]=0
+    report["network_fee_payment_source"]="SEPARATE_FEE_PAYER_SOL_ACCOUNT"
     report["gross_output_base_units"]=output
     report["gross_delta_start_mint_base_units"]=output-spent[0]
     # Break-even is an observable upper bound on *total* fees/slippage
@@ -69,6 +73,7 @@ def evaluate(fixture,receipt,*,observed_fee_lamports=None,
     if (fixture.get("route_mints",[None])[0]==WRAPPED_SOL_MINT
             and type(report.get("exact_signed_message_fee_estimate_lamports")) is int):
         message_fee=report["exact_signed_message_fee_estimate_lamports"]
+        report["estimated_economic_surplus_after_separate_sol_fee_wsol_base_units"]=output-spent[0]-message_fee
         report["estimated_net_delta_wsol_base_units"]=output-spent[0]-message_fee
         report["estimated_fee_budget_remaining_wsol_base_units"]=(
             output-spent[0]-message_fee)
@@ -81,6 +86,7 @@ def evaluate(fixture,receipt,*,observed_fee_lamports=None,
         # fee. This is a boundary on the *observed signed output*, not a
         # forecast of future fills or evidence of settled network payment.
         required=spent[0]+message_fee
+        report["estimated_economic_break_even_swap_output_wsol_base_units"]=required
         report["estimated_fee_break_even_output_base_units"]=required
         report["estimated_maximum_additional_output_haircut_bps"]=(
             max(0,min(10_000,
