@@ -22,6 +22,8 @@ def decode(raw):
     keys=[b58(raw[8+i*32:40+i*32]) for i in range(10)]
     if len(set(keys[2:7]))!=5:
         raise ValueError("duplicate token accounts or mints")
+    if raw[389] not in (0,1,2) or raw[390] not in (0,1):
+        raise ValueError("invalid on-chain CPMM creator fee mode or flag")
     return {"amm_config":keys[0],"creator":keys[1],
         "token_0_vault":keys[2],"token_1_vault":keys[3],
         "lp_mint":keys[4],"token_0_mint":keys[5],"token_1_mint":keys[6],
@@ -29,7 +31,9 @@ def decode(raw):
         "observation":keys[9],
         "auth_bump":raw[328],"status":raw[329],
         "mint_0_decimals":raw[331],"mint_1_decimals":raw[332],
-        "swap_enabled":not bool(raw[329]&4)}
+        "swap_enabled":not bool(raw[329]&4),
+        "creator_fee_on":raw[389],
+        "enable_creator_fee":bool(raw[390])}
 
 def candidates(rpc,max_candidates=12):
     if type(max_candidates)!=int or not 1<=max_candidates<=50:
