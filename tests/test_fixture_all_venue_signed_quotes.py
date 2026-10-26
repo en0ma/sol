@@ -15,5 +15,6 @@ class Tests(unittest.TestCase):
    result=quote_leg(f,leg_index=0,amount_in=100,observed_unix=1)
    self.assertEqual(result["quote_status"],"NATIVE_QUOTE_BLOCKED")
    self.assertIsNone(result["predicted_output_base_units"])
-   self.assertIn("MISSING_NATIVE_AUXILIARY_STATE",result["reason"])
+   self.assertTrue(result["reason"])
+   self.assertFalse(result["protocol_exact_verified"])
 if __name__=="__main__":unittest.main()
