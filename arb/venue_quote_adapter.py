@@ -74,3 +74,26 @@ def quote_concentrated_source_bound(venue,state,input_mint,amount,*,snapshot_slo
     r=quote(venue,state,input_mint,amount,evidence=e)
     return {**r,"source_snapshot_slot":snapshot_slot,
             "tick_state_same_slot_checked":True,"protocol_exact_verified":False}
+
+def quote_pumpswap_source_bound(state,input_mint,amount,*,pool_slot,fee_slot,
+                                effective_total_fee_ppm,fee_tier_provenance):
+    """Use PumpSwap's existing virtual-reserve/fee-bucket engine, not CPMM math.
+
+    Requires an independently decoded, synchronized effective fee tier.
+    The pool and fee configuration must already have undergone owner/byte
+    authentication upstream; never substitute a static venue-wide rate.
+    """
+    if (type(pool_slot)is not int or pool_slot<0 or
+            type(fee_slot)is not int or pool_slot!=fee_slot):
+        raise ValueError("PumpSwap pool and dynamic fee config snapshots differ")
+    if fee_tier_provenance!="SOURCE_DECODED_EFFECTIVE_TIER":
+        raise ValueError("PumpSwap effective fee tier lacks native provenance")
+    if (state.get("verified") is not True or
+            state.get("fee_verified_onchain") is not True or
+            state.get("effective_fee_verified") is not True):
+        raise ValueError("PumpSwap state lacks independent fee authentication")
+    return {**quote("pumpswap",state,input_mint,amount,evidence={
+        "source_authenticated":True,"effective_fee_verified":True,
+        "effective_total_fee_ppm":effective_total_fee_ppm}),
+        "pool_and_fee_snapshot_slot":pool_slot,
+        "fee_tier_provenance":fee_tier_provenance}

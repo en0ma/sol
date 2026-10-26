@@ -49,6 +49,11 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_signed_fee_break_even_haircut.py -v
       - name: Test exact signed-message RPC fee estimation without broadcast or paid-fee claim
         run: python3 -m unittest discover -s tests -p test_signed_message_fee_estimate.py -v
+      - name: Test independent venue quote adapters and same-slot fee and tick authentication
+        run: |
+          python3 -m unittest discover -s tests -p test_venue_quote_adapter.py -v
+          python3 -m unittest discover -s tests -p test_source_bound_concentrated_quotes.py -v
+          python3 -m unittest discover -s tests -p test_source_bound_pumpswap_quotes.py -v
       - name: Test venue-owned CPMM accrued fee liabilities and effective vault reserves
         run: |
           python3 -m unittest discover -s tests -p test_cpmm_accrued_fee_state.py -v

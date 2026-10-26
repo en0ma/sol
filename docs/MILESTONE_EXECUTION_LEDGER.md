@@ -85,6 +85,10 @@ Extended the **actual signed** three-venue economics pipeline to derive a break-
 
 The multi-route isolated signed trial now generates `evidence-rollup.json` alongside the individual receipts. The rollup derives *accepted signed route and distinct venue counts* only from the independent acceptance output, counts **actual** indicative priced legs and missing quote blockers separately, and collects **observed gross start-mint deltas** and precise unavailable fee/conversion blocker counts. Pricing and economic acceptance remain deliberately zero when these gaps persist; broadened route attempts never promote a quote to protocol-exact or a gross delta to net profit. This makes the most consequential missing work visible per CI run without adding a parallel execution engine.
 
+## M5-C02 — Parallel venue-native source-bound pricing
+
+Three engineering commits add a venue-only research quote interface for all seven adapters, reuse existing authenticated bounded Orca and Raydium CLMM arithmetic plus PumpSwap's venue-specific virtual-reserve/fee-bucket pricing, and strictly reject unauthenticated DLMM bin traversal or DAMM v2 dynamic fee models. Explicit same-slot boundaries and dynamic-fee provenance are mandatory. The coordinator is untouched. These are source-bound research interfaces and tests, not a claim of seven working protocol-exact signed swap quote paths or actual Surfpool parity runs.
+
 ## M5-C02 — Raydium native effective reserves (venue-owned)
 
 At baseline focused CI #163 and non-v4 CI #93, both passed. Inspected upstream Raydium cp-swap PoolState::vault_amount_without_fee: fee liabilities are protocol, fund and creator accumulations owed from each raw SPL vault; using raw vault amounts as invariant reserves is wrong. Three substantive commits implement six packed accrued-fee fields at canonical offsets, a strict venue-local reserve subtraction with underflow checks and source-fixture quote integration. This improves pricing fidelity for creator-fee and trade-fee pools, but exact signed parity against real forks is still separately required. No coordinator fee implementation, broadcasting or funded swaps.
