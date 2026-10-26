@@ -101,6 +101,7 @@ class M5EndToEndResearch(unittest.TestCase):
             report=run_m5_research("http://127.0.0.1:8899",{"pools":[]},
                 source_dir=temp,signed_dir="/tmp/m5-signed",observed_unix=100,
                 quote_input=1000)
+        self.assertEqual(report["source_quote_ranking"]["ranked"][0]["source_batch_route_index"],1)
         self.assertEqual(report["signed_selection"]["selected_source_route_indices"],[1])
         self.assertEqual(report["signed_simulation_attempts"],1)
         self.assertEqual(report["quoted_candidates"],2)

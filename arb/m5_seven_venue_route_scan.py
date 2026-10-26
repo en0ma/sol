@@ -125,6 +125,8 @@ def run_m5_research(rpc, registry, *, max_cycles=200, source_dir=None,
                            observed_unix=observed_unix,maximum=maximum)
             for line in ranking["all_results"]:
                 line["source_batch_route_index"] = mapping[line["index"]]
+            for line in ranking["ranked"]:
+                line["source_batch_route_index"] = mapping[line["index"]]
             report["source_quote_ranking"] = ranking
             report["quoted_candidates"] = ranking["fully_quoted"]
             report["gross_positive_source_quote_routes"] = ranking["positive_gross"]
