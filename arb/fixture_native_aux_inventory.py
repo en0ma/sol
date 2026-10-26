@@ -38,8 +38,16 @@ def inspect(fixture,*,pool_filter=None):
                 if not isinstance(data,list) or len(data)!=2 or data[1]!="base64":continue
                 raw=base64.b64decode(data[0],validate=True)
                 if len(raw)==SIZE and raw[:8]==DISC and b58(raw[8:40])==row["address"]:
+                    from arb.raydium_clmm_ticks import tick_array_pda
+                    start=int.from_bytes(raw[40:44],"little",signed=True)
+                    if start%(60*pool["tick_spacing"])!=0:
+                        raise ValueError("CLMM source array start is misaligned")
+                    if address!=tick_array_pda(row["address"],start):
+                        raise ValueError("CLMM source array PDA mismatch")
+                    from arb.raydium_clmm_tick_decode import initialized_ticks
+                    initialized=initialized_ticks(raw,start,pool["tick_spacing"])
                     record["decoded_auxiliary"].append({"type":"tick_array","account":address,
-                        "start_tick":int.from_bytes(raw[40:44],"little",signed=True)})
+                        "start_tick":start,"initialized_ticks":len(initialized)})
             if not any(a["type"]=="tick_array" for a in record["decoded_auxiliary"]):
                 record["missing"].append("initialized_tick_array")
         elif venue=="meteora_dlmm":
