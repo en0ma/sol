@@ -39,18 +39,28 @@ def source_batch(rpc,readiness,directory,*,maximum=4):
     (root/"summary.json").write_text(json.dumps(report,indent=2)+"\n")
     return report
 
-def offline_batch(rpc,fixtures,directory,*,observed_unix,fee_observations=None):
+def offline_batch(rpc,fixtures,directory,*,observed_unix,fee_observations=None,route_indices=None):
     root=Path(directory);root.mkdir(parents=True,exist_ok=True)
     src=Path(fixtures)
     listing=json.loads((src/"summary.json").read_text())
     if fee_observations is not None and not isinstance(fee_observations,dict):
         raise ValueError("fee observations must be keyed by route index")
+    if route_indices is not None:
+        if (not isinstance(route_indices,list) or len(route_indices)>12
+                or any(type(n)is not int or n<0 for n in route_indices)
+                or len(route_indices)!=len(set(route_indices))):
+            raise ValueError("invalid selected authenticated route indices")
+        available={r["index"] for r in listing["routes"]}
+        if not set(route_indices)<=available:
+            raise ValueError("selected route absent from source fixture manifest")
     rows=[]
     parity_reports=[]
     economics_reports=[]
     experimental_samples=[]
     auxiliary_evidence=[]
     for row in listing["routes"]:
+        if route_indices is not None and row["index"] not in route_indices:
+            continue
         if row["status"]!="AUTHENTICATED_THREE_VENUE_SOURCE_FIXTURE":
             rows.append({"index":row["index"],"status":"SOURCE_FIXTURE_BLOCKED",**SAFE})
             continue
@@ -116,7 +126,9 @@ def offline_batch(rpc,fixtures,directory,*,observed_unix,fee_observations=None):
                      "economics_status":economics["status"] if economics is not None else "UNAVAILABLE",
                      "source_price_economics_gate":evidence["status"] if evidence is not None else "UNAVAILABLE",
                      "quote_diagnostic_legs":len(parity["leg_comparisons"]) if parity is not None else 0,**SAFE})
-    report={"attempted":len(rows),
+    report={"selection_mode":"QUOTE_RANKED" if route_indices is not None else "SOURCE_COVERAGE",
+            "selected_source_route_indices":route_indices,
+            "attempted":len(rows),
             "independent_signed_accepted":sum(r.get("independent_signed_accepted") is True for r in rows),
             "independently_validated_quote_samples":0,"routes":rows,**SAFE}
     report["observed_venue_quote_samples"]=sum(
