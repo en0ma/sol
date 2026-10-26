@@ -51,8 +51,8 @@ def derive(fixture,*,observed_unix):
             elif effective is not None:
                 raise ValueError("unverified effective fee cannot be projected")
             if venue=="raydium_cpmm":
-                row["native_trade_fee_ppm"]=fee["trade_fee_ppm"]
-                row["native_creator_fee_ppm"]=fee["creator_fee_ppm"]
+                row["native_trade_fee_ppm"]=fee.get("trade_fee_ppm")
+                row["native_creator_fee_ppm"]=fee.get("creator_fee_ppm")
                 row["creator_fee_enabled"]=fee.get("creator_fee_enabled")
                 row["creator_fee_on"]=fee.get("creator_fee_on")
             if fee["total_effective_fee_authenticated"] is True:
