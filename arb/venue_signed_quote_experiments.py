@@ -42,6 +42,8 @@ def measure(fixture,receipt,*,observed_unix,parity_report=None):
              "predicted_output_base_units":quoted,
              "sample_status":"SIGNED_FORK_QUOTE_COMPARISON" if valid else "SAMPLE_BLOCKED",
              "integer_delta_base_units":observed-quoted if valid else None,
+            "absolute_integer_error_base_units":abs(observed-quoted) if valid else None,
+            "exact_input_observation_source":"SIGNED_CPI_AND_TERMINAL_SPL_BALANCES" if valid else None,
              "exact_integer_match":observed==quoted if valid else None,
              "source_exact_protocol_verified":False,
              "reason":leg.get("reason"),**SAFE}
@@ -50,5 +52,9 @@ def measure(fixture,receipt,*,observed_unix,parity_report=None):
             "signed_execution_accepted":report.get("signed_execution_accepted") is True,
             "observed_compared_samples":sum(x["sample_status"]=="SIGNED_FORK_QUOTE_COMPARISON" for x in rows),
             "exact_integer_matches":sum(x["exact_integer_match"] is True for x in rows),
+            "mismatched_integer_samples":sum(x["exact_integer_match"] is False for x in rows),
+            "largest_absolute_integer_error_base_units":max(
+                (x["absolute_integer_error_base_units"] for x in rows
+                 if x["absolute_integer_error_base_units"] is not None),default=None),
             "independently_validated_protocol_exact_samples":0,
             "venue_samples":rows,**SAFE}

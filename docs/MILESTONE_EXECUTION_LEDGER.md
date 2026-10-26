@@ -85,6 +85,10 @@ Extended the **actual signed** three-venue economics pipeline to derive a break-
 
 The multi-route isolated signed trial now generates `evidence-rollup.json` alongside the individual receipts. The rollup derives *accepted signed route and distinct venue counts* only from the independent acceptance output, counts **actual** indicative priced legs and missing quote blockers separately, and collects **observed gross start-mint deltas** and precise unavailable fee/conversion blocker counts. Pricing and economic acceptance remain deliberately zero when these gaps persist; broadened route attempts never promote a quote to protocol-exact or a gross delta to net profit. This makes the most consequential missing work visible per CI run without adding a parallel execution engine.
 
+## M5-C02 — Signed fork quote measurement integrity and integer-error evidence
+
+Preceding CI focused #180 and non-v4 #110 passed. Three commits harden empirical quote comparison against mismatched leg identity, wrong signed delta and unaccepted CPI receipts; eliminate re-quoting the same signed batch twice and correct emitted aggregate JSON format; and add per-venue absolute integer price errors with maximum deviation. All observations still require the existing genuine signed Surfpool and rollback evidence. No protocol exactness is claimed from indicative parity alone. No coordinator modification or broadcast.
+
 ## M5-C02 — Empirical signed fork price-versus-execution artifact
 
 Three commits add an empirical per-venue source quote versus accepted signed Surfpool swap comparison to the existing independent three-venue batch: store the observed signed input/output, same source fixture manifest/slot, native quoted output and exact base-unit signed-minus-quote error. Per-route artifacts and aggregate per-venue exact/mismatch/blocked counts are written for CI inspection. Samples without accepted CPI/rollback proof or account-derived quotes are explicitly blocked. **Parity matching indicative arithmetic is not automatically protocol-exact validation.** No new RPC transaction broadcast, coordinator rewrite or paper quote inference.

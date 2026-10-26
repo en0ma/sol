@@ -107,12 +107,17 @@ def offline_batch(rpc,fixtures,directory,*,observed_unix,fee_observations=None):
     by_venue={}
     for sample in experimental_samples:
         venue=sample["venue"]
-        summary=by_venue.setdefault(venue,{"compared":0,"exact":0,"blocked":0,"mismatch":0})
+        summary=by_venue.setdefault(venue,{"compared":0,"exact":0,"blocked":0,"mismatch":0,
+            "maximum_absolute_error_base_units":None})
         if sample["sample_status"]!="SIGNED_FORK_QUOTE_COMPARISON":
             summary["blocked"]+=1
         else:
             summary["compared"]+=1
             summary["exact" if sample["exact_integer_match"] else "mismatch"]+=1
+            error=sample["absolute_integer_error_base_units"]
+            if (summary["maximum_absolute_error_base_units"] is None or
+                    error>summary["maximum_absolute_error_base_units"]):
+                summary["maximum_absolute_error_base_units"]=error
     report["signed_price_evidence_by_venue"]=by_venue
     (root/"signed-price-experiments.json").write_text(json.dumps(
         {"samples":experimental_samples,"by_venue":by_venue,**SAFE},indent=2)+"\n")
