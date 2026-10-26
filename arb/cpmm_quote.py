@@ -41,3 +41,23 @@ def quote_pool(pool,mint_in,amount_in,verified_trade_fee_rate=None):
                                 amount_in,verified_trade_fee_rate),
             "pool":pool["address"],"mint_in":mint_in,
             "mint_out":mints[1-side],"indicative_only":True}
+
+def quote_fee_rounding_interval(reserve_in,reserve_out,amount_in,trade_fee_rate):
+    """Account-derived CPMM output interval for floor/ceiling fee rounding.
+
+    Uses exact integer reserve invariant. An observed signed output outside
+    this interval cannot be explained by input fee rounding alone.
+    """
+    vals=(reserve_in,reserve_out,amount_in,trade_fee_rate)
+    if any(type(x)is not int for x in vals) or min(reserve_in,reserve_out,amount_in)<=0:
+        raise ValueError("positive integer CPMM inputs required")
+    if not 0<=trade_fee_rate<FEE_DENOMINATOR or amount_in>=2**64:
+        raise ValueError("invalid CPMM fee or input")
+    fee_floor=amount_in*trade_fee_rate//FEE_DENOMINATOR
+    fee_ceil=(amount_in*trade_fee_rate+FEE_DENOMINATOR-1)//FEE_DENOMINATOR
+    def out(fee):
+        effective=amount_in-fee
+        return reserve_out*effective//(reserve_in+effective)
+    return {"fee_floor_input_units":fee_floor,"fee_ceiling_input_units":fee_ceil,
+            "output_interval_base_units":[out(fee_ceil),out(fee_floor)],
+            "protocol_exact_verified":False}
