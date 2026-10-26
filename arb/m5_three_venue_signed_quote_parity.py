@@ -66,8 +66,17 @@ def compare(fixture,receipt,*,observed_unix):
                 q=quote_cpmm_only(fixture,observed_unix=observed_unix,
                                   leg=leg,amount_in=amounts[i])["quote"]
             elif venues[i]=="raydium_amm_v4":
-                q=quote_from_fixture(fixture,pool=pools[i],input_mint=mints[i],
-                    amount_in=amounts[i],observed_unix=observed_unix)["quote"]
+                native_result=quote_from_fixture(fixture,pool=pools[i],input_mint=mints[i],
+                    amount_in=amounts[i],observed_unix=observed_unix)
+                q=native_result["quote"]
+                fee_state=native_result.get("native_fee_fraction_reference")
+                if isinstance(fee_state,dict):
+                    row["native_fee_numerator"]=fee_state.get("fee_numerator")
+                    row["native_fee_denominator"]=fee_state.get("fee_denominator")
+                    row["native_fee_floor_input_units"]=fee_state.get("fee_floor_input_units")
+                    row["native_fee_ceiling_input_units"]=fee_state.get("fee_ceiling_input_units")
+                    row["native_adjusted_reserve_model"]=q.get("quote_model")
+                    row["native_fee_fraction_authenticated_quote"]=True
             else:
                 raise ValueError("protocol directional fee/liquidity quote not independently implemented")
             if (q.get("venue")!=venues[i] or q.get("pool")!=pools[i]
@@ -101,6 +110,10 @@ def compare(fixture,receipt,*,observed_unix):
         default=None)
     result["exact_integer_indicative_matches"]=sum(
         r.get("signed_quote_exact_integer_match") is True for r in result["leg_comparisons"])
+    result["native_fraction_signed_legs_compared"]=sum(
+        r.get("native_fee_fraction_authenticated_quote") is True
+        and r.get("signed_minus_quote_base_units") is not None
+        for r in result["leg_comparisons"])
     result["nonzero_errors_hidden_by_truncated_bps"]=sum(
         r.get("deviation_bps")==0 and r.get("absolute_error_base_units",0)>0
         for r in result["leg_comparisons"])
