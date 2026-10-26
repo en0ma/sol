@@ -77,6 +77,12 @@ def compare(fixture,receipt,*,observed_unix):
                     row["native_fee_ceiling_input_units"]=fee_state.get("fee_ceiling_input_units")
                     row["native_adjusted_reserve_model"]=q.get("quote_model")
                     row["native_fee_fraction_authenticated_quote"]=True
+                    fee_min=fee_state.get("fee_floor_input_units")
+                    fee_max=fee_state.get("fee_ceiling_input_units")
+                    if (type(fee_min) is int and type(fee_max) is int
+                            and 0<=fee_min<=fee_max<=amounts[i]):
+                        row["native_fee_input_units_interval"]=[fee_min,fee_max]
+                        row["native_fee_rounding_uncertainty_input_units"]=fee_max-fee_min
             else:
                 raise ValueError("protocol directional fee/liquidity quote not independently implemented")
             if (q.get("venue")!=venues[i] or q.get("pool")!=pools[i]
@@ -110,6 +116,9 @@ def compare(fixture,receipt,*,observed_unix):
         default=None)
     result["exact_integer_indicative_matches"]=sum(
         r.get("signed_quote_exact_integer_match") is True for r in result["leg_comparisons"])
+    result["native_fraction_fee_rounding_uncertainty_input_units"]=sum(
+        r.get("native_fee_rounding_uncertainty_input_units",0)
+        for r in result["leg_comparisons"])
     result["native_fraction_signed_legs_compared"]=sum(
         r.get("native_fee_fraction_authenticated_quote") is True
         and r.get("signed_minus_quote_base_units") is not None
