@@ -104,6 +104,7 @@ def run_m5_research(rpc, registry, *, max_cycles=200, source_dir=None,
     report["source_triangles"] = {"status": "NOT_REQUESTED"}
     report["source_quote_ranking"] = {"status": "NOT_REQUESTED"}
     report["signed_triangles"] = {"status": "NOT_REQUESTED"}
+    report["signed_selection"] = {"status": "NOT_REQUESTED", **SAFE}
     if source_dir is not None:
         from arb.m5_distinct_venue_coverage_batch import source_batch
         exported = source_batch(rpc, readiness, source_dir, maximum=maximum)
@@ -129,8 +130,26 @@ def run_m5_research(rpc, registry, *, max_cycles=200, source_dir=None,
             report["gross_positive_source_quote_routes"] = ranking["positive_gross"]
     if signed_dir is not None:
         from arb.m5_distinct_venue_coverage_batch import offline_batch
-        signed = offline_batch(rpc, source_dir, signed_dir,
-                               observed_unix=observed_unix)
+        if quote_input is not None:
+            # The very same source fixture index must drive the actual signed
+            # attempt. Reject quote-unavailable or non-positive gross cycles;
+            # no fee-converted net profitability is inferred here.
+            ranking = report["source_quote_ranking"]
+            selected = [row["source_batch_route_index"] for row in ranking["ranked"]
+                        if row["positive_gross"] is True]
+            report["signed_selection"] = {
+                "status": "POSITIVE_GROSS_INDICATIVE_ONLY",
+                "selected_source_route_indices": selected,
+                "unselected_source_routes": report["signed_triangle_source_exported"]-len(selected),
+                "net_profitability_verified": False, **SAFE}
+            signed = offline_batch(rpc, source_dir, signed_dir,
+                                   observed_unix=observed_unix,route_indices=selected)
+        else:
+            report["signed_selection"] = {
+                "status": "SOURCE_COVERAGE_NOT_RANKED",
+                "net_profitability_verified": False, **SAFE}
+            signed = offline_batch(rpc, source_dir, signed_dir,
+                                   observed_unix=observed_unix)
         report["signed_triangles"] = signed
         report["signed_simulation_attempts"] = signed["attempted"]
         report["independently_signed_triangles_accepted"] = signed["independent_signed_accepted"]
