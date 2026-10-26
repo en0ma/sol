@@ -9,6 +9,7 @@ from collections import defaultdict
 from arb.rpc import call
 from arb.pool_registry import refresh
 from arb.onchain_pool_discovery import discover,MINTS,VENUES
+from arb.execution_target_matrix import TARGET_VENUES
 
 MAX_HOPS=4
 MAX_POOLS=200
@@ -27,7 +28,7 @@ def cycles(pools,anchors=None,max_hops=MAX_HOPS,max_cycles=MAX_CYCLES):
             continue
         a,b=p["mints"]
         venue,address=p.get("venue"),p.get("address")
-        if venue not in VENUES or a==b or not address:continue
+        if venue not in TARGET_VENUES or a==b or not address:continue
         key=(venue,address)
         if key in seen:continue
         seen.add(key)
