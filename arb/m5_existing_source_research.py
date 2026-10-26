@@ -39,14 +39,24 @@ def evaluate(source_dir, *, amount_in, observed_unix, signed_dir=None, maximum=3
             raise ValueError("unsafe signed summary")
         for row in signed.get("routes",[]):
             index=row.get("index")
-            if type(index)is not int or index in signed_records or index not in {r["index"] for r in records}:
+            if type(index)is not int or index in signed_records or index not in set(mapping):
                 raise ValueError("unmatched or duplicate signed route")
             signed_records[index]=row
     ranked=[]
+    signed_gross_sign_disagreements=0
     for row in quoted["ranked"]:
-        index=row["source_batch_route_index"]
+        index=mapping[row["index"]]
+        row={**row,"source_batch_route_index":index}
         receipt=signed_records.get(index)
+        signed_delta=receipt.get("gross_start_mint_delta") if receipt else None
+        signed_accepted=receipt is not None and receipt.get("independent_signed_accepted") is True
+        if signed_accepted and type(signed_delta) is int:
+            if (signed_delta>0)!=(row["gross_delta_start_mint_base_units"]>0):
+                signed_gross_sign_disagreements+=1
         ranked.append({**row,
+            "signed_minus_quoted_gross_base_units":(
+                signed_delta-row["gross_delta_start_mint_base_units"]
+                if signed_accepted and type(signed_delta) is int else None),
             "signed_observation":({
                 "status":receipt.get("status"),
                 "independent_signed_accepted":receipt.get("independent_signed_accepted") is True,
@@ -61,6 +71,7 @@ def evaluate(source_dir, *, amount_in, observed_unix, signed_dir=None, maximum=3
         "native_quote_blocked":quoted["blocked"],
         "positive_gross_indicative":quoted["positive_gross"],
         "signed_receipts_available":len(signed_records),
+        "signed_gross_sign_disagreements":signed_gross_sign_disagreements,
         "ranked_routes":ranked,"all_native_quote_results":quoted["all_results"],
         "net_profit_verified":False,"broadcast":False,**SAFE}
 
