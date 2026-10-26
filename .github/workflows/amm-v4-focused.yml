@@ -49,6 +49,9 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_signed_fee_break_even_haircut.py -v
       - name: Test exact signed-message RPC fee estimation without broadcast or paid-fee claim
         run: python3 -m unittest discover -s tests -p test_signed_message_fee_estimate.py -v
+      - name: Compile four-venue manifest-owned auxiliary fee and liquidity extraction
+        run: |
+          python3 -m py_compile arb/fixture_native_aux_inventory.py arb/fixture_all_venue_signed_quotes.py arb/m5_distinct_venue_coverage_batch.py
       - name: Test all-seven native source quote dispatch and signed leg parity wiring
         run: |
           python3 -m py_compile arb/fixture_all_venue_signed_quotes.py arb/m5_three_venue_signed_quote_parity.py
