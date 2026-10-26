@@ -2,7 +2,7 @@ import unittest
 from arb.research_engine_pipeline import authenticated_registry,run_cycle_pipeline
 NOW=1000
 POOLS=[{"venue":"orca","address":"p-orca","mints":["A","B"],"verified":True,"source_authenticated":True,"account_owner_verified":True,"snapshot_origin":"READ_ONLY_MAINNET_BACKED_SURFPOOL","slot":500,"observed_unix":990},
-       {"venue":"raydium_cpmm","address":"p-cpmm","mints":["A","B"],"verified":True,"source_authenticated":True,"slot":500,"observed_unix":990}]
+       {"venue":"raydium_cpmm","address":"p-cpmm","mints":["A","B"],"verified":True,"source_authenticated":True,"account_owner_verified":True,"snapshot_origin":"READ_ONLY_MAINNET_BACKED_SURFPOOL","slot":500,"observed_unix":990}]
 COSTS={"network_fee":2,"priority_fee":2,"compute_cost":2,"slippage_buffer":5,"quote_uncertainty_buffer":5}
 class PipelineTests(unittest.TestCase):
  def test_reject_stale_pool_and_missing_evidence(self):

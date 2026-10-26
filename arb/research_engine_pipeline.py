@@ -87,10 +87,10 @@ def run_cycle_pipeline(snapshot, *, now, quote_provider, cost_provider,
                             else "signed_rejected"]+=1
                 except (ValueError,KeyError,TypeError) as exc:
                     metrics["signed_rejected"]+=1
-                    metrics["signed_unavailable"]+=1
-                result["simulation_audit"]={"status":"UNVERIFIED",
+                    result["simulation_audit"]={"status":"UNVERIFIED",
                         "failure_reasons":["signed simulation rejected: "+str(exc)[:160]]}
             else:
+                metrics["signed_unavailable"]+=1
                 result["simulation_audit"]={"status":"UNVERIFIED",
                     "failure_reasons":["signed simulator unavailable or route not two distinct venues"]}
         rows.append(result)
