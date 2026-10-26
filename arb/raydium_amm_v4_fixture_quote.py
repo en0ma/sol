@@ -22,23 +22,12 @@ def quote_from_fixture(fixture,*,pool,input_mint,amount_in,observed_unix):
         raise ValueError("valid exact input amount required")
     # The quote adapter checks both directions, effective reserves, fee,
     # and market account authentication before computing any output.
-    record={"venue":"raydium_amm_v4","address":pool,"mints":row["mints"],
-        "slot":row["slot"],"observed_unix":observed_unix,
-        "source_authenticated":True,"verified":True,
-        "account_owner_verified":True,
-        "snapshot_origin":"READ_ONLY_MAINNET_BACKED_SURFPOOL",
-        "base_mint":a,"quote_mint":b,
-        "trade_fee_ppm":row["trade_fee_ppm"],
-        "trade_fee_authenticated":row["trade_fee_authenticated"],
-        "market_accounts_authenticated":row["market_accounts_authenticated"],
-        "effective_reserves_authenticated":row["effective_reserves_authenticated"],
-        "effective_reserves_base_units":row["effective_reserves_base_units"]}
+    if not (row.get("market_accounts_authenticated") is True
+            and row.get("effective_reserves_authenticated") is True
+            and row.get("native_fraction_fee_authenticated") is True):
+        raise ValueError("AMM v4 native fee and adjusted reserves not authenticated")
     native=quote_native_fraction(row["effective_reserves_base_units"],row["mints"],
         input_mint,amount_in,row["native_fee_numerator"],row["native_fee_denominator"])
-    if not (row["market_accounts_authenticated"] is True
-            and row["effective_reserves_authenticated"] is True
-            and row["native_fraction_fee_authenticated"] is True):
-        raise ValueError("AMM v4 native fee and adjusted reserves not authenticated")
     leg={"venue":"raydium_amm_v4","pool":pool,
         "input_mint":input_mint,"output_mint":b if input_mint==a else a}
     quoted={"venue":"raydium_amm_v4","pool":pool,
@@ -50,6 +39,17 @@ def quote_from_fixture(fixture,*,pool,input_mint,amount_in,observed_unix):
     # Retain an independently computed ppm-model cross-check whenever
     # the chain fraction is exactly representable in the existing provider.
     if row["trade_fee_authenticated"] is True:
+        record={"venue":"raydium_amm_v4","address":pool,"mints":row["mints"],
+            "slot":row["slot"],"observed_unix":observed_unix,
+            "source_authenticated":True,"verified":True,
+            "account_owner_verified":True,
+            "snapshot_origin":"READ_ONLY_MAINNET_BACKED_SURFPOOL",
+            "base_mint":a,"quote_mint":b,
+            "trade_fee_ppm":row["trade_fee_ppm"],
+            "trade_fee_authenticated":row["trade_fee_authenticated"],
+            "market_accounts_authenticated":row["market_accounts_authenticated"],
+            "effective_reserves_authenticated":row["effective_reserves_authenticated"],
+            "effective_reserves_base_units":row["effective_reserves_base_units"]}
         provider,registry=from_snapshot([record],now=observed_unix)
         if registry["pool_count"]!=1:
             raise ValueError("AMM v4 source snapshot rejected")
