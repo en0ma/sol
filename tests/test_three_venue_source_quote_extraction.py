@@ -45,13 +45,15 @@ class Tests(unittest.TestCase):
     @patch("arb.fixture_config_quote_projection.from_snapshot")
     def test_cpmm_quote_uses_only_matched_pool_not_unpriced_third_venue(self,provider,derive):
         derive.return_value={"snapshots":[
-            {"venue":"raydium_cpmm","address":"one","trade_fee_authenticated":True},
+            {"venue":"raydium_cpmm","address":"one","trade_fee_authenticated":True,
+             "mints":["A","B"],"vault_base_units":[10000,20000],"trade_fee_ppm":2500},
             {"venue":"orca","address":"two","trade_fee_authenticated":False},
             {"venue":"raydium_amm_v4","address":"three","trade_fee_authenticated":False}]}
         provider.return_value=(lambda leg,n:{"amount_out":7},{"pool_count":1})
         result=quote_cpmm_only({},observed_unix=12,
-            leg={"venue":"raydium_cpmm","pool":"one"},amount_in=5)
+            leg={"venue":"raydium_cpmm","pool":"one","input_mint":"A","output_mint":"B"},amount_in=5)
         self.assertEqual(result["quote"]["amount_out"],7)
+        self.assertEqual(len(result["native_fee_rounding_reference"]["output_interval_base_units"]),2)
         self.assertEqual(len(provider.call_args.args[0]),1)
         self.assertFalse(result["protocol_exact_verified"])
 if __name__=="__main__":unittest.main()
