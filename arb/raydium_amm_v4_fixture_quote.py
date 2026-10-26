@@ -4,7 +4,7 @@ Reuses pool-native fee, SPL vault balances, and OpenOrders/PnL net reserve
 derivation. Inputs are read from a single captured contextual inventory.
 Outputs are *indicative* until compared against signed isolated simulations.
 """
-from arb.raydium_amm_v4_fee_state import derive_v4
+from arb.raydium_amm_v4_fee_state import derive_v4,quote_native_fraction
 from arb.authenticated_quote_provider import from_snapshot
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
 def quote_from_fixture(fixture,*,pool,input_mint,amount_in,observed_unix):
@@ -39,7 +39,12 @@ def quote_from_fixture(fixture,*,pool,input_mint,amount_in,observed_unix):
     leg={"venue":"raydium_amm_v4","pool":pool,
         "input_mint":input_mint,"output_mint":b if input_mint==a else a}
     quoted=provider(leg,amount_in)
+    native=quote_native_fraction(row["effective_reserves_base_units"],row["mints"],
+        input_mint,amount_in,row["native_fee_numerator"],row["native_fee_denominator"])
+    if native["amount_out"]!=quoted["amount_out"]:
+        raise ValueError("AMM v4 native fraction quote and ppm model diverge")
     return {"status":"AMM_V4_ACCOUNT_DERIVED_INDICATIVE_QUOTE",
         "quote":quoted,"snapshot_slot":row["slot"],
+        "native_fee_fraction_reference":native,
         "signed_swap_accuracy_verified":False,
         "source_rpc_provenance_independently_attested":False,**SAFE}
