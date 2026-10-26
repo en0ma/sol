@@ -8,11 +8,13 @@ from arb.fixture_quote_execution_pipeline import extract_pool_states
 from arb.source_snapshot_manifest import verify
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
 
-def inspect(fixture):
+def inspect(fixture,*,pool_filter=None):
     verify(fixture)
     rows=extract_pool_states(fixture)
     result=[]
     for row in rows:
+        if pool_filter is not None and row["address"]!=pool_filter:
+            continue
         venue=row["venue"]
         if venue not in ("raydium_clmm","meteora_dlmm","meteora_damm_v2","pumpswap"):continue
         pool=row["decoded_pool_state"]
@@ -108,3 +110,30 @@ def inspect(fixture):
         result.append(record)
     return {"source_slot":fixture["state_accounts_observed_slot"],
             "venues":result,"full_native_fee_pricing_verified":False,**SAFE}
+
+def inspect_isolated(fixture):
+    """Decode source auxiliary evidence independently for each venue pool.
+
+    One malformed fee account cannot suppress other venue evidence; all
+    accounting and manifest validation continues to run for each pool.
+    """
+    verify(fixture)
+    rows=extract_pool_states(fixture)
+    output=[]
+    for row in rows:
+        venue=row["venue"]
+        if venue not in ("raydium_clmm","meteora_dlmm","meteora_damm_v2","pumpswap"):
+            continue
+        try:
+            evidence=inspect(fixture,pool_filter=row["address"])["venues"]
+            if len(evidence)!=1:
+                raise ValueError("native venue account decode incomplete")
+            output.append(evidence[0])
+        except (ValueError,KeyError,TypeError,ArithmeticError) as exc:
+            output.append({"venue":venue,"pool":row["address"],
+                "source_slot":row["snapshot_slot"],
+                "status":"AUXILIARY_DECODE_BLOCKED","reason":str(exc)[:240],
+                "decoded_auxiliary":[],"missing":["native_auxiliary_decoder_blocked"],
+                "fully_priced":False,**SAFE})
+    return {"source_slot":fixture["state_accounts_observed_slot"],
+            "venues":output,"full_native_fee_pricing_verified":False,**SAFE}

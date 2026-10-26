@@ -10,7 +10,7 @@ from arb.next_ten_signed_atomic_offline import run_three_venue
 from arb.m5_three_distinct_venue_signed_acceptance import verify as accept
 from arb.m5_three_venue_signed_quote_parity import compare
 from arb.venue_signed_quote_experiments import measure as measure_signed_quote
-from arb.fixture_native_aux_inventory import inspect as inspect_native_aux
+from arb.fixture_native_aux_inventory import inspect_isolated as inspect_native_aux
 from arb.m5_three_venue_observed_economics import evaluate as evaluate_economics
 from arb.m5_research_evidence_rollup import summarize as rollup
 from arb.m5_source_quote_economic_gate import gate as evidence_gate
