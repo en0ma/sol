@@ -26,3 +26,61 @@ def quote_one_bin(*,amount_in,swap_x_for_y,price_q64,bin_x,bin_y,total_fee_rate,
             "one_bin_only":True,"dynamic_fee_source_required":True,
             "protocol_exact_verified":False,"actionable":False,
             "live_execution_approved":False,"broadcast":False}
+
+def quote_bins(*,amount_in,swap_x_for_y,bins,total_fee_rate,max_bins=32):
+    """Price a bounded sequence of externally decoded DLMM bins.
+
+    Bins MUST be provided in directional walk order by a source-authenticated
+    bin-array decoder. Fee charged independently per consumed input per bin;
+    output liquidity capacity is enforced at every step. Refuse partial fills,
+    crossed unsupported fee regimes, or exhausted arrays.
+    """
+    if type(amount_in)is not int or not 0<amount_in<2**64:
+        raise ValueError("DLMM positive integer input required")
+    if type(swap_x_for_y)is not bool or type(total_fee_rate)is not int or not 0<=total_fee_rate<DEN:
+        raise ValueError("DLMM direction or fee invalid")
+    if not isinstance(bins,list) or not 1<=len(bins)<=max_bins<=70:
+        raise ValueError("DLMM bounded bins missing")
+    remaining=amount_in
+    output=fees=0
+    consumed=[]
+    prior=None
+    for b in bins:
+        if not isinstance(b,dict) or any(type(b.get(k))is not int for k in
+                ("bin_id","price_q64","amount_x","amount_y")):
+            raise ValueError("DLMM decoded bin missing integer fields")
+        idx=b["bin_id"]
+        if prior is not None and (idx>=prior if swap_x_for_y else idx<=prior):
+            raise ValueError("DLMM bin walk direction invalid")
+        prior=idx
+        capacity=b["amount_y"] if swap_x_for_y else b["amount_x"]
+        price=b["price_q64"]
+        if not 0<price<1<<128 or min(b["amount_x"],b["amount_y"])<0:
+            raise ValueError("invalid authenticated bin inventory")
+        if not capacity:continue
+        # Bound input by output-side bin inventory, reducing the guess-and-
+        # round problem to monotone exact integer binary search.
+        lo,hi=0,remaining
+        while lo<hi:
+            mid=(lo+hi+1)//2
+            fee=(mid*total_fee_rate+DEN-1)//DEN
+            net=mid-fee
+            out=net*price//Q if swap_x_for_y else net*Q//price
+            if out<=capacity:lo=mid
+            else:hi=mid-1
+        used=lo
+        if used==0:continue
+        fee=(used*total_fee_rate+DEN-1)//DEN
+        net=used-fee
+        got=net*price//Q if swap_x_for_y else net*Q//price
+        if got<=0:continue
+        remaining-=used;output+=got;fees+=fee
+        consumed.append({"bin_id":idx,"gross_input_base_units":used,
+                         "fee_input_base_units":fee,"output_base_units":got})
+        if remaining==0:break
+    if remaining or not output:
+        raise ValueError("DLMM bin inventory cannot fill complete exact input")
+    return {"amount_out":output,"fee_input_base_units":fees,
+            "bins_traversed":consumed,"exact_input_filled":True,
+            "protocol_exact_verified":False,"actionable":False,
+            "live_execution_approved":False,"broadcast":False}
