@@ -16,7 +16,7 @@ def calculate(reserve_in,reserve_out,amount_in,trade_ppm,creator_ppm,mode,input_
     side_input=(mode==0 or mode==input_index+1)
     rate=creator_ppm if enabled else 0
     ceiling=lambda amount,ppm:(amount*ppm+DEN-1)//DEN
-    trading=ceiling(amount,trade_ppm)
+    trading=ceiling(amount_in,trade_ppm)
     creator_input=ceiling(amount_in,rate) if side_input else 0
     remaining=amount_in-trading-creator_input
     if remaining<=0:raise ValueError("fee exceeds swap input")
