@@ -6,7 +6,7 @@ import json
 import sys
 from pathlib import Path
 from arb.m5_three_distinct_venue_signed_acceptance import verify as accept
-from arb.fixture_config_quote_projection import quote_cpmm_only,quote_cpmm_creator_fee_source
+from arb.fixture_config_quote_projection import quote_cpmm_creator_fee_source
 from arb.raydium_amm_v4_fixture_quote import quote_from_fixture
 from arb.fixture_all_venue_signed_quotes import quote_leg as source_native_quote
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
@@ -67,14 +67,11 @@ def compare(fixture,receipt,*,observed_unix):
                 # The venue owns creator-fee direction and arithmetic.
                 # Source-bound creator-fee state is preferred; legacy fee-only
                 # path remains available for older verified source fixtures.
-                try:
-                    cpmm_result=quote_cpmm_creator_fee_source(
-                        fixture,observed_unix=observed_unix,
-                        leg=leg,amount_in=amounts[i])
-                except (ValueError,KeyError,TypeError):
-                    cpmm_result=quote_cpmm_only(
-                        fixture,observed_unix=observed_unix,
-                        leg=leg,amount_in=amounts[i])
+                # Never hide a missing/invalid creator fee by silently
+                # substituting the legacy trade-fee-only estimate.
+                cpmm_result=quote_cpmm_creator_fee_source(
+                    fixture,observed_unix=observed_unix,
+                    leg=leg,amount_in=amounts[i])
                 row["venue_native_fee_detail"]=cpmm_result.get("venue_fee_detail")
                 q=cpmm_result["quote"]
                 candidates=cpmm_result.get("native_fee_candidate_quotes")
