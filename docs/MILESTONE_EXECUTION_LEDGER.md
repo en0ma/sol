@@ -25,6 +25,10 @@ SURFPOOL_EXPLICITLY_OFFLINE=1 python3 -m arb.m5_seven_venue_route_scan --rpc htt
 
 Requires an **already running isolated local mainnet-backed Surfpool fork**; this interface does not start/fund a live trading wallet or broadcast. The signed stage uses existing true signed three-distinct-venue source candidates, not a fabricated or pre-ranked graph candidate: graph topology and signed sample/economic evidence remain separate fields. No current live discovery totals, signed experiment results or profitable opportunities are established just by adding this command. The offline gate is mandatory for source export and signed trials. CI includes unit/integration control-plane tests; fresh actual run artifacts are required before completing M5-E2E-02/03. Next: capture real source-run artifacts, then attach source-verified multi-venue quoting/cost ranking to the candidate graph so selected opportunities (not only independent signed triangles) reach simulation.
 
+## M5-E2E signed quote-ranked selection — 2026-10-26
+
+The same authenticated source fixture identifier can now be carried from venue-native three-leg **gross indicative** quoting into the existing `offline_batch` signed Surfpool and rollback pipeline. With `--quote-input <base_units> --source-dir <dir> --signed-dir <dir> --observed-unix <unix>`, only fully quoted, **positive gross** source triangles are selected. The runner's `route_indices` argument explicitly limits execution; empty selection produces zero attempts, not default fallback. Existing source-coverage-mode experiments remain available without `--quote-input`. This does **not** establish net profitability: independently converted network/priority/compute/slippage costs and genuine signed parity are separate acceptance gates. The current exporter selects a small diverse set of source triangles before pricing; candidate breadth and route-specific sizing remain open. The unit tests use mocked fixture/provider data, not new live market evidence.
+
 ## Rules that stop duplicate work
 
 - **Inspect existing implementation and latest CI artifact before opening a work item.** "Not fully validated" does not mean "not implemented".
