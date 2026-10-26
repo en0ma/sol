@@ -49,6 +49,10 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_signed_fee_break_even_haircut.py -v
       - name: Test exact signed-message RPC fee estimation without broadcast or paid-fee claim
         run: python3 -m unittest discover -s tests -p test_signed_message_fee_estimate.py -v
+      - name: Test venue-owned CPMM creator-fee source quotation
+        run: |
+          python3 -m unittest discover -s tests -p test_cpmm_creator_fee_pool_decode.py -v
+          python3 -m unittest discover -s tests -p test_cpmm_creator_fee_venue_math.py -v
       - name: Test CPMM integer fee candidate classification and gross-loss economics
         run: |
           python3 -m unittest discover -s tests -p test_cpmm_native_fee_candidates.py -v

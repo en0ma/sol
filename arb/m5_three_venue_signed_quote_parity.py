@@ -6,7 +6,7 @@ import json
 import sys
 from pathlib import Path
 from arb.m5_three_distinct_venue_signed_acceptance import verify as accept
-from arb.fixture_config_quote_projection import quote_cpmm_only
+from arb.fixture_config_quote_projection import quote_cpmm_only,quote_cpmm_creator_fee_source
 from arb.raydium_amm_v4_fixture_quote import quote_from_fixture
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
 
@@ -63,8 +63,20 @@ def compare(fixture,receipt,*,observed_unix):
             if venues[i]=="raydium_cpmm":
                 leg={"venue":venues[i],"pool":pools[i],"input_mint":mints[i],
                      "output_mint":mints[i+1]}
-                cpmm_result=quote_cpmm_only(fixture,observed_unix=observed_unix,
-                                  leg=leg,amount_in=amounts[i])
+                # The venue owns creator-fee direction and arithmetic.
+                # Source-bound creator-fee state is preferred; legacy fee-only
+                # path remains available for older verified source fixtures.
+                try:
+                    cpmm_result=quote_cpmm_creator_fee_source(
+                        fixture,observed_unix=observed_unix,
+                        leg=leg,amount_in=amounts[i])
+                except ValueError as fee_exc:
+                    if "not authenticated" not in str(fee_exc):
+                        raise
+                    cpmm_result=quote_cpmm_only(
+                        fixture,observed_unix=observed_unix,
+                        leg=leg,amount_in=amounts[i])
+                row["venue_native_fee_detail"]=cpmm_result.get("venue_fee_detail")
                 q=cpmm_result["quote"]
                 candidates=cpmm_result.get("native_fee_candidate_quotes")
                 if isinstance(candidates,dict):
