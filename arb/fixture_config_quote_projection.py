@@ -8,7 +8,7 @@ from arb.fixture_pool_fundamentals import extract
 from arb.fixture_quote_execution_pipeline import extract_pool_states
 from arb.fixture_aux_fee_decoder import decode_native_config_fee
 from arb.authenticated_quote_provider import from_snapshot
-from arb.cpmm_quote import quote_fee_rounding_interval
+from arb.cpmm_quote import quote_fee_rounding_interval,quote_native_fee_candidates
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
 
 def derive(fixture,*,observed_unix):
@@ -88,7 +88,10 @@ def quote_cpmm_only(fixture,*,observed_unix,leg,amount_in):
     reserves=state["vault_base_units"]
     fee_interval=quote_fee_rounding_interval(reserves[i],reserves[1-i],
         amount_in,state["trade_fee_ppm"])
+    candidates=quote_native_fee_candidates(reserves[i],reserves[1-i],
+        amount_in,state["trade_fee_ppm"])
     return {"status":"ACCOUNT_DERIVED_CPMM_INDICATIVE_ONLY",
+            "native_fee_candidate_quotes":candidates,
             "native_fee_rounding_reference":fee_interval,
             "quote":quoted,"protocol_exact_verified":False,
             "signed_execution_reconciled":False,**SAFE}

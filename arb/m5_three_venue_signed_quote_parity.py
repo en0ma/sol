@@ -66,6 +66,15 @@ def compare(fixture,receipt,*,observed_unix):
                 cpmm_result=quote_cpmm_only(fixture,observed_unix=observed_unix,
                                   leg=leg,amount_in=amounts[i])
                 q=cpmm_result["quote"]
+                candidates=cpmm_result.get("native_fee_candidate_quotes")
+                if isinstance(candidates,dict):
+                    row["cpmm_native_fee_candidates"]=candidates
+                    row["cpmm_signed_output_matches_fee_model"]=[
+                        name for name,key in (
+                            ("fractional_invariant","fractional_invariant_output_base_units"),
+                            ("floor_fee_then_swap","floor_fee_then_swap_output_base_units"),
+                            ("ceil_fee_then_swap","ceil_fee_then_swap_output_base_units"))
+                        if candidates.get(key)==received]
                 interval=cpmm_result.get("native_fee_rounding_reference",{}).get(
                     "output_interval_base_units")
                 if (isinstance(interval,list) and len(interval)==2
