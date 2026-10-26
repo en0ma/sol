@@ -10,6 +10,8 @@ SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
 
 def estimate_signed_message_fee(rpc,transaction):
     local_rpc_only(rpc)
+    if not hasattr(transaction,"signatures") or not transaction.signatures:
+        raise ValueError("signed transaction signatures required")
     msg=bytes(transaction.message)
     if not msg:
         raise ValueError("empty signed message")
@@ -20,6 +22,10 @@ def estimate_signed_message_fee(rpc,transaction):
     except (ValueError,KeyError,TypeError,RuntimeError,OSError) as exc:
         return {"status":"FEE_ESTIMATE_UNAVAILABLE",
                 "signed_message_sha256":digest,"reason":str(exc)[:140],**SAFE}
+    # Some JSON-RPC adapters unwrap the result object; others return it
+    # under result. Never treat a missing value as a zero fee.
+    if isinstance(response,dict) and isinstance(response.get("result"),dict):
+        response=response["result"]
     value=response.get("value") if isinstance(response,dict) else None
     if type(value)is not int or value<0:
         return {"status":"FEE_ESTIMATE_UNAVAILABLE",
