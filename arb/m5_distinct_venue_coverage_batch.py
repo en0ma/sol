@@ -63,7 +63,13 @@ def offline_batch(rpc,fixtures,directory,*,observed_unix,fee_observations=None):
             fixture=json.loads(path.read_text())
             result=run_three_venue(rpc,fixture)
             accept(fixture,result)
-            native_aux=inspect_native_aux(fixture)
+            # Auxiliary parsing is diagnostic: it must never erase a genuine
+            # accepted signed execution when a fee/bin account is absent.
+            try:
+                native_aux=inspect_native_aux(fixture)
+            except (ValueError,KeyError,TypeError) as auxiliary_error:
+                native_aux={"status":"AUXILIARY_STATE_UNAVAILABLE",
+                    "reason":str(auxiliary_error)[:240],**SAFE}
             (root/("native-aux-%02d.json"%row["index"])).write_text(
                 json.dumps(native_aux,indent=2)+"\n")
             parity=compare(fixture,result,observed_unix=observed_unix)
