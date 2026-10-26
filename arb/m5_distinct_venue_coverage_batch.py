@@ -9,6 +9,7 @@ from arb.next_ten_pair_fixture_export import export_three_venue
 from arb.next_ten_signed_atomic_offline import run_three_venue
 from arb.m5_three_distinct_venue_signed_acceptance import verify as accept
 from arb.m5_three_venue_signed_quote_parity import compare
+from arb.venue_signed_quote_experiments import measure as measure_signed_quote
 from arb.m5_three_venue_observed_economics import evaluate as evaluate_economics
 from arb.m5_research_evidence_rollup import summarize as rollup
 from arb.m5_source_quote_economic_gate import gate as evidence_gate
@@ -45,6 +46,7 @@ def offline_batch(rpc,fixtures,directory,*,observed_unix,fee_observations=None):
     rows=[]
     parity_reports=[]
     economics_reports=[]
+    experimental_samples=[]
     for row in listing["routes"]:
         if row["status"]!="AUTHENTICATED_THREE_VENUE_SOURCE_FIXTURE":
             rows.append({"index":row["index"],"status":"SOURCE_FIXTURE_BLOCKED",**SAFE})
@@ -61,6 +63,10 @@ def offline_batch(rpc,fixtures,directory,*,observed_unix,fee_observations=None):
             result=run_three_venue(rpc,fixture)
             accept(fixture,result)
             parity=compare(fixture,result,observed_unix=observed_unix)
+            experiment=measure_signed_quote(fixture,result,observed_unix=observed_unix)
+            experimental_samples.extend(experiment["venue_samples"])
+            (root/("signed-price-experiment-%02d.json"%row["index"])).write_text(
+                json.dumps(experiment,indent=2)+"\n")
             # Simulation does not yield an independently assessed fee or
             # authenticated SOL→start-mint conversion; report the actual blocker.
             observation=(fee_observations or {}).get(str(row["index"]))
@@ -92,6 +98,24 @@ def offline_batch(rpc,fixtures,directory,*,observed_unix,fee_observations=None):
     report={"attempted":len(rows),
             "independent_signed_accepted":sum(r.get("independent_signed_accepted") is True for r in rows),
             "independently_validated_quote_samples":0,"routes":rows,**SAFE}
+    report["observed_venue_quote_samples"]=sum(
+        s["sample_status"]=="SIGNED_FORK_QUOTE_COMPARISON" for s in experimental_samples)
+    report["observed_venue_quote_exact_matches"]=sum(
+        s["exact_integer_match"] is True for s in experimental_samples)
+    report["observed_venue_quote_mismatches"]=sum(
+        s["exact_integer_match"] is False for s in experimental_samples)
+    by_venue={}
+    for sample in experimental_samples:
+        venue=sample["venue"]
+        summary=by_venue.setdefault(venue,{"compared":0,"exact":0,"blocked":0,"mismatch":0})
+        if sample["sample_status"]!="SIGNED_FORK_QUOTE_COMPARISON":
+            summary["blocked"]+=1
+        else:
+            summary["compared"]+=1
+            summary["exact" if sample["exact_integer_match"] else "mismatch"]+=1
+    report["signed_price_evidence_by_venue"]=by_venue
+    (root/"signed-price-experiments.json").write_text(json.dumps(
+        {"samples":experimental_samples,"by_venue":by_venue,**SAFE},indent=2)+"\\n")
     evidence=rollup(listing,report,parity_reports,economics_reports)
     (root/"evidence-rollup.json").write_text(json.dumps(evidence,indent=2)+"\n")
     (root/"summary.json").write_text(json.dumps(report,indent=2)+"\n")
