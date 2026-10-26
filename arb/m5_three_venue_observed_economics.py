@@ -66,7 +66,7 @@ def evaluate(fixture,receipt,*,observed_fee_lamports=None,
     if fee_observation is not None:
         if (not isinstance(fee_observation,dict)
                 or fee_observation.get("kind")!="INDEPENDENT_OBSERVED_TRANSACTION_FEE"
-                or fee_observation.get("source") not in ("getTransaction", "getFeeForMessage")
+                or fee_observation.get("source")!="getTransaction"
                 or type(fee_observation.get("lamports")) is not int
                 or fee_observation["lamports"]<0
                 or not isinstance(fee_observation.get("signature_or_message_hash"),str)
@@ -76,6 +76,13 @@ def evaluate(fixture,receipt,*,observed_fee_lamports=None,
         if (observed_fee_lamports is not None
                 and observed_fee_lamports!=fee_observation["lamports"]):
             report["reason"]="INDEPENDENT_FEE_OBSERVATION_CONFLICT"
+            return report
+        # A getTransaction fee is only attributable if the signed execution
+        # receipt itself carries that exact transaction signature. Offline
+        # simulateTransaction has no settled signature; this must fail closed.
+        if (receipt.get("settled_transaction_signature") !=
+                fee_observation["signature_or_message_hash"]):
+            report["reason"]="SETTLED_TRANSACTION_SIGNATURE_NOT_MATCHED"
             return report
         observed_fee_lamports=fee_observation["lamports"]
         report["observed_fee_provenance"]=dict(fee_observation)
