@@ -67,6 +67,8 @@ jobs:
           python3 -m unittest discover -s tests -p test_meteora_dlmm_multibin_quote.py -v
           python3 -m unittest discover -s tests -p test_venue_dlmm_multibin_integration.py -v
           python3 -m unittest discover -s tests -p test_meteora_dlmm_per_bin_fees.py -v
+      - name: Test Meteora DAMM v2 collection mode fee denomination by swap direction
+        run: python3 -m unittest discover -s tests -p test_damm_v2_native_fee_modes.py -v
       - name: Test Meteora DLMM bounded bin and DAMM v2 fee denomination models
         run: |
           python3 -m unittest discover -s tests -p test_meteora_dlmm_one_bin_quote.py -v

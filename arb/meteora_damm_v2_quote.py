@@ -29,3 +29,22 @@ def quote_exact_input(reserve_a,reserve_b,amount_in,*,input_is_a,
             "fee_output_units":output_fee,"fee_denomination":fee_token_side,
             "protocol_exact_verified":False,"requires_authenticated_dynamic_fee":True,
             "actionable":False,"live_execution_approved":False,"broadcast":False}
+
+def quote_collection_mode(reserve_a,reserve_b,amount_in,*,input_is_a,
+                          effective_fee_ppm,collection_mode):
+    """Map DAMM v2 native fee collection semantics to input/output mint.
+
+    Per Meteora's pool detail documentation:
+    BASE_AND_QUOTE charges output for either swap direction;
+    QUOTE_ONLY and QUOTE_COMPOUNDING charge token B regardless of direction.
+    The mode and effective rate MUST be source-decoded by the caller.
+    """
+    if collection_mode=="BASE_AND_QUOTE":
+        side="output"
+    elif collection_mode in ("QUOTE_ONLY","QUOTE_COMPOUNDING"):
+        side="output" if input_is_a else "input"
+    else:
+        raise ValueError("unrecognized DAMM source fee collection mode")
+    return {**quote_exact_input(reserve_a,reserve_b,amount_in,
+        input_is_a=input_is_a,effective_fee_ppm=effective_fee_ppm,
+        fee_token_side=side),"native_collection_mode":collection_mode}
