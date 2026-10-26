@@ -61,3 +61,20 @@ def quote_fee_rounding_interval(reserve_in,reserve_out,amount_in,trade_fee_rate)
     return {"fee_floor_input_units":fee_floor,"fee_ceiling_input_units":fee_ceil,
             "output_interval_base_units":[out(fee_ceil),out(fee_floor)],
             "protocol_exact_verified":False}
+
+def quote_native_fee_candidates(reserve_in,reserve_out,amount_in,trade_fee_rate):
+    """Compare integer fee-debit paths with fractional-invariant CPMM quote.
+
+    These are explicit alternative rounding rules, not claims of matching
+    the currently deployed CPMM implementation.
+    """
+    interval=quote_fee_rounding_interval(reserve_in,reserve_out,amount_in,trade_fee_rate)
+    ratio=quote_exact_input(reserve_in,reserve_out,amount_in,trade_fee_rate)
+    lo,hi=interval["output_interval_base_units"]
+    return {"fractional_invariant_output_base_units":ratio["estimated_output_base_units"],
+            "floor_fee_then_swap_output_base_units":hi,
+            "ceil_fee_then_swap_output_base_units":lo,
+            "fee_floor_input_units":interval["fee_floor_input_units"],
+            "fee_ceil_input_units":interval["fee_ceiling_input_units"],
+            "source_fee_rate_ppm":trade_fee_rate,
+            "protocol_exact_verified":False}
