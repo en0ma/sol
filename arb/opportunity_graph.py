@@ -15,7 +15,8 @@ MAX_HOPS=4
 MAX_POOLS=200
 MAX_CYCLES=2000
 
-def cycles(pools,anchors=None,max_hops=MAX_HOPS,max_cycles=MAX_CYCLES):
+def cycles(pools,anchors=None,max_hops=MAX_HOPS,max_cycles=MAX_CYCLES,truncate=False):
+    if type(truncate) is not bool:raise ValueError("invalid truncation flag")
     if type(max_hops) is not int or not 2<=max_hops<=4:
         raise ValueError("max_hops must be 2..4")
     if type(max_cycles) is not int or not 1<=max_cycles<=10000:
@@ -39,6 +40,7 @@ def cycles(pools,anchors=None,max_hops=MAX_HOPS,max_cycles=MAX_CYCLES):
     anchors=set(anchors) if anchors is not None else set(edges)
     if not anchors:raise ValueError("empty anchors")
     found=[];identities=set()
+    class BoundedDiscoveryComplete(Exception):pass
     def visit(start,current,path,used,visited):
         for e in edges[current]:
             if (e["venue"],e["pool"]) in used:continue
@@ -55,11 +57,16 @@ def cycles(pools,anchors=None,max_hops=MAX_HOPS,max_cycles=MAX_CYCLES):
                     "same_venue":len(set(x["venue"] for x in new))==1,
                     "status":"UNQUOTED","net_profit_lamports":None,
                     "simulation_verified":False,"opportunity_confirmed":False})
-                if len(found)>max_cycles:raise ValueError("cycle budget exceeded")
+                if len(found)>=max_cycles:
+                    if truncate:raise BoundedDiscoveryComplete()
+                    if len(found)>max_cycles:raise ValueError("cycle budget exceeded")
             elif nxt not in visited and len(new)<max_hops:
                 visit(start,nxt,new,used|{(e["venue"],e["pool"])},visited|{nxt})
-    for anchor in sorted(anchors & set(edges)):
-        visit(anchor,anchor,[],set(),{anchor})
+    try:
+        for anchor in sorted(anchors & set(edges)):
+            visit(anchor,anchor,[],set(),{anchor})
+    except BoundedDiscoveryComplete:
+        pass
     return found
 
 def scan(rpc,registry,extra_pairs=(),anchors=None,max_cycles=MAX_CYCLES):
