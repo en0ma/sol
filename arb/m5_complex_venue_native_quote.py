@@ -48,6 +48,12 @@ def quote_auxiliary(fixture, row, *, venue, mint_in, amount_in, auxiliary):
         raise ValueError("MISSING_NATIVE_AUXILIARY_STATE: source pool program owner invalid")
     state=row["decoded_pool_state"]
     if venue=="meteora_dlmm":
+        # The bin-array claims must reference an account actually owned by
+        # the DLMM program; a plain token vault cannot supply bin prices.
+        if not any(a!=row["address"] and
+                   fixture["accounts"][a].get("owner")==PROGRAMS[venue]
+                   for a in addresses):
+            raise ValueError("MISSING_NATIVE_AUXILIARY_STATE: DLMM program-owned bin array evidence required")
         from arb.meteora_dlmm_bin_quote import quote_bins
         required=("bins","total_fee_rate","swap_x_for_y")
         if any(k not in auxiliary for k in required):
