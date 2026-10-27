@@ -16,6 +16,9 @@ def research_chain(fixture, *, amount_in, observed_unix):
     mints=fixture.get("route_mints")
     if not isinstance(mints,list) or len(mints)!=len(rows)+1 or mints[0]!=mints[-1]:
         raise ValueError("closed authenticated route mint topology required")
+    if any(mints[i] not in row["mints"] or mints[i+1] not in row["mints"]
+           for i,row in enumerate(rows)):
+        raise ValueError("source account mint topology differs from route")
     current=amount_in
     trace=[]
     for index,row in enumerate(rows):
@@ -28,7 +31,9 @@ def research_chain(fixture, *, amount_in, observed_unix):
                     "reason":result.get("reason","source native quote missing")[:240],
                     "quoted_legs":trace,"full_route_quoted":False,
                     "signed_simulation_verified":False,"net_profit_verified":False,**SAFE}
-        if result.get("source_slot")!=fixture.get("state_accounts_observed_slot"):
+        if (result.get("pool") not in (None,row["address"]) or
+                result.get("venue") not in (None,row["venue"]) or
+                result.get("source_slot")!=fixture.get("state_accounts_observed_slot")):
             raise ValueError("native quote source slot mismatch")
         next_amount=result.get("predicted_output_base_units")
         if type(next_amount)is not int or not 0<next_amount<2**64:
@@ -40,6 +45,9 @@ def research_chain(fixture, *, amount_in, observed_unix):
     return {"status":"SOURCE_BOUND_INDICATIVE_CHAIN_NOT_EXECUTION_VERIFIED",
             "hops":len(rows),"input_base_units":amount_in,"output_base_units":current,
             "gross_delta_start_mint_base_units":current-amount_in,
+            "estimated_cost_start_mint_base_units":None,
+            "net_delta_start_mint_base_units":None,
+            "net_economics_status":"UNCONVERTED_NETWORK_AND_PRIORITY_COSTS",
             "full_route_quoted":False,"indicative_all_legs":True,
             "quoted_legs":trace,"signed_simulation_verified":False,
             "net_profit_verified":False,**SAFE}
