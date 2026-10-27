@@ -7,6 +7,11 @@ class Transaction:
     message=Message()
     signatures=[b"signed"]
 class Tests(unittest.TestCase):
+    def setUp(self):
+        self.message_encoding=patch("solders.message.to_bytes_versioned",
+                                     return_value=b"exact-signed-message")
+        self.message_encoding.start()
+        self.addCleanup(self.message_encoding.stop)
     @patch("arb.m5_signed_message_fee_estimate.call",return_value={"value":8000})
     def test_exact_signed_message_fee_estimate_never_paid(self,call):
         result=estimate_signed_message_fee("http://127.0.0.1:8899",Transaction())

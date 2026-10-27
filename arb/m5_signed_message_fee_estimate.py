@@ -15,7 +15,10 @@ def estimate_signed_message_fee(rpc,transaction):
     # Verify the signed packet itself before attributing a fee quote to it.
     if hasattr(transaction,"verify"):
         transaction.verify()
-    # Solana RPC accepts the versioned wire format, not MessageV0\n    # untagged bytes. The version discriminator is signed and needed to\n    # interpret ALT lookup account indices in getFeeForMessage.\n    from solders.message import to_bytes_versioned\n    msg=to_bytes_versioned(transaction.message)
+    # A signed VersionedTransaction serializes MessageV0 with a version prefix.
+    # The wire format is required for RPC to resolve v0 lookup account indexes.
+    from solders.message import to_bytes_versioned
+    msg=to_bytes_versioned(transaction.message)
     if not msg:
         raise ValueError("empty signed message")
     digest=hashlib.sha256(msg).hexdigest()
