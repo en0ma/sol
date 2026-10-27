@@ -65,7 +65,7 @@ class ThreeMilestoneIntegrationTests(unittest.TestCase):
         def adapter(fixture,*,leg_index,amount_in,observed_unix):
             amounts.append(amount_in)
             return {"quote_status":"SOURCE_BOUND_INDICATIVE",
-                    "predicted_output_base_units":amount_in+1,"source_slot":42}
+                    "predicted_output_base_units":amount_in+1,"source_slot":42,**SAFE}
         quote.side_effect=adapter
         result=research_chain({"route_mints":["A","B","C","A"],"state_accounts_observed_slot":42},amount_in=100,observed_unix=20)
         self.assertEqual(amounts,[100,101,102])
@@ -84,7 +84,7 @@ class ThreeMilestoneIntegrationTests(unittest.TestCase):
         def adapter(fixture,*,leg_index,amount_in,observed_unix):
             observed.append(amount_in)
             return {"quote_status":"SOURCE_BOUND_INDICATIVE",
-                    "predicted_output_base_units":amount_in+2,"source_slot":42}
+                    "predicted_output_base_units":amount_in+2,"source_slot":42,**SAFE}
         quote.side_effect=adapter
         result=research_chain({"route_mints":["A","B","C","D","A"],
             "state_accounts_observed_slot":42},amount_in=100,observed_unix=20)
