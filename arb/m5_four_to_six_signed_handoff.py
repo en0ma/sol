@@ -52,11 +52,20 @@ def assess(fixture,*,quote_report=None,signed_audit=None):
             signed_audit.get("route_pool_addresses")!=fixture["route_pool_addresses"] or
             signed_audit.get("snapshot_slot")!=fixture["state_accounts_observed_slot"]):
         issues.append("independent four-to-six-hop signed CPI/SPL and rollback receipt missing")
+    # The coordinator cannot safely sign against a hypothetical net-positive
+    # output when actual fees are not converted into the starting mint.
+    if (not isinstance(quote_report,dict) or
+            type(quote_report.get("estimated_cost_start_mint_base_units")) is not int or
+            quote_report.get("estimated_cost_start_mint_base_units",0)<0 or
+            quote_report.get("net_profit_verified") is not True):
+        issues.append("starting-mint total cost and net economics not verified")
     # Execution should NOT be classified accepted by an arbitrary flags-only
     # object; until an independent 4–6-hop auditor is wired, always block.
     issues.append("independent four-to-six-hop acceptance auditor not yet integrated")
     return {"status":"FOUR_TO_SIX_HOP_SIGNED_HANDOFF_BLOCKED",
             "hops":len(rows),"source_slot":fixture["state_accounts_observed_slot"],
             "route_venues":[r["venue"] for r in rows],
-            "blockers":issues,"independently_signed_verified":False,
+            "blockers":issues,"signed_handoff_ready":False,
+            "source_route_pool_addresses":fixture["route_pool_addresses"],
+            "independently_signed_verified":False,
             "net_profit_verified":False,**SAFE}
