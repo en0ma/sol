@@ -25,6 +25,14 @@ class SevenVenueScanner(unittest.TestCase):
         self.assertTrue(all(row["signed_simulation_status"] == "NOT_ATTEMPTED"
                             for row in result["routes"]))
 
+    def test_broad_pool_graph_truncates_with_explicit_nonexhaustive_status(self):
+        result=analyze(snapshot(),max_cycles=1)
+        self.assertEqual(result["connected_cycles"],1)
+        self.assertTrue(result["cycle_inventory_truncated"])
+        self.assertFalse(result["cycle_count_is_exhaustive"])
+        self.assertEqual(result["cycle_budget"],1)
+        self.assertFalse(result["broadcast"])
+
     def test_empty_seven_venue_source_is_explicitly_empty(self):
         report = snapshot()
         report["authenticated_pools"] = {v: [] for v in ORDER}

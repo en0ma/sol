@@ -25,6 +25,14 @@ class OpportunityGraphTests(unittest.TestCase):
         routes=cycles(p,anchors=["A"])
         self.assertGreater(len(routes),0)
         self.assertTrue(any("raydium_amm_v4" in r["venues"] for r in routes))
+    def test_bounded_discovery_keeps_partial_cycle_evidence(self):
+        pools=[self.pool("orca","p-o","A","B"),
+               self.pool("raydium_cpmm","p-c","A","B")]
+        routes=cycles(pools,anchors=["A"],max_cycles=1,truncate=True)
+        self.assertEqual(len(routes),1)
+        self.assertEqual(routes[0]["hops"],2)
+        with self.assertRaises(ValueError):
+            cycles(pools,anchors=["A"],max_cycles=1)
     def test_budget_rejected(self):
         p=[self.pool("orca","a","SOL","USDC"),
            self.pool("raydium_cpmm","b","SOL","USDC")]
