@@ -395,7 +395,7 @@ jobs:
         run: |
           python3 -m arb.m5_seven_venue_public_hints \
             --registry arb/pool_registry.json \
-            --max-per-venue 4 \
+            --max-per-venue 8 \
             --output "$RUNNER_TEMP/m5-seven-venue-untrusted-pool-hints.json"
           python3 -m arb.m5_seven_venue_route_scan \
             --registry "$RUNNER_TEMP/m5-seven-venue-untrusted-pool-hints.json" \

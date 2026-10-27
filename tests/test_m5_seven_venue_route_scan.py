@@ -48,6 +48,9 @@ class SevenVenueScanner(unittest.TestCase):
         self.assertEqual(topology["distinct_mint_pairs"],1)
         self.assertEqual(topology["mint_pair_venue_multiplicity"]["2"],1)
         self.assertEqual(topology["two_core_mints"],0)
+        self.assertEqual(topology["leaf_mints"],2)
+        self.assertEqual(topology["connected_components"],1)
+        self.assertEqual(topology["component_sizes"][0]["pair_count"],1)
         self.assertFalse(topology["broadcast"])
 
     def test_empty_seven_venue_source_is_explicitly_empty(self):
