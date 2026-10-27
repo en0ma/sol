@@ -1,0 +1,33 @@
+import unittest
+from arb.m5_authenticated_multihop_shortlist import shortlist
+
+SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
+def route(hops,venues):
+    mints=["A","B","C","D","E","F","A"]
+    legs=[{"input":mints[i],"output":mints[i+1],
+           "venue":venues[i],"pool":"p"+str(i)} for i in range(hops)]
+    return {"hops":hops,"start_mint":"A","legs":legs}
+class AuthenticatedMultihopShortlistTests(unittest.TestCase):
+    def test_longer_routes_and_venue_diversity_prioritized(self):
+        routes=[route(2,["orca","raydium_cpmm"]),
+                route(4,["orca","raydium_cpmm","raydium_clmm","pumpswap"]),
+                route(4,["orca","raydium_cpmm","raydium_clmm","pumpswap"])]
+        report=shortlist({"routes":routes,"cycle_inventory_truncated":True,**SAFE},maximum=2)
+        self.assertEqual([r["source_graph_route_index"] for r in report["selected"]],[1,0])
+        self.assertEqual(report["selected_by_hops"],{"2":1,"4":1})
+        self.assertFalse(report["selected"][0]["source_quote_verified"])
+        self.assertEqual(report["net_profitable_count"],0)
+        self.assertFalse(report["broadcast"])
+    def test_wrong_mint_or_unsafe_graph_rejected(self):
+        broken=route(2,["orca","raydium_cpmm"])
+        broken["legs"][1]["input"]="X"
+        with self.assertRaises(ValueError):
+            shortlist({"routes":[broken],**SAFE})
+        with self.assertRaises(ValueError):
+            shortlist({"routes":[],"broadcast":True,"actionable":False,
+                       "live_execution_approved":False})
+    def test_no_routes_yields_no_fabricated_candidates(self):
+        result=shortlist({"routes":[],"cycle_inventory_truncated":False,**SAFE})
+        self.assertEqual(result["selected"],[])
+        self.assertEqual(result["native_quoted_count"],0)
+if __name__=="__main__":unittest.main()
