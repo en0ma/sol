@@ -39,6 +39,13 @@ def quote_auxiliary(fixture, row, *, venue, mint_in, amount_in, auxiliary):
            fixture["accounts"][a]["data"][1]!="base64"
            for a in addresses):
         raise ValueError("MISSING_NATIVE_AUXILIARY_STATE: source bytes unavailable")
+    from arb.next_ten_fork_pool_probe import PROGRAMS
+    # Even manifest-consistent fields cannot authenticate a claimed decoder.
+    # Enforce pool program ownership and nonexecutable pricing accounts here;
+    # source manifest integrity alone is not ownership verification.
+    pool_account=fixture["accounts"][row["address"]]
+    if pool_account.get("owner")!=PROGRAMS[venue]:
+        raise ValueError("MISSING_NATIVE_AUXILIARY_STATE: source pool program owner invalid")
     state=row["decoded_pool_state"]
     if venue=="meteora_dlmm":
         from arb.meteora_dlmm_bin_quote import quote_bins
