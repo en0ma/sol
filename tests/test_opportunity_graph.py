@@ -33,6 +33,17 @@ class OpportunityGraphTests(unittest.TestCase):
         self.assertEqual(routes[0]["hops"],2)
         with self.assertRaises(ValueError):
             cycles(pools,anchors=["A"],max_cycles=1)
+    def test_six_hop_cycles_are_reachable_through_same_graph(self):
+        mints=["A","B","C","D","E","F"]
+        venues=["orca","raydium_cpmm","raydium_clmm","raydium_amm_v4",
+                "meteora_dlmm","pumpswap"]
+        pools=[self.pool(venues[i],"p"+str(i),mints[i],mints[(i+1)%6])
+               for i in range(6)]
+        result=cycles(pools,anchors=["A"],max_hops=6,min_hops=6)
+        self.assertTrue(any(row["hops"]==6 for row in result))
+        self.assertEqual(cycles(pools,anchors=["A"],max_hops=5,min_hops=5),[])
+        with self.assertRaises(ValueError):
+            cycles(pools,min_hops=7,max_hops=6)
     def test_budget_rejected(self):
         p=[self.pool("orca","a","SOL","USDC"),
            self.pool("raydium_cpmm","b","SOL","USDC")]

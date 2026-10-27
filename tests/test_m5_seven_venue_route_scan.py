@@ -33,6 +33,13 @@ class SevenVenueScanner(unittest.TestCase):
         self.assertEqual(result["cycle_budget"],1)
         self.assertFalse(result["broadcast"])
 
+    def test_each_hop_length_receives_bounded_search_budget(self):
+        report=analyze(snapshot(),max_cycles=25)
+        self.assertEqual(set(report["cycle_coverage_by_hops"]),set("23456"))
+        self.assertEqual(sum(x["budget"] for x in report["cycle_coverage_by_hops"].values()),25)
+        self.assertEqual(report["cycle_coverage_by_hops"]["2"]["returned"],4)
+        self.assertEqual(report["cycle_coverage_by_hops"]["6"]["returned"],0)
+
     def test_empty_seven_venue_source_is_explicitly_empty(self):
         report = snapshot()
         report["authenticated_pools"] = {v: [] for v in ORDER}
