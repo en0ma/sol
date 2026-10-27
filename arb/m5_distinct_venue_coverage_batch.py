@@ -34,7 +34,7 @@ def source_batch(rpc,readiness,directory,*,maximum=4):
                 fixture=json.loads(path.read_text())
                 auxiliary=inspect_native_aux(fixture)
                 (root/("source-native-aux-%02d.json"%i)).write_text(
-                    json.dumps(auxiliary,indent=2)+"\\n")
+                    json.dumps(auxiliary,indent=2)+"\n")
                 native_status="AUXILIARY_DIAGNOSTICS_CAPTURED"
                 native_missing=sorted({reason for record in auxiliary["venues"]
                                       for reason in record.get("missing",[])})
