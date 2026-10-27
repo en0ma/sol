@@ -68,6 +68,16 @@ class SevenNativeVenueAuxiliaryTests(unittest.TestCase):
                     "native_state_decoder_authenticated":True})
 
     @patch("arb.m5_complex_venue_native_quote.verify")
+    def test_pool_alone_cannot_authenticate_auxiliary_quote(self,verify):
+        fixture=self.fixture()
+        with self.assertRaisesRegex(ValueError,"MISSING_NATIVE_AUXILIARY_STATE"):
+            quote_auxiliary(fixture,self.row("meteora_dlmm"),
+                venue="meteora_dlmm",mint_in="A",amount_in=100,
+                auxiliary={"snapshot_slot":123,
+                    "source_account_addresses":["POOL"],
+                    "native_state_decoder_authenticated":True})
+
+    @patch("arb.m5_complex_venue_native_quote.verify")
     def test_native_dlmm_quote_requires_active_bin_and_uses_existing_math(self,verify):
         aux={"snapshot_slot":123,"source_account_addresses":["POOL","BIN"],
              "native_state_decoder_authenticated":True,"bins":[{"bin_id":5,
