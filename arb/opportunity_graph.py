@@ -15,10 +15,12 @@ MAX_HOPS=4
 MAX_POOLS=200
 MAX_CYCLES=2000
 
-def cycles(pools,anchors=None,max_hops=MAX_HOPS,max_cycles=MAX_CYCLES,truncate=False):
+def cycles(pools,anchors=None,max_hops=MAX_HOPS,max_cycles=MAX_CYCLES,truncate=False,min_hops=2):
     if type(truncate) is not bool:raise ValueError("invalid truncation flag")
-    if type(max_hops) is not int or not 2<=max_hops<=4:
-        raise ValueError("max_hops must be 2..4")
+    if type(max_hops) is not int or not 2<=max_hops<=6:
+        raise ValueError("max_hops must be 2..6")
+    if type(min_hops) is not int or not 2<=min_hops<=max_hops:
+        raise ValueError("invalid minimum cycle length")
     if type(max_cycles) is not int or not 1<=max_cycles<=10000:
         raise ValueError("invalid cycle limit")
     if len(pools)>MAX_POOLS:raise ValueError("pool budget exceeded")
@@ -47,7 +49,7 @@ def cycles(pools,anchors=None,max_hops=MAX_HOPS,max_cycles=MAX_CYCLES,truncate=F
             nxt=e["output"]
             new=path+[e]
             if nxt==start:
-                if len(new)<2:continue
+                if len(new)<min_hops:continue
                 identity=tuple((x["venue"],x["pool"],x["input"]) for x in new)
                 if identity in identities:continue
                 identities.add(identity)
