@@ -54,9 +54,8 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix):
                "snapshot_slot":row["snapshot_slot"]}
         elif v=="raydium_clmm":
             from arb.fixture_aux_fee_decoder import decode_native_config_fee
-            from arb.raydium_clmm_tick_decode import initialized_ticks,next_boundary
-            from arb.raydium_clmm_within_tick_quote import quote_within_tick
-            from arb.orca_tick_math import sqrt_price_from_tick_index
+            from arb.raydium_clmm_tick_decode import initialized_ticks
+            from arb.raydium_clmm_cross_tick_quote import quote_across_initialized_ticks
             import base64
             from arb.raydium_clmm_ticks import SIZE,DISC
             state=row["decoded_pool_state"]
@@ -82,11 +81,11 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix):
                 candidates.extend(initialized_ticks(raw,start,state["tick_spacing"]))
             if not candidates:
                 raise ValueError("CLMM initialized source ticks unavailable")
-            index=next_boundary(candidates,state["tick_current"],downward)
-            native=quote_within_tick(state,leg["input_mint"],amount_in,fee,
-                sqrt_price_from_tick_index(index))
+            native=quote_across_initialized_ticks(
+                state,leg["input_mint"],amount_in,fee,candidates,
+                max_crossings=32)
             q={**leg,"amount_in":amount_in,
-               "amount_out":native["estimated_output_base_units"],
+               "amount_out":native["amount_out"],
                "snapshot_slot":row["snapshot_slot"]}
         elif v in ("meteora_dlmm","meteora_damm_v2","pumpswap"):
             from arb.m5_complex_venue_native_quote import quote_auxiliary
