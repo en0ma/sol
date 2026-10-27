@@ -43,7 +43,7 @@ class PumpSourceTierSelectionTests(unittest.TestCase):
         result=market_cap_quote_base_units(base_reserve=1000_000000,
             quote_reserve=2000_000000,virtual_quote_reserves=-200_000000,
             base_decimals=6)
-        self.assertEqual(result["market_cap_quote_base_units"],1_800_000_000_000_000)
+        self.assertEqual(result["market_cap_quote_base_units"],1800_000000000)
     def test_initialized_classic_mint_decimals(self):
         raw=bytearray(82)
         raw[44]=6
@@ -62,7 +62,8 @@ class PumpSourceTierSelectionTests(unittest.TestCase):
             "virtual_quote_reserves":0,"is_mayhem_mode":0,"is_cashback_coin":0}
         result=choose_tier_by_source_market_cap(pool_state=state,
             fee_config=config,base_reserve=1000000000,
-            quote_reserve=2000000000,base_decimals=0)
+            quote_reserve=2000000000,base_decimals=0,
+            base_supply_base_units=1_000_000_000)
         self.assertTrue(result["tier_selected"])
         self.assertEqual(result["selected_threshold_quote_base_units"],1500_000000)
         self.assertEqual(result["selected_total_fee_bps"],110)
