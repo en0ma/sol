@@ -19,15 +19,19 @@ def initialized_ticks(raw,start,spacing):
         pos=FIRST_TICK+i*TICK_BYTES
         index=int.from_bytes(raw[pos:pos+4],"little",signed=True)
         expected=start+i*spacing
-        # Verify even uninitialized tick indexes: a malformed packed layout
-        # must never be interpreted as usable liquidity.
-        if index!=expected:
-            raise ValueError("unexpected CLMM tick-array index layout")
         net=int.from_bytes(raw[pos+4:pos+20],"little",signed=True)
         gross=int.from_bytes(raw[pos+20:pos+36],"little")
+        # Real Raydium initialized-only TickState arrays leave the tick field
+        # at zero for unused slots. Their position still denotes expected;
+        # only populated slots may attest an initialized price boundary.
         if gross:
+            if index!=expected:
+                raise ValueError("initialized CLMM tick-array index mismatches source position")
             if abs(net)>gross:
                 raise ValueError("invalid CLMM initialized tick liquidity")
+        elif net or index not in (0,expected):
+            raise ValueError("uninitialized CLMM tick has nonzero liquidity or forged index")
+        if gross:
             result.append({"tick_index":index,"liquidity_net":net,"liquidity_gross":gross})
         elif net:
             raise ValueError("uninitialized tick has nonzero net liquidity")
