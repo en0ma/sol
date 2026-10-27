@@ -32,12 +32,14 @@ class FourToSixNativeSweepTests(unittest.TestCase):
         self.assertEqual(r["protocol_exact_route_count"],0)
         self.assertEqual(r["net_profitable_route_count"],0)
         self.assertFalse(r["broadcast"])
+    @patch("arb.m5_four_to_six_native_amount_sweep.walk")
     @patch("arb.m5_four_to_six_native_amount_sweep.research_chain")
     @patch("arb.m5_four_to_six_native_amount_sweep.quote_leg")
     @patch("arb.m5_four_to_six_native_amount_sweep.extract_pool_states")
-    def test_unsafe_native_leg_fails_closed(self,states,quote,chain):
+    def test_unsafe_native_leg_fails_closed(self,states,quote,chain,walk):
         states.return_value=self.rows()
         chain.return_value={"status":"NATIVE_ROUTE_INDICATIVE_BLOCKED","quoted_legs":[]}
+        walk.return_value={"status":"MULTIHOP_NATIVE_SOURCE_INTERVAL_BLOCKED"}
         quote.return_value={"quote_status":"SOURCE_BOUND_INDICATIVE",
                             **{**SAFE,"broadcast":True}}
         with self.assertRaisesRegex(ValueError,"unsafe"):

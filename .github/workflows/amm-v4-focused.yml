@@ -597,6 +597,33 @@ jobs:
               except Exception:time.sleep(2)
           else:raise SystemExit("offline RPC unavailable")
           PY
+      - name: Execute source-captured four-to-six-hop signed isolated Surfpool trial
+        if: ${{ matrix.shard == 0 }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/m5-four-to-six-signed-attempt"
+          if [ -s "$RUNNER_TEMP/m5-four-to-six-source-fixture.json" ]; then
+            python3 -m arb.next_ten_signed_atomic_offline \
+              --four-to-six-venue-fixture "$RUNNER_TEMP/m5-four-to-six-source-fixture.json" \
+              --output-dir "$RUNNER_TEMP/m5-four-to-six-signed-attempt"
+          else
+            printf '%s\n' '{"status":"NO_AUTHENTICATED_FOUR_TO_SIX_HOP_SOURCE_FIXTURE","signed_atomic_simulation_verified":false,"actionable":false,"broadcast":false,"live_execution_approved":false}' > "$RUNNER_TEMP/m5-four-to-six-signed-attempt/four-to-six-venue.json"
+          fi
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          p=Path(os.environ["RUNNER_TEMP"])/"m5-four-to-six-signed-attempt/four-to-six-venue.json"
+          result=json.loads(p.read_text())
+          print(json.dumps({"four_to_six_signed_status":result["status"],
+                "signed_atomic_simulation_verified":result.get("signed_atomic_simulation_verified",False),
+                "rollback_failure_case_verified":result.get("rollback_failure_case_verified",False),
+                "diagnostic":result.get("diagnostic"),"broadcast":False}))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() && matrix.shard == 0 }}
+        with:
+          name: m5-four-to-six-source-bound-signed-surfpool-trial
+          path: ${{ runner.temp }}/m5-four-to-six-signed-attempt/
+          if-no-files-found: warn
       - name: Attempt actual three-distinct-venue signed closed route and last-hop rollback
         if: ${{ matrix.shard == 0 }}
         run: |
