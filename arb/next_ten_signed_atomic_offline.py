@@ -615,11 +615,48 @@ def run_four_to_six_venue(rpc,fixture,*,amount_in=100_000,program_cache=None):
             source_slot=fixture["state_accounts_observed_slot"])
     return receipt
 
+def run_four_to_six_size_sweep(rpc,fixture,*,amounts,program_cache=None):
+    """Try several genuine signed atomics against one authenticated fork fixture.
+
+    Re-hydrate source state on every amount attempt; a failed simulation
+    cannot poison later trials. Program ELF cache is safe across attempts
+    because the on-chain ELF digest is tied to the captured source account.
+    """
+    if (not isinstance(amounts,(list,tuple)) or not 1<=len(amounts)<=8 or
+            len(set(amounts))!=len(amounts) or
+            any(type(a)is not int or not 0<a<2**64 for a in amounts)):
+        raise ValueError("1 to 8 distinct positive isolated input amounts required")
+    attempts=[]
+    cache={} if program_cache is None else program_cache
+    for amount in amounts:
+        result={"status":"SIGNED_SIZE_TRIAL_BLOCKED",
+                "signed_atomic_simulation_verified":False,**SAFETY}
+        try:
+            result=run_four_to_six_venue(rpc,fixture,amount_in=amount,
+                program_cache=cache)
+        except (ValueError,TypeError,KeyError,RuntimeError,OSError) as exc:
+            result.update(error_class=type(exc).__name__,
+                diagnostic=str(exc)[:500])
+        if any(result.get(k) is not False for k in SAFETY):
+            raise ValueError("unsafe local source signed size result")
+        attempts.append({"input_base_units":amount,"receipt":result})
+    verified=[a for a in attempts if (
+        a["receipt"].get("signed_atomic_simulation_verified") is True and
+        a["receipt"].get("rollback_failure_case_verified") is True and
+        a["receipt"].get("signed_cpi_per_leg_verified") is True and
+        a["receipt"].get("status")=="SIGNED_N_LEG_ATOMIC_AND_ROLLBACK_VERIFIED")]
+    return {"status":"SIGNED_MULTISIZE_SOURCE_OFFLINE_TRIALS",
+        "attempts":attempts,"attempt_count":len(attempts),
+        "atomic_and_rollback_receipt_count":len(verified),
+        "selected_receipt":verified[0]["receipt"] if verified else None,
+        "independently_audited_receipt_count":0,**SAFETY}
+
 def main():
     p=argparse.ArgumentParser()
     p.add_argument("--fixture-dir")
     p.add_argument("--three-venue-fixture")
     p.add_argument("--four-to-six-venue-fixture")
+    p.add_argument("--four-to-six-amounts",default="10000,100000,1000000")
     p.add_argument("--output-dir",required=True)
     p.add_argument("--batch",choices=("first","next","remaining","non-v4"),default="first")
     p.add_argument("--shard-index",type=int,default=0)
@@ -640,8 +677,17 @@ def main():
              "signed_atomic_simulation_verified":False,**SAFETY}
         (root/"four-to-six-venue.json").write_text(json.dumps(out,indent=2)+"\n")
         try:
-            out=run_four_to_six_venue("http://127.0.0.1:8899",
-                                     json.loads(path.read_text()),program_cache={})
+            amounts=tuple(int(a) for a in args.four_to_six_amounts.split(","))
+            report=run_four_to_six_size_sweep(
+                "http://127.0.0.1:8899",json.loads(path.read_text()),
+                amounts=amounts,program_cache={})
+            for attempt in report["attempts"]:
+                (root/("signed-size-"+str(attempt["input_base_units"])+".json")).write_text(
+                    json.dumps(attempt["receipt"],indent=2)+"\n")
+            (root/"four-to-six-signed-size-sweep.json").write_text(
+                json.dumps({k:v for k,v in report.items() if k!="attempts"},
+                           indent=2)+"\n")
+            out=report["selected_receipt"] or report["attempts"][0]["receipt"]
         except Exception as exc:
             out.update(error_class=type(exc).__name__,diagnostic=str(exc)[:500])
         (root/"four-to-six-venue.json").write_text(json.dumps(out,indent=2)+"\n")
