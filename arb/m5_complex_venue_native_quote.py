@@ -22,11 +22,14 @@ def quote_auxiliary(fixture, row, *, venue, mint_in, amount_in, auxiliary):
     if (type(auxiliary.get("snapshot_slot"))is not int
             or auxiliary["snapshot_slot"]!=slot
             or not isinstance(addresses,list) or not addresses
+            or len(addresses)!=len(set(addresses))
             or any(not isinstance(a,str) or a not in fixture["state_account_addresses"]
                    for a in addresses)
             or row["address"] not in addresses
             or auxiliary.get("native_state_decoder_authenticated") is not True):
         raise ValueError("MISSING_NATIVE_AUXILIARY_STATE: authenticated same-slot decoder and account bindings required")
+    if any(fixture["accounts"][a] is None for a in addresses):
+        raise ValueError("MISSING_NATIVE_AUXILIARY_STATE: captured source account not present")
     state=row["decoded_pool_state"]
     if venue=="meteora_dlmm":
         from arb.meteora_dlmm_bin_quote import quote_bins
