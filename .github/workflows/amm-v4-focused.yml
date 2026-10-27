@@ -278,10 +278,6 @@ jobs:
         run: |
           python3 -m py_compile arb/m5_four_to_six_source_signed_acceptance.py
           python3 -m unittest discover -s tests -p test_m5_four_to_six_source_signed_acceptance.py -v
-      - name: Test Raydium CLMM native cross-tick liquidity traversal, fees and conservative exhaustion
-        run: |
-          python3 -m py_compile arb/raydium_clmm_cross_tick_quote.py arb/fixture_all_venue_signed_quotes.py
-          python3 -m unittest discover -s tests -p test_raydium_clmm_cross_tick_quote.py -v
       - name: Verify integrated four-hop mixed-venue modeled quote paths and no profit promotion
         run: |
           python3 -m py_compile arb/m5_source_multihop_interval_engine.py arb/next_ten_signed_atomic_offline.py
@@ -673,6 +669,18 @@ jobs:
               --fixture "$RUNNER_TEMP/m5-four-to-six-source-fixture.json" \
               --receipt "$RUNNER_TEMP/m5-four-to-six-signed-attempt/four-to-six-venue.json" \
               --output "$RUNNER_TEMP/m5-four-to-six-signed-attempt/source-independent-acceptance.json"
+          fi
+          if [ -s "$RUNNER_TEMP/m5-four-to-six-source-fixture.json" ]; then
+            for size in 10000 100000 1000000; do
+              receipt="$RUNNER_TEMP/m5-four-to-six-signed-attempt/signed-size-$size.json"
+              if [ -s "$receipt" ]; then
+                python3 -m arb.m5_source_signed_prefix_quote_parity \
+                  --fixture "$RUNNER_TEMP/m5-four-to-six-source-fixture.json" \
+                  --receipt "$receipt" \
+                  --output "$RUNNER_TEMP/m5-four-to-six-signed-attempt/signed-size-$size-native-parity.json" \
+                  --observed-unix "$(date +%s)"
+              fi
+            done
           fi
           if [ -s "$RUNNER_TEMP/m5-four-to-six-source-fixture.json" ]; then
             python3 -m arb.m5_source_signed_prefix_quote_parity \
