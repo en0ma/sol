@@ -14,8 +14,8 @@ def evaluate_cycle(candidate, *, as_of_unix, max_age_seconds=60):
     if not isinstance(candidate,dict):
         raise ValueError("candidate must be a dict")
     legs=candidate.get("legs")
-    if not isinstance(legs,list) or not 2<=len(legs)<=4:
-        raise ValueError("research requires 2 to 4 observed legs")
+    if not isinstance(legs,list) or not 2<=len(legs)<=6:
+        raise ValueError("research requires 2 to 6 observed legs")
     reasons=[]
     mint=candidate.get("start_mint")
     first=legs[0]
