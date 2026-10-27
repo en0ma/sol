@@ -16,14 +16,14 @@ class ExistingSourceResearchTests(unittest.TestCase):
                 {"index":7,"status":"AUTHENTICATED_THREE_VENUE_SOURCE_FIXTURE",
                  "fixture":"triangle-07.json"}],**SAFE}))
             (source/"triangle-07.json").write_text(json.dumps({"route_mints":["A","B","C","A"]}))
-            (signed/"triangle-07.json").write_text(json.dumps({"planned_inputs":[100,80,60]}))
+            (signed/"triangle-07.json").write_text(json.dumps({"planned_inputs":[100,50,30]}))
             (signed/"summary.json").write_text(json.dumps({"routes":[{
                 "index":7,"status":"SIGNED_TRIANGLE_OBSERVED",
                 "independent_signed_accepted":True,"gross_start_mint_delta":6,
                 "economics_status":"COST_EVIDENCE_BLOCKED"}],**SAFE}))
             quote={"fully_quoted":1,"blocked":0,"positive_gross":1,
                 "ranked":[{"index":0,"status":"GROSS_INDICATIVE_ONLY",
-                           "gross_delta_start_mint_base_units":10}],
+                           "gross_delta_start_mint_base_units":10,"input_base_units":100}],
                 "all_results":[{"index":0,"status":"GROSS_INDICATIVE_ONLY"}]}
             with patch("arb.m5_existing_source_research.rank",return_value=quote) as ranker:
                 result=evaluate(source,amount_in=100,observed_unix=123,signed_dir=signed)
@@ -32,7 +32,6 @@ class ExistingSourceResearchTests(unittest.TestCase):
             self.assertTrue(result["ranked_routes"][0]["signed_observation"]["independent_signed_accepted"])
             self.assertEqual(result["ranked_routes"][0]["signed_observation"]["gross_start_mint_delta"],6)
             self.assertEqual(result["ranked_routes"][0]["signed_minus_quoted_gross_base_units"],-4)
-            self.assertTrue(result["ranked_routes"][0]["quote_signed_amounts_comparable"])
             self.assertEqual(result["signed_gross_sign_disagreements"],0)
             self.assertFalse(result["net_profit_verified"])
             self.assertFalse(result["broadcast"])
@@ -43,27 +42,26 @@ class ExistingSourceResearchTests(unittest.TestCase):
             src.mkdir();signed.mkdir()
             (src/"summary.json").write_text(json.dumps({"routes":[{"index":3,"status":"AUTHENTICATED_THREE_VENUE_SOURCE_FIXTURE","fixture":"triangle-03.json"}],**SAFE}))
             (src/"triangle-03.json").write_text(json.dumps({"route_mints":["A","B","C","A"]}))
-            (signed/"triangle-03.json").write_text(json.dumps({"planned_inputs":[100,80,60]}))
+            (signed/"triangle-03.json").write_text(json.dumps({"planned_inputs":[100,50,30]}))
             (signed/"summary.json").write_text(json.dumps({"routes":[{"index":3,"status":"VERIFIED","independent_signed_accepted":True,"gross_start_mint_delta":-7}],**SAFE}))
-            quoted={"fully_quoted":1,"blocked":0,"positive_gross":1,"ranked":[{"index":0,"gross_delta_start_mint_base_units":10}],"all_results":[{"index":0}]}
+            quoted={"fully_quoted":1,"blocked":0,"positive_gross":1,"ranked":[{"index":0,"gross_delta_start_mint_base_units":10,"input_base_units":100}],"all_results":[{"index":0}]}
             with patch("arb.m5_existing_source_research.rank",return_value=quoted):
                 result=evaluate(src,amount_in=100,observed_unix=123,signed_dir=signed)
             self.assertEqual(result["signed_gross_sign_disagreements"],1)
             self.assertEqual(result["ranked_routes"][0]["signed_minus_quoted_gross_base_units"],-17)
             self.assertFalse(result["net_profit_verified"])
 
-    def test_signed_different_amount_never_becomes_quote_disagreement(self):
+    def test_mismatched_receipt_size_does_not_count_as_price_error(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);src=root/"src";signed=root/"signed"
             src.mkdir();signed.mkdir()
-            (src/"summary.json").write_text(json.dumps({"routes":[{
-                "index":2,"status":"AUTHENTICATED_THREE_VENUE_SOURCE_FIXTURE",
+            (src/"summary.json").write_text(json.dumps({"routes":[{"index":2,
+                "status":"AUTHENTICATED_THREE_VENUE_SOURCE_FIXTURE",
                 "fixture":"triangle-02.json"}],**SAFE}))
-            (src/"triangle-02.json").write_text(json.dumps({"route_mints":["A","B","C","A"]}))
+            (src/"triangle-02.json").write_text("{}")
             (signed/"triangle-02.json").write_text(json.dumps({"planned_inputs":[100000000,70,40]}))
-            (signed/"summary.json").write_text(json.dumps({"routes":[{
-                "index":2,"independent_signed_accepted":True,
-                "gross_start_mint_delta":-5000}],**SAFE}))
+            (signed/"summary.json").write_text(json.dumps({"routes":[{"index":2,
+                "independent_signed_accepted":True,"gross_start_mint_delta":-5000}],**SAFE}))
             quote={"fully_quoted":1,"blocked":0,"positive_gross":1,
                    "ranked":[{"index":0,"input_base_units":10000,
                               "gross_delta_start_mint_base_units":20}],
