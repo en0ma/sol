@@ -1,5 +1,37 @@
 # Sol — Agent operating instructions
 
+## PRIMARY DIRECTIVE — INTEGRATED ENGINEERING EXECUTION (user directive, 2026-10-27)
+
+**On every "Proceed", read this entire AGENTS.md, the active milestone ledger and roadmap, inspect current branch HEAD and CI, then implement the broadest coherent production batch across the COMPLETE seven-venue M5 milestone.** This policy applies to every future engineering prompt, not only requests explicitly mentioning the agent file. Do not treat a single decoder, standalone test, or improved blocker report as completion of an engineering batch.
+
+### Mandatory simultaneous workstreams
+
+1. **Native pricing across all incomplete venues:** advance Meteora DLMM bin traversal and effective dynamic fees; Meteora DAMM v2 native fee scheduler, fee collection and curve calculations; PumpSwap market-cap tier, effective fee mode, accrued liabilities and reserves; Orca Whirlpool and Raydium CLMM cross-tick handling; and Raydium CPMM/AMM v4 source-fee and reserve reconciliation. Identify and work on multiple actionable gaps in the same batch rather than selecting the easiest venue and deferring the others.
+2. **Authenticated end-to-end 2–6-hop economics:** integrate those exact venue-owned quote adapters with existing authenticated graph routes and single-slot source fixtures, propagate exact-input integer amounts, account for transaction/priority costs in the starting mint when verifiable, and rank only genuinely evidenced candidates.
+3. **Independently verified offline Surfpool execution:** reuse the existing generic 2–6-leg route compiler and signed simulator; build genuine source-bound signed atomic attempts with intermediate SPL/CPI accounting, negative controls, rollback validation and durable receipts. Do not equate a quote or a signed fixture with independent atomic acceptance.
+
+**Develop all three workstreams within one coherent batch** to the extent real evidence and dependencies permit. Inspect signatures, production callers, existing tests and source artifacts before writing new code. Reuse established engines; avoid separate duplicate quote coordinators or report-only alternatives.
+
+### Implementation-first acceptance
+
+**Commit implementations rather than documenting blockers.** When a missing decoder, algorithm, source-account integration, fee calculation, routing link or signed execution path is known, implement that production functionality and wire it into the existing pipeline before describing remaining limitations. A new TODO, blocker ledger, diagnostic wrapper, test alone, document, or green CI run does NOT count as substantive milestone delivery.
+
+Implement authoritative protocol behavior where supported; validate real on-chain layouts, rounding, dynamic fees, vault identity and simulation evidence. If an exact protocol behavior cannot be independently established, fail closed, make substantive progress on independently implementable workstreams, and report the precise remaining verification dependency. **Do not guess protocols, synthesize source accounts, inflate success claims, or mark indicative outputs executable.**
+
+### Mandatory scope and push discipline
+
+Target **three meaningful milestone-scoped implementation commits, at least 1,000 newly written or substantively rewritten production source-code lines per milestone commit**, and one coherent push after integration/tests when feasible. Exclude tests, documentation, generated material, comments, whitespace, copied code, filler and diagnostics-only changes from qualifying lines. Do not pad code to reach numerical targets. Report actual eligible line deltas, rather than claiming this target without measuring. A batch below the threshold must be marked incomplete; urgency/safety or explicitly requested policy-only commits may be exceptions, clearly disclosed.
+
+**Do not stop and push after the first workstream.** Complete the available native-pricing, multihop, and signed-verification implementations together, add adversarial and real-source regressions, and inspect both current-HEAD GitHub Actions jobs and actual evidence artifacts. One green workflow, three commits, or one fixed decoder does not satisfy the objective.
+
+### Non-negotiable safety and delivery evidence
+
+This is strictly research and isolated signing/simulation only. Never broadcast swaps or enable live trading; always keep `actionable=false`, `broadcast=false`, and `live_execution_approved=false`. No invented pools, fees, profits, protocol-exact quotes, signed success or rollback receipts.
+
+At each completed engineering response report: (1) user-facing production behavior actually implemented for **each** of the three workstreams; (2) measured qualifying production source-code lines per commit; (3) integration and caller wiring; (4) genuine slot/pool/source and independent signed CPI/SPL/rollback evidence, or explicitly unverified; (5) pushed SHA and exact-SHA CI results; (6) remaining technical gaps. Separate implemented, mocked, source authenticated, quoted, signed simulated and independently accepted statuses.
+
+**Definition of success:** an operational source-authenticated seven-venue native-pricing, amount-aware multihop opportunity research, and independently audited signed offline Surfpool pipeline—not the creation of small commits, helper modules, or longer lists of blockers.
+
 Read this file, [docs/MILESTONE_EXECUTION_LEDGER.md](docs/MILESTONE_EXECUTION_LEDGER.md), and [docs/ROADMAP_AND_ARCHITECTURE.md](docs/ROADMAP_AND_ARCHITECTURE.md) before making changes. The roadmap is the durable record of user-agreed design directions and acceptance criteria. Update it whenever a design decision, target, or milestone changes.
 
 ## PRIMARY DELIVERY MANDATE — M5 Working Seven-Venue Arbitrage Opportunity Discovery and Offline Verification (user priority, 2026-10-26)
