@@ -1,7 +1,7 @@
 """Decode DLMM LbPair static fee configuration from actual 904-byte account.
 
 Source layout: 8-byte Anchor discriminator, 32-byte StaticParameters,
-16-byte VariableParameters. Base fee is exact static numerator in 1e9
+32-byte VariableParameters. Base fee is exact static numerator in 1e9
 precision; dynamic rate requires a fresh volatility reference update, so this
 module never substitutes the base rate for an effective swap fee.
 """
@@ -37,12 +37,12 @@ def static_parameters(raw):
 def variable_parameters(raw):
     if type(raw)is not bytes or len(raw)!=SIZE or raw[:8]!=DISC:
         raise ValueError("invalid DLMM LbPair bytes for volatility decoder")
-    b=raw[40:56]
+    b=raw[40:72]
     u=lambda offset,size:int.from_bytes(b[offset:offset+size],"little")
     return {"volatility_accumulator":u(0,4),
             "volatility_reference":u(4,4),
             "index_reference":int.from_bytes(b[8:12],"little",signed=True),
-            "last_update_timestamp":u(12,4)}
+            "last_update_timestamp":int.from_bytes(b[16:24],"little",signed=True)}
 
 def source_fee_bounds(raw, *, bin_step, observed_unix):
     if type(bin_step)is not int or not 0<bin_step<10000:
