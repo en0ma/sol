@@ -399,6 +399,9 @@ jobs:
           PY
       - name: Prioritize source-authenticated four-to-six-hop venue-diverse research leads
         run: |
+          if [ ! -s "$RUNNER_TEMP/m5-broad-source-route-candidates.json" ]; then
+            echo "Broad source graph unavailable: no shortlist is claimed"; exit 0
+          fi
           python3 -m arb.m5_authenticated_multihop_shortlist \
             --graph "$RUNNER_TEMP/m5-broad-source-route-candidates.json" \
             --maximum 30 --output "$RUNNER_TEMP/m5-authenticated-multihop-shortlist.json"
