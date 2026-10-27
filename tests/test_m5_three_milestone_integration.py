@@ -67,11 +67,29 @@ class ThreeMilestoneIntegrationTests(unittest.TestCase):
             return {"quote_status":"SOURCE_BOUND_INDICATIVE",
                     "predicted_output_base_units":amount_in+1,"source_slot":42}
         quote.side_effect=adapter
-        result=research_chain({},amount_in=100,observed_unix=20)
+        result=research_chain({"route_mints":["A","B","C","A"],"state_accounts_observed_slot":42},amount_in=100,observed_unix=20)
         self.assertEqual(amounts,[100,101,102])
         self.assertEqual(result["gross_delta_start_mint_base_units"],3)
         self.assertFalse(result["full_route_quoted"])
         self.assertFalse(result["net_profit_verified"])
+    @patch("arb.m5_source_indicative_route_chain.extract_pool_states")
+    @patch("arb.m5_source_indicative_route_chain.quote_leg")
+    def test_four_hop_native_amounts_are_chained_but_remain_indicative(self,quote,states):
+        states.return_value=[{"venue":v,"address":str(i)} for i,v in enumerate(
+            ("orca","raydium_cpmm","raydium_clmm","raydium_amm_v4"))]
+        observed=[]
+        def adapter(fixture,*,leg_index,amount_in,observed_unix):
+            observed.append(amount_in)
+            return {"quote_status":"SOURCE_BOUND_INDICATIVE",
+                    "predicted_output_base_units":amount_in+2,"source_slot":42}
+        quote.side_effect=adapter
+        result=research_chain({"route_mints":["A","B","C","D","A"],
+            "state_accounts_observed_slot":42},amount_in=100,observed_unix=20)
+        self.assertEqual(observed,[100,102,104,106])
+        self.assertEqual(result["output_base_units"],108)
+        self.assertFalse(result["full_route_quoted"])
+        self.assertFalse(result["signed_simulation_verified"])
+
     @patch("arb.m5_four_to_six_signed_handoff.verify")
     @patch("arb.m5_four_to_six_signed_handoff.extract_pool_states")
     def test_signed_handoff_must_not_accept_unverified_four_hop_claim(self,states,verify):
