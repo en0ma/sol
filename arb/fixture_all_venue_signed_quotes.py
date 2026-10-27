@@ -115,8 +115,8 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix):
                     return {"venue":v,"pool":pool,"leg_index":leg_index,
                         "source_slot":row["snapshot_slot"],
                         "predicted_output_base_units":None,
-                        "quote_status":"NATIVE_QUOTE_BOUNDED_NOT_EXACT"
-                            if "lower_output_bound" in candidate else "NATIVE_QUOTE_BLOCKED",
+                        "quote_status":"NATIVE_QUOTE_MODELED_NOT_EXACT"
+                            if "minimum_candidate_output" in candidate else "NATIVE_QUOTE_BLOCKED",
                         "native_fee_envelope":candidate,
                         "reason":"effective PumpSwap market-cap tier and mode unverified",
                         "protocol_exact_verified":False,**SAFE}
@@ -127,7 +127,7 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix):
                     return {"venue":v,"pool":pool,"leg_index":leg_index,
                         "source_slot":row["snapshot_slot"],
                         "predicted_output_base_units":None,
-                        "quote_status":"NATIVE_QUOTE_BOUNDED_NOT_EXACT",
+                        "quote_status":"NATIVE_QUOTE_MODELED_NOT_EXACT",
                         "native_fee_envelope":candidate,
                         "reason":"DAMM v2 fee scheduler and curve model unverified",
                         "protocol_exact_verified":False,**SAFE}

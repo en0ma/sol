@@ -44,7 +44,7 @@ def walk(fixture,*,input_base_units,observed_unix,max_branches=16):
                 candidates=[output] if type(output)is int and 0<output<2**64 else []
                 hypothetical=branch["hypothetical"]
                 bounded=branch["source_bounded"]
-            elif status=="NATIVE_QUOTE_BOUNDED_NOT_EXACT":
+            elif status in ("NATIVE_QUOTE_BOUNDED_NOT_EXACT","NATIVE_QUOTE_MODELED_NOT_EXACT"):
                 envelope=q.get("native_fee_envelope")
                 if not isinstance(envelope,dict) or any(
                         envelope.get(k)is not False for k in SAFE):
@@ -53,6 +53,10 @@ def walk(fixture,*,input_base_units,observed_unix,max_branches=16):
                 if row["venue"]=="meteora_damm_v2":
                     low=envelope.get("lower_modeled_output")
                     high=envelope.get("upper_modeled_output")
+                    hypothetical=True
+                elif row["venue"]=="pumpswap":
+                    low=envelope.get("minimum_candidate_output")
+                    high=envelope.get("maximum_candidate_output")
                     hypothetical=True
                 else:
                     low=envelope.get("lower_output_bound")
@@ -104,6 +108,7 @@ def walk(fixture,*,input_base_units,observed_unix,max_branches=16):
         "maximum_modeled_gross_delta":max(outs)-input_base_units,
         "hypothetical_fee_model_present":any(b["hypothetical"] for b in branches),
         "source_bounded_scenario_present":any(b["source_bounded"] for b in branches),
+        "scenario_envelope_not_true_interval":any(b["hypothetical"] for b in branches),
         "completed_branches":branches,"failed_branches":failures,
         "source_slot":fixture["state_accounts_observed_slot"],
         "full_route_quote_verified":False,
