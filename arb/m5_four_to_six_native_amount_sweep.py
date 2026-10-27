@@ -7,6 +7,7 @@ liquidity, no net-profit labels, no live execution.
 from arb.fixture_quote_execution_pipeline import extract_pool_states
 from arb.fixture_all_venue_signed_quotes import quote_leg
 from arb.m5_source_indicative_route_chain import research_chain
+from arb.m5_source_multihop_interval_engine import walk
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
 
 def sweep(fixture, *, observed_unix, amounts=(10000,100000,1000000)):
@@ -16,7 +17,6 @@ def sweep(fixture, *, observed_unix, amounts=(10000,100000,1000000)):
             any(type(x)is not int or not 0<x<2**64 for x in amounts) or
             any(fixture.get(k)is not False for k in SAFE)):
         raise ValueError("safe four-to-six-hop source amount sweep required")
-    from arb.m5_source_multihop_interval_engine import walk
     attempts=[]
     venue_probes=[]
     modeled_intervals=[]
