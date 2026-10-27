@@ -6,7 +6,7 @@ class SevenNativeVenueAuxiliaryTests(unittest.TestCase):
     def fixture(self):
         return {"state_accounts_observed_slot":123,
             "state_account_addresses":["POOL","BIN","FEE"],
-            "accounts":{"POOL":{"executable":False},"BIN":{"executable":False},"FEE":{"executable":False}}}
+            "accounts":{"POOL":{"executable":False,"data":["AA==","base64"]},"BIN":{"executable":False},"FEE":{"executable":False}}}
     def row(self,venue):
         state={"token_x_mint":"A","token_y_mint":"B","active_id":5,
                "token_a_mint":"A","token_b_mint":"B",
@@ -55,6 +55,16 @@ class SevenNativeVenueAuxiliaryTests(unittest.TestCase):
                 venue="meteora_dlmm",mint_in="A",amount_in=100,
                 auxiliary={"snapshot_slot":123,
                     "source_account_addresses":["POOL","BIN"],
+                    "native_state_decoder_authenticated":True})
+
+    @patch("arb.m5_complex_venue_native_quote.verify")
+    def test_rejects_source_account_without_base64_evidence(self,verify):
+        fixture=self.fixture()
+        fixture["accounts"]["BIN"]["data"]=["not-base64","jsonParsed"]
+        with self.assertRaisesRegex(ValueError,"source bytes unavailable"):
+            quote_auxiliary(fixture,self.row("meteora_dlmm"),
+                venue="meteora_dlmm",mint_in="A",amount_in=100,
+                auxiliary={"snapshot_slot":123,"source_account_addresses":["POOL","BIN"],
                     "native_state_decoder_authenticated":True})
 
     @patch("arb.m5_complex_venue_native_quote.verify")
