@@ -41,6 +41,9 @@ def audit(root,*,batch="remaining",only_venue=None):
                            "verified_route_occurrences":venue_verified[venue],
                            "unverified_route_occurrences":failing_venue_occurrences[venue]}
                     for venue,count in sorted(venue_totals.items())}
+    # Explicitly distinguish actual independent signed research from any
+    # hypothetical source quote or complete economic verification.
+    signed_complete=(verified==len(routes))
     return {"status":"SEVEN_VENUE_ADAPTIVE_RESEARCH","target":len(routes),
             "unverified_route_count":len(failures),
             "unverified_routes":failures,
@@ -49,6 +52,9 @@ def audit(root,*,batch="remaining",only_venue=None):
             "dlmm_unverified_routes":dlmm_affected,
             "venue_signed_coverage":venue_coverage,
             "verified":verified,"routes":rows,
+            "all_selected_signed_routes_verified":signed_complete,
+            "complete_native_route_quotes_verified":0,
+            "net_profitable_routes_verified":0,
             "full_42_adaptive_verified":False,
             "independently_validated_quote_samples":0,**SAFE}
 
