@@ -459,6 +459,10 @@ jobs:
               --fixture "$RUNNER_TEMP/m5-four-to-six-source-fixture.json" \
               --amount 100000 --observed-unix "$(date +%s)" \
               --output "$RUNNER_TEMP/m5-four-to-six-native-chain.json"
+            python3 -m arb.m5_four_to_six_native_amount_sweep \
+              --fixture "$RUNNER_TEMP/m5-four-to-six-source-fixture.json" \
+              --observed-unix "$(date +%s)" \
+              --output "$RUNNER_TEMP/m5-four-to-six-native-amount-sweep.json"
             python3 - <<'PY'
           import json,os
           from pathlib import Path
@@ -483,6 +487,7 @@ jobs:
             ${{ runner.temp }}/m5-four-to-six-source-fixture.json
             ${{ runner.temp }}/m5-four-to-six-source-capture.json
             ${{ runner.temp }}/m5-four-to-six-native-chain.json
+            ${{ runner.temp }}/m5-four-to-six-native-amount-sweep.json
             ${{ runner.temp }}/m5-four-to-six-signed-handoff.json
           if-no-files-found: warn
       - name: Validate authenticated source graph connectivity and disclose short-route dominance
