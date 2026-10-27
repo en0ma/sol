@@ -49,6 +49,20 @@ def assess(fixture,receipt):
             any(type(x)is not int or not 0<x<2**64 for x in amounts)):
         errors.append("invalid declared signed amounts")
         amounts=None
+    prefixes=receipt.get("signed_prefix_observations")
+    if not isinstance(prefixes,list) or len(prefixes)!=n-1 or amounts is None:
+        errors.append("independent source-route signed prefix observations missing")
+    else:
+        for i,observation in enumerate(prefixes):
+            if (not isinstance(observation,dict) or
+                    observation.get("index")!=i or
+                    observation.get("venue")!=fixture["route_venues"][i] or
+                    observation.get("pool")!=fixture["route_pool_addresses"][i] or
+                    observation.get("amount_in")!=amounts[i] or
+                    observation.get("observed_output")!=amounts[i+1] or
+                    type(observation.get("compute_units"))is not int or
+                    observation["compute_units"]<=0):
+                errors.append("independent signed prefix amount continuity leg "+str(i))
     start=receipt.get("initial_balances_base_units")
     if (not isinstance(start,list) or len(start)!=n+1 or
             amounts is None or start!=[amounts[0]]+[0]*n):

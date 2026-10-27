@@ -26,6 +26,11 @@ class AuthenticatedSignedSourceAcceptanceTests(unittest.TestCase):
                 "quote_accuracy_verified":False,
                 "source_snapshot_slot":None,
                 "planned_inputs":[100,90,80,70],
+                "signed_prefix_observations":[{"index":i,
+                    "venue":f["route_venues"][i],"pool":f["route_pool_addresses"][i],
+                    "amount_in":amount,"observed_output":output,
+                    "compute_units":15000} for i,(amount,output) in
+                    enumerate(((100,90),(90,80),(80,70)))],
                 "initial_balances_base_units":[100,0,0,0,0],
                 "positive_post_balances_base_units":[0,0,0,0,60],
                 "cpi_hops":[{"hop":i,"account":"user_token_"+str(i),
