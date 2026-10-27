@@ -18,6 +18,25 @@ class Tests(unittest.TestCase):
             self.assertEqual(report["exported"],3)
             self.assertEqual(export.call_count,3)
             self.assertFalse(report["broadcast"])
+    def test_source_auxiliary_account_evidence_exported_without_fee_invention(self):
+        with tempfile.TemporaryDirectory() as directory,patch(
+            "arb.m5_distinct_venue_coverage_batch.export_three_venue") as export,patch(
+            "arb.m5_distinct_venue_coverage_batch.inspect_native_aux") as decode:
+            def produce(rpc,ready,index,path):
+                Path(path).write_text(json.dumps({"fixture":"captured"}))
+                return {"status":"AUTHENTICATED_THREE_VENUE_SOURCE_FIXTURE"}
+            export.side_effect=produce
+            decode.return_value={"source_slot":123,"venues":[{"venue":"meteora_dlmm",
+                "missing":["decoded_dynamic_fee_parameters"],"fully_priced":False}],
+                "full_native_fee_pricing_verified":False}
+            report=source_batch("http://127.0.0.1:8899",
+                {"authenticated_pools":self.pools()},directory,maximum=1)
+            self.assertEqual(report["native_auxiliary_diagnostics_captured"],1)
+            evidence=json.loads((Path(directory)/"source-native-aux-00.json").read_text())
+            self.assertFalse(evidence["full_native_fee_pricing_verified"])
+            self.assertIn("decoded_dynamic_fee_parameters",report["routes"][0]["native_auxiliary_missing"])
+            self.assertFalse(report["broadcast"])
+
     def test_signed_gate_controls_success_count(self):
         with tempfile.TemporaryDirectory() as source,tempfile.TemporaryDirectory() as output:
             root=Path(source)
