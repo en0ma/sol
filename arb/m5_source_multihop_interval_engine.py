@@ -44,6 +44,23 @@ def walk(fixture,*,input_base_units,observed_unix,max_branches=16):
                 candidates=[output] if type(output)is int and 0<output<2**64 else []
                 hypothetical=branch["hypothetical"]
                 bounded=branch["source_bounded"]
+            elif status=="NATIVE_QUOTE_SOURCE_DERIVED_NOT_EXACT":
+                envelope=q.get("native_fee_envelope")
+                detail=(envelope.get("source_derived_dynamic_fee_quote")
+                        if isinstance(envelope,dict) else None)
+                if (not isinstance(detail,dict) or
+                        detail.get("status")!="SOURCE_VOLATILITY_DYNAMIC_FEE_MODELED"
+                        or any(detail.get(key)is not False for key in SAFE)
+                        or any(envelope.get(key)is not False for key in SAFE)
+                        or envelope.get("source_slot")!=fixture["state_accounts_observed_slot"]
+                        or detail.get("source_clock")!=observed_unix):
+                    raise ValueError("source-derived DLMM dynamic fee attestation malformed")
+                output=detail.get("amount_out")
+                if type(output)is not int or not 0<output<2**64:
+                    raise ValueError("invalid native volatility amount")
+                candidates=[output]
+                hypothetical=branch["hypothetical"]
+                bounded=True
             elif status in ("NATIVE_QUOTE_BOUNDED_NOT_EXACT","NATIVE_QUOTE_MODELED_NOT_EXACT"):
                 envelope=q.get("native_fee_envelope")
                 if not isinstance(envelope,dict) or any(

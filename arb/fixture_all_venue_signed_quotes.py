@@ -103,8 +103,11 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix):
                     return {"venue":v,"pool":pool,"leg_index":leg_index,
                         "source_slot":row["snapshot_slot"],
                         "predicted_output_base_units":None,
-                        "quote_status":"NATIVE_QUOTE_BOUNDED_NOT_EXACT"
-                             if "lower_output_bound" in bound else "NATIVE_QUOTE_BLOCKED",
+                        "quote_status":("NATIVE_QUOTE_SOURCE_DERIVED_NOT_EXACT"
+                            if isinstance(bound.get("source_derived_dynamic_fee_quote"),dict)
+                            and type(bound["source_derived_dynamic_fee_quote"].get("amount_out")) is int
+                            else "NATIVE_QUOTE_BOUNDED_NOT_EXACT"
+                            if "lower_output_bound" in bound else "NATIVE_QUOTE_BLOCKED"),
                         "native_fee_envelope":bound,
                         "reason":"effective DLMM dynamic fee and execution parity unverified",
                         "protocol_exact_verified":False,**SAFE}
