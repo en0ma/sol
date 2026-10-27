@@ -465,7 +465,8 @@ jobs:
           from arb.m5_four_to_six_signed_handoff import assess
           root=Path(os.environ["RUNNER_TEMP"])
           fixture=json.loads((root/"m5-four-to-six-source-fixture.json").read_text())
-          report=assess(fixture)
+          native=json.loads((root/"m5-four-to-six-native-chain.json").read_text())
+          report=assess(fixture,quote_report=native)
           (root/"m5-four-to-six-signed-handoff.json").write_text(
               json.dumps(report,indent=2)+"\n")
           print(json.dumps({"four_to_six_signed_handoff":report["status"],
