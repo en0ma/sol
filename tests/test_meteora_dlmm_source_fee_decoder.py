@@ -1,7 +1,7 @@
 import unittest
 from arb.meteora_dlmm_source_fee_decoder import (
     static_parameters,variable_parameters,source_fee_bounds,
-    FEE_PRECISION,MAX_FEE_NUMERATOR
+    FEE_PRECISION,MAX_FEE_NUMERATOR,dynamic_fee_rate_by_bin
 )
 from arb.meteora_dlmm import SIZE,DISC
 
@@ -41,6 +41,44 @@ class NativeDlmmFeeSourceTests(unittest.TestCase):
         self.assertFalse(result["dynamic_fee_verified"])
         self.assertFalse(result["protocol_exact_verified"])
         self.assertFalse(result["broadcast"])
+    def test_dynamic_volatility_fee_increases_with_bin_crossings(self):
+        raw=bytes(self.pool())
+        result=dynamic_fee_rate_by_bin(raw,bin_step=25,
+            observed_unix=123456790,active_bin_id=5,
+            visited_bin_ids=[5,4,3],swap_x_for_y=True)
+        rates=[x["effective_fee_rate"] for x in result["rates"]]
+        self.assertEqual(len(rates),3)
+        self.assertEqual(rates,sorted(rates))
+        self.assertEqual(result["updated_volatility_reference"],10)
+        self.assertFalse(result["protocol_exact_verified"])
+    def test_decay_window_updates_reference_bin(self):
+        raw=bytes(self.pool())
+        result=dynamic_fee_rate_by_bin(raw,bin_step=25,
+            observed_unix=123456800,active_bin_id=7,
+            visited_bin_ids=[7,8],swap_x_for_y=False)
+        self.assertEqual(result["reference_bin_id"],7)
+        self.assertEqual(result["updated_volatility_reference"],10)
+        self.assertEqual(result["rates"][0]["volatility_accumulator"],10)
+        self.assertEqual(result["rates"][1]["volatility_accumulator"],5000)
+    def test_idle_decay_resets_volatility_reference(self):
+        raw=bytes(self.pool())
+        result=dynamic_fee_rate_by_bin(raw,bin_step=25,
+            observed_unix=123456850,active_bin_id=7,
+            visited_bin_ids=[7],swap_x_for_y=False)
+        self.assertEqual(result["updated_volatility_reference"],0)
+        self.assertEqual(result["rates"][0]["variable_fee_rate"],0)
+    def test_y_only_fee_collection_requires_supported_denominator(self):
+        raw=self.pool()
+        raw[36]=1
+        with self.assertRaisesRegex(ValueError,"output-denominated"):
+            dynamic_fee_rate_by_bin(bytes(raw),bin_step=25,
+                observed_unix=123456850,active_bin_id=7,
+                visited_bin_ids=[7],swap_x_for_y=True)
+    def test_discontinuous_bin_sequence_fails_closed(self):
+        with self.assertRaisesRegex(ValueError,"contiguous"):
+            dynamic_fee_rate_by_bin(bytes(self.pool()),bin_step=25,
+                observed_unix=123456790,active_bin_id=5,
+                visited_bin_ids=[5,3],swap_x_for_y=True)
     def test_rejects_volatility_exceeding_configured_cap(self):
         raw=self.pool()
         raw[40:44]=(6000).to_bytes(4,"little")
