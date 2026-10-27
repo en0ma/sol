@@ -12,10 +12,11 @@ VENUES=frozenset(("orca","raydium_cpmm","raydium_clmm","meteora_dlmm",
                   "meteora_damm_v2","pumpswap","raydium_amm_v4"))
 
 def quote_leg(fixture,*,leg_index,amount_in,observed_unix):
-    if type(leg_index)is not int or not 0<=leg_index<3 or type(amount_in)is not int or not 0<amount_in<2**64:
+    if type(leg_index)is not int or not 0<=leg_index<6 or type(amount_in)is not int or not 0<amount_in<2**64:
         raise ValueError("invalid signed leg number or amount")
     rows=extract_pool_states(fixture)
-    if len(rows)!=3:raise ValueError("three source-bound decoded pool states required")
+    if not 2<=len(rows)<=6 or leg_index>=len(rows):
+        raise ValueError("two to six source-bound decoded pool states required")
     row=rows[leg_index]
     v=row["venue"]
     m=fixture["route_mints"]
