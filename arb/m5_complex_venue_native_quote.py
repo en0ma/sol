@@ -28,8 +28,9 @@ def quote_auxiliary(fixture, row, *, venue, mint_in, amount_in, auxiliary):
             or row["address"] not in addresses
             or auxiliary.get("native_state_decoder_authenticated") is not True):
         raise ValueError("MISSING_NATIVE_AUXILIARY_STATE: authenticated same-slot decoder and account bindings required")
-    if any(fixture["accounts"][a] is None for a in addresses):
-        raise ValueError("MISSING_NATIVE_AUXILIARY_STATE: captured source account not present")
+    if any(not isinstance(fixture["accounts"][a],dict) or
+           fixture["accounts"][a].get("executable") is not False for a in addresses):
+        raise ValueError("MISSING_NATIVE_AUXILIARY_STATE: captured source account not present or executable")
     state=row["decoded_pool_state"]
     if venue=="meteora_dlmm":
         from arb.meteora_dlmm_bin_quote import quote_bins
