@@ -39,6 +39,13 @@ def quote_auxiliary(fixture, row, *, venue, mint_in, amount_in, auxiliary):
            fixture["accounts"][a]["data"][1]!="base64"
            for a in addresses):
         raise ValueError("MISSING_NATIVE_AUXILIARY_STATE: source bytes unavailable")
+    import base64
+    try:
+        if any(not base64.b64decode(fixture["accounts"][a]["data"][0],validate=True)
+               for a in addresses):
+            raise ValueError("source auxiliary account data empty")
+    except (ValueError,TypeError,base64.binascii.Error) as exc:
+        raise ValueError("MISSING_NATIVE_AUXILIARY_STATE: invalid captured account bytes") from exc
     from arb.next_ten_fork_pool_probe import PROGRAMS
     # Even manifest-consistent fields cannot authenticate a claimed decoder.
     # Enforce pool program ownership and nonexecutable pricing accounts here;
@@ -48,7 +55,6 @@ def quote_auxiliary(fixture, row, *, venue, mint_in, amount_in, auxiliary):
         raise ValueError("MISSING_NATIVE_AUXILIARY_STATE: source pool program owner invalid")
     # Validate the claimed decoded pool mint identities against manifest bytes.
     # No caller-supplied decoded state can override its actual source account.
-    import base64
     from arb.next_ten_fork_pool_probe import DECODERS,MINT_KEYS
     encoded=pool_account["data"]
     decoded=DECODERS[venue](base64.b64decode(encoded[0],validate=True))
