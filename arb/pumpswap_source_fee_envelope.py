@@ -40,7 +40,7 @@ def quote_fee_candidates(fixture,*,pool,mint_in,amount_in):
     base,quote=fundamentals["vault_base_units"]
     accrued=state["protocol_fees"]+state["creator_fees"]
     virtual=state["virtual_quote_reserves"]
-    if any(type(x)is not int for x in (base,quote,accrued,virtual)) or min(base,quote)<=0 or accrued<0 or accrued>=quote or virtual<0:
+    if any(type(x)is not int for x in (base,quote,accrued,virtual)) or min(base,quote)<=0 or accrued<0 or accrued>=quote or quote+virtual<=0:
         raise ValueError("invalid source PumpSwap fee liabilities")
     base_mint,quote_mint=state["base_mint"],state["quote_mint"]
     if mint_in not in (base_mint,quote_mint):raise ValueError("PumpSwap input direction mismatch")
@@ -55,6 +55,27 @@ def quote_fee_candidates(fixture,*,pool,mint_in,amount_in):
         candidates.append((name,fees))
     for kind,tiers in (("standard",fee["fee_tiers"]),("stable",fee["stable_fee_tiers"])):
         candidates.extend((kind+":"+str(t["market_cap_threshold"]),t["fees"]) for t in tiers)
+    # The canonical source mint account supplies actual decimals. The
+    # source fee tier's threshold is in the corresponding quote base unit.
+    selected=None
+    if base_mint in included and base_mint in fixture["accounts"]:
+        from arb.pumpswap_source_tier_selector import (
+            choose_tier_by_source_market_cap,mint_decimals_from_account)
+        mint_account=fixture["accounts"][base_mint]
+        from arb.token_vaults import TOKEN_PROGRAM
+        encoded_mint=mint_account.get("data")
+        if (mint_account.get("owner")==TOKEN_PROGRAM and
+                mint_account.get("executable") is False and
+                isinstance(encoded_mint,list) and len(encoded_mint)==2 and
+                encoded_mint[1]=="base64"):
+            decimals=mint_decimals_from_account(
+                base64.b64decode(encoded_mint[0],validate=True))
+            selected=choose_tier_by_source_market_cap(
+                pool_state=state,fee_config=fee,
+                base_reserve=base,quote_reserve=quote,
+                base_decimals=decimals)
+    if selected is not None and selected.get("tier_selected") is True:
+        candidates=[("selected_onchain_source_tier",selected["fees"])]
     outcomes=[]
     for name,fees in candidates:
         values=[fees[k] for k in ("lp_fee_bps","protocol_fee_bps")]+[
@@ -76,6 +97,8 @@ def quote_fee_candidates(fixture,*,pool,mint_in,amount_in):
             "source_slot":fixture["state_accounts_observed_slot"],"pool":pool,
             "input_mint":mint_in,"amount_in":amount_in,
             "candidate_count":len(outcomes),"candidates":outcomes,
+            "canonical_source_tier_selection":selected,
+            "fee_mode_selected_from_source":selected is not None and selected.get("tier_selected") is True,
             "minimum_candidate_output":min(x["amount_out"] for x in outcomes),
             "maximum_candidate_output":max(x["amount_out"] for x in outcomes),
             "all_possible_fee_modes_exhaustively_verified":False,
