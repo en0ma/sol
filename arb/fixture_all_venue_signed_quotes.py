@@ -93,6 +93,7 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix):
             fee=decode_native_config_fee(v,state,fixture)["trade_fee_ppm"]
             downward=leg["input_mint"]==state["token_mint_0"]
             candidates=[]
+            array_starts=[]
             for address in fixture["state_account_addresses"]:
                 account=fixture["accounts"].get(address,{})
                 if account.get("owner")!="CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK" or account.get("executable") is not False:
@@ -109,11 +110,13 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix):
                     raise ValueError("CLMM captured tick array has noncanonical PDA")
                 if start%(60*state["tick_spacing"])!=0:
                     raise ValueError("CLMM source tick array start is misaligned")
+                array_starts.append(start)
                 candidates.extend(initialized_ticks(raw,start,state["tick_spacing"]))
             if not candidates:
                 raise ValueError("CLMM initialized source ticks unavailable")
             native=quote_across_initialized_ticks(
-                state,leg["input_mint"],amount_in,fee,candidates,
+                {**state,"authenticated_tick_array_starts":array_starts},
+                leg["input_mint"],amount_in,fee,candidates,
                 max_crossings=32)
             q={**leg,"amount_in":amount_in,
                "amount_out":native["amount_out"],
