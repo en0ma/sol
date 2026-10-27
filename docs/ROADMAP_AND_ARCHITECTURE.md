@@ -10,6 +10,12 @@
 
 **Delivery discipline:** batch broad, meaningful vertical-slice changes with tests; normally at least three substantive commits per engineering push rather than narrow single-fix pushes. Existing modules must be audited and reused, not recreated. Update the ledger for evidence and missing integrations. CI-green or more model diagnostics alone does not complete M5.
 
+## Three-milestone delivery discipline and active engineering targets — 2026-10-27
+
+The user explicitly requires each engineering batch to advance three independent M5 targets in parallel: **(1) real seven-venue amount-aware source-native quote evidence**, **(2) authenticated four-to-six-hop capture and common-start-mint economics**, and **(3) isolated signed Surfpool execution with independent CPI/SPL/rollback audit**. Three commits addressing one narrow defect do **not** satisfy this standard. Use the existing discovery, adapters, compiler, signer, and independent auditor; preserve nonbroadcast safety flags.
+
+New work connects real four-to-six-hop graph leads to single-context source-fixture capture and existing manifest decoding, introduces three-leg source-native indicative amount propagation, and records why four-to-six-hop signed execution is not independently verified. These are **partial integrations**, not completed milestone acceptance. The signed auditor and full effective quote models remain outstanding; report partial / blocked / verified states for each of the three targets with current-HEAD CI and artifact evidence.
+
 ## Current engineering checklist — 2026-10-25
 
 **Primary active work tracking:** [MILESTONE_EXECUTION_LEDGER.md](MILESTONE_EXECUTION_LEDGER.md). This ledger audits completed venue adapters, atomic execution, historical 42/42 evidence and generic compiler; it tracks outstanding adaptive multi-leg coordination, per-venue effective pricing, observed costs, and CI acceptance. Do not redo completed infrastructure. This section supersedes any older roadmap phrasing suggesting the primary adapters or atomic engine are still missing.

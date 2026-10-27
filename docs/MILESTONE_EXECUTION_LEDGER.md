@@ -14,6 +14,16 @@
 - [ ] **M5-E2E-03 — Isolated signed route verification.** Send eligible candidates through the *existing* generic signed Surfpool simulation and independent CPI/SPL/negative rollback acceptance; persist genuine attempts/acceptances/rejections and safe flags. Preserve historical proofs separately; do not broadcast.
 - [ ] **M5-E2E-04 — Repeatable operating entry point and regression CI.** Make the end-to-end process runnable from a documented command/workflow with machine-readable evidence; test incomplete venues, stale state, unconvertible costs, empty candidates, simulated failures and all safety gates. Inspect CI jobs/artifacts at the exact pushed SHA before claiming an accepted milestone.
 
+## Three parallel M5 milestone slices — 2026-10-27 (engineering, not acceptance)
+
+The user now requires each ordinary batch to advance **three distinct milestones**, not count three narrow commits as progress. See root `AGENTS.md`. The following changes are **advanced, not independently completed**, until real current-head Surfpool artifacts prove the full criteria.
+
+1. **Native venue quote integration:** `arb/m5_source_indicative_route_chain.py` propagates actual amount-aware outputs from the existing authenticated three-leg native quote dispatcher without upgrading indicative output into exact quotes or verified profit. Full seven-venue effective fees, larger tick/bin traversal, and protocol parity remain open.
+2. **Authentic four-to-six-hop sources:** `arb/m5_four_to_six_source_capture.py` reuses existing source-authentication, venue auxiliary account capture, program-ELF capture, one-context inventory, and manifest digest for real graph routes. `arb/fixture_quote_execution_pipeline.py` accepts that source topology; the existing M5 runner/CLI can request the artifact. New focused CI *attempts* a genuine four-hop source capture in the broad seven-venue graph job. This is not yet proof of a completed quote or signed atomic attempt.
+3. **Independent signed verification:** `arb/m5_four_to_six_signed_handoff.py` and runner integration expose explicit quote/receipt/auditor blockers, instead of borrowing historical three-leg signed evidence as a four-to-six-hop acceptance. The existing 2–6-hop compiler must still be connected to a signed offline run and an independently verified multi-leg CPI/SPL/rollback auditor; signed M5 acceptance remains **unchecked**.
+
+**Evidence threshold:** CI test results and fresh `m5-four-to-six-source-capture.json` plus (if successful) `m5-four-to-six-source-fixture.json`. Never infer current authenticated pool counts, native prices, successful four-hop signed execution or net profitability from unit tests alone. All source and report safe flags must remain false.
+
 ## M5-E2E — Integrated signed research runner checkpoint (2026-10-26)
 
 The `arb/m5_seven_venue_route_scan.py` entry point now composes existing read-only seven-venue authenticated pool probing and route graph construction with the **already built** `source_batch` source-triangle fixture exporter and `offline_batch` signed Surfpool execution/parity/economics/evidence rollup. Invocation modes are explicit and independently auditable:
