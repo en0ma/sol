@@ -73,6 +73,22 @@ def assess(fixture,receipt):
                 errors.append("independent signed SPL/CPI continuity hop "+str(i))
             if isinstance(hop,dict) and isinstance(hop.get("account"),str):
                 seen.add(hop["account"])
+    import re
+    positive_digest=receipt.get("signed_transaction_sha256")
+    negative_digest=receipt.get("negative_signed_transaction_sha256")
+    if (not isinstance(positive_digest,str) or
+            not re.fullmatch(r"[0-9a-f]{64}",positive_digest) or
+            not isinstance(negative_digest,str) or
+            not re.fullmatch(r"[0-9a-f]{64}",negative_digest) or
+            positive_digest==negative_digest or
+            receipt.get("signed_packet_crypto_bound") is not True):
+        errors.append("independently bound positive and negative signed packet hashes missing")
+    pos_sig=receipt.get("signed_transaction_signature")
+    neg_sig=receipt.get("negative_signed_transaction_signature")
+    if (not isinstance(pos_sig,str) or len(pos_sig)<64
+            or not isinstance(neg_sig,str) or len(neg_sig)<64
+            or pos_sig==neg_sig):
+        errors.append("distinct verified signed control signatures missing")
     packet=receipt.get("signed_packet_bytes")
     if type(packet)is not int or not 100<=packet<=1232:
         errors.append("actual signed Solana packet size unverified")

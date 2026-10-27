@@ -33,6 +33,11 @@ class AuthenticatedSignedSourceAcceptanceTests(unittest.TestCase):
                     "received_base_units":amount,"consumed_base_units":amount}
                     for i,amount in enumerate((90,80,70),1)],
                 "signed_packet_bytes":1100,
+                "signed_transaction_sha256":"a"*64,
+                "negative_signed_transaction_sha256":"b"*64,
+                "signed_transaction_signature":"A"*88,
+                "negative_signed_transaction_signature":"B"*88,
+                "signed_packet_crypto_bound":True,
                 "negative_error":"{'InstructionError': [3, 'Custom']}",
                 "negative_failure_instruction_index":3,
                 "negative_packet_bytes":1100,
@@ -69,6 +74,13 @@ class AuthenticatedSignedSourceAcceptanceTests(unittest.TestCase):
         states.return_value=self.rows()
         r=self.receipt()
         r["negative_error"]="{'InstructionError': [2, 'Custom']}"
+        self.assertTrue(assess(self.fixture(),r)["failure_reasons"])
+    @patch("arb.m5_four_to_six_source_signed_acceptance.extract_pool_states")
+    @patch("arb.m5_four_to_six_source_signed_acceptance.verify")
+    def test_replayed_identical_signed_negative_control_rejected(self,verify,states):
+        states.return_value=self.rows()
+        r=self.receipt()
+        r["negative_signed_transaction_sha256"]=r["signed_transaction_sha256"]
         self.assertTrue(assess(self.fixture(),r)["failure_reasons"])
     @patch("arb.m5_four_to_six_source_signed_acceptance.extract_pool_states")
     @patch("arb.m5_four_to_six_source_signed_acceptance.verify")
