@@ -30,7 +30,7 @@ def advance_sqrt(liquidity,at,net,zero_for_one):
     return at+net*Q//liquidity
 
 def quote_across_initialized_ticks(state,mint_in,amount_in,fee_rate_ppm,ticks,
-                                  *,max_crossings=32,require_all_intermediate=True):
+                                  *,max_crossings=32):
     """Simulate crossing source-initialized ticks, respecting per-tick liquidity net.
 
     Fee rounding is per swap step. A limit-cross requires enough gross input to
