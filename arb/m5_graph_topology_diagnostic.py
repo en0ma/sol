@@ -37,7 +37,31 @@ def audit(readiness):
         for v in leaves:
             for other in remaining[v]:remaining[other].discard(v)
             del remaining[v]
+    # Candidate-depth diagnostics are source-only: they identify missing
+    # connectivity, never infer profitability or invented pool liquidity.
+    branching_mints=sorted((mint for mint,d in degrees.items() if d>=2))
+    leaf_count=sum(d==1 for d in degrees.values())
+    components=[]
+    unseen=set(adj)
+    while unseen:
+        start=min(unseen);pending=[start];component=set()
+        while pending:
+            mint=pending.pop()
+            if mint in component:continue
+            component.add(mint);pending.extend(adj[mint]-component)
+        unseen-=component
+        components.append({"mint_count":len(component),
+                           "pair_count":sum(len(adj[m]) for m in component)//2,
+                           "degree_ge_two":sum(degrees[m]>=2 for m in component)})
+    components.sort(key=lambda x:(-x["pair_count"],-x["mint_count"]))
     return {"status":"AUTHENTICATED_GRAPH_TOPOLOGY_DIAGNOSTIC",
+        "connected_components":len(components),
+        "component_sizes":components,
+        "leaf_mints":leaf_count,
+        "branching_mint_count":len(branching_mints),
+        "four_to_six_hop_feasibility_note":(
+            "Small source token core or missing cross-pair links can prevent longer mint-simple cycles;"
+            " broaden mutually connected mint pairs rather than adding parallel pools alone."),
         "authenticated_pools":len(rows),"distinct_token_mints":len(adj),
         "distinct_mint_pairs":len(pairs),
         "mint_pair_venue_multiplicity":{str(k):v for k,v in sorted(pair_sizes.items())},
