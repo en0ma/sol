@@ -45,9 +45,15 @@ def inspect_fixture(fixture, *, observed_unix, amounts=(10000,100000,1000000)):
                 "reason":observed.get("reason") if status=="NATIVE_QUOTE_BLOCKED"
                          else "indicative quote; protocol exactness unverified",
                 "protocol_exact_verified":False,**SAFE})
+    from collections import Counter
+    counts=Counter((r["venue"],r["status"]) for r in leg_probes)
+    per_venue={venue:{"indicative":counts[(venue,"SOURCE_BOUND_INDICATIVE")],
+                       "blocked":counts[(venue,"NATIVE_QUOTE_BLOCKED")]}
+               for venue in sorted({r["venue"] for r in leg_probes})}
     out=attempt(graph,amounts=amounts,quote_leg=native)
     return {**out,"fixture_source_slot":fixture["state_accounts_observed_slot"],
             "venue_sequence":[r["venue"] for r in rows],
             "independent_leg_probe_count":len(leg_probes),
             "independent_leg_probes":leg_probes,
+            "venue_native_quote_probe_counts":per_venue,
             "fixture_native_protocol_exact_verified":False,**SAFE}

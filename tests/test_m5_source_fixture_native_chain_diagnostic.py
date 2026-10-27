@@ -23,6 +23,7 @@ class FixtureNativeChainTests(unittest.TestCase):
         self.assertFalse(result["broadcast"])
         self.assertEqual(quote.call_count,8)
         self.assertEqual(result["independent_leg_probe_count"],6)
+        self.assertEqual(result["venue_native_quote_probe_counts"]["meteora_dlmm"]["blocked"],2)
         self.assertEqual({r["venue"] for r in result["independent_leg_probes"]},
                          {"orca","meteora_dlmm","pumpswap"})
     @patch("arb.m5_source_fixture_native_chain_diagnostic.fixture_quote_leg")
