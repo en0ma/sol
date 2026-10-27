@@ -5,6 +5,7 @@ Never count legacy two-instruction atomic evidence as adaptive success.
 import argparse
 import json
 from pathlib import Path
+from collections import Counter
 from arb.m5_adaptive_signed_acceptance import check
 from arb.next_ten_atomic_routes import route_batch
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
@@ -26,7 +27,13 @@ def audit(root,*,batch="remaining",only_venue=None):
             rows.append({"route":"__".join(route),"status":"UNVERIFIED",
                          "failure_reasons":["invalid adaptive receipt: "+str(exc)[:160]],**SAFE})
     verified=sum(x["status"]=="VERIFIED_ADAPTIVE_SIGNED_OFFLINE" for x in rows)
+    failures=[{"route":r["route"],"failure_reasons":r["failure_reasons"]}
+              for r in rows if r["status"]!="VERIFIED_ADAPTIVE_SIGNED_OFFLINE"]
+    failure_counts=Counter(reason for r in failures for reason in r["failure_reasons"])
     return {"status":"SEVEN_VENUE_ADAPTIVE_RESEARCH","target":len(routes),
+            "unverified_route_count":len(failures),
+            "unverified_routes":failures,
+            "failure_reason_counts":dict(sorted(failure_counts.items())),
             "verified":verified,"routes":rows,
             "full_42_adaptive_verified":False,
             "independently_validated_quote_samples":0,**SAFE}
@@ -40,6 +47,8 @@ def main():
     args=p.parse_args()
     result=audit(args.receipts,batch=args.batch,only_venue=args.only_venue)
     args.output.write_text(json.dumps(result,indent=2,sort_keys=True)+"\n")
-    print(json.dumps({"adaptive_verified":result["verified"],"target":result["target"],**SAFE}))
+    print(json.dumps({"adaptive_verified":result["verified"],"target":result["target"],
+                      "unverified_routes":result["unverified_routes"],
+                      "failure_reason_counts":result["failure_reason_counts"],**SAFE}))
     return 0 if result["verified"]==result["target"] else 1
 if __name__=="__main__":raise SystemExit(main())
