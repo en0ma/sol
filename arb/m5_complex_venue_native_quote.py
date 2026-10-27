@@ -46,7 +46,15 @@ def quote_auxiliary(fixture, row, *, venue, mint_in, amount_in, auxiliary):
     pool_account=fixture["accounts"][row["address"]]
     if pool_account.get("owner")!=PROGRAMS[venue]:
         raise ValueError("MISSING_NATIVE_AUXILIARY_STATE: source pool program owner invalid")
+    # Validate the claimed decoded pool mint identities against manifest bytes.
+    # No caller-supplied decoded state can override its actual source account.
+    import base64
+    from arb.next_ten_fork_pool_probe import DECODERS,MINT_KEYS
+    encoded=pool_account["data"]
+    decoded=DECODERS[venue](base64.b64decode(encoded[0],validate=True))
     state=row["decoded_pool_state"]
+    if decoded!=state or [decoded[k] for k in MINT_KEYS[venue]]!=row["mints"]:
+        raise ValueError("MISSING_NATIVE_AUXILIARY_STATE: decoded source pool bytes mismatch")
     if venue=="meteora_dlmm":
         # The bin-array claims must reference an account actually owned by
         # the DLMM program; a plain token vault cannot supply bin prices.
