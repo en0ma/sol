@@ -7,7 +7,7 @@ class SevenNativeVenueAuxiliaryTests(unittest.TestCase):
         from arb.next_ten_fork_pool_probe import PROGRAMS
         return {"state_accounts_observed_slot":123,
             "state_account_addresses":["POOL","BIN","FEE"],
-            "accounts":{"POOL":{"owner":PROGRAMS[venue],"executable":False,"data":["AA==","base64"]},"BIN":{"executable":False,"data":["AA==","base64"]},"FEE":{"executable":False,"data":["AA==","base64"]}}}
+            "accounts":{"POOL":{"owner":PROGRAMS[venue],"executable":False,"data":["AA==","base64"]},"BIN":{"owner":PROGRAMS[venue],"executable":False,"data":["AA==","base64"]},"FEE":{"executable":False,"data":["AA==","base64"]}}}
     def row(self,venue):
         state={"token_x_mint":"A","token_y_mint":"B","active_id":5,
                "token_a_mint":"A","token_b_mint":"B",
@@ -83,6 +83,16 @@ class SevenNativeVenueAuxiliaryTests(unittest.TestCase):
         fixture=self.fixture()
         fixture["accounts"]["POOL"]["owner"]="malicious-owner"
         with self.assertRaisesRegex(ValueError,"source pool program owner invalid"):
+            quote_auxiliary(fixture,self.row("meteora_dlmm"),
+                venue="meteora_dlmm",mint_in="A",amount_in=100,
+                auxiliary={"snapshot_slot":123,"source_account_addresses":["POOL","BIN"],
+                    "native_state_decoder_authenticated":True})
+
+    @patch("arb.m5_complex_venue_native_quote.verify")
+    def test_rejects_bin_account_of_wrong_program(self,verify):
+        fixture=self.fixture()
+        fixture["accounts"]["BIN"]["owner"]="NOT_DLMM"
+        with self.assertRaisesRegex(ValueError,"DLMM program-owned bin array"):
             quote_auxiliary(fixture,self.row("meteora_dlmm"),
                 venue="meteora_dlmm",mint_in="A",amount_in=100,
                 auxiliary={"snapshot_slot":123,"source_account_addresses":["POOL","BIN"],
