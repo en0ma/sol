@@ -61,6 +61,36 @@ def quote_fee_envelope(fixture, *, pool, mint_in, amount_in, observed_unix,
         except ValueError as exc:
             outcomes.append({"fee_bound":name,"fee_rate_numerator":rate,
                              "complete_fill":False,"blocker":str(exc)[:160]})
+    # Actual LbPair volatility fields drive an independent integer
+    # fee trajectory, rather than substituting a static guessed tier.
+    from arb.meteora_dlmm_source_fee_decoder import dynamic_fee_rate_by_bin
+    import base64
+    pool_account=fixture["accounts"][pool]
+    encoded=pool_account.get("data")
+    if (not isinstance(encoded,list) or len(encoded)!=2 or encoded[1]!="base64"):
+        raise ValueError("source DLMM pool bytes missing for dynamic fee calculation")
+    raw=base64.b64decode(encoded[0],validate=True)
+    effective=None
+    if bins:
+        try:
+            schedule=dynamic_fee_rate_by_bin(raw,bin_step=state["bin_step"],
+                observed_unix=observed_unix,active_bin_id=active,
+                visited_bin_ids=[b["bin_id"] for b in bins],
+                swap_x_for_y=direction)
+            enriched=[{**b,"effective_fee_rate":rate["effective_fee_rate"]}
+                      for b,rate in zip(bins,schedule["rates"])]
+            native=quote_bins(amount_in=amount_in,swap_x_for_y=direction,
+                bins=enriched,total_fee_rate=rates["base_fee_rate_numerator"],max_bins=70)
+            effective={"status":"SOURCE_VOLATILITY_DYNAMIC_FEE_MODELED",
+                "amount_out":native["amount_out"],
+                "fee_input_base_units":native["fee_input_base_units"],
+                "fee_collect_mode":schedule["fee_collect_mode"],
+                "bin_fee_rates":schedule["rates"],
+                "source_clock":schedule["observed_unix"],
+                "protocol_exact_verified":False,**SAFE}
+        except ValueError as exc:
+            effective={"status":"SOURCE_VOLATILITY_DYNAMIC_FEE_NOT_SUPPORTED",
+                "reason":str(exc)[:180],"protocol_exact_verified":False,**SAFE}
     full=all(x["complete_fill"] for x in outcomes)
     result={"status":"SOURCE_NATIVE_DLMM_FEE_ENVELOPE_NOT_PROTOCOL_EXACT"
                        if full else "SOURCE_NATIVE_DLMM_ENVELOPE_CAPACITY_BLOCKED",
@@ -73,6 +103,7 @@ def quote_fee_envelope(fixture, *, pool, mint_in, amount_in, observed_unix,
             "walked_bin_count":len(bins),
             "missing_arrays":missing,
             "fee_bounds":outcomes,
+            "source_derived_dynamic_fee_quote":effective,
             "fee_precision":FEE_PRECISION,
             "effective_fee_verified":False,
             "full_route_quoted":False,
