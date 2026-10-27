@@ -22,10 +22,15 @@ class MultihopSourceIntervalTests(unittest.TestCase):
                 return {**base,"quote_status":"SOURCE_BOUND_INDICATIVE",
                         "predicted_output_base_units":amount_in+10}
             if leg_index==2:
-                return {**base,"quote_status":"NATIVE_QUOTE_BOUNDED_NOT_EXACT",
+                return {**base,"quote_status":"NATIVE_QUOTE_MODELED_NOT_EXACT",
                     "native_fee_envelope":{"status":"DAMM_V2_SOURCE_RESERVE_HYPOTHETICAL_FEE_ENVELOPE",
                         "source_slot":43,"lower_modeled_output":amount_in-3,
                         "upper_modeled_output":amount_in-1,**SAFE}}
+            if leg_index==3:
+                return {**base,"quote_status":"NATIVE_QUOTE_MODELED_NOT_EXACT",
+                    "native_fee_envelope":{"status":"PUMPSWAP_SOURCE_FEE_TIER_SCENARIOS_NOT_EXHAUSTIVE",
+                        "source_slot":43,"minimum_candidate_output":amount_in-2,
+                        "maximum_candidate_output":amount_in+1,**SAFE}}
             return {**base,"quote_status":"NATIVE_QUOTE_BOUNDED_NOT_EXACT",
                     "native_fee_envelope":{"source_slot":43,
                         "lower_output_bound":amount_in-2,
@@ -35,6 +40,7 @@ class MultihopSourceIntervalTests(unittest.TestCase):
         self.assertEqual(r["route_hops"],4)
         self.assertGreater(r["minimum_modeled_output"],0)
         self.assertTrue(r["hypothetical_fee_model_present"])
+        self.assertTrue(r["scenario_envelope_not_true_interval"])
         self.assertFalse(r["full_route_quote_verified"])
         self.assertFalse(r["net_profit_verified"])
         self.assertFalse(r["broadcast"])
