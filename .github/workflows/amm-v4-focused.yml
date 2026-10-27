@@ -269,6 +269,10 @@ jobs:
         run: |
           python3 -m py_compile arb/m5_four_to_six_native_amount_sweep.py
           python3 -m unittest discover -s tests -p test_m5_four_to_six_native_amount_sweep.py -v
+      - name: Validate source-decoded canonical DLMM bin inventories without promoting missing fee evidence
+        run: |
+          python3 -m py_compile arb/meteora_dlmm_source_bin_decoder.py
+          python3 -m unittest discover -s tests -p test_meteora_dlmm_source_bin_decoder.py -v
       - name: Verify three independent M5 milestone integrations
         run: |
           python3 -m py_compile arb/m5_four_to_six_source_capture.py arb/m5_source_indicative_route_chain.py arb/m5_four_to_six_signed_handoff.py
