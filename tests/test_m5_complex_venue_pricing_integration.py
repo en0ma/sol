@@ -1,0 +1,60 @@
+import unittest
+from unittest.mock import patch
+from arb.pumpswap_source_fee_envelope import quote_fee_candidates
+from arb.meteora_damm_v2_source_scenarios import scenario_envelope
+SAFE={"actionable":False,"broadcast":False,"live_execution_approved":False}
+
+class ComplexVenuePricingIntegrationTests(unittest.TestCase):
+    @patch("arb.pumpswap_source_fee_envelope.extract_pool_states")
+    @patch("arb.pumpswap_source_fee_envelope.extract")
+    @patch("arb.pumpswap_source_fee_envelope.authenticated_address")
+    @patch("arb.pumpswap_source_fee_envelope.decode_authenticated")
+    @patch("arb.pumpswap_source_fee_envelope.global_decode")
+    def test_pumpswap_real_account_mode_envelope_cannot_upgrade_effective_fee(
+            self,global_decode,fees,address,extract,rows):
+        from arb.pumpswap_source_fee_envelope import ADDRESS
+        address.return_value=("fee-account",255)
+        rows.return_value=[{"venue":"pumpswap","address":"pool",
+            "decoded_pool_state":{"base_mint":"X","quote_mint":"Y",
+             "protocol_fees":50,"creator_fees":20,"virtual_quote_reserves":100}}]
+        extract.return_value={"fundamentals":[{"address":"pool","vault_base_units":[1000,2000]}]}
+        fees.return_value={"flat_fees":{"lp_fee_bps":10,"protocol_fee_bps":20,
+                             "creator_fee_bps":30},"exotic_flat_fees":{"lp_fee_bps":0,
+                             "protocol_fee_bps":20,"creator_fee_bps":10},
+                           "fee_tiers":[{"market_cap_threshold":100,
+                             "fees":{"lp_fee_bps":5,"protocol_fee_bps":15,
+                                     "creator_fee_bps":10}}],"stable_fee_tiers":[]}
+        global_decode.return_value={"lp_fee_bps":10,"protocol_fee_bps":10,
+            "coin_creator_fee_bps":10,"sell_enabled":True,"buy_enabled":True}
+        fixture={"state_accounts_observed_slot":123,"state_account_addresses":["fee-account",ADDRESS],
+            "accounts":{ADDRESS:{"owner":"6EF8rrecthR5Dkzon8Nwu78jEVPUzPyTXc6crF6uAjpm",
+                "executable":False,"data":["AA==","base64"]}},**SAFE}
+        with patch("arb.pumpswap_source_fee_envelope.PROGRAM","6EF8rrecthR5Dkzon8Nwu78jEVPUzPyTXc6crF6uAjpm"):
+            result=quote_fee_candidates(fixture,pool="pool",mint_in="X",amount_in=100)
+        self.assertGreater(result["candidate_count"],1)
+        self.assertLessEqual(result["lower_output_bound"],result["upper_output_bound"])
+        self.assertFalse(result["effective_fee_verified"])
+        self.assertFalse(result["protocol_exact_verified"])
+    @patch("arb.meteora_damm_v2_source_scenarios.extract_pool_states")
+    @patch("arb.meteora_damm_v2_source_scenarios.extract")
+    def test_damm_modes_from_source_reserves_do_not_invent_scheduler(self,extract,rows):
+        rows.return_value=[{"venue":"meteora_damm_v2","address":"pool",
+            "decoded_pool_state":{"pool_status":0,"token_a_flag":0,
+                "token_b_flag":0,"token_a_mint":"X","token_b_mint":"Y"}}]
+        extract.return_value={"fundamentals":[{"address":"pool","vault_base_units":[1000000,2000000]}]}
+        result=scenario_envelope({"state_accounts_observed_slot":123,**SAFE},
+            pool="pool",mint_in="X",amount_in=100000)
+        self.assertGreater(len(result["scenarios"]),4)
+        self.assertFalse(result["effective_fee_verified"])
+        self.assertFalse(result["curve_model_verified"])
+        self.assertFalse(result["broadcast"])
+    @patch("arb.meteora_damm_v2_source_scenarios.extract_pool_states")
+    @patch("arb.meteora_damm_v2_source_scenarios.extract")
+    def test_damm_rejects_non_source_fee_rates(self,extract,rows):
+        rows.return_value=[{"venue":"meteora_damm_v2","address":"pool",
+            "decoded_pool_state":{"pool_status":0,"token_a_flag":0,"token_b_flag":0,
+                "token_a_mint":"X","token_b_mint":"Y"}}]
+        with self.assertRaises(ValueError):
+            scenario_envelope({"state_accounts_observed_slot":123,**SAFE},
+                pool="pool",mint_in="X",amount_in=10,fee_rates_ppm=(100,10))
+if __name__=="__main__":unittest.main()

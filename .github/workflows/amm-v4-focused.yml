@@ -281,6 +281,10 @@ jobs:
         run: |
           python3 -m py_compile arb/meteora_dlmm_source_bin_decoder.py
           python3 -m unittest discover -s tests -p test_meteora_dlmm_source_bin_decoder.py -v
+      - name: Validate integrated PumpSwap DAMM v2 source price scenarios and nonbroadcast fee bounds
+        run: |
+          python3 -m py_compile arb/pumpswap_source_fee_envelope.py arb/meteora_damm_v2_source_scenarios.py arb/fixture_all_venue_signed_quotes.py
+          python3 -m unittest discover -s tests -p test_m5_complex_venue_pricing_integration.py -v
       - name: Verify three independent M5 milestone integrations
         run: |
           python3 -m py_compile arb/m5_four_to_six_source_capture.py arb/m5_source_indicative_route_chain.py arb/m5_four_to_six_signed_handoff.py
