@@ -47,6 +47,17 @@ class SevenNativeVenueAuxiliaryTests(unittest.TestCase):
                     "native_state_decoder_authenticated":True})
 
     @patch("arb.m5_complex_venue_native_quote.verify")
+    def test_rejects_executable_account_in_source_auxiliary_inventory(self,verify):
+        fixture=self.fixture()
+        fixture["accounts"]["BIN"]={"executable":True}
+        with self.assertRaisesRegex(ValueError,"captured source account not present"):
+            quote_auxiliary(fixture,self.row("meteora_dlmm"),
+                venue="meteora_dlmm",mint_in="A",amount_in=100,
+                auxiliary={"snapshot_slot":123,
+                    "source_account_addresses":["POOL","BIN"],
+                    "native_state_decoder_authenticated":True})
+
+    @patch("arb.m5_complex_venue_native_quote.verify")
     def test_native_dlmm_quote_requires_active_bin_and_uses_existing_math(self,verify):
         aux={"snapshot_slot":123,"source_account_addresses":["POOL","BIN"],
              "native_state_decoder_authenticated":True,"bins":[{"bin_id":5,
