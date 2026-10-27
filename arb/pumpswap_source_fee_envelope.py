@@ -68,12 +68,14 @@ def quote_fee_candidates(fixture,*,pool,mint_in,amount_in):
                 mint_account.get("executable") is False and
                 isinstance(encoded_mint,list) and len(encoded_mint)==2 and
                 encoded_mint[1]=="base64"):
-            decimals=mint_decimals_from_account(
-                base64.b64decode(encoded_mint[0],validate=True))
+            raw_mint=base64.b64decode(encoded_mint[0],validate=True)
+            decimals=mint_decimals_from_account(raw_mint)
+            actual_supply=int.from_bytes(raw_mint[36:44],"little")
             selected=choose_tier_by_source_market_cap(
                 pool_state=state,fee_config=fee,
                 base_reserve=base,quote_reserve=quote,
-                base_decimals=decimals)
+                base_decimals=decimals,
+                base_supply_base_units=actual_supply)
     if selected is not None and selected.get("tier_selected") is True:
         candidates=[("selected_onchain_source_tier",selected["fees"])]
     outcomes=[]
