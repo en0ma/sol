@@ -255,6 +255,10 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_authenticated_quote_provider.py -v
       - name: Test isolated authenticated market-state registry and common quote evidence boundary
         run: python3 -m unittest discover -s tests -p test_market_state_and_quote_contract.py -v
+      - name: Test bounded public seven-venue pool discovery and source trust boundary
+        run: |
+          python3 -m py_compile arb/m5_seven_venue_public_hints.py
+          python3 -m unittest discover -s tests -p test_m5_seven_venue_public_hints.py -v
       - name: Test native source-bound multi-venue gross opportunity ranking
         run: |
           python3 -m py_compile arb/m5_source_triangle_quote_ranking.py arb/m5_seven_venue_route_scan.py
@@ -378,6 +382,25 @@ jobs:
             ${{ runner.temp }}/three-venue-candidate-count.txt
             ${{ runner.temp }}/venues.json
           if-no-files-found: error
+      - name: Enumerate broad untrusted all-seven market pool hints and independently probe source-backed cycles
+        continue-on-error: true
+        run: |
+          python3 -m arb.m5_seven_venue_public_hints \
+            --registry arb/pool_registry.json \
+            --max-per-venue 4 \
+            --output "$RUNNER_TEMP/m5-seven-venue-untrusted-pool-hints.json"
+          python3 -m arb.m5_seven_venue_route_scan \
+            --registry "$RUNNER_TEMP/m5-seven-venue-untrusted-pool-hints.json" \
+            --max-cycles 200 \
+            --output "$RUNNER_TEMP/m5-broad-source-route-candidates.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: m5-broad-seven-venue-discovery-and-source-cycles
+          path: |
+            ${{ runner.temp }}/m5-seven-venue-untrusted-pool-hints.json
+            ${{ runner.temp }}/m5-broad-source-route-candidates.json
+          if-no-files-found: warn
       - name: Shut down upstream-backed fork before offline account writes
         if: always()
         run: |
