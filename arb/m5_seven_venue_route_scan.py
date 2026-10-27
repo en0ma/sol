@@ -136,6 +136,7 @@ def run_m5_research(rpc, registry, *, max_cycles=200, source_dir=None,
     report["signed_triangles"] = {"status": "NOT_REQUESTED"}
     report["signed_selection"] = {"status": "NOT_REQUESTED", **SAFE}
     report["four_to_six_source_fixture"] = {"status": "NOT_REQUESTED", **SAFE}
+    report["four_to_six_signed_handoff"] = {"status": "NOT_REQUESTED", **SAFE}
     if source_dir is not None:
         from arb.m5_distinct_venue_coverage_batch import source_batch
         exported = source_batch(rpc, readiness, source_dir, maximum=maximum)
@@ -172,6 +173,10 @@ def run_m5_research(rpc, registry, *, max_cycles=200, source_dir=None,
             try:
                 path.parent.mkdir(parents=True,exist_ok=True)
                 result=capture(rpc,report,targets[0],path)
+                from arb.m5_four_to_six_signed_handoff import assess
+                source=json.loads(path.read_text())
+                handoff=assess(source)
+                report["four_to_six_signed_handoff"]=handoff
                 report["four_to_six_source_fixture"]={
                     **result,"graph_route_index":targets[0],
                     "source_fixture_path":str(path),
