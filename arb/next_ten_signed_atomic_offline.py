@@ -608,6 +608,11 @@ def run_four_to_six_venue(rpc,fixture,*,amount_in=100_000,program_cache=None):
         hydrated_fork_state_readback=readback,
         execution_environment="ISOLATED_SURFPOOL_OFFLINE",
         independently_validated_quote_samples=0,**SAFETY)
+    if receipt.get("positive_post_balances_base_units") is not None:
+        from arb.m5_signed_start_mint_economics import signed_net_economics
+        receipt["signed_start_mint_economics"]=signed_net_economics(
+            receipt,start_mint=mints[0],
+            source_slot=fixture["state_accounts_observed_slot"])
     return receipt
 
 def main():
