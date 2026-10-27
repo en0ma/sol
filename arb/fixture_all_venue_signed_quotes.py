@@ -108,6 +108,29 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix):
                         "native_fee_envelope":bound,
                         "reason":"effective DLMM dynamic fee and execution parity unverified",
                         "protocol_exact_verified":False,**SAFE}
+                if v=="pumpswap":
+                    from arb.pumpswap_source_fee_envelope import quote_fee_candidates
+                    candidate=quote_fee_candidates(fixture,pool=pool,
+                        mint_in=leg["input_mint"],amount_in=amount_in)
+                    return {"venue":v,"pool":pool,"leg_index":leg_index,
+                        "source_slot":row["snapshot_slot"],
+                        "predicted_output_base_units":None,
+                        "quote_status":"NATIVE_QUOTE_BOUNDED_NOT_EXACT"
+                            if "lower_output_bound" in candidate else "NATIVE_QUOTE_BLOCKED",
+                        "native_fee_envelope":candidate,
+                        "reason":"effective PumpSwap market-cap tier and mode unverified",
+                        "protocol_exact_verified":False,**SAFE}
+                if v=="meteora_damm_v2":
+                    from arb.meteora_damm_v2_source_scenarios import scenario_envelope
+                    candidate=scenario_envelope(fixture,pool=pool,
+                        mint_in=leg["input_mint"],amount_in=amount_in)
+                    return {"venue":v,"pool":pool,"leg_index":leg_index,
+                        "source_slot":row["snapshot_slot"],
+                        "predicted_output_base_units":None,
+                        "quote_status":"NATIVE_QUOTE_BOUNDED_NOT_EXACT",
+                        "native_fee_envelope":candidate,
+                        "reason":"DAMM v2 fee scheduler and curve model unverified",
+                        "protocol_exact_verified":False,**SAFE}
                 raise ValueError("MISSING_NATIVE_AUXILIARY_STATE: "+v+
                     " source-verified effective fees, reserves and/or bin arrays")
             q=quote_auxiliary(fixture,row,venue=v,
