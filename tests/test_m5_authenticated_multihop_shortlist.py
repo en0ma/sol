@@ -33,6 +33,11 @@ class AuthenticatedMultihopShortlistTests(unittest.TestCase):
         self.assertEqual(report["native_quoted_count"],0)
         self.assertFalse(report["selected"][0]["signed_simulation_verified"])
 
+    def test_rejects_foreign_graph_report_even_with_valid_looking_routes(self):
+        with self.assertRaises(ValueError):
+            shortlist({"status":"UNTRUSTED_API_ROUTES","routes":[
+                route(4,["orca","raydium_cpmm","meteora_dlmm","pumpswap"])],**SAFE})
+
     def test_no_routes_yields_no_fabricated_candidates(self):
         result=shortlist({"routes":[],"cycle_inventory_truncated":False,**SAFE})
         self.assertEqual(result["selected"],[])

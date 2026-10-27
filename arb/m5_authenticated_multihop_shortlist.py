@@ -9,6 +9,8 @@ def shortlist(report, *, maximum=20):
     if (not isinstance(report,dict) or any(report.get(k)is not False for k in SAFE)
             or type(maximum)is not int or not 1<=maximum<=100):
         raise ValueError("invalid authenticated source candidate report")
+    if "status" in report and report["status"]!="SOURCE_AUTHENTICATED_ROUTE_DISCOVERY_ONLY":
+        raise ValueError("source authenticated cycle report required")
     routes=report.get("routes")
     if not isinstance(routes,list) or len(routes)>2000:
         raise ValueError("invalid bounded cycle inventory")
