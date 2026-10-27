@@ -126,7 +126,8 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix):
                 if v=="meteora_damm_v2":
                     from arb.meteora_damm_v2_source_scenarios import scenario_envelope
                     candidate=scenario_envelope(fixture,pool=pool,
-                        mint_in=leg["input_mint"],amount_in=amount_in)
+                        mint_in=leg["input_mint"],amount_in=amount_in,
+                        observed_unix=observed_unix)
                     return {"venue":v,"pool":pool,"leg_index":leg_index,
                         "source_slot":row["snapshot_slot"],
                         "predicted_output_base_units":None,
