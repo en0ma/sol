@@ -375,6 +375,25 @@ jobs:
           name: m5-multi-size-source-opportunity-evidence
           path: ${{ runner.temp }}/m5-multi-size-source-opportunity-evidence.json
           if-no-files-found: warn
+      - name: Validate authenticated source graph connectivity and disclose short-route dominance
+        run: |
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          p=Path(os.environ["RUNNER_TEMP"])/"m5-broad-source-route-candidates.json"
+          if not p.exists():
+              print(json.dumps({"graph_diagnostic":"NOT_AVAILABLE","broadcast":False}))
+          else:
+              r=json.loads(p.read_text())
+              t=r["authenticated_token_graph_topology"]
+              print(json.dumps({"authenticated_pools":t["authenticated_pools"],
+                  "distinct_token_mints":t["distinct_token_mints"],
+                  "two_core_mints":t["two_core_mints"],
+                  "connected_components":t["connected_components"],
+                  "cycles_by_hops":r["cycle_coverage_by_hops"],
+                  "all_cycle_counts_exhaustive":r["cycle_count_is_exhaustive"],
+                  "broadcast":False}))
+          PY
       - name: Export twelve authenticated AMM v4 fixtures only
         run: |
           python3 -m arb.next_ten_pair_fixture_export --batch remaining --only-venue raydium_amm_v4 --readiness "$RUNNER_TEMP/amm-v4-ready.json" --output-dir "$RUNNER_TEMP/amm-v4-fixtures"
