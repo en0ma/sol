@@ -265,6 +265,10 @@ jobs:
         run: |
           python3 -m py_compile arb/fixture_native_aux_inventory.py
           python3 -m unittest discover -s tests -p test_m5_pumpswap_canonical_aux.py -v
+      - name: Verify three independent M5 milestone integrations
+        run: |
+          python3 -m py_compile arb/m5_four_to_six_source_capture.py arb/m5_source_indicative_route_chain.py arb/m5_four_to_six_signed_handoff.py
+          python3 -m unittest discover -s tests -p test_m5_three_milestone_integration.py -v
       - name: Verify captured source triangle invokes actual native quote adapters without false full-route pricing
         run: |
           python3 -m py_compile arb/m5_source_fixture_native_chain_diagnostic.py
@@ -446,6 +450,10 @@ jobs:
             --registry "$RUNNER_TEMP/m5-seven-venue-untrusted-pool-hints.json" \
             --max-cycles 200 \
             --output "$RUNNER_TEMP/m5-broad-source-route-candidates.json"
+          python3 -m arb.m5_four_to_six_source_capture \
+            --graph "$RUNNER_TEMP/m5-broad-source-route-candidates.json" \
+            --output "$RUNNER_TEMP/m5-four-to-six-source-fixture.json" \
+            --report "$RUNNER_TEMP/m5-four-to-six-source-capture.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -453,6 +461,8 @@ jobs:
           path: |
             ${{ runner.temp }}/m5-seven-venue-untrusted-pool-hints.json
             ${{ runner.temp }}/m5-broad-source-route-candidates.json
+            ${{ runner.temp }}/m5-four-to-six-source-fixture.json
+            ${{ runner.temp }}/m5-four-to-six-source-capture.json
           if-no-files-found: warn
       - name: Validate authenticated source graph connectivity and disclose short-route dominance
         run: |
