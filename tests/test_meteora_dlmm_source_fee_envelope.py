@@ -5,34 +5,41 @@ SAFE={"actionable":False,"broadcast":False,"live_execution_approved":False}
 POOL="source-dlmm-pool"
 class DlmmSourceEnvelopeTests(unittest.TestCase):
     def fixture(self):
-        return {"state_accounts_observed_slot":123,**SAFE}
+        return {"state_accounts_observed_slot":123,
+                "accounts":{POOL:{"data":["AA==","base64"]}},**SAFE}
     def rows(self):
         return [{"venue":"meteora_dlmm","address":POOL,
                  "decoded_pool_state":{"token_x_mint":"X",
-                     "token_y_mint":"Y","active_id":5}}]
+                     "token_y_mint":"Y","active_id":5,"bin_step":25}}]
+    @patch("arb.meteora_dlmm_source_fee_decoder.dynamic_fee_rate_by_bin")
     @patch("arb.meteora_dlmm_source_fee_envelope.quote_bins")
     @patch("arb.meteora_dlmm_source_fee_envelope.fee_bounds_from_fixture")
     @patch("arb.meteora_dlmm_source_fee_envelope.directional_bins")
     @patch("arb.meteora_dlmm_source_fee_envelope.decode_from_fixture")
     @patch("arb.meteora_dlmm_source_fee_envelope.extract_pool_states")
     def test_real_source_fee_endpoints_price_same_amount_without_claiming_exactness(
-            self,rows,decode,walk,rates,quote):
+            self,rows,decode,walk,rates,quote,dynamic):
         rows.return_value=self.rows()
         decode.return_value={"array_index":0,"bin_count":70}
         walk.return_value={"bins":[{"bin_id":5,"amount_x":200,"amount_y":200,
                                     "price_q64":1<<64}]}
-        rates.return_value={"minimum_total_fee_rate_numerator":1000,
+        dynamic.return_value={"fee_collect_mode":0,"observed_unix":123,
+            "rates":[{"bin_id":5,"effective_fee_rate":5000}]}
+        rates.return_value={"base_fee_rate_numerator":1000,
+                             "minimum_total_fee_rate_numerator":1000,
                              "maximum_total_fee_rate_numerator":100000000}
         quote.side_effect=[
             {"amount_out":100,"fee_input_base_units":1,"bins_traversed":[]},
-            {"amount_out":90,"fee_input_base_units":10,"bins_traversed":[]}]
+            {"amount_out":90,"fee_input_base_units":10,"bins_traversed":[]},
+            {"amount_out":95,"fee_input_base_units":5,"bins_traversed":[]}]
         result=quote_fee_envelope(self.fixture(),pool=POOL,mint_in="X",
             amount_in=101,observed_unix=123,maximum_arrays=1)
         self.assertEqual(result["lower_output_bound"],90)
         self.assertEqual(result["upper_output_bound"],100)
         self.assertFalse(result["effective_fee_verified"])
         self.assertFalse(result["protocol_exact_verified"])
-        self.assertEqual(quote.call_count,2)
+        self.assertEqual(quote.call_count,3)
+        self.assertEqual(result["source_derived_dynamic_fee_quote"]["amount_out"],95)
         self.assertFalse(result["broadcast"])
     @patch("arb.meteora_dlmm_source_fee_envelope.decode_from_fixture")
     @patch("arb.meteora_dlmm_source_fee_envelope.extract_pool_states")
