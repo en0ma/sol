@@ -16,6 +16,10 @@ def assess(fixture,*,quote_report=None,signed_audit=None):
         raise ValueError("four-to-six actual native source legs missing")
     if any(fixture.get(k) is not False for k in SAFE):
         raise ValueError("unsafe captured source route")
+    if isinstance(quote_report,dict) and any(quote_report.get(k) is not False for k in SAFE):
+        raise ValueError("unsafe or unverifiable native quote handoff")
+    if isinstance(signed_audit,dict) and any(signed_audit.get(k) is not False for k in SAFE):
+        raise ValueError("unsafe signed simulation audit handoff")
     issues=[]
     # An indicative amount chain can help diagnose signing readiness, but
     # cannot authorize an execution attempt or be mistaken for exact prices.

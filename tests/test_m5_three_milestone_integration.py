@@ -100,11 +100,11 @@ class ThreeMilestoneIntegrationTests(unittest.TestCase):
         fixture={"fixture_kind":"AUTHENTICATED_FOUR_TO_SIX_HOP_SOURCE_ROUTE",
                  "state_accounts_observed_slot":42,"route_pool_addresses":["a","b","c","d"],**SAFE}
         result=assess(fixture,quote_report={"source_quote_verified":True,
-            "protocol_exact_verified":True,"snapshot_slot":42,"hops":4},
+            "protocol_exact_verified":True,"snapshot_slot":42,"hops":4,**SAFE},
             signed_audit={"status":"VERIFIED_SIGNED_FOUR_TO_SIX_HOP_ROLLBACK",
               "signed_atomic_simulation_verified":True,
               "rollback_failure_case_verified":True,"route_pool_addresses":["a","b","c","d"],
-              "snapshot_slot":42})
+              "snapshot_slot":42,**SAFE})
         self.assertFalse(result["independently_signed_verified"])
         self.assertIn("independent four-to-six-hop acceptance auditor not yet integrated",result["blockers"])
 if __name__=="__main__":unittest.main()
