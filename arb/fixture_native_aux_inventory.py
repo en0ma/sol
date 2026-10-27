@@ -83,7 +83,16 @@ def inspect(fixture,*,pool_filter=None):
             if not any(a["type"]=="bin_array" and a["contains_active_bin"]
                        for a in record["decoded_auxiliary"]):
                 record["missing"].append("active_bin_array")
-            record["missing"].append("decoded_dynamic_fee_parameters")
+            from arb.meteora_dlmm_source_fee_decoder import fee_bounds_from_fixture
+            bounds=fee_bounds_from_fixture(fixture,pool=row["address"],observed_unix=0)
+            record["decoded_auxiliary"].append({
+                "type":"lb_pair_native_fee_parameters",
+                "base_fee_rate_numerator":bounds["base_fee_rate_numerator"],
+                "maximum_total_fee_rate_numerator":bounds["maximum_total_fee_rate_numerator"],
+                "fee_precision":bounds["fee_precision"],
+                "static":bounds["static"],"variable":bounds["variable"],
+                "dynamic_fee_verified":False})
+            record["missing"].append("effective_dynamic_fee_rate_not_verified")
         elif venue=="meteora_damm_v2":
             record["decoded_auxiliary"].append({"type":"pool_liquidity",
                 "sqrt_price_x64":pool["sqrt_price"],"liquidity":pool["liquidity"]})
