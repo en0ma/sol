@@ -25,6 +25,8 @@ class FourToSixNativeSweepTests(unittest.TestCase):
         self.assertEqual({x["venue"] for x in r["venue_probes"]},
                          {"orca","meteora_dlmm","pumpswap","raydium_amm_v4"})
         self.assertEqual(quote.call_count,8)
+        self.assertEqual(r["complete_indicative_chain_count"],0)
+        self.assertEqual(r["indicative_ranked_input_sizes"],[])
         self.assertEqual(r["protocol_exact_route_count"],0)
         self.assertEqual(r["net_profitable_route_count"],0)
         self.assertFalse(r["broadcast"])
