@@ -443,6 +443,19 @@ jobs:
           python3 -m arb.m5_authenticated_multihop_shortlist \
             --graph "$RUNNER_TEMP/m5-broad-source-route-candidates.json" \
             --maximum 30 --output "$RUNNER_TEMP/m5-authenticated-multihop-shortlist.json"
+      - name: Report source-bound multihop native adapter coverage explicitly
+        run: |
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          p=Path(os.environ["RUNNER_TEMP"])/"m5-authenticated-multihop-shortlist.json"
+          if p.is_file():
+              r=json.loads(p.read_text())
+              print(json.dumps({k:r.get(k) for k in (
+                  "status","total_source_cycles","native_adapter_covered_source_cycles",
+                  "native_adapter_covered_selected","missing_auxiliary_venue_occurrences",
+                  "native_quoted_count","net_profitable_count")},sort_keys=True))
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
