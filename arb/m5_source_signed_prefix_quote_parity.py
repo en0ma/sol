@@ -40,8 +40,28 @@ def compare(fixture,receipt,*,observed_unix):
                 observation.get("amount_in")!=planned[index] or
                 observation.get("observed_output")!=planned[index+1]):
             raise ValueError("signed prefix SPL output or venue identity mismatch")
+    # Only an independently simulated complete atomic receipt can supply
+    # the terminal swap output. Signed prefixes alone never authenticate
+    # the final output or an end-to-end route's realized starting-mint delta.
+    post=receipt.get("positive_post_balances_base_units")
+    before=receipt.get("initial_balances_base_units")
+    complete=(receipt.get("status")=="SIGNED_N_LEG_ATOMIC_AND_ROLLBACK_VERIFIED"
+              and receipt.get("signed_atomic_simulation_verified") is True
+              and receipt.get("signed_cpi_per_leg_verified") is True
+              and receipt.get("rollback_failure_case_verified") is True)
+    terminal=None
+    if complete:
+        if (not isinstance(post,list) or not isinstance(before,list)
+                or len(post)!=n+1 or len(before)!=n+1
+                or before!=[planned[0]]+[0]*n
+                or any(type(x)is not int or x!=0 for x in post[:-1])
+                or type(post[-1])is not int or not 0<post[-1]<2**64):
+            raise ValueError("independent complete signed atomic SPL final balances invalid")
+        terminal=post[-1]-before[-1]
+    signed_outputs=[o["observed_output"] for o in observations]
+    if terminal is not None:signed_outputs.append(terminal)
     outcomes=[]
-    for index,observation in enumerate(observations):
+    for index,signed in enumerate(signed_outputs):
         row=rows[index]
         native=quote_leg(fixture,leg_index=index,amount_in=planned[index],
                          observed_unix=observed_unix)
@@ -69,20 +89,28 @@ def compare(fixture,receipt,*,observed_unix):
         if source_output is not None and (
                 type(source_output)is not int or not 0<source_output<2**64):
             raise ValueError("invalid independently source-derived amount")
-        signed=observation["observed_output"]
         delta=source_output-signed if source_output is not None else None
         outcomes.append({"leg_index":index,"venue":row["venue"],"pool":row["address"],
             "source_slot":fixture["state_accounts_observed_slot"],
             "exact_input_base_units":planned[index],
-            "signed_prefix_output_base_units":signed,
+            "signed_observed_output_base_units":signed,
+            "signed_observation_type":"ATOMIC_TERMINAL_POST_ACCOUNT" if index==n-1
+                                      else "SIGNED_CUMULATIVE_PREFIX",
             "source_native_modeled_output_base_units":source_output,
             "modeled_minus_signed_base_units":delta,
             "absolute_model_error_base_units":abs(delta) if delta is not None else None,
             "native_quote_status":status,"classification":classification,
-            "signed_prefix_observation_authenticated":True,
+            "signed_prefix_observation_authenticated":index<n-1,
+            "signed_atomic_terminal_post_account_authenticated":index==n-1,
             "protocol_exact_parity_verified":False,**SAFE})
-    return {"status":"SOURCE_NATIVE_TO_SIGNED_PREFIX_COMPARISON",
-        "hops":n,"compared_prefix_count":len(outcomes),
+    return {"status":"SOURCE_NATIVE_TO_SIGNED_ALL_LEGS_COMPARISON" if terminal is not None
+                     else "SOURCE_NATIVE_TO_SIGNED_PREFIX_COMPARISON",
+        "hops":n,"compared_prefix_count":len(observations),
+        "compared_signed_legs":len(outcomes),
+        "atomic_terminal_observation_used":terminal is not None,
+        "signed_atomic_terminal_output_base_units":terminal,
+        "signed_atomic_gross_delta_start_mint_base_units":
+            terminal-planned[0] if terminal is not None else None,
         "numeric_comparison_count":sum(r["modeled_minus_signed_base_units"] is not None
                                        for r in outcomes),
         "source_slot":fixture["state_accounts_observed_slot"],
