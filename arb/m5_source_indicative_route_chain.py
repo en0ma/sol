@@ -9,6 +9,8 @@ from arb.fixture_all_venue_signed_quotes import quote_leg
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
 def research_chain(fixture, *, amount_in, observed_unix):
     rows=extract_pool_states(fixture)
+    if any(fixture.get(k) is not False for k in SAFE):
+        raise ValueError("unsafe native route fixture")
     if not 2<=len(rows)<=6 or type(amount_in)is not int or not 0<amount_in<2**64:
         raise ValueError("valid source-bound route and initial input required")
     if type(observed_unix)is not int or observed_unix<0:
@@ -25,6 +27,8 @@ def research_chain(fixture, *, amount_in, observed_unix):
         result=quote_leg(fixture,leg_index=index,amount_in=current,
                          observed_unix=observed_unix)
         status=result.get("quote_status")
+        if not isinstance(result,dict) or any(result.get(k) is not False for k in SAFE):
+            raise ValueError("unsafe or malformed native leg quote")
         if status!="SOURCE_BOUND_INDICATIVE":
             return {"status":"NATIVE_ROUTE_INDICATIVE_BLOCKED",
                     "blocked_leg_index":index,"blocked_venue":row["venue"],
