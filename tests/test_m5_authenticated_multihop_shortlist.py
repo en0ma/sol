@@ -3,7 +3,7 @@ from arb.m5_authenticated_multihop_shortlist import shortlist
 
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
 def route(hops,venues):
-    mints=["A","B","C","D","E","F","A"]
+    mints=["A","B","C","D","E","F"][:hops]+["A"]
     legs=[{"input":mints[i],"output":mints[i+1],
            "venue":venues[i],"pool":"p"+str(i)} for i in range(hops)]
     return {"hops":hops,"start_mint":"A","legs":legs}

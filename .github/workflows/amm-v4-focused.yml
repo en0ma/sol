@@ -259,6 +259,9 @@ jobs:
         run: |
           python3 -m py_compile arb/m5_all_venue_adaptive_acceptance.py
           python3 -m unittest discover -s tests -p test_m5_adaptive_failure_diagnostics.py -v
+      - name: Test genuine source-cycle venue-diverse shortlist
+        run: |
+          python3 -m unittest discover -s tests -p test_m5_authenticated_multihop_shortlist.py -v
       - name: Test bounded public seven-venue pool discovery and source trust boundary
         run: |
           python3 -m py_compile arb/m5_seven_venue_public_hints.py
@@ -394,6 +397,17 @@ jobs:
                   "all_cycle_counts_exhaustive":r["cycle_count_is_exhaustive"],
                   "broadcast":False}))
           PY
+      - name: Prioritize source-authenticated four-to-six-hop venue-diverse research leads
+        run: |
+          python3 -m arb.m5_authenticated_multihop_shortlist \
+            --graph "$RUNNER_TEMP/m5-broad-source-route-candidates.json" \
+            --maximum 30 --output "$RUNNER_TEMP/m5-authenticated-multihop-shortlist.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: m5-authenticated-multihop-shortlist
+          path: ${{ runner.temp }}/m5-authenticated-multihop-shortlist.json
+          if-no-files-found: warn
       - name: Export twelve authenticated AMM v4 fixtures only
         run: |
           python3 -m arb.next_ten_pair_fixture_export --batch remaining --only-venue raydium_amm_v4 --readiness "$RUNNER_TEMP/amm-v4-ready.json" --output-dir "$RUNNER_TEMP/amm-v4-fixtures"
