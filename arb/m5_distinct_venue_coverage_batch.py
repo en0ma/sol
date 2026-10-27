@@ -103,6 +103,17 @@ def offline_batch(rpc,fixtures,directory,*,observed_unix,fee_observations=None,r
             (root/("native-aux-%02d.json"%row["index"])).write_text(
                 json.dumps(native_aux,indent=2)+"\n")
             auxiliary_evidence.extend(native_aux.get("venues",[]))
+            # Directly exercise existing venue-native quote adapter on captured
+            # source accounts for several input sizes. Indicative responses
+            # MUST NOT be counted as protocol-exact complete route quotes.
+            try:
+                from arb.m5_source_fixture_native_chain_diagnostic import inspect_fixture
+                native_chain=inspect_fixture(fixture,observed_unix=observed_unix)
+                (root/("native-chain-%02d.json"%row["index"])).write_text(
+                    json.dumps(native_chain,indent=2)+"\n")
+            except (ValueError,KeyError,TypeError,ArithmeticError) as exc:
+                native_chain={"status":"NATIVE_CHAIN_DIAGNOSTIC_BLOCKED",
+                              "reason":str(exc)[:240],**SAFE}
             parity=compare(fixture,result,observed_unix=observed_unix)
             try:
                 experiment=measure_signed_quote(
