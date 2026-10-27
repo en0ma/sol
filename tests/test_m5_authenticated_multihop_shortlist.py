@@ -26,6 +26,13 @@ class AuthenticatedMultihopShortlistTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             shortlist({"routes":[],"broadcast":True,"actionable":False,
                        "live_execution_approved":False})
+    def test_four_hop_graph_is_unquoted_without_real_leg_evidence(self):
+        report=shortlist({"routes":[route(4,["orca","raydium_cpmm",
+            "meteora_dlmm","pumpswap"])],"cycle_inventory_truncated":False,**SAFE})
+        self.assertEqual(report["selected_by_hops"],{"4":1})
+        self.assertEqual(report["native_quoted_count"],0)
+        self.assertFalse(report["selected"][0]["signed_simulation_verified"])
+
     def test_no_routes_yields_no_fabricated_candidates(self):
         result=shortlist({"routes":[],"cycle_inventory_truncated":False,**SAFE})
         self.assertEqual(result["selected"],[])
