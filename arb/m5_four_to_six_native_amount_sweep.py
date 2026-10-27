@@ -16,10 +16,18 @@ def sweep(fixture, *, observed_unix, amounts=(10000,100000,1000000)):
             any(type(x)is not int or not 0<x<2**64 for x in amounts) or
             any(fixture.get(k)is not False for k in SAFE)):
         raise ValueError("safe four-to-six-hop source amount sweep required")
+    from arb.m5_source_multihop_interval_engine import walk
     attempts=[]
     venue_probes=[]
+    modeled_intervals=[]
     for amount in amounts:
         result=research_chain(fixture,amount_in=amount,observed_unix=observed_unix)
+        modeled=walk(fixture,input_base_units=amount,observed_unix=observed_unix)
+        modeled_intervals.append({"input_base_units":amount,"status":modeled["status"],
+            "minimum_modeled_output":modeled.get("minimum_modeled_output"),
+            "maximum_modeled_output":modeled.get("maximum_modeled_output"),
+            "hypothetical_fee_model_present":modeled.get("hypothetical_fee_model_present"),
+            "full_route_quote_verified":False,**SAFE})
         attempts.append({"input_base_units":amount,"status":result["status"],
             "quoted_leg_count":len(result.get("quoted_legs",[])),
             "blocked_leg_index":result.get("blocked_leg_index"),
@@ -45,6 +53,7 @@ def sweep(fixture, *, observed_unix, amounts=(10000,100000,1000000)):
             "route_venues":[row["venue"] for row in rows],
             "attempt_count":len(attempts),"venue_probe_count":len(venue_probes),
             "attempts":attempts,"venue_probes":venue_probes,
+            "source_native_multihop_modeled_intervals":modeled_intervals,
             "complete_indicative_chain_count":len(completed),
             "indicative_positive_gross_count":sum(x["indicative_gross_positive"] for x in completed),
             "indicative_ranked_input_sizes":[x["input_base_units"] for x in ranked],
