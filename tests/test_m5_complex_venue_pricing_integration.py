@@ -5,13 +5,14 @@ from arb.meteora_damm_v2_source_scenarios import scenario_envelope
 SAFE={"actionable":False,"broadcast":False,"live_execution_approved":False}
 
 class ComplexVenuePricingIntegrationTests(unittest.TestCase):
+    @patch("arb.pumpswap_source_fee_envelope.verify")
     @patch("arb.pumpswap_source_fee_envelope.extract_pool_states")
     @patch("arb.pumpswap_source_fee_envelope.extract")
     @patch("arb.pumpswap_source_fee_envelope.authenticated_address")
     @patch("arb.pumpswap_source_fee_envelope.decode_authenticated")
     @patch("arb.pumpswap_source_fee_envelope.global_decode")
     def test_pumpswap_real_account_mode_envelope_cannot_upgrade_effective_fee(
-            self,global_decode,fees,address,extract,rows):
+            self,global_decode,fees,address,extract,rows,verify):
         from arb.pumpswap_source_fee_envelope import ADDRESS
         address.return_value=("fee-account",255)
         rows.return_value=[{"venue":"pumpswap","address":"pool",
@@ -27,12 +28,13 @@ class ComplexVenuePricingIntegrationTests(unittest.TestCase):
         global_decode.return_value={"lp_fee_bps":10,"protocol_fee_bps":10,
             "coin_creator_fee_bps":10,"sell_enabled":True,"buy_enabled":True}
         fixture={"state_accounts_observed_slot":123,"state_account_addresses":["fee-account",ADDRESS],
-            "accounts":{ADDRESS:{"owner":"6EF8rrecthR5Dkzon8Nwu78jEVPUzPyTXc6crF6uAjpm",
+            "accounts":{"fee-account":{"owner":"pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ",
+                "executable":False,"data":["AA==","base64"]},ADDRESS:{"owner":"6EF8rrecthR5Dkzon8Nwu78jEVPUzPyTXc6crF6uAjpm",
                 "executable":False,"data":["AA==","base64"]}},**SAFE}
         with patch("arb.pumpswap_source_fee_envelope.PROGRAM","6EF8rrecthR5Dkzon8Nwu78jEVPUzPyTXc6crF6uAjpm"):
             result=quote_fee_candidates(fixture,pool="pool",mint_in="X",amount_in=100)
         self.assertGreater(result["candidate_count"],1)
-        self.assertLessEqual(result["lower_output_bound"],result["upper_output_bound"])
+        self.assertLessEqual(result["minimum_candidate_output"],result["maximum_candidate_output"])
         self.assertFalse(result["effective_fee_verified"])
         self.assertFalse(result["protocol_exact_verified"])
     @patch("arb.meteora_damm_v2_source_scenarios.extract_pool_states")
