@@ -43,7 +43,7 @@ def merge(registry,feeds,*,limit_per_venue=12):
     return {"pools":result,"discovery":{"status":"UNTRUSTED_HINTS_REQUIRE_SOURCE_RPC",
         "coverage":counts,"total_candidates":len(result),**SAFE}}
 
-def collect(*,limit_per_venue=12):
+def collect(*,limit_per_venue=12,registry=None):
     feeds={v:[] for v in PROGRAMS}
     errors={}
     def attempt(venue,fn):
@@ -54,12 +54,12 @@ def collect(*,limit_per_venue=12):
     attempt("orca",lambda:parse_page(fetch_page(size=50))[0])
     from arb.atomic_missing_venue_candidates import (
         discover_amm_v4_candidates,discover_clmm_candidates)
-    # Existing Raydium adapters need pinned mints for peer prioritization.
+    # Feed the existing peer inventory to the Raydium public discovery adapters.
     # Global public enumeration is bounded and does not assume a fixed token pair.
     attempt("raydium_amm_v4",lambda:[x["address"] for x in
-            discover_amm_v4_candidates({"pools":[]},max_pages=2)][:limit_per_venue])
+            discover_amm_v4_candidates(registry or {"pools":[]},max_pages=2)][:limit_per_venue])
     attempt("raydium_clmm",lambda:[x["address"] for x in
-            discover_clmm_candidates({"pools":[]},max_pages=2)][:limit_per_venue])
+            discover_clmm_candidates(registry or {"pools":[]},max_pages=2)][:limit_per_venue])
     from arb.indexed_pool_discovery import fetch_candidates
     for v in ("meteora_dlmm","meteora_damm_v2"):
         attempt(v,lambda venue=v:fetch_candidates(venue,page_size=100))
@@ -68,7 +68,7 @@ def collect(*,limit_per_venue=12):
     return feeds,errors
 
 def collect_for_registry(registry,*,limit_per_venue=12):
-    feeds,errors=collect(limit_per_venue=limit_per_venue)
+    feeds,errors=collect(limit_per_venue=limit_per_venue,registry=registry)
     from arb.pumpswap_indexed_discovery import fetch
     from arb.onchain_pool_discovery import MINTS
     mints=list(dict.fromkeys(m for p in registry["pools"] if isinstance(p,dict)
