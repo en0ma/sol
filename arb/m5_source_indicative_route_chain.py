@@ -13,12 +13,9 @@ def research_chain(fixture, *, amount_in, observed_unix):
         raise ValueError("valid source-bound route and initial input required")
     if type(observed_unix)is not int or observed_unix<0:
         raise ValueError("valid observation timestamp required")
-    # The existing dispatcher is strictly three-leg only. Never masquerade
-    # a larger route as a supported signed quote fixture.
-    if len(rows)!=3:
-        return {"status":"NATIVE_QUOTE_DISPATCHER_MISSING_FOUR_TO_SIX_HOP",
-                "hops":len(rows),"full_route_quoted":False,
-                "signed_simulation_verified":False,"net_profit_verified":False,**SAFE}
+    mints=fixture.get("route_mints")
+    if not isinstance(mints,list) or len(mints)!=len(rows)+1 or mints[0]!=mints[-1]:
+        raise ValueError("closed authenticated route mint topology required")
     current=amount_in
     trace=[]
     for index,row in enumerate(rows):
@@ -31,6 +28,8 @@ def research_chain(fixture, *, amount_in, observed_unix):
                     "reason":result.get("reason","source native quote missing")[:240],
                     "quoted_legs":trace,"full_route_quoted":False,
                     "signed_simulation_verified":False,"net_profit_verified":False,**SAFE}
+        if result.get("source_slot")!=fixture.get("state_accounts_observed_slot"):
+            raise ValueError("native quote source slot mismatch")
         next_amount=result.get("predicted_output_base_units")
         if type(next_amount)is not int or not 0<next_amount<2**64:
             raise ValueError("invalid native predicted amount")
