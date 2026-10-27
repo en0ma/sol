@@ -17,6 +17,22 @@ def assess(fixture,*,quote_report=None,signed_audit=None):
     if any(fixture.get(k) is not False for k in SAFE):
         raise ValueError("unsafe captured source route")
     issues=[]
+    # An indicative amount chain can help diagnose signing readiness, but
+    # cannot authorize an execution attempt or be mistaken for exact prices.
+    chain_trace=quote_report.get("quoted_legs") if isinstance(quote_report,dict) else None
+    if isinstance(chain_trace,list) and chain_trace:
+        if len(chain_trace)!=len(rows) or any(
+                not isinstance(leg,dict) or leg.get("index")!=i or
+                leg.get("venue")!=row["venue"] or leg.get("pool")!=row["address"] or
+                leg.get("source_slot")!=fixture["state_accounts_observed_slot"] or
+                type(leg.get("input_base_units"))is not int or
+                type(leg.get("output_base_units"))is not int or
+                leg["input_base_units"]<=0 or leg["output_base_units"]<=0 or
+                (i>0 and leg["input_base_units"]!=chain_trace[i-1]["output_base_units"])
+                for i,(leg,row) in enumerate(zip(chain_trace,rows))):
+            issues.append("native route leg amounts or source identities inconsistent")
+    else:
+        issues.append("complete source-bound four-to-six leg amount trace missing")
     if (not isinstance(quote_report,dict) or
             quote_report.get("source_quote_verified") is not True or
             quote_report.get("protocol_exact_verified") is not True or
