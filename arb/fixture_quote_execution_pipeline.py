@@ -21,14 +21,18 @@ def extract_pool_states(fixture):
     addresses=fixture["state_account_addresses"]
     accounts=fixture["accounts"]
     rows=[]
-    if fixture.get("fixture_kind")=="THREE_DISTINCT_VENUE_CLOSED_ROUTE":
+    if fixture.get("fixture_kind") in ("THREE_DISTINCT_VENUE_CLOSED_ROUTE",
+                                     "AUTHENTICATED_FOUR_TO_SIX_HOP_SOURCE_ROUTE"):
         venues=fixture.get("route_venues")
         pools=fixture.get("route_pool_addresses")
         route_mints=fixture.get("route_mints")
+        expected=3 if fixture["fixture_kind"]=="THREE_DISTINCT_VENUE_CLOSED_ROUTE" else None
         if (not isinstance(venues,list) or not isinstance(pools,list)
-                or not isinstance(route_mints,list) or len(venues)!=3
-                or len(pools)!=3 or len(route_mints)!=4
-                or len(set(venues))!=3 or len(set(pools))!=3
+                or not isinstance(route_mints,list) or
+                (len(venues)!=expected if expected is not None else not 4<=len(venues)<=6)
+                or len(pools)!=len(venues) or len(route_mints)!=len(venues)+1
+                or (len(set(venues))!=3 if expected is not None else False)
+                or len(set(pools))!=len(pools)
                 or route_mints[0]!=route_mints[-1]):
             raise ValueError("invalid authenticated three-venue fixture topology")
         entries=list(zip(venues,pools))
