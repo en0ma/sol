@@ -265,6 +265,10 @@ jobs:
         run: |
           python3 -m py_compile arb/fixture_native_aux_inventory.py
           python3 -m unittest discover -s tests -p test_m5_pumpswap_canonical_aux.py -v
+      - name: Independently check four-to-six-source signed acceptance report code
+        run: |
+          python3 -m py_compile arb/m5_four_to_six_source_signed_acceptance.py
+          python3 -m unittest discover -s tests -p test_m5_four_to_six_source_signed_acceptance.py -v
       - name: Verify integrated four-hop mixed-venue modeled quote paths and no profit promotion
         run: |
           python3 -m py_compile arb/m5_source_multihop_interval_engine.py arb/next_ten_signed_atomic_offline.py
@@ -607,6 +611,12 @@ jobs:
               --output-dir "$RUNNER_TEMP/m5-four-to-six-signed-attempt"
           else
             printf '%s\n' '{"status":"NO_AUTHENTICATED_FOUR_TO_SIX_HOP_SOURCE_FIXTURE","signed_atomic_simulation_verified":false,"actionable":false,"broadcast":false,"live_execution_approved":false}' > "$RUNNER_TEMP/m5-four-to-six-signed-attempt/four-to-six-venue.json"
+          fi
+          if [ -s "$RUNNER_TEMP/m5-four-to-six-source-fixture.json" ]; then
+            python3 -m arb.m5_four_to_six_source_signed_acceptance \
+              --fixture "$RUNNER_TEMP/m5-four-to-six-source-fixture.json" \
+              --receipt "$RUNNER_TEMP/m5-four-to-six-signed-attempt/four-to-six-venue.json" \
+              --output "$RUNNER_TEMP/m5-four-to-six-signed-attempt/source-independent-acceptance.json"
           fi
           python3 - <<'PY'
           import json,os
