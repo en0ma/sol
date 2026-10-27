@@ -104,23 +104,45 @@ def inspect(fixture,*,pool_filter=None):
                 record["missing"].append("pool_accrued_fee_bucket_fields")
             # Pump fee rates cannot be treated as effective without PDA
             # derivation, market-cap selection and fee-mode authentication.
-            from arb.pumpswap_fee_config import DISC,decode
-            from arb.pumpswap_fee_account import PROGRAM
-            for address in fixture["state_account_addresses"]:
-                info=accounts[address]
-                if info.get("owner")!=PROGRAM:continue
-                data=info.get("data")
-                if not isinstance(data,list) or len(data)!=2 or data[1]!="base64":continue
-                raw=base64.b64decode(data[0],validate=True)
-                if raw[:8]==DISC:
-                    decoded=decode(raw)
-                    record["decoded_auxiliary"].append({"type":"pump_fee_config",
-                        "account":address,"flat_fee_bps":decoded["flat_fees"],
-                        "standard_tiers":len(decoded["fee_tiers"]),
-                        "stable_tiers":len(decoded["stable_fee_tiers"])})
-            if not any(a["type"]=="pump_fee_config" for a in record["decoded_auxiliary"]):
-                record["missing"].append("pump_fee_config")
-            record["missing"].append("pda_and_dynamic_tier_verified")
+            # Authenticate the canonical pump_fees PDA, not merely any
+            # account owned by the pump_fees program with a valid layout.
+            # Decoded tiers are source evidence, but market-cap and fee-mode
+            # selection remains unresolved until independently verified.
+            from arb.pumpswap_fee_account import (
+                authenticated_address,decode_authenticated)
+            from arb.pumpswap_global_config import (
+                ADDRESS as GLOBAL_CONFIG,decode as decode_global)
+            from arb.pumpswap_pool import PROGRAM as PUMP_PROGRAM
+            canonical_fee,_=authenticated_address()
+            if canonical_fee not in included:
+                record["missing"].append("canonical_pump_fee_config_account")
+            else:
+                fee=decode_authenticated(accounts[canonical_fee],address=canonical_fee)
+                record["decoded_auxiliary"].append({
+                    "type":"canonical_pump_fee_config","account":canonical_fee,
+                    "flat_fee_bps":fee["flat_fees"],
+                    "standard_tiers":len(fee["fee_tiers"]),
+                    "stable_tiers":len(fee["stable_fee_tiers"]),
+                    "canonical_pda_authenticated":True})
+            if GLOBAL_CONFIG not in included:
+                record["missing"].append("pump_global_config_account")
+            else:
+                info=accounts[GLOBAL_CONFIG]
+                if info.get("owner")!=PUMP_PROGRAM or info.get("executable") is not False:
+                    raise ValueError("PumpSwap global config source owner mismatch")
+                encoded=info.get("data")
+                if not isinstance(encoded,list) or len(encoded)!=2 or encoded[1]!="base64":
+                    raise ValueError("PumpSwap global config source encoding missing")
+                native=decode_global(base64.b64decode(encoded[0],validate=True))
+                record["decoded_auxiliary"].append({
+                    "type":"pump_global_config","account":GLOBAL_CONFIG,
+                    "lp_fee_bps":native["lp_fee_bps"],
+                    "protocol_fee_bps":native["protocol_fee_bps"],
+                    "creator_fee_bps":native["coin_creator_fee_bps"],
+                    "buy_enabled":native["buy_enabled"],
+                    "sell_enabled":native["sell_enabled"],
+                    "effective_fee_verified":False})
+            record["missing"].append("source_authenticated_market_cap_fee_tier_and_fee_mode")
         record.update(fully_priced=False,**SAFE)
         result.append(record)
     return {"source_slot":fixture["state_accounts_observed_slot"],
