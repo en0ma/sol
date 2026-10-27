@@ -43,7 +43,7 @@ class PumpSourceTierSelectionTests(unittest.TestCase):
         result=market_cap_quote_base_units(base_reserve=1000_000000,
             quote_reserve=2000_000000,virtual_quote_reserves=-200_000000,
             base_decimals=6)
-        self.assertEqual(result["market_cap_quote_base_units"],1800_000000000)
+        self.assertEqual(result["market_cap_quote_base_units"],1_800_000_000_000_000)
     def test_initialized_classic_mint_decimals(self):
         raw=bytearray(82)
         raw[44]=6
@@ -74,7 +74,8 @@ class PumpSourceTierSelectionTests(unittest.TestCase):
         result=choose_tier_by_source_market_cap(pool_state={"base_mint":"base",
             "quote_mint":NATIVE_WSOL_MINT,"is_mayhem_mode":0,
             "is_cashback_coin":1},fee_config={"account_authenticated":True},
-            base_reserve=100,quote_reserve=100,base_decimals=6)
+            base_reserve=100,quote_reserve=100,base_decimals=6,
+            base_supply_base_units=1_000_000_000)
         self.assertFalse(result["tier_selected"])
     def test_market_cap_rejects_virtual_liquidity_underflow(self):
         with self.assertRaisesRegex(ValueError,"nonpositive"):

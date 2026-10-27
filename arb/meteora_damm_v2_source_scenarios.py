@@ -6,7 +6,7 @@ Authentic pool mint, same-slot classic SPL reserves and pool state are required.
 """
 from arb.fixture_quote_execution_pipeline import extract_pool_states
 from arb.fixture_pool_fundamentals import extract
-from arb.meteora_damm_v2_quote import quote_collection_mode
+from arb.meteora_damm_v2_native_fee_math import quote_native_fee, FEE_DENOMINATOR
 SAFE={"actionable":False,"broadcast":False,"live_execution_approved":False}
 
 def scenario_envelope(fixture,*,pool,mint_in,amount_in,
