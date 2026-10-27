@@ -102,7 +102,7 @@ def scan_local_fork(rpc, registry, *, max_cycles=200):
 
 def run_m5_research(rpc, registry, *, max_cycles=200, source_dir=None,
                     signed_dir=None, observed_unix=None, maximum=4,
-                    quote_input=None):
+                    quote_input=None,four_to_six_source_output=None):
     """One explicitly offline, existing-engine source -> signed evidence path.
 
     Signed triangles are independent source-backed candidate probes, NOT
@@ -119,6 +119,8 @@ def run_m5_research(rpc, registry, *, max_cycles=200, source_dir=None,
         raise ValueError("source quote ranking requires fixtures, amount and time")
     if type(maximum) is not int or not 1 <= maximum <= 12:
         raise ValueError("bounded three-venue trial count required")
+    if four_to_six_source_output is not None and source_dir is None:
+        raise ValueError("four-to-six source output requires explicit fixture mode")
     if (source_dir is not None or signed_dir is not None) and (
             os.environ.get("SURFPOOL_EXPLICITLY_OFFLINE") != "1"):
         raise ValueError("explicit isolated fork gate required for fixture operations")
@@ -133,6 +135,7 @@ def run_m5_research(rpc, registry, *, max_cycles=200, source_dir=None,
     report["source_quote_ranking"] = {"status": "NOT_REQUESTED"}
     report["signed_triangles"] = {"status": "NOT_REQUESTED"}
     report["signed_selection"] = {"status": "NOT_REQUESTED", **SAFE}
+    report["four_to_six_source_fixture"] = {"status": "NOT_REQUESTED", **SAFE}
     if source_dir is not None:
         from arb.m5_distinct_venue_coverage_batch import source_batch
         exported = source_batch(rpc, readiness, source_dir, maximum=maximum)
@@ -158,6 +161,25 @@ def run_m5_research(rpc, registry, *, max_cycles=200, source_dir=None,
             report["source_quote_ranking"] = ranking
             report["quoted_candidates"] = ranking["fully_quoted"]
             report["gross_positive_source_quote_routes"] = ranking["positive_gross"]
+    if four_to_six_source_output is not None:
+        from arb.m5_four_to_six_source_capture import capture
+        path=Path(four_to_six_source_output)
+        targets=[i for i,r in enumerate(report["routes"]) if 4<=r["hops"]<=6]
+        if not targets:
+            report["four_to_six_source_fixture"]={
+                "status":"NO_AUTHENTICATED_FOUR_TO_SIX_CYCLE_IN_BOUNDED_GRAPH",**SAFE}
+        else:
+            try:
+                path.parent.mkdir(parents=True,exist_ok=True)
+                result=capture(rpc,report,targets[0],path)
+                report["four_to_six_source_fixture"]={
+                    **result,"graph_route_index":targets[0],
+                    "source_fixture_path":str(path),
+                    "signed_simulation_verified":False,**SAFE}
+            except (ValueError,TypeError,KeyError,RuntimeError) as exc:
+                report["four_to_six_source_fixture"]={
+                    "status":"FOUR_TO_SIX_SOURCE_CAPTURE_BLOCKED",
+                    "graph_route_index":targets[0],"reason":str(exc)[:240],**SAFE}
     if signed_dir is not None:
         from arb.m5_distinct_venue_coverage_batch import offline_batch
         if quote_input is not None:
@@ -197,6 +219,7 @@ def main():
     parser.add_argument("--observed-unix", type=int)
     parser.add_argument("--maximum", type=int, default=4)
     parser.add_argument("--quote-input", type=int)
+    parser.add_argument("--four-to-six-source-output")
     args = parser.parse_args()
     if not 1 <= args.max_cycles <= 2000:
         parser.error("bounded maximum cycles must be 1..2000")
@@ -204,7 +227,8 @@ def main():
     report = run_m5_research(args.rpc, registry, max_cycles=args.max_cycles,
         source_dir=args.source_dir, signed_dir=args.signed_dir,
         observed_unix=args.observed_unix, maximum=args.maximum,
-        quote_input=args.quote_input)
+        quote_input=args.quote_input,
+        four_to_six_source_output=args.four_to_six_source_output)
     Path(args.output).write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
     print(json.dumps({key: report[key] for key in (
         "status", "venue_coverage", "authenticated_pool_count", "connected_cycles",
