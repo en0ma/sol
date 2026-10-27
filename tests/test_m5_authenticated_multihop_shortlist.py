@@ -38,6 +38,18 @@ class AuthenticatedMultihopShortlistTests(unittest.TestCase):
             shortlist({"status":"UNTRUSTED_API_ROUTES","routes":[
                 route(4,["orca","raydium_cpmm","meteora_dlmm","pumpswap"])],**SAFE})
 
+    def test_native_adapter_coverage_is_not_a_native_quote(self):
+        rows=[route(4,["orca","raydium_cpmm","raydium_clmm","raydium_amm_v4"]),
+              route(4,["orca","raydium_cpmm","meteora_dlmm","pumpswap"])]
+        result=shortlist({"routes":rows,**SAFE},maximum=2)
+        self.assertEqual(result["native_adapter_covered_source_cycles"],1)
+        self.assertEqual(result["native_adapter_covered_selected"],1)
+        self.assertTrue(result["selected"][0]["native_adapter_coverage_only"])
+        self.assertFalse(result["selected"][0]["full_native_quote_observed"])
+        self.assertEqual(result["native_quoted_count"],0)
+        self.assertEqual(result["missing_auxiliary_venue_occurrences"],
+                         {"meteora_dlmm":1,"pumpswap":1})
+
     def test_no_routes_yields_no_fabricated_candidates(self):
         result=shortlist({"routes":[],"cycle_inventory_truncated":False,**SAFE})
         self.assertEqual(result["selected"],[])
