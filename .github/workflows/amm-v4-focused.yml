@@ -278,6 +278,10 @@ jobs:
         run: |
           python3 -m py_compile arb/m5_four_to_six_source_signed_acceptance.py
           python3 -m unittest discover -s tests -p test_m5_four_to_six_source_signed_acceptance.py -v
+      - name: Test Raydium CLMM native cross-tick liquidity traversal, fees and conservative exhaustion
+        run: |
+          python3 -m py_compile arb/raydium_clmm_cross_tick_quote.py arb/fixture_all_venue_signed_quotes.py
+          python3 -m unittest discover -s tests -p test_raydium_clmm_cross_tick_quote.py -v
       - name: Verify integrated four-hop mixed-venue modeled quote paths and no profit promotion
         run: |
           python3 -m py_compile arb/m5_source_multihop_interval_engine.py arb/next_ten_signed_atomic_offline.py
