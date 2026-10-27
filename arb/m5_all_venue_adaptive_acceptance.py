@@ -44,6 +44,11 @@ def audit(root,*,batch="remaining",only_venue=None):
     # Explicitly distinguish actual independent signed research from any
     # hypothetical source quote or complete economic verification.
     signed_complete=(verified==len(routes))
+    if verified+len(failures)!=len(routes):
+        raise ValueError("adaptive source route verification partition invalid")
+    if any(row["attempted_route_occurrences"]!=row["verified_route_occurrences"]+row["unverified_route_occurrences"]
+           for row in venue_coverage.values()):
+        raise ValueError("adaptive per-venue signed coverage partition invalid")
     return {"status":"SEVEN_VENUE_ADAPTIVE_RESEARCH","target":len(routes),
             "unverified_route_count":len(failures),
             "unverified_routes":failures,
