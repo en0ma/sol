@@ -30,10 +30,14 @@ def audit(root,*,batch="remaining",only_venue=None):
     failures=[{"route":r["route"],"failure_reasons":r["failure_reasons"]}
               for r in rows if r["status"]!="VERIFIED_ADAPTIVE_SIGNED_OFFLINE"]
     failure_counts=Counter(reason for r in failures for reason in r["failure_reasons"])
+    failing_venue_occurrences=Counter(venue for r in failures for venue in r["route"].split("__"))
+    dlmm_affected=[r["route"] for r in failures if "meteora_dlmm" in r["route"].split("__")]
     return {"status":"SEVEN_VENUE_ADAPTIVE_RESEARCH","target":len(routes),
             "unverified_route_count":len(failures),
             "unverified_routes":failures,
             "failure_reason_counts":dict(sorted(failure_counts.items())),
+            "failing_venue_occurrences":dict(sorted(failing_venue_occurrences.items())),
+            "dlmm_unverified_routes":dlmm_affected,
             "verified":verified,"routes":rows,
             "full_42_adaptive_verified":False,
             "independently_validated_quote_samples":0,**SAFE}
@@ -49,6 +53,8 @@ def main():
     args.output.write_text(json.dumps(result,indent=2,sort_keys=True)+"\n")
     print(json.dumps({"adaptive_verified":result["verified"],"target":result["target"],
                       "unverified_routes":result["unverified_routes"],
-                      "failure_reason_counts":result["failure_reason_counts"],**SAFE}))
+                      "failure_reason_counts":result["failure_reason_counts"],
+                      "failing_venue_occurrences":result["failing_venue_occurrences"],
+                      "dlmm_unverified_routes":result["dlmm_unverified_routes"],**SAFE}))
     return 0 if result["verified"]==result["target"] else 1
 if __name__=="__main__":raise SystemExit(main())
