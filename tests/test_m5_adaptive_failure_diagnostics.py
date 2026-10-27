@@ -35,6 +35,10 @@ class AdaptiveFailureDiagnostics(unittest.TestCase):
         self.assertEqual(report["verified"],1)
         self.assertEqual(report["unverified_route_count"],2)
         self.assertEqual(report["failing_venue_occurrences"]["meteora_dlmm"],2)
+        self.assertEqual(report["venue_signed_coverage"]["meteora_dlmm"],
+            {"attempted_route_occurrences":2,"verified_route_occurrences":0,
+             "unverified_route_occurrences":2})
+        self.assertEqual(report["venue_signed_coverage"]["orca"]["verified_route_occurrences"],1)
         self.assertEqual(report["dlmm_unverified_routes"],
             ["meteora_dlmm__orca","pumpswap__meteora_dlmm"])
         self.assertFalse(report["actionable"])
