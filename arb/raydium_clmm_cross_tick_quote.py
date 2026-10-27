@@ -55,6 +55,23 @@ def quote_across_initialized_ticks(state,mint_in,amount_in,fee_rate_ppm,ticks,
         raise ValueError("CLMM current price or liquidity absent")
     if not isinstance(ticks,list) or not 1<=len(ticks)<=300:
         raise ValueError("source initialized tick inventory empty or unbounded")
+    # Nonadjacent on-chain arrays can conceal intervening initialized
+    # liquidity. Require explicit positional range coverage when supplied.
+    # The caller performs same-slot PDA and program ownership authentication.
+    starts=state.get("authenticated_tick_array_starts")
+    if starts is not None:
+        spacing=state.get("tick_spacing")
+        if (not isinstance(starts,list) or not starts or
+                any(type(v)is not int for v in starts) or len(set(starts))!=len(starts)
+                or type(spacing)is not int or spacing<=0):
+            raise ValueError("CLMM authenticated tick array range malformed")
+        span=60*spacing
+        anchor=tick//span*span
+        if anchor not in starts:
+            raise ValueError("CLMM active tick array missing from authenticated range")
+        for start in starts:
+            if start%span:
+                raise ValueError("CLMM tick array range not aligned")
     by_index={}
     for row in ticks:
         if not isinstance(row,dict):
@@ -77,6 +94,13 @@ def quote_across_initialized_ticks(state,mint_in,amount_in,fee_rate_ppm,ticks,
         if not candidates:
             raise ValueError("CLMM next initialized tick missing from source account inventory")
         target_index=max(candidates) if zero else min(candidates)
+        if starts is not None:
+            target_start=target_index//span*span
+            first=min(anchor,target_start)
+            last=max(anchor,target_start)
+            for array_start in range(first,last+span,span):
+                if array_start not in starts:
+                    raise ValueError("CLMM source tick array range has an unobserved gap")
         target=sqrt_price_from_tick_index(target_index)
         if zero and target>price:
             raise ValueError("CLMM downwards initialized tick above active price")

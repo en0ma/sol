@@ -35,7 +35,7 @@ class ClmmTickDecodeTests(unittest.TestCase):
         # are strictly aligned. Preserve a real-account decoding property.
         for i in range(60):
             if i not in (3,7):
-                raw[44+i*168:48+i*168]=b"\\x00"*4
+                raw[44+i*168:48+i*168]=bytes(4)
         ticks=initialized_ticks(bytes(raw),0,10)
         self.assertEqual([t["tick_index"] for t in ticks],[30,70])
     def test_populated_wrong_index_cannot_be_normalized(self):
