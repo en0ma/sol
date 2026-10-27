@@ -38,7 +38,16 @@ def quote_fee_candidates(fixture,*,pool,mint_in,amount_in):
     fundamentals=next((x for x in extract(fixture)["fundamentals"] if x["address"]==pool),None)
     if fundamentals is None:raise ValueError("PumpSwap SPL vault evidence absent")
     base,quote=fundamentals["vault_base_units"]
-    accrued=state["protocol_fees"]+state["creator_fees"]
+    # Earlier PumpSwap Pool versions predate appended fee counters.
+    # Official PumpSwap account compatibility treats absent trailing fields
+    # as zero, never as unvalidated liquidity or a fabricated fee tier.
+    pfee=state.get("protocol_fees")
+    cfee=state.get("creator_fees")
+    if pfee is None:pfee=0
+    if cfee is None:cfee=0
+    if type(pfee)is not int or type(cfee)is not int:
+        raise ValueError("PumpSwap accrued fee counters malformed")
+    accrued=pfee+cfee
     virtual=state["virtual_quote_reserves"]
     if any(type(x)is not int for x in (base,quote,accrued,virtual)) or min(base,quote)<=0 or accrued<0 or accrued>=quote or quote+virtual<=0:
         raise ValueError("invalid source PumpSwap fee liabilities")
