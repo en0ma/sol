@@ -47,8 +47,39 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix):
                 raise ValueError("Whirlpool tick span outside native protocol bounds")
             lower=sqrt_price_from_tick_index(boundary)
             upper=sqrt_price_from_tick_index(boundary+spacing)
-            native=quote_bounded_single_tick(state,leg["input_mint"],amount_in,
-                lower_sqrt_x64=lower,upper_sqrt_x64=upper)
+            from arb.whirlpool_ticks import (
+                FIXED_LEN,DISC as ORCA_TICK_DISC,decode_fixed_ticks,
+                addresses as orca_array_addresses)
+            from arb.orca_multitick_quote import quote_from_decoded_arrays
+            from arb.orca_whirlpool import PROGRAM as ORCA_PROGRAM
+            import base64
+            decoded_arrays=[]
+            for address in fixture["state_account_addresses"]:
+                account=fixture["accounts"].get(address)
+                if not isinstance(account,dict) or account.get("owner")!=ORCA_PROGRAM:
+                    continue
+                if account.get("executable") is not False:
+                    raise ValueError("executable Whirlpool pool tick state rejected")
+                data=account.get("data")
+                if not isinstance(data,list) or len(data)!=2 or data[1]!="base64":
+                    raise ValueError("unauthenticated Whirlpool source array encoding")
+                raw=base64.b64decode(data[0],validate=True)
+                if len(raw)!=FIXED_LEN or raw[:8]!=ORCA_TICK_DISC:
+                    continue
+                start=int.from_bytes(raw[8:12],"little",signed=True)
+                if address!=orca_array_addresses(pool,[start])[0]:
+                    raise ValueError("Whirlpool captured tick array PDA mismatch")
+                records=decode_fixed_ticks(raw,pool,start,spacing)
+                decoded_arrays.append({"start_tick":start,"ticks":records,
+                                       "status":"FIXED_VALID"})
+            if decoded_arrays:
+                # Reuse the existing exact-input Orca venue model, rather than
+                # pretending the current tick has infinite constant liquidity.
+                native=quote_from_decoded_arrays(state,leg["input_mint"],amount_in,
+                    decoded_arrays,max_crossings=12)
+            else:
+                native=quote_bounded_single_tick(state,leg["input_mint"],amount_in,
+                    lower_sqrt_x64=lower,upper_sqrt_x64=upper)
             q={**leg,"amount_in":amount_in,
                "amount_out":native["estimated_output_base_units"],
                "snapshot_slot":row["snapshot_slot"]}
