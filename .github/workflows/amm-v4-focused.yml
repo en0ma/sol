@@ -301,10 +301,6 @@ jobs:
         run: |
           python3 -m py_compile arb/meteora_damm_v2_native_fee_math.py arb/pumpswap_source_tier_selector.py
           python3 -m unittest discover -s tests -p test_m5_protocol_fee_math_native.py -v
-      - name: Test real four-to-six-hop multiamount signed attempts and rollback evidence
-        run: |
-          python3 -m py_compile arb/next_ten_signed_atomic_offline.py
-          python3 -m unittest discover -s tests -p test_m5_signed_four_to_six_multisize.py -v
       - name: Verify multihop native-versus-signed SPL prefix parity fail-closed
         run: |
           python3 -m py_compile arb/m5_source_signed_prefix_quote_parity.py
@@ -631,6 +627,12 @@ jobs:
               --output-dir "$RUNNER_TEMP/m5-four-to-six-signed-attempt"
           else
             printf '%s\n' '{"status":"NO_AUTHENTICATED_FOUR_TO_SIX_HOP_SOURCE_FIXTURE","signed_atomic_simulation_verified":false,"actionable":false,"broadcast":false,"live_execution_approved":false}' > "$RUNNER_TEMP/m5-four-to-six-signed-attempt/four-to-six-venue.json"
+          fi
+          if [ -s "$RUNNER_TEMP/m5-four-to-six-source-fixture.json" ]; then
+            python3 -m arb.m5_four_to_six_signed_batch_audit \
+              --fixture "$RUNNER_TEMP/m5-four-to-six-source-fixture.json" \
+              --receipts "$RUNNER_TEMP/m5-four-to-six-signed-attempt" \
+              --output "$RUNNER_TEMP/m5-four-to-six-signed-attempt/all-signed-size-acceptance.json"
           fi
           if [ -s "$RUNNER_TEMP/m5-four-to-six-source-fixture.json" ]; then
             python3 -m arb.m5_four_to_six_source_signed_acceptance \
