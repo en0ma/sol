@@ -1,5 +1,5 @@
 import unittest
-from arb.m5_seven_venue_public_hints import merge
+from arb.m5_seven_venue_public_hints import merge,choose_connectivity_leads
 from arb.next_ten_fork_pool_probe import PROGRAMS
 BASE={"pools":[{"venue":"orca","address":"1"*32,"mints":["A","B"]}]}
 class BroadenedHintsTests(unittest.TestCase):
@@ -22,6 +22,19 @@ class BroadenedHintsTests(unittest.TestCase):
         r=merge(BASE,feeds,limit_per_venue=2)
         self.assertEqual(r["discovery"]["coverage"]["orca"]["total_candidates"],2)
         self.assertEqual(r["discovery"]["coverage"]["meteora_dlmm"]["total_candidates"],1)
+    def test_greedy_mint_connectivity_prefers_bridge_over_hub_leaf(self):
+        registry={"pools":[
+            {"venue":"orca","address":"1"*32,"mints":["A","B"]},
+            {"venue":"orca","address":"2"*32,"mints":["B","C"]}]}
+        leads=[{"address":"3"*32,"mints":["A","D"]},
+               {"address":"4"*32,"mints":["A","C"]},
+               {"address":"5"*32,"mints":["A","E"]}]
+        chosen=choose_connectivity_leads(leads,registry,limit=2)
+        self.assertEqual(chosen[0],"4"*32)
+        self.assertEqual(len(chosen),2)
+        with self.assertRaises(ValueError):
+            choose_connectivity_leads(leads,registry,limit=0)
+
     def test_invalid_pool_address_fails_closed(self):
         feeds={v:[] for v in PROGRAMS}
         with self.assertRaises(ValueError):
