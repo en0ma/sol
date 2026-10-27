@@ -403,9 +403,16 @@ def simulate_adaptive_n_leg_offline(rpc, legs, tokens, states, evidence, owner,
     from arb.m5_signed_message_fee_estimate import estimate_signed_message_fee
     estimate=estimate_signed_message_fee(rpc,tx)
     positive,packet=_simulate(rpc,tx,accounts)
+    import hashlib
+    signed_digest=hashlib.sha256(bytes(tx)).hexdigest()
+    signed_signature=str(tx.signatures[0])
     receipt={"status":"UNVERIFIED","legs":n,"planned_inputs":planned["amounts"],
              "initial_balances_base_units":list(before),
-             "signed_packet_bytes":packet,"positive_error":str(positive.get("err")),
+             "signed_packet_bytes":packet,
+             "signed_transaction_sha256":signed_digest,
+             "signed_transaction_signature":signed_signature,
+             "signed_packet_crypto_bound":True,
+             "positive_error":str(positive.get("err")),
              "signed_message_fee_estimate":estimate,
              "signed_cpi_per_leg_verified":False,"rollback_failure_case_verified":False,
              "signed_atomic_simulation_verified":False,"quote_accuracy_verified":False,
@@ -463,6 +470,9 @@ def simulate_adaptive_n_leg_offline(rpc, legs, tokens, states, evidence, owner,
     else:
         bad_tx=sign_v0_with_lookup(bad_ix,signer,blockhash,lookup)
     failure,bad_packet=_simulate(rpc,bad_tx,accounts)
+    negative_digest=hashlib.sha256(bytes(bad_tx)).hexdigest()
+    if signed_digest==negative_digest or signed_signature==str(bad_tx.signatures[0]):
+        raise ValueError("negative control did not cryptographically change transaction")
     error=failure.get("err")
     idx=error.get("InstructionError",[None])[0] if isinstance(error,dict) else None
     fail_expected=[event for p in programs[:-1] for event in ([p,"invoke"],[p,"success"])]
@@ -470,6 +480,8 @@ def simulate_adaptive_n_leg_offline(rpc, legs, tokens, states, evidence, owner,
     rollback=(idx==n-1 and top_level_events(failure.get("logs") or [],set(programs))==fail_expected
               and _post(rpc,accounts,tokens,owner)==before)
     receipt.update(negative_error=str(error),negative_failure_instruction_index=idx,negative_packet_bytes=bad_packet,
+                   negative_signed_transaction_sha256=negative_digest,
+                   negative_signed_transaction_signature=str(bad_tx.signatures[0]),
                    rollback_failure_case_verified=rollback,
                    signed_atomic_simulation_verified=rollback,
                    status="SIGNED_N_LEG_ATOMIC_AND_ROLLBACK_VERIFIED" if rollback else "ROLLBACK_UNVERIFIED")
