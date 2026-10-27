@@ -67,7 +67,7 @@ class ThreeMilestoneIntegrationTests(unittest.TestCase):
             return {"quote_status":"SOURCE_BOUND_INDICATIVE",
                     "predicted_output_base_units":amount_in+1,"source_slot":42,**SAFE}
         quote.side_effect=adapter
-        result=research_chain({"route_mints":["A","B","C","A"],"state_accounts_observed_slot":42},amount_in=100,observed_unix=20)
+        result=research_chain({"route_mints":["A","B","C","A"],"state_accounts_observed_slot":42,**SAFE},amount_in=100,observed_unix=20)
         self.assertEqual(amounts,[100,101,102])
         self.assertEqual(result["gross_delta_start_mint_base_units"],3)
         self.assertFalse(result["full_route_quoted"])
@@ -87,7 +87,7 @@ class ThreeMilestoneIntegrationTests(unittest.TestCase):
                     "predicted_output_base_units":amount_in+2,"source_slot":42,**SAFE}
         quote.side_effect=adapter
         result=research_chain({"route_mints":["A","B","C","D","A"],
-            "state_accounts_observed_slot":42},amount_in=100,observed_unix=20)
+            "state_accounts_observed_slot":42,**SAFE},amount_in=100,observed_unix=20)
         self.assertEqual(observed,[100,102,104,106])
         self.assertEqual(result["output_base_units"],108)
         self.assertFalse(result["full_route_quoted"])
