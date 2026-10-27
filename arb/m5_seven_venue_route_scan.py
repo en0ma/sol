@@ -66,6 +66,8 @@ def analyze(readiness, *, max_cycles=200):
                              "budget":budget,"truncated":length_truncated}
         truncated=truncated or length_truncated
     routes=found
+    from arb.m5_graph_topology_diagnostic import audit
+    topology=audit(readiness)
     rows = [{"start_mint": r["start_mint"], "hops": r["hops"],
              "legs": r["legs"], "venue_count": len(r["venues"]),
              "quote_status": "NOT_QUOTED",
@@ -79,6 +81,7 @@ def analyze(readiness, *, max_cycles=200):
             "connected_cycles": len(rows),
             "cycle_inventory_truncated": truncated,
             "cycle_coverage_by_hops": coverage,
+            "authenticated_token_graph_topology": topology,
             "cycle_budget": max_cycles,
             "cycle_count_is_exhaustive": not truncated,
             "distinct_venue_cycles": sum(x["venue_count"] > 1 for x in rows),
