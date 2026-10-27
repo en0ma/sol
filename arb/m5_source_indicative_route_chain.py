@@ -26,9 +26,9 @@ def research_chain(fixture, *, amount_in, observed_unix):
     for index,row in enumerate(rows):
         result=quote_leg(fixture,leg_index=index,amount_in=current,
                          observed_unix=observed_unix)
-        status=result.get("quote_status")
         if not isinstance(result,dict) or any(result.get(k) is not False for k in SAFE):
             raise ValueError("unsafe or malformed native leg quote")
+        status=result.get("quote_status")
         if status!="SOURCE_BOUND_INDICATIVE":
             return {"status":"NATIVE_ROUTE_INDICATIVE_BLOCKED",
                     "blocked_leg_index":index,"blocked_venue":row["venue"],
