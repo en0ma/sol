@@ -90,3 +90,57 @@ def fee_bounds_from_fixture(fixture, *, pool, observed_unix):
     return {**source_fee_bounds(raw,bin_step=state["bin_step"],
                   observed_unix=observed_unix),
             "pool":pool,"source_slot":fixture["state_accounts_observed_slot"],**SAFE}
+
+def dynamic_fee_rate_by_bin(raw, *, bin_step, observed_unix, active_bin_id,
+                            visited_bin_ids, swap_x_for_y):
+    """Reproduce integer volatility references and bin-crossing fee numerators.
+
+    Based on Meteora DLMM LbPair update_references,
+    update_volatility_accumulator and compute_variable_fee. This prices the
+    observed local slot and explicit swap direction only. Swap fee collection
+    mode and SPL token transfer extensions remain separately gated.
+    """
+    if (type(active_bin_id)is not int or type(swap_x_for_y)is not bool
+            or not isinstance(visited_bin_ids,list) or not 1<=len(visited_bin_ids)<=210
+            or visited_bin_ids[0]!=active_bin_id
+            or any(type(i)is not int for i in visited_bin_ids)
+            or any(visited_bin_ids[i]!=visited_bin_ids[i-1]+(-1 if swap_x_for_y else 1)
+                   for i in range(1,len(visited_bin_ids)))):
+        raise ValueError("invalid contiguous DLMM source bin traversal")
+    state=source_fee_bounds(raw,bin_step=bin_step,observed_unix=observed_unix)
+    static=state["static"];variable=state["variable"]
+    mode=static["collect_fee_mode"]
+    if mode not in (0,1):
+        raise ValueError("unsupported native DLMM fee collection mode")
+    if mode==1 and swap_x_for_y:
+        raise ValueError("DLMM Y-only output-denominated fee requires separate pricing")
+    elapsed=observed_unix-variable["last_update_timestamp"]
+    if elapsed<0:
+        raise ValueError("DLMM quote observation precedes source pool volatility clock")
+    if not static["filter_period"]<=static["decay_period"]:
+        raise ValueError("DLMM source fee decay windows inconsistent")
+    reference=variable["volatility_reference"]
+    index=variable["index_reference"]
+    if elapsed>=static["filter_period"]:
+        index=active_bin_id
+        if elapsed<static["decay_period"]:
+            reference=(variable["volatility_accumulator"]*static["reduction_factor"])//10000
+        else:
+            reference=0
+    base=state["base_fee_rate_numerator"]
+    rates=[]
+    for bin_id in visited_bin_ids:
+        volatility=min(reference+abs(index-bin_id)*10000,
+                       static["max_volatility_accumulator"])
+        scaled=volatility*bin_step
+        fee_numerator=(static["variable_fee_control"]*scaled*scaled+100_000_000_000-1)//100_000_000_000
+        effective=min(base+fee_numerator,MAX_FEE_NUMERATOR)
+        rates.append({"bin_id":bin_id,"effective_fee_rate":effective,
+                      "volatility_accumulator":volatility,
+                      "base_fee_rate":base,"variable_fee_rate":fee_numerator})
+    return {"rates":rates,"reference_bin_id":index,
+            "updated_volatility_reference":reference,
+            "observed_unix":observed_unix,
+            "fee_collect_mode":mode,
+            "integer_fee_schedule_derived":True,
+            "protocol_exact_verified":False,**SAFE}
