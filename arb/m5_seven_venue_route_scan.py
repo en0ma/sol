@@ -44,7 +44,12 @@ def analyze(readiness, *, max_cycles=200):
                 raise ValueError("invalid source token pair")
             pools.append({"venue": venue, "address": item["pool"],
                           "mints": mints, "verified": True, "slot": item["slot"]})
-    routes = cycles(pools, max_cycles=max_cycles) if pools else []
+    # One extra cycle distinguishes an exhausted search from truncation.
+    # Preserve an auditable partial inventory instead of failing the entire
+    # seven-venue run when many source pools connect.
+    found = cycles(pools,max_cycles=max_cycles+1,truncate=True) if pools else []
+    truncated = len(found)>max_cycles
+    routes = found[:max_cycles]
     rows = [{"start_mint": r["start_mint"], "hops": r["hops"],
              "legs": r["legs"], "venue_count": len(r["venues"]),
              "quote_status": "NOT_QUOTED",
@@ -56,6 +61,9 @@ def analyze(readiness, *, max_cycles=200):
             "venue_coverage": {venue: len(source[venue]) for venue in ORDER},
             "authenticated_pool_count": len(pools),
             "connected_cycles": len(rows),
+            "cycle_inventory_truncated": truncated,
+            "cycle_budget": max_cycles,
+            "cycle_count_is_exhaustive": not truncated,
             "distinct_venue_cycles": sum(x["venue_count"] > 1 for x in rows),
             "quoted_candidates": 0, "ranked_profitable_candidates": 0,
             "signed_simulation_attempts": 0,
