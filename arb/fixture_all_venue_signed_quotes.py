@@ -95,6 +95,19 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix):
             native_aux=fixture.get("source_native_auxiliary_quotes",{})
             auxiliary=native_aux.get(pool) if isinstance(native_aux,dict) else None
             if auxiliary is None:
+                if v=="meteora_dlmm":
+                    from arb.meteora_dlmm_source_fee_envelope import quote_fee_envelope
+                    bound=quote_fee_envelope(fixture,pool=pool,
+                        mint_in=leg["input_mint"],amount_in=amount_in,
+                        observed_unix=observed_unix)
+                    return {"venue":v,"pool":pool,"leg_index":leg_index,
+                        "source_slot":row["snapshot_slot"],
+                        "predicted_output_base_units":None,
+                        "quote_status":"NATIVE_QUOTE_BOUNDED_NOT_EXACT"
+                             if "lower_output_bound" in bound else "NATIVE_QUOTE_BLOCKED",
+                        "native_fee_envelope":bound,
+                        "reason":"effective DLMM dynamic fee and execution parity unverified",
+                        "protocol_exact_verified":False,**SAFE}
                 raise ValueError("MISSING_NATIVE_AUXILIARY_STATE: "+v+
                     " source-verified effective fees, reserves and/or bin arrays")
             q=quote_auxiliary(fixture,row,venue=v,
