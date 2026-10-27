@@ -33,6 +33,8 @@ def audit(root,*,batch="remaining",only_venue=None):
     failing_venue_occurrences=Counter(venue for r in failures for venue in r["route"].split("__"))
     dlmm_affected=[r["route"] for r in failures if "meteora_dlmm" in r["route"].split("__")]
     venue_totals=Counter(venue for route in routes for venue in route)
+    if any(r.get("route") not in {"__".join(route) for route in routes} for r in rows):
+        raise ValueError("adaptive signed audit row route identity mismatch")
     venue_verified=Counter(venue for r in rows if r["status"]=="VERIFIED_ADAPTIVE_SIGNED_OFFLINE"
                            for venue in r["route"].split("__"))
     venue_coverage={venue:{"attempted_route_occurrences":count,
