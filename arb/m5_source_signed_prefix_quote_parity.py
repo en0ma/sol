@@ -85,3 +85,27 @@ def compare(fixture,receipt,*,observed_unix):
         "quote_accuracy_verified":False,
         "atomic_execution_independently_accepted":False,
         "net_profit_verified":False,**SAFE}
+
+def main():
+    import argparse,json
+    from pathlib import Path
+    p=argparse.ArgumentParser()
+    p.add_argument("--fixture",required=True)
+    p.add_argument("--receipt",required=True)
+    p.add_argument("--output",required=True)
+    p.add_argument("--observed-unix",type=int,required=True)
+    args=p.parse_args()
+    output=Path(args.output)
+    try:
+        result=compare(json.loads(Path(args.fixture).read_text()),
+            json.loads(Path(args.receipt).read_text()),
+            observed_unix=args.observed_unix)
+    except (ValueError,TypeError,KeyError,RuntimeError,OverflowError) as exc:
+        result={"status":"SOURCE_SIGNED_NATIVE_PARITY_BLOCKED",
+                "reason":str(exc)[:240],"quote_accuracy_verified":False,
+                "net_profit_verified":False,**SAFE}
+    output.write_text(json.dumps(result,indent=2,sort_keys=True)+"\n")
+    print(json.dumps({"status":result["status"],
+        "compared_prefix_count":result.get("compared_prefix_count",0),
+        "quote_accuracy_verified":False,**SAFE}))
+if __name__=="__main__":main()

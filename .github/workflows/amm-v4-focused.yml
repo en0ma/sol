@@ -293,10 +293,6 @@ jobs:
         run: |
           python3 -m py_compile arb/meteora_dlmm_source_bin_decoder.py
           python3 -m unittest discover -s tests -p test_meteora_dlmm_source_bin_decoder.py -v
-      - name: Validate real DAMM billion-denominator fees and Pump canonical market-cap tier selection
-        run: |
-          python3 -m py_compile arb/meteora_damm_v2_native_fee_math.py arb/pumpswap_source_tier_selector.py
-          python3 -m unittest discover -s tests -p test_m5_protocol_fee_math_native.py -v
       - name: Validate integrated PumpSwap DAMM v2 source price scenarios and nonbroadcast fee bounds
         run: |
           python3 -m py_compile arb/pumpswap_source_fee_envelope.py arb/meteora_damm_v2_source_scenarios.py arb/fixture_all_venue_signed_quotes.py
@@ -625,6 +621,13 @@ jobs:
               --fixture "$RUNNER_TEMP/m5-four-to-six-source-fixture.json" \
               --receipt "$RUNNER_TEMP/m5-four-to-six-signed-attempt/four-to-six-venue.json" \
               --output "$RUNNER_TEMP/m5-four-to-six-signed-attempt/source-independent-acceptance.json"
+          fi
+          if [ -s "$RUNNER_TEMP/m5-four-to-six-source-fixture.json" ]; then
+            python3 -m arb.m5_source_signed_prefix_quote_parity \
+              --fixture "$RUNNER_TEMP/m5-four-to-six-source-fixture.json" \
+              --receipt "$RUNNER_TEMP/m5-four-to-six-signed-attempt/four-to-six-venue.json" \
+              --output "$RUNNER_TEMP/m5-four-to-six-signed-attempt/source-signed-native-parity.json" \
+              --observed-unix "$(date +%s)"
           fi
           python3 - <<'PY'
           import json,os

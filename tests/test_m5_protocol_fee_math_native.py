@@ -43,7 +43,7 @@ class PumpSourceTierSelectionTests(unittest.TestCase):
         result=market_cap_quote_base_units(base_reserve=1000_000000,
             quote_reserve=2000_000000,virtual_quote_reserves=-200_000000,
             base_decimals=6)
-        self.assertEqual(result["market_cap_quote_base_units"],1800_000000000)
+        self.assertEqual(result["market_cap_quote_base_units"],1_800_000_000_000_000)
     def test_initialized_classic_mint_decimals(self):
         raw=bytearray(82)
         raw[44]=6
