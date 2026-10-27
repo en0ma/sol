@@ -59,8 +59,8 @@ class ThreeMilestoneIntegrationTests(unittest.TestCase):
     @patch("arb.m5_source_indicative_route_chain.extract_pool_states")
     @patch("arb.m5_source_indicative_route_chain.quote_leg")
     def test_amount_aware_indicative_legs_never_claim_executable_net_profit(self,quote,states):
-        states.return_value=[{"venue":v,"address":str(i)} for i,v in
-                             enumerate(("orca","raydium_cpmm","pumpswap"))]
+        states.return_value=[{"venue":v,"address":str(i),"mints":[a,b]} for i,(v,a,b) in
+                             enumerate((("orca","A","B"),("raydium_cpmm","B","C"),("pumpswap","C","A")))]
         amounts=[]
         def adapter(fixture,*,leg_index,amount_in,observed_unix):
             amounts.append(amount_in)
@@ -72,11 +72,14 @@ class ThreeMilestoneIntegrationTests(unittest.TestCase):
         self.assertEqual(result["gross_delta_start_mint_base_units"],3)
         self.assertFalse(result["full_route_quoted"])
         self.assertFalse(result["net_profit_verified"])
+        self.assertIsNone(result["net_delta_start_mint_base_units"])
+        self.assertEqual(result["net_economics_status"],"UNCONVERTED_NETWORK_AND_PRIORITY_COSTS")
     @patch("arb.m5_source_indicative_route_chain.extract_pool_states")
     @patch("arb.m5_source_indicative_route_chain.quote_leg")
     def test_four_hop_native_amounts_are_chained_but_remain_indicative(self,quote,states):
-        states.return_value=[{"venue":v,"address":str(i)} for i,v in enumerate(
-            ("orca","raydium_cpmm","raydium_clmm","raydium_amm_v4"))]
+        states.return_value=[{"venue":v,"address":str(i),"mints":[a,b]} for i,(v,a,b) in enumerate(
+            (("orca","A","B"),("raydium_cpmm","B","C"),
+             ("raydium_clmm","C","D"),("raydium_amm_v4","D","A")))]
         observed=[]
         def adapter(fixture,*,leg_index,amount_in,observed_unix):
             observed.append(amount_in)
