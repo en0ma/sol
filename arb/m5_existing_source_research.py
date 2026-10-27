@@ -33,6 +33,8 @@ def evaluate(source_dir, *, amount_in, observed_unix, signed_dir=None, maximum=3
         row["source_batch_route_index"]=source_index
         by_source[source_index]=row
     signed_records={}
+    comparable_signed_receipts=0
+    signed_amount_mismatches=0
     if signed_dir is not None:
         signed=json.loads((Path(signed_dir)/"summary.json").read_text())
         if any(signed.get(k) is not False for k in SAFE):
@@ -41,7 +43,11 @@ def evaluate(source_dir, *, amount_in, observed_unix, signed_dir=None, maximum=3
             index=row.get("index")
             if type(index)is not int or index in signed_records or index not in set(mapping):
                 raise ValueError("unmatched or duplicate signed route")
-            signed_records[index]=row
+            source_name=next(r["fixture"] for r in records if r["index"]==index)
+            observed=json.loads((Path(signed_dir)/source_name).read_text())
+            planned=observed.get("planned_inputs")
+            actual_in=planned[0] if isinstance(planned,list) and planned and type(planned[0]) is int else None
+            signed_records[index]={**row,"observed_start_input_base_units":actual_in}
     ranked=[]
     signed_gross_sign_disagreements=0
     for row in quoted["ranked"]:
@@ -50,17 +56,25 @@ def evaluate(source_dir, *, amount_in, observed_unix, signed_dir=None, maximum=3
         receipt=signed_records.get(index)
         signed_delta=receipt.get("gross_start_mint_delta") if receipt else None
         signed_accepted=receipt is not None and receipt.get("independent_signed_accepted") is True
-        if signed_accepted and type(signed_delta) is int:
+        same_amount=(receipt is not None and
+                     receipt["observed_start_input_base_units"]==row["input_base_units"])
+        if signed_accepted and not same_amount:
+            signed_amount_mismatches+=1
+        if signed_accepted and same_amount:
+            comparable_signed_receipts+=1
+        if signed_accepted and same_amount and type(signed_delta) is int:
             if (signed_delta>0)!=(row["gross_delta_start_mint_base_units"]>0):
                 signed_gross_sign_disagreements+=1
         ranked.append({**row,
+            "quote_signed_amounts_comparable":bool(signed_accepted and same_amount),
             "signed_minus_quoted_gross_base_units":(
                 signed_delta-row["gross_delta_start_mint_base_units"]
-                if signed_accepted and type(signed_delta) is int else None),
+                if signed_accepted and same_amount and type(signed_delta) is int else None),
             "signed_observation":({
                 "status":receipt.get("status"),
                 "independent_signed_accepted":receipt.get("independent_signed_accepted") is True,
                 "gross_start_mint_delta":receipt.get("gross_start_mint_delta"),
+                "observed_start_input_base_units":receipt.get("observed_start_input_base_units"),
                 "economics_status":receipt.get("economics_status"),
                 "source_price_economics_gate":receipt.get("source_price_economics_gate"),
             } if receipt else {"status":"NOT_OBSERVED",
@@ -72,6 +86,8 @@ def evaluate(source_dir, *, amount_in, observed_unix, signed_dir=None, maximum=3
         "positive_gross_indicative":quoted["positive_gross"],
         "signed_receipts_available":len(signed_records),
         "signed_gross_sign_disagreements":signed_gross_sign_disagreements,
+        "comparable_signed_receipts":comparable_signed_receipts,
+        "signed_amount_mismatches":signed_amount_mismatches,
         "ranked_routes":ranked,"all_native_quote_results":quoted["all_results"],
         "net_profit_verified":False,"broadcast":False,**SAFE}
 
