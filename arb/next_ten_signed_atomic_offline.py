@@ -566,6 +566,12 @@ def run_four_to_six_venue(rpc,fixture,*,amount_in=100_000,program_cache=None):
         if set(state[k] for k in MINT_KEYS[venue])!={mints[i],mints[i+1]}:
             raise ValueError("hydrated four-to-six-hop pool mint changed")
         proof=dict(proofs[i])
+        # Four-hop source capture wraps venue_accounts evidence inside
+        # "auxiliary"; flatten only the authenticated source-derived fields.
+        aux=proof.pop("auxiliary",None)
+        if not isinstance(aux,dict):
+            raise ValueError("four-to-six-hop source venue builder evidence missing")
+        proof.update(aux)
         if venue=="raydium_clmm":
             proof.update(clmm_direction_evidence(
                 state,mints[i],proof.get("tick_arrays_by_direction"),fixture["accounts"]))
