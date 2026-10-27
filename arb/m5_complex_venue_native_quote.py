@@ -31,6 +31,13 @@ def quote_auxiliary(fixture, row, *, venue, mint_in, amount_in, auxiliary):
     if any(not isinstance(fixture["accounts"][a],dict) or
            fixture["accounts"][a].get("executable") is not False for a in addresses):
         raise ValueError("MISSING_NATIVE_AUXILIARY_STATE: captured source account not present or executable")
+    # Claiming the decoder was authenticated is not independent evidence:
+    # require concrete byte-bearing source accounts in the signed manifest.
+    if any(not isinstance(fixture["accounts"][a].get("data"),list) or
+           len(fixture["accounts"][a]["data"])!=2 or
+           fixture["accounts"][a]["data"][1]!="base64"
+           for a in addresses):
+        raise ValueError("MISSING_NATIVE_AUXILIARY_STATE: source bytes unavailable")
     state=row["decoded_pool_state"]
     if venue=="meteora_dlmm":
         from arb.meteora_dlmm_bin_quote import quote_bins
