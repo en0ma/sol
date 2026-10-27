@@ -59,12 +59,18 @@ def hydrate(rpc, fixture, *, program_cache=None, batch=BATCH_10):
         raise ValueError("isolated Surfpool explicit offline gate required")
     if fixture.get("source")!="READ_ONLY_MAINNET_BACKED_SURFPOOL":
         raise ValueError("untrusted source fixture")
-    triangle=fixture.get("fixture_kind")=="THREE_DISTINCT_VENUE_CLOSED_ROUTE"
+    triangle=fixture.get("fixture_kind") in (
+        "THREE_DISTINCT_VENUE_CLOSED_ROUTE",
+        "AUTHENTICATED_FOUR_TO_SIX_HOP_SOURCE_ROUTE")
     if triangle:
         route=fixture.get("route_venues")
-        if (not isinstance(route,list) or len(route)!=3 or
-                len(set(route))!=3 or any(v not in PROGRAMS for v in route)):
-            raise ValueError("invalid three-distinct-venue source fixture")
+        expected=3 if fixture["fixture_kind"]=="THREE_DISTINCT_VENUE_CLOSED_ROUTE" else None
+        if (not isinstance(route,list) or
+                (len(route)!=3 and expected==3) or
+                (not 4<=len(route)<=6 and expected is None) or
+                (len(set(route))!=3 and expected==3) or
+                any(v not in PROGRAMS for v in route)):
+            raise ValueError("invalid authenticated multihop source fixture")
     else:
         route=(fixture.get("first_venue"),fixture.get("second_venue"))
         if route not in batch:
@@ -515,10 +521,94 @@ def run_three_venue(rpc,fixture,*,amount_in=100_000_000,program_cache=None):
         independently_validated_quote_samples=0,**SAFETY)
     return receipt
 
+
+def run_four_to_six_venue(rpc,fixture,*,amount_in=100_000,program_cache=None):
+    """Actually hydrate, construct, sign and simulate an authenticated 4–6-hop route.
+
+    Reuse the existing 2–6-hop adaptive signer and independent CPI/rollback
+    verifier. The result is experimental and never authorizes broadcasting.
+    An unsupported venue builder returns a concrete failure receipt.
+    """
+    from arb.atomic_graph_coordinator import simulate_adaptive_n_leg_offline
+    from arb.venue_swap_adapter import build_leg
+    from arb.source_snapshot_manifest import verify
+    local_rpc_only(rpc)
+    if (fixture.get("fixture_kind")!="AUTHENTICATED_FOUR_TO_SIX_HOP_SOURCE_ROUTE"
+            or fixture.get("source")!="READ_ONLY_MAINNET_BACKED_SURFPOOL"
+            or any(fixture.get(k) is not False for k in SAFETY)):
+        raise ValueError("safe authenticated four-to-six-hop source fixture required")
+    verify(fixture)
+    venues=fixture.get("route_venues")
+    pools=fixture.get("route_pool_addresses")
+    mints=fixture.get("route_mints")
+    proofs=fixture.get("leg_evidence_by_index")
+    if (not isinstance(venues,list) or not isinstance(pools,list)
+            or not isinstance(mints,list) or not isinstance(proofs,list)
+            or not 4<=len(venues)<=6 or len(pools)!=len(venues)
+            or len(proofs)!=len(venues) or len(mints)!=len(venues)+1
+            or len(set(pools))!=len(pools) or mints[0]!=mints[-1]
+            or any(v not in PROGRAMS for v in venues)
+            or type(amount_in)is not int or not 0<amount_in<2**64):
+        raise ValueError("invalid four-to-six-hop source route topology")
+    if any(not isinstance(proof,dict) or proof.get("venue")!=venues[i]
+           or proof.get("pool")!=pools[i] for i,proof in enumerate(proofs)):
+        raise ValueError("four-to-six-hop source evidence identity mismatch")
+    # Hydration reuses the same full verified source inventory as the accepted
+    # three-leg runner. Only temporary user accounts and signer are synthetic.
+    hydrate(rpc,fixture,program_cache=program_cache)
+    from arb.hydrated_fork_state_audit import verify_hydrated_state
+    readback=verify_hydrated_state(rpc,fixture)
+    states={}
+    evidence={}
+    route=[]
+    for i,(venue,pool) in enumerate(zip(venues,pools)):
+        state=_pool(rpc,pool,PROGRAMS[venue],DECODERS[venue])
+        if set(state[k] for k in MINT_KEYS[venue])!={mints[i],mints[i+1]}:
+            raise ValueError("hydrated four-to-six-hop pool mint changed")
+        proof=dict(proofs[i])
+        if venue=="raydium_clmm":
+            proof.update(clmm_direction_evidence(
+                state,mints[i],proof.get("tick_arrays_by_direction"),fixture["accounts"]))
+        states[(venue,pool)]=state
+        evidence[(venue,pool)]=proof
+        route.append({"venue":venue,"pool":pool,
+                      "input_mint":mints[i],"output_mint":mints[i+1]})
+    signer=Keypair()
+    owner=str(signer.pubkey())
+    keys=[str(Keypair().pubkey()) for _ in mints]
+    call(rpc,"surfnet_setAccount",[owner,{"lamports":1_000_000_000,
+        "data":"","owner":SYSTEM,"executable":False}])
+    for i,(key,mint) in enumerate(zip(keys,mints)):
+        call(rpc,"surfnet_setAccount",[key,{"lamports":2_039_280,
+            "data":token_account_bytes(mint,owner,amount_in if i==0 else 0).hex(),
+            "owner":TOKEN_PROGRAM,"executable":False}])
+    before=_post(rpc,keys,mints,owner)
+    if before!=[amount_in]+[0]*len(venues):
+        raise ValueError("four-to-six-hop source user token initialization inconsistent")
+    def negative(instructions,amounts):
+        last=len(venues)-1
+        bad=build_leg(venues[last],pools[last],states[(venues[last],pools[last])],
+            evidence[(venues[last],pools[last])],owner,
+            keys[-2],keys[-1],mints[-2],mints[-1],amounts[-1],2**64-1)
+        return list(instructions[:-1])+[bad]
+    receipt=simulate_adaptive_n_leg_offline(
+        rpc,route,mints,states,evidence,owner,keys,amount_in,None,signer,
+        negative_instructions=negative,require_closed=True)
+    receipt.update(route_venues=venues,route_pool_addresses=pools,route_mints=mints,
+        fixture_kind=fixture["fixture_kind"],
+        source_snapshot_slot=None,
+        state_accounts_observed_slot=fixture["state_accounts_observed_slot"],
+        state_account_manifest_sha256=fixture["state_account_manifest_sha256"],
+        hydrated_fork_state_readback=readback,
+        execution_environment="ISOLATED_SURFPOOL_OFFLINE",
+        independently_validated_quote_samples=0,**SAFETY)
+    return receipt
+
 def main():
     p=argparse.ArgumentParser()
     p.add_argument("--fixture-dir")
     p.add_argument("--three-venue-fixture")
+    p.add_argument("--four-to-six-venue-fixture")
     p.add_argument("--output-dir",required=True)
     p.add_argument("--batch",choices=("first","next","remaining","non-v4"),default="first")
     p.add_argument("--shard-index",type=int,default=0)
@@ -533,6 +623,20 @@ def main():
     local_rpc_only("http://127.0.0.1:8899")
     root=Path(args.output_dir)
     root.mkdir(parents=True,exist_ok=True)
+    if args.four_to_six_venue_fixture:
+        path=Path(args.four_to_six_venue_fixture)
+        out={"status":"FOUR_TO_SIX_SIGNED_EXECUTION_BLOCKED",
+             "signed_atomic_simulation_verified":False,**SAFETY}
+        (root/"four-to-six-venue.json").write_text(json.dumps(out,indent=2)+"\n")
+        try:
+            out=run_four_to_six_venue("http://127.0.0.1:8899",
+                                     json.loads(path.read_text()),program_cache={})
+        except Exception as exc:
+            out.update(error_class=type(exc).__name__,diagnostic=str(exc)[:500])
+        (root/"four-to-six-venue.json").write_text(json.dumps(out,indent=2)+"\n")
+        print(json.dumps({"route":"four-to-six-venues","status":out["status"],
+                          "broadcast":False}),flush=True)
+        return
     if args.three_venue_fixture:
         path=Path(args.three_venue_fixture)
         result={"status":"THREE_VENUE_SIGNED_EXECUTION_BLOCKED",**SAFETY}
