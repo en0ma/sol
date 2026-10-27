@@ -378,6 +378,40 @@ jobs:
           name: m5-multi-size-source-opportunity-evidence
           path: ${{ runner.temp }}/m5-multi-size-source-opportunity-evidence.json
           if-no-files-found: warn
+      - name: Export twelve authenticated AMM v4 fixtures only
+        run: |
+          python3 -m arb.next_ten_pair_fixture_export --batch remaining --only-venue raydium_amm_v4 --readiness "$RUNNER_TEMP/amm-v4-ready.json" --output-dir "$RUNNER_TEMP/amm-v4-fixtures"
+      - name: Publish authentic source diagnostics and isolated fixture bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: amm-v4-focused-source
+          path: |
+            ${{ runner.temp }}/amm-v4-fixtures/
+            ${{ runner.temp }}/amm-v4-ready.json
+            ${{ runner.temp }}/three-venue-source.json
+            ${{ runner.temp }}/three-venue-source-batch/
+            ${{ runner.temp }}/three-venue-candidate-count.txt
+            ${{ runner.temp }}/venues.json
+          if-no-files-found: error
+      - name: Enumerate broad untrusted all-seven market pool hints and independently probe source-backed cycles
+        continue-on-error: true
+        run: |
+          python3 -m arb.m5_seven_venue_public_hints \
+            --registry arb/pool_registry.json \
+            --max-per-venue 8 \
+            --output "$RUNNER_TEMP/m5-seven-venue-untrusted-pool-hints.json"
+          python3 -m arb.m5_seven_venue_route_scan \
+            --registry "$RUNNER_TEMP/m5-seven-venue-untrusted-pool-hints.json" \
+            --max-cycles 200 \
+            --output "$RUNNER_TEMP/m5-broad-source-route-candidates.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: m5-broad-seven-venue-discovery-and-source-cycles
+          path: |
+            ${{ runner.temp }}/m5-seven-venue-untrusted-pool-hints.json
+            ${{ runner.temp }}/m5-broad-source-route-candidates.json
+          if-no-files-found: warn
       - name: Validate authenticated source graph connectivity and disclose short-route dominance
         run: |
           python3 - <<'PY'
@@ -412,40 +446,6 @@ jobs:
         with:
           name: m5-authenticated-multihop-shortlist
           path: ${{ runner.temp }}/m5-authenticated-multihop-shortlist.json
-          if-no-files-found: warn
-      - name: Export twelve authenticated AMM v4 fixtures only
-        run: |
-          python3 -m arb.next_ten_pair_fixture_export --batch remaining --only-venue raydium_amm_v4 --readiness "$RUNNER_TEMP/amm-v4-ready.json" --output-dir "$RUNNER_TEMP/amm-v4-fixtures"
-      - name: Publish authentic source diagnostics and isolated fixture bundle
-        uses: actions/upload-artifact@v4
-        with:
-          name: amm-v4-focused-source
-          path: |
-            ${{ runner.temp }}/amm-v4-fixtures/
-            ${{ runner.temp }}/amm-v4-ready.json
-            ${{ runner.temp }}/three-venue-source.json
-            ${{ runner.temp }}/three-venue-source-batch/
-            ${{ runner.temp }}/three-venue-candidate-count.txt
-            ${{ runner.temp }}/venues.json
-          if-no-files-found: error
-      - name: Enumerate broad untrusted all-seven market pool hints and independently probe source-backed cycles
-        continue-on-error: true
-        run: |
-          python3 -m arb.m5_seven_venue_public_hints \
-            --registry arb/pool_registry.json \
-            --max-per-venue 8 \
-            --output "$RUNNER_TEMP/m5-seven-venue-untrusted-pool-hints.json"
-          python3 -m arb.m5_seven_venue_route_scan \
-            --registry "$RUNNER_TEMP/m5-seven-venue-untrusted-pool-hints.json" \
-            --max-cycles 200 \
-            --output "$RUNNER_TEMP/m5-broad-source-route-candidates.json"
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: m5-broad-seven-venue-discovery-and-source-cycles
-          path: |
-            ${{ runner.temp }}/m5-seven-venue-untrusted-pool-hints.json
-            ${{ runner.temp }}/m5-broad-source-route-candidates.json
           if-no-files-found: warn
       - name: Shut down upstream-backed fork before offline account writes
         if: always()
