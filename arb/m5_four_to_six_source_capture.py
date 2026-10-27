@@ -100,13 +100,26 @@ def main():
     targets=[i for i,r in enumerate(graph.get("routes",[]))
              if 4<=r.get("hops",0)<=6]
     result={"status":"NO_AUTHENTICATED_FOUR_TO_SIX_CYCLE",**SAFE}
-    if targets:
+    failures=[]
+    # A candidate graph is not an authenticated fixture. If the first
+    # candidate has an unavailable pool, continue to the next independent
+    # candidate rather than denying the signer a real multi-hop source.
+    for index in targets[:8]:
         try:
-            result={**capture(args.rpc,graph,targets[0],args.output),
-                    "graph_route_index":targets[0]}
+            captured=capture(args.rpc,graph,index,args.output)
+            result={**captured,"graph_route_index":index,
+                    "candidate_capture_attempts":len(failures)+1,
+                    "previous_candidate_failures":failures}
+            break
         except (ValueError,TypeError,KeyError,RuntimeError) as exc:
+            failures.append({"graph_route_index":index,
+                             "reason":str(exc)[:240]})
+    else:
+        if targets:
             result={"status":"SOURCE_CAPTURE_BLOCKED",
-                    "graph_route_index":targets[0],"reason":str(exc)[:240],**SAFE}
+                    "candidate_capture_attempts":len(failures),
+                    "remaining_candidates_untried":max(0,len(targets)-len(failures)),
+                    "candidate_failures":failures,**SAFE}
     Path(args.report).write_text(json.dumps(result,indent=2)+"\n")
     print(json.dumps(result))
 if __name__=="__main__":main()
