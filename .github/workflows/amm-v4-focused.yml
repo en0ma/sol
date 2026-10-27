@@ -454,6 +454,24 @@ jobs:
             --graph "$RUNNER_TEMP/m5-broad-source-route-candidates.json" \
             --output "$RUNNER_TEMP/m5-four-to-six-source-fixture.json" \
             --report "$RUNNER_TEMP/m5-four-to-six-source-capture.json"
+          if [ -s "$RUNNER_TEMP/m5-four-to-six-source-fixture.json" ]; then
+            python3 -m arb.m5_source_indicative_route_chain \
+              --fixture "$RUNNER_TEMP/m5-four-to-six-source-fixture.json" \
+              --amount 100000 --observed-unix "$(date +%s)" \
+              --output "$RUNNER_TEMP/m5-four-to-six-native-chain.json"
+            python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          from arb.m5_four_to_six_signed_handoff import assess
+          root=Path(os.environ["RUNNER_TEMP"])
+          fixture=json.loads((root/"m5-four-to-six-source-fixture.json").read_text())
+          report=assess(fixture)
+          (root/"m5-four-to-six-signed-handoff.json").write_text(
+              json.dumps(report,indent=2)+"\n")
+          print(json.dumps({"four_to_six_signed_handoff":report["status"],
+              "blockers":report["blockers"],"broadcast":False}))
+          PY
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -463,6 +481,8 @@ jobs:
             ${{ runner.temp }}/m5-broad-source-route-candidates.json
             ${{ runner.temp }}/m5-four-to-six-source-fixture.json
             ${{ runner.temp }}/m5-four-to-six-source-capture.json
+            ${{ runner.temp }}/m5-four-to-six-native-chain.json
+            ${{ runner.temp }}/m5-four-to-six-signed-handoff.json
           if-no-files-found: warn
       - name: Validate authenticated source graph connectivity and disclose short-route dominance
         run: |
