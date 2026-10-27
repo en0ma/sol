@@ -6,7 +6,7 @@ class SevenNativeVenueAuxiliaryTests(unittest.TestCase):
     def fixture(self):
         return {"state_accounts_observed_slot":123,
             "state_account_addresses":["POOL","BIN","FEE"],
-            "accounts":{"POOL":{"executable":False,"data":["AA==","base64"]},"BIN":{"executable":False},"FEE":{"executable":False}}}
+            "accounts":{"POOL":{"executable":False,"data":["AA==","base64"]},"BIN":{"executable":False,"data":["AA==","base64"]},"FEE":{"executable":False,"data":["AA==","base64"]}}}
     def row(self,venue):
         state={"token_x_mint":"A","token_y_mint":"B","active_id":5,
                "token_a_mint":"A","token_b_mint":"B",
