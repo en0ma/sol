@@ -29,7 +29,25 @@ def inspect_fixture(fixture, *, observed_unix, amounts=(10000,100000,1000000)):
         # Existing fixture adapter returns indicative, *not* protocol-exact
         # receipts. Never turn its predicted output into a passing quote.
         raise ValueError("leg %d %s: native source-bound quote indicative only"%(index,leg["venue"]))
+    # Probe every captured leg independently at each initial amount. Chain
+    # evaluation cannot reach leg 2 if leg 1 is unavailable, so independent
+    # probes are essential to reveal the actual venue-specific blockers.
+    leg_probes=[]
+    for input_amount in amounts:
+        for index,leg in enumerate(legs):
+            observed=fixture_quote_leg(fixture,leg_index=index,
+                amount_in=input_amount,observed_unix=observed_unix)
+            status=observed.get("quote_status")
+            leg_probes.append({"leg_index":index,"venue":leg["venue"],
+                "pool":leg["pool"],"input_amount_base_units":input_amount,
+                "status":status if status in ("SOURCE_BOUND_INDICATIVE","NATIVE_QUOTE_BLOCKED")
+                         else "NATIVE_QUOTE_BLOCKED",
+                "reason":observed.get("reason") if status=="NATIVE_QUOTE_BLOCKED"
+                         else "indicative quote; protocol exactness unverified",
+                "protocol_exact_verified":False,**SAFE})
     out=attempt(graph,amounts=amounts,quote_leg=native)
     return {**out,"fixture_source_slot":fixture["state_accounts_observed_slot"],
             "venue_sequence":[r["venue"] for r in rows],
+            "independent_leg_probe_count":len(leg_probes),
+            "independent_leg_probes":leg_probes,
             "fixture_native_protocol_exact_verified":False,**SAFE}
