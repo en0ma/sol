@@ -26,6 +26,7 @@ def quote_auxiliary(fixture, row, *, venue, mint_in, amount_in, auxiliary):
             or any(not isinstance(a,str) or a not in fixture["state_account_addresses"]
                    for a in addresses)
             or row["address"] not in addresses
+            or len(addresses)<2
             or auxiliary.get("native_state_decoder_authenticated") is not True):
         raise ValueError("MISSING_NATIVE_AUXILIARY_STATE: authenticated same-slot decoder and account bindings required")
     if any(not isinstance(fixture["accounts"][a],dict) or
