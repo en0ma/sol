@@ -27,14 +27,31 @@ def source_batch(rpc,readiness,directory,*,maximum=4):
         path=root/("triangle-%02d.json"%i)
         try:
             status=export_three_venue(rpc,readiness,i,path)
+            # Read the captured, manifest-bound source accounts immediately.
+            # Explicitly record which native auxiliary layouts are decoded
+            # versus still lacking effective fee/scheduler parameters.
+            try:
+                fixture=json.loads(path.read_text())
+                auxiliary=inspect_native_aux(fixture)
+                (root/("source-native-aux-%02d.json"%i)).write_text(
+                    json.dumps(auxiliary,indent=2)+"\\n")
+                native_status="AUXILIARY_DIAGNOSTICS_CAPTURED"
+                native_missing=sorted({reason for record in auxiliary["venues"]
+                                      for reason in record.get("missing",[])})
+            except (ValueError,KeyError,TypeError,OSError) as exc:
+                native_status="AUXILIARY_DIAGNOSTICS_BLOCKED"
+                native_missing=["decoder: "+str(exc)[:160]]
             rows.append({"index":i,"status":status["status"],"venues":candidates[i]["route_venues"],
-                         "fixture":path.name,**SAFE})
+                         "fixture":path.name,"native_auxiliary_status":native_status,
+                         "native_auxiliary_missing":native_missing,**SAFE})
         except (ValueError,TypeError,KeyError,RuntimeError) as exc:
             rows.append({"index":i,"status":"SOURCE_FIXTURE_BLOCKED",
                          "venues":candidates[i]["route_venues"],
                          "reason":str(exc)[:240],**SAFE})
     report={"candidate_count":len(candidates),"attempted":len(rows),
             "exported":sum(row["status"]=="AUTHENTICATED_THREE_VENUE_SOURCE_FIXTURE" for row in rows),
+            "native_auxiliary_diagnostics_captured":sum(
+                r.get("native_auxiliary_status")=="AUXILIARY_DIAGNOSTICS_CAPTURED" for r in rows),
             "routes":rows,**SAFE}
     (root/"summary.json").write_text(json.dumps(report,indent=2)+"\n")
     return report
