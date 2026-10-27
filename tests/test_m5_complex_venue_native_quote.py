@@ -29,6 +29,24 @@ class SevenNativeVenueAuxiliaryTests(unittest.TestCase):
                     auxiliary={"snapshot_slot":slot,"source_account_addresses":accounts,
                     "native_state_decoder_authenticated":True})
     @patch("arb.m5_complex_venue_native_quote.verify")
+    def test_rejects_duplicate_and_missing_source_auxiliary_accounts(self,verify):
+        fixture=self.fixture()
+        for addresses in (["POOL","POOL"],["POOL","ABSENT"]):
+            with self.subTest(addresses=addresses),self.assertRaisesRegex(
+                    ValueError,"MISSING_NATIVE_AUXILIARY_STATE"):
+                quote_auxiliary(fixture,self.row("meteora_dlmm"),
+                    venue="meteora_dlmm",mint_in="A",amount_in=100,
+                    auxiliary={"snapshot_slot":123,"source_account_addresses":addresses,
+                        "native_state_decoder_authenticated":True})
+        fixture["accounts"]["BIN"]=None
+        with self.assertRaisesRegex(ValueError,"captured source account not present"):
+            quote_auxiliary(fixture,self.row("meteora_dlmm"),
+                venue="meteora_dlmm",mint_in="A",amount_in=100,
+                auxiliary={"snapshot_slot":123,
+                    "source_account_addresses":["POOL","BIN"],
+                    "native_state_decoder_authenticated":True})
+
+    @patch("arb.m5_complex_venue_native_quote.verify")
     def test_native_dlmm_quote_requires_active_bin_and_uses_existing_math(self,verify):
         aux={"snapshot_slot":123,"source_account_addresses":["POOL","BIN"],
              "native_state_decoder_authenticated":True,"bins":[{"bin_id":5,
