@@ -261,6 +261,10 @@ jobs:
           python3 -m unittest discover -s tests -p test_m5_adaptive_failure_diagnostics.py -v
       - name: Enforce authenticated graph prerequisite CI step ordering
         run: python3 -m unittest discover -s tests -p test_m5_ci_source_dependency_order.py -v
+      - name: Validate native adapters for DLMM DAMM v2 and PumpSwap require authenticated auxiliary state
+        run: |
+          python3 -m py_compile arb/m5_complex_venue_native_quote.py arb/fixture_all_venue_signed_quotes.py
+          python3 -m unittest discover -s tests -p test_m5_complex_venue_native_quote.py -v
       - name: Test genuine source-cycle venue-diverse shortlist
         run: |
           python3 -m unittest discover -s tests -p test_m5_authenticated_multihop_shortlist.py -v
