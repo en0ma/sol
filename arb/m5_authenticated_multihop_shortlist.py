@@ -5,6 +5,8 @@ A route is a *topological research lead* only; no profitability claim.
 from collections import Counter
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
 
+NATIVE_ADAPTER_VENUES=frozenset(("orca","raydium_cpmm","raydium_clmm","raydium_amm_v4"))
+
 def shortlist(report, *, maximum=20):
     if (not isinstance(report,dict) or any(report.get(k)is not False for k in SAFE)
             or type(maximum)is not int or not 1<=maximum<=100):
@@ -29,7 +31,11 @@ def shortlist(report, *, maximum=20):
             current=leg.get("output")
         if current!=mint:raise ValueError("route not closed")
         venues={x["venue"] for x in legs}
-        scored.append({"source_graph_route_index":idx,"hops":len(legs),
+        missing=sorted(venues-NATIVE_ADAPTER_VENUES)
+        scored.append({"native_adapter_coverage_only":not missing,
+                       "missing_auxiliary_venue_adapters":missing,
+                       "full_native_quote_observed":False,
+                       "source_graph_route_index":idx,"hops":len(legs),
                        "distinct_venue_count":len(venues),
                        "start_mint":mint,"pool_addresses":[l["pool"] for l in legs],
                        "venues":[l["venue"] for l in legs],
@@ -38,10 +44,10 @@ def shortlist(report, *, maximum=20):
                        "signed_simulation_verified":False,**SAFE})
     # Coverage rather than raw route count: prioritize longer routes and
     # diverse venue combinations, avoid spending all slots on near-duplicates.
-    scored.sort(key=lambda r:(-r["hops"],-r["distinct_venue_count"],r["source_graph_route_index"]))
+    scored.sort(key=lambda r:(not r["native_adapter_coverage_only"],-r["hops"],-r["distinct_venue_count"],r["source_graph_route_index"]))
     chosen=[];seen_venue_sequences=set()
     for row in scored:
-        k=(row["hops"],tuple(row["venues"]))
+        k=(row["native_adapter_coverage_only"],row["hops"],tuple(row["venues"]))
         if k not in seen_venue_sequences:
             chosen.append(row);seen_venue_sequences.add(k)
             if len(chosen)==maximum:break
@@ -53,6 +59,9 @@ def shortlist(report, *, maximum=20):
             "cycle_inventory_truncated":report.get("cycle_inventory_truncated"),
             "selected":chosen,
             "selected_by_hops":dict(sorted(Counter(str(r["hops"]) for r in chosen).items())),
+            "native_adapter_covered_source_cycles":sum(r["native_adapter_coverage_only"] for r in scored),
+            "native_adapter_covered_selected":sum(r["native_adapter_coverage_only"] for r in chosen),
+            "missing_auxiliary_venue_occurrences":dict(sorted(Counter(v for r in scored for v in r["missing_auxiliary_venue_adapters"]).items())),
             "native_quoted_count":0,"net_profitable_count":0,**SAFE}
 
 def main():
