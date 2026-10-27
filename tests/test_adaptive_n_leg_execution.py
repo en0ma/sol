@@ -13,6 +13,9 @@ class Tests(unittest.TestCase):
             "arb.damm_cpmm_atomic_offline._simulate",return_value=({"err":None,"logs":[],"unitsConsumed":120000},250)),patch(
             "arb.next_ten_signed_atomic_offline.top_level_events",return_value=[
             ["cpmm","invoke"],["cpmm","success"],["orca","invoke"],["orca","success"]]),patch(
+            "arb.m5_signed_message_fee_estimate.estimate_signed_message_fee",
+            return_value={"status":"FEE_ESTIMATE_UNAVAILABLE","actionable":False,
+                          "broadcast":False,"live_execution_approved":False}),patch(
             "arb.atomic_graph_coordinator.audit_n_leg_cpi",return_value={"hops":[{"hop":1}]}),patch(
             "arb.atomic_graph_coordinator.signed_n_leg_post_balances",return_value=[0,0,75]),patch(
             "arb.next_ten_fork_pool_probe.PROGRAMS",{"raydium_cpmm":"cpmm","orca":"orca"}):
