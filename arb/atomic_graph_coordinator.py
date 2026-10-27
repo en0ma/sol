@@ -407,6 +407,7 @@ def simulate_adaptive_n_leg_offline(rpc, legs, tokens, states, evidence, owner,
     signed_digest=hashlib.sha256(bytes(tx)).hexdigest()
     signed_signature=str(tx.signatures[0])
     receipt={"status":"UNVERIFIED","legs":n,"planned_inputs":planned["amounts"],
+             "signed_prefix_observations":planned["observations"],
              "initial_balances_base_units":list(before),
              "signed_packet_bytes":packet,
              "signed_transaction_sha256":signed_digest,
