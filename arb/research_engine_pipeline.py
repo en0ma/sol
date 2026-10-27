@@ -21,7 +21,7 @@ def authenticated_registry(snapshot, *, now, max_age=60):
 
 def run_cycle_pipeline(snapshot, *, now, quote_provider, cost_provider,
                        simulate_provider=None, max_age=60, max_cycles=200,
-                       initial_input=None):
+                       initial_input=None, max_hops=6):
     """Never infer signed proof from quote math; simulator must return receipts.
 
     Provider invocation is intentionally local/injected: this function cannot
@@ -33,8 +33,10 @@ def run_cycle_pipeline(snapshot, *, now, quote_provider, cost_provider,
         raise ValueError("invalid initial exact-input amount")
     if not callable(quote_provider) or not callable(cost_provider):
         raise ValueError("quote and cost providers required")
+    if type(max_hops)is not int or not 2<=max_hops<=6:
+        raise ValueError("invalid maximum route length")
     registry=authenticated_registry(snapshot,now=now,max_age=max_age)
-    graph=cycles(registry["pools"],max_cycles=max_cycles) if registry["pools"] else []
+    graph=cycles(registry["pools"],max_cycles=max_cycles,max_hops=max_hops) if registry["pools"] else []
     rows=[]
     metrics={"quote_attempted":0,"quote_blocked":0,"cost_screened":0,
              "cost_blocked":0,"signed_attempted":0,"signed_accepted":0,

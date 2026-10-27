@@ -3,7 +3,7 @@ from arb.opportunity_research import evaluate_cycle, SAFETY
 
 def screen(route, quotes, costs, *, now, max_age=60):
     edges=route.get("legs")
-    if not isinstance(edges,list) or not 2<=len(edges)<=4 or not isinstance(quotes,list) or len(edges)!=len(quotes):
+    if not isinstance(edges,list) or not 2<=len(edges)<=6 or not isinstance(quotes,list) or len(edges)!=len(quotes):
         raise ValueError("each cycle leg requires an observed quote")
     required=("venue","pool","input_mint","output_mint")
     for i,(edge,q) in enumerate(zip(edges,quotes)):
