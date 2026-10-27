@@ -5,7 +5,7 @@ A route is a *topological research lead* only; no profitability claim.
 from collections import Counter
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
 
-NATIVE_ADAPTER_VENUES=frozenset(("orca","raydium_cpmm","raydium_clmm","raydium_amm_v4"))
+NATIVE_ADAPTER_VENUES=frozenset(("orca","raydium_cpmm","raydium_clmm","raydium_amm_v4","meteora_dlmm","meteora_damm_v2","pumpswap"))
 
 def shortlist(report, *, maximum=20):
     if (not isinstance(report,dict) or any(report.get(k)is not False for k in SAFE)
@@ -33,6 +33,7 @@ def shortlist(report, *, maximum=20):
         venues={x["venue"] for x in legs}
         missing=sorted(venues-NATIVE_ADAPTER_VENUES)
         scored.append({"native_adapter_coverage_only":not missing,
+                       "auxiliary_account_capture_required":any(v in ("meteora_dlmm","meteora_damm_v2","pumpswap") for v in venues),
                        "missing_auxiliary_venue_adapters":missing,
                        "full_native_quote_observed":False,
                        "source_graph_route_index":idx,"hops":len(legs),

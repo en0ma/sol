@@ -87,14 +87,19 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix):
             q={**leg,"amount_in":amount_in,
                "amount_out":native["estimated_output_base_units"],
                "snapshot_slot":row["snapshot_slot"]}
+        elif v in ("meteora_dlmm","meteora_damm_v2","pumpswap"):
+            from arb.m5_complex_venue_native_quote import quote_auxiliary
+            # Decoders must attach explicit account-derived state, not just
+            # fee numbers from an untrusted API. None is intentionally blocked.
+            native_aux=fixture.get("source_native_auxiliary_quotes",{})
+            auxiliary=native_aux.get(pool) if isinstance(native_aux,dict) else None
+            if auxiliary is None:
+                raise ValueError("MISSING_NATIVE_AUXILIARY_STATE: "+v+
+                    " source-verified effective fees, reserves and/or bin arrays")
+            q=quote_auxiliary(fixture,row,venue=v,
+                mint_in=leg["input_mint"],amount_in=amount_in,auxiliary=auxiliary)
         else:
-            # These venues require explicit same-slot auxiliary accounts; raw
-            # vaults are not protocol-native dynamic fee/bin/tick evidence.
-            missing={
-             "meteora_dlmm":"decoded active and traversed bin arrays and live variable fee",
-             "meteora_damm_v2":"decoded fee scheduler and pool curve configuration",
-             "pumpswap":"decoded dynamic effective fee tier and fee vault buckets"}[v]
-            raise ValueError("MISSING_NATIVE_AUXILIARY_STATE: "+missing)
+            raise ValueError("unsupported source venue")
         if (q.get("pool")!=pool or q.get("venue")!=v or
             q.get("input_mint")!=m[leg_index] or
             q.get("output_mint")!=m[leg_index+1] or
