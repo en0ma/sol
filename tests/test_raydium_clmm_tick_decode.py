@@ -28,8 +28,25 @@ class ClmmTickDecodeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"outside"):
             next_boundary(ticks,90,False)
 
+    def test_real_raydium_zeroed_uninitialized_tick_slots(self):
+        raw=self.fixture()
+        # Real source array JkVJo8v3y38hDjciDxSyauz8JvY1KrFLU9xA4Z9ieJk
+        # has zero-valued indexes in unused slots while populated slots
+        # are strictly aligned. Preserve a real-account decoding property.
+        for i in range(60):
+            if i not in (3,7):
+                raw[44+i*168:48+i*168]=b"\\x00"*4
+        ticks=initialized_ticks(bytes(raw),0,10)
+        self.assertEqual([t["tick_index"] for t in ticks],[30,70])
+    def test_populated_wrong_index_cannot_be_normalized(self):
+        raw=self.fixture()
+        pos=44+3*168
+        raw[pos:pos+4]=(999).to_bytes(4,"little",signed=True)
+        with self.assertRaisesRegex(ValueError,"initialized .*index"):
+            initialized_ticks(bytes(raw),0,10)
+
     def test_malformed_tick_index_rejected(self):
         raw=self.fixture()
         raw[44+5*168:48+5*168]=(500).to_bytes(4,"little",signed=True)
-        with self.assertRaisesRegex(ValueError,"index layout"):
+        with self.assertRaisesRegex(ValueError,"forged index"):
             initialized_ticks(bytes(raw),0,10)
