@@ -87,3 +87,26 @@ def capture(rpc,graph,route_index,output):
     Path(output).write_text(json.dumps(result,sort_keys=True,indent=2)+"\n")
     return {"status":"AUTHENTICATED_FOUR_TO_SIX_HOP_SOURCE_FIXTURE",
             "hops":len(legs),"source_slot":slot,"state_account_count":len(addresses),**SAFE}
+
+def main():
+    import argparse
+    p=argparse.ArgumentParser()
+    p.add_argument("--rpc",default="http://127.0.0.1:8899")
+    p.add_argument("--graph",required=True)
+    p.add_argument("--output",required=True)
+    p.add_argument("--report",required=True)
+    args=p.parse_args()
+    graph=json.loads(Path(args.graph).read_text())
+    targets=[i for i,r in enumerate(graph.get("routes",[]))
+             if 4<=r.get("hops",0)<=6]
+    result={"status":"NO_AUTHENTICATED_FOUR_TO_SIX_CYCLE",**SAFE}
+    if targets:
+        try:
+            result={**capture(args.rpc,graph,targets[0],args.output),
+                    "graph_route_index":targets[0]}
+        except (ValueError,TypeError,KeyError,RuntimeError) as exc:
+            result={"status":"SOURCE_CAPTURE_BLOCKED",
+                    "graph_route_index":targets[0],"reason":str(exc)[:240],**SAFE}
+    Path(args.report).write_text(json.dumps(result,indent=2)+"\n")
+    print(json.dumps(result))
+if __name__=="__main__":main()
