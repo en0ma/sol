@@ -20,5 +20,5 @@ class Tests(unittest.TestCase):
   self.assertEqual(net["spendable_quote_base_units"],1980)
   self.assertEqual(net["priced_quote_base_units"],2400)
   self.assertFalse(row["fully_priced"])
-  self.assertIn("pda_and_dynamic_tier_verified",row["missing"])
+  self.assertIn("source_authenticated_market_cap_fee_tier_and_fee_mode",row["missing"])
 if __name__=="__main__":unittest.main()
