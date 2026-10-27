@@ -269,6 +269,11 @@ jobs:
         run: |
           python3 -m py_compile arb/m5_signed_start_mint_economics.py
           python3 -m unittest discover -s tests -p test_m5_signed_start_mint_economics.py -v
+      - name: Test all genuine multi-size signed local-fork attempts and independent receipt audits
+        run: |
+          python3 -m py_compile arb/next_ten_signed_atomic_offline.py arb/m5_four_to_six_signed_batch_audit.py
+          python3 -m unittest discover -s tests -p test_m5_signed_four_to_six_multisize.py -v
+          python3 -m unittest discover -s tests -p test_m5_four_to_six_signed_batch_audit.py -v
       - name: Independently check four-to-six-source signed acceptance report code
         run: |
           python3 -m py_compile arb/m5_four_to_six_source_signed_acceptance.py
