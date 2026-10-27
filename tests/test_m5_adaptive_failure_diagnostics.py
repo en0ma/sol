@@ -22,6 +22,9 @@ class AdaptiveFailureDiagnostics(unittest.TestCase):
         self.assertEqual(report["unverified_routes"][0]["route"],"raydium_cpmm__orca")
         self.assertEqual(report["failure_reason_counts"]["signed adaptive receipt missing"],1)
         self.assertFalse(report["broadcast"])
+        self.assertFalse(report["all_selected_signed_routes_verified"])
+        self.assertEqual(report["complete_native_route_quotes_verified"],0)
+        self.assertEqual(report["net_profitable_routes_verified"],0)
     @patch("arb.m5_all_venue_adaptive_acceptance.route_batch")
     @patch("arb.m5_all_venue_adaptive_acceptance.check")
     def test_dlmm_signed_failure_report_is_venue_specific_not_accepted(self,check,batch):
