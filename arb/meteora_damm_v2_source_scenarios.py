@@ -35,12 +35,15 @@ def scenario_envelope(fixture,*,pool,mint_in,amount_in,
     for rate in fee_rates_ppm:
         for mode in ("BASE_AND_QUOTE","QUOTE_ONLY","QUOTE_COMPOUNDING"):
             try:
-                q=quote_collection_mode(reserve_a,reserve_b,amount_in,
-                                        input_is_a=inputs_a,
-                                        effective_fee_ppm=rate,collection_mode=mode)
+                q=quote_native_fee(reserve_a=reserve_a,reserve_b=reserve_b,
+                                   amount_in=amount_in,input_is_a=inputs_a,
+                                   total_fee_numerator=rate*1000,
+                                   collection_mode=mode,fee_version=1)
             except ValueError:
                 continue
             outcomes.append({"hypothetical_fee_ppm":rate,
+                             "native_fee_numerator":rate*1000,
+                             "native_fee_denominator":FEE_DENOMINATOR,
                              "hypothetical_collection_mode":mode,
                              "amount_out":q["amount_out"],
                              "fee_input_units":q["fee_input_units"],
