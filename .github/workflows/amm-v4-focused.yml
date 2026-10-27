@@ -609,6 +609,31 @@ jobs:
         with:
           name: amm-v4-focused-source
           path: ${{ runner.temp }}
+      - name: Import independently captured four-to-six-hop source fixture for actual offline signing
+        if: ${{ matrix.shard == 0 }}
+        uses: actions/download-artifact@v4
+        with:
+          name: m5-broad-seven-venue-discovery-and-source-cycles
+          path: ${{ runner.temp }}
+      - name: Verify authenticated four-hop handoff exists before offline fork signing
+        if: ${{ matrix.shard == 0 }}
+        run: |
+          test -s "$RUNNER_TEMP/m5-four-to-six-source-fixture.json"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          from arb.source_snapshot_manifest import verify
+          root=Path(os.environ["RUNNER_TEMP"])
+          fixture=json.loads((root/"m5-four-to-six-source-fixture.json").read_text())
+          verify(fixture)
+          assert fixture["fixture_kind"]=="AUTHENTICATED_FOUR_TO_SIX_HOP_SOURCE_ROUTE"
+          assert 4<=len(fixture["route_venues"])<=6
+          assert all(fixture[k] is False for k in
+                     ("actionable","live_execution_approved","broadcast"))
+          print(json.dumps({"signed_handoff_fixture_hops":len(fixture["route_venues"]),
+            "source_slot":fixture["state_accounts_observed_slot"],
+            "accounts":fixture["state_account_count"],"broadcast":False}))
+          PY
       - name: Start disposable explicitly offline Surfpool
         run: |
           nohup surfpool start --ci --offline > "$RUNNER_TEMP/offline.log" 2>&1 < /dev/null &
