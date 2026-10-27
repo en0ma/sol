@@ -371,6 +371,26 @@ jobs:
       - name: Export diverse distinct-venue source triangle fixture batch
         run: |
           python3 -m arb.m5_distinct_venue_coverage_batch --mode source --readiness "$RUNNER_TEMP/amm-v4-ready.json" --output-dir "$RUNNER_TEMP/three-venue-source-batch" --maximum 10
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          root=Path(os.environ["RUNNER_TEMP"])/"three-venue-source-batch"
+          r=json.loads((root/"summary.json").read_text())
+          decoded=r.get("native_auxiliary_diagnostics_captured",0)
+          missing={}
+          for row in r["routes"]:
+              for reason in row.get("native_auxiliary_missing",[]):
+                  missing[reason]=missing.get(reason,0)+1
+              if row.get("native_auxiliary_status")=="AUXILIARY_DIAGNOSTICS_CAPTURED":
+                  p=root/("source-native-aux-%02d.json"%row["index"])
+                  evidence=json.loads(p.read_text())
+                  assert evidence["full_native_fee_pricing_verified"] is False
+                  assert evidence["broadcast"] is False
+          print(json.dumps({"source_fixture_exports":r["exported"],
+              "source_auxiliary_decoded":decoded,
+              "source_auxiliary_missing_reason_counts":missing,
+              "native_quotes_proven":False,"broadcast":False},sort_keys=True))
+          PY
       - name: Produce actual multi-size native quote opportunity discovery evidence
         run: |
           python3 -m arb.m5_source_trade_size_sweep \
