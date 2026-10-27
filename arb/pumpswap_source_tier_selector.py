@@ -20,7 +20,8 @@ def mint_decimals_from_account(raw):
     return decimals
 
 def market_cap_quote_base_units(*,base_reserve,quote_reserve,
-                                virtual_quote_reserves,base_decimals):
+                                virtual_quote_reserves,base_decimals,
+                                base_supply_base_units=None):
     inputs=(base_reserve,quote_reserve,virtual_quote_reserves,base_decimals)
     if any(type(v)is not int for v in inputs) or base_reserve<=0 or quote_reserve<=0:
         raise ValueError("positive native pool token reserves required")
@@ -29,16 +30,22 @@ def market_cap_quote_base_units(*,base_reserve,quote_reserve,
     effective=quote_reserve+virtual_quote_reserves
     if effective<=0:
         raise ValueError("effective quoted liquidity is nonpositive")
-    market_cap=(effective*BASE_SUPPLY_HUMAN*10**base_decimals)//base_reserve
+    if base_supply_base_units is not None and (
+            type(base_supply_base_units)is not int or base_supply_base_units<=0):
+        raise ValueError("native source base mint supply invalid")
+    supply=(BASE_SUPPLY_HUMAN*10**base_decimals
+            if base_supply_base_units is None else base_supply_base_units)
+    market_cap=effective*supply//base_reserve
     return {"market_cap_quote_base_units":market_cap,
             "reserve_implied_price_numerator":effective,
             "reserve_implied_price_denominator":base_reserve,
             "base_decimals":base_decimals,
+            "source_mint_supply_authenticated":base_supply_base_units is not None,
             "quote_base_units":True,**SAFE}
 
 def choose_tier_by_source_market_cap(*,pool_state,fee_config,
                                       base_reserve,quote_reserve,
-                                      base_decimals):
+                                      base_decimals,base_supply_base_units=None):
     if not isinstance(pool_state,dict) or not isinstance(fee_config,dict):
         raise ValueError("PumpSwap native state and fee configuration required")
     if fee_config.get("account_authenticated") is not True:
@@ -46,10 +53,33 @@ def choose_tier_by_source_market_cap(*,pool_state,fee_config,
     canonical=classify_pool(pool_state)
     base_mint=pool_state.get("base_mint")
     quote_mint=pool_state.get("quote_mint")
-    if (not canonical["canonical"] or base_mint==NATIVE_WSOL_MINT
-            or quote_mint not in (NATIVE_WSOL_MINT,USDC)):
-        return {"status":"PUMP_FEE_MODE_REQUIRES_CUSTOM_OR_NONCANONICAL_VERIFICATION",
-                "tier_selected":False,**SAFE}
+    if not canonical["canonical"]:
+        fees=fee_config.get("flat_fees")
+        if not isinstance(fees,dict):
+            raise ValueError("noncanonical PumpSwap native flat fee unavailable")
+        return {"status":"PUMP_NONCANONICAL_SOURCE_FLAT_FEE",
+                "tier_selected":True,"fees":fees,
+                "selected_total_fee_bps":sum(fees.values()),
+                "source_tier_account_authenticated":True,
+                "onchain_fee_rounding_parity_verified":False,
+                "protocol_exact_verified":False,**SAFE}
+    if quote_mint not in (NATIVE_WSOL_MINT,USDC):
+        fees=fee_config.get("exotic_flat_fees")
+        if not isinstance(fees,dict):
+            raise ValueError("custom quote PumpSwap native exotic fee unavailable")
+        if pool_state.get("creator_fee_bps",0):
+            return {"status":"PUMP_CUSTOM_CREATOR_FEE_REQUIRES_POOL_OVERRIDE",
+                    "tier_selected":False,**SAFE}
+        return {"status":"PUMP_CUSTOM_QUOTE_SOURCE_FLAT_FEE",
+                "tier_selected":True,"fees":fees,
+                "selected_total_fee_bps":sum(fees.values()),
+                "source_tier_account_authenticated":True,
+                "onchain_fee_rounding_parity_verified":False,
+                "protocol_exact_verified":False,**SAFE}
+    if base_mint==NATIVE_WSOL_MINT:
+        raise ValueError("unsupported PumpSwap canonical base mint is WSOL")
+    if type(base_supply_base_units)is not int or base_supply_base_units<=0:
+        raise ValueError("source-authenticated canonical base mint supply required")
     if pool_state.get("is_mayhem_mode") not in (0,1) or pool_state.get("is_cashback_coin") not in (0,1):
         raise ValueError("PumpSwap source mode flags not available")
     if pool_state["is_mayhem_mode"] or pool_state["is_cashback_coin"]:
@@ -58,7 +88,8 @@ def choose_tier_by_source_market_cap(*,pool_state,fee_config,
     market=market_cap_quote_base_units(
         base_reserve=base_reserve,quote_reserve=quote_reserve,
         virtual_quote_reserves=pool_state.get("virtual_quote_reserves"),
-        base_decimals=base_decimals)
+        base_decimals=base_decimals,
+        base_supply_base_units=base_supply_base_units)
     stable=quote_mint==USDC
     tiers=fee_config.get("stable_fee_tiers" if stable else "fee_tiers")
     if not isinstance(tiers,list) or not tiers:
