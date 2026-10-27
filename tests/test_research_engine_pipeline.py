@@ -47,6 +47,29 @@ class PipelineTests(unittest.TestCase):
     result=authenticated_registry([untrusted],now=NOW)
     self.assertEqual(result["pools"],[])
     self.assertTrue(result["rejected"])
+ def test_six_hop_source_bound_quotes_and_costs_remain_research_only(self):
+    mints=["A","B","C","D","E","F"]
+    venues=["orca","raydium_cpmm","raydium_clmm","raydium_amm_v4",
+            "meteora_dlmm","pumpswap"]
+    pools=[{**POOLS[0],"venue":venues[i],"address":"pool-"+str(i),
+            "mints":[mints[i],mints[(i+1)%6]]} for i in range(6)]
+    def quote(leg,amount):
+        self.assertIsNotNone(amount)
+        return {**leg,"amount_in":amount,"amount_out":amount+100,
+                "source_authenticated":True,"quote_source":"authenticated-snapshot",
+                "observed_unix":995,"liquidity_input_units":100000000}
+    result=run_cycle_pipeline(pools,now=NOW,quote_provider=quote,
+        cost_provider=lambda *args:COSTS,initial_input=1000,max_hops=6)
+    self.assertTrue(any(len(x["route"]["legs"])==6 for x in result["results"]))
+    self.assertTrue(any(len(x["route"]["legs"])==6 and
+        x["research"]["status"]=="RESEARCH_CANDIDATE_ONLY" for x in result["results"]
+        if "research" in x))
+    self.assertEqual(result["signed_simulated_candidates"],0)
+    self.assertFalse(result["broadcast"])
+    with self.assertRaises(ValueError):
+        run_cycle_pipeline(pools,now=NOW,quote_provider=quote,
+            cost_provider=lambda *args:COSTS,max_hops=7)
+
  def test_cross_slot_skew_excludes_old_pool(self):
     old=dict(POOLS[0],slot=400)
     result=authenticated_registry([old,POOLS[1]],now=NOW)
