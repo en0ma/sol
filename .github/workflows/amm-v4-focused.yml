@@ -265,6 +265,10 @@ jobs:
         run: |
           python3 -m py_compile arb/fixture_native_aux_inventory.py
           python3 -m unittest discover -s tests -p test_m5_pumpswap_canonical_aux.py -v
+      - name: Validate real-source multihop quote attempts fail closed on missing native pricing
+        run: |
+          python3 -m py_compile arb/m5_native_route_quote_attempts.py
+          python3 -m unittest discover -s tests -p test_m5_native_route_quote_attempts.py -v
       - name: Verify authenticated 2–6-hop native quote chain refuses incomplete source evidence
         run: |
           python3 -m py_compile arb/m5_authenticated_native_route_chain.py
