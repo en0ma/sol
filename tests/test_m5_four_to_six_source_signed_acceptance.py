@@ -36,7 +36,10 @@ class AuthenticatedSignedSourceAcceptanceTests(unittest.TestCase):
                 "negative_error":"{'InstructionError': [3, 'Custom']}",
                 "negative_failure_instruction_index":3,
                 "negative_packet_bytes":1100,
-                "hydrated_fork_state_readback":{"verified":True},**SAFE}
+                "hydrated_fork_state_readback":{"status":"HYDRATED_FORK_ACCOUNT_BYTES_MATCH",
+                    "accounts_checked":30,"fork_readback_slot":123,
+                    "captured_source_slot":42,
+                    "source_mainnet_slot_independently_attested":False,**SAFE},**SAFE}
     @patch("arb.m5_four_to_six_source_signed_acceptance.extract_pool_states")
     @patch("arb.m5_four_to_six_source_signed_acceptance.verify")
     def test_source_bound_atomic_receipt_can_pass_without_claiming_profit(self,verify,states):

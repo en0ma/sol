@@ -88,8 +88,15 @@ def assess(fixture,receipt):
         errors.append("negative signed rollback packet missing")
     # A superficially green receipt must include actual fork readback.
     hydrated=receipt.get("hydrated_fork_state_readback")
-    if not isinstance(hydrated,dict):
-        errors.append("independent hydrated source-fork readback missing")
+    if (not isinstance(hydrated,dict) or
+            hydrated.get("status")!="HYDRATED_FORK_ACCOUNT_BYTES_MATCH" or
+            hydrated.get("captured_source_slot")!=fixture["state_accounts_observed_slot"] or
+            hydrated.get("source_mainnet_slot_independently_attested") is not False or
+            type(hydrated.get("accounts_checked")) is not int or
+            hydrated["accounts_checked"]<=0 or
+            type(hydrated.get("fork_readback_slot")) is not int or
+            any(hydrated.get(key) is not False for key in SAFE)):
+        errors.append("independent hydrated source-fork readback missing or mismatched")
     # No origin or profitability can be inferred from simulation's synthetic
     # user test token balances or from unsigned indicative source quotes.
     return {"status":"VERIFIED_SIGNED_FOUR_TO_SIX_HOP_ROLLBACK" if not errors
