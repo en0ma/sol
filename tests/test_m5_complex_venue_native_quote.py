@@ -78,6 +78,15 @@ class SevenNativeVenueAuxiliaryTests(unittest.TestCase):
                     "source_account_addresses":["POOL"],
                     "native_state_decoder_authenticated":True})
 
+    @patch("arb.next_ten_fork_pool_probe.DECODERS",{"meteora_dlmm":lambda raw: {"token_x_mint":"BAD","token_y_mint":"B"}})
+    @patch("arb.m5_complex_venue_native_quote.verify")
+    def test_rejects_claimed_decoded_state_not_matching_pool_bytes(self,verify):
+        with self.assertRaisesRegex(ValueError,"decoded source pool bytes mismatch"):
+            quote_auxiliary(self.fixture(),self.row("meteora_dlmm"),
+                venue="meteora_dlmm",mint_in="A",amount_in=100,
+                auxiliary={"snapshot_slot":123,"source_account_addresses":["POOL","BIN"],
+                    "native_state_decoder_authenticated":True})
+
     @patch("arb.m5_complex_venue_native_quote.verify")
     def test_rejects_wrong_venue_pool_owner(self,verify):
         fixture=self.fixture()
@@ -98,6 +107,7 @@ class SevenNativeVenueAuxiliaryTests(unittest.TestCase):
                 auxiliary={"snapshot_slot":123,"source_account_addresses":["POOL","BIN"],
                     "native_state_decoder_authenticated":True})
 
+    @patch("arb.next_ten_fork_pool_probe.DECODERS",{"meteora_dlmm":lambda raw: {"token_x_mint":"A","token_y_mint":"B","active_id":5,"token_a_mint":"A","token_b_mint":"B","base_mint":"A","quote_mint":"B"}})
     @patch("arb.m5_complex_venue_native_quote.verify")
     def test_native_dlmm_quote_requires_active_bin_and_uses_existing_math(self,verify):
         aux={"snapshot_slot":123,"source_account_addresses":["POOL","BIN"],
