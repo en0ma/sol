@@ -43,6 +43,48 @@ def merge(registry,feeds,*,limit_per_venue=12):
     return {"pools":result,"discovery":{"status":"UNTRUSTED_HINTS_REQUIRE_SOURCE_RPC",
         "coverage":counts,"total_candidates":len(result),**SAFE}}
 
+def choose_connectivity_leads(leads,registry,limit):
+    """Greedily prefer new token links joining already observed token paths.
+
+    Uses UNTRUSTED advertised mints only to prioritize local-RPC probes, never
+    to approve a route, quote, or pool. Existing registry mint edges are hints.
+    """
+    from collections import defaultdict
+    if type(limit)is not int or not 1<=limit<=12:
+        raise ValueError("invalid connectivity bound")
+    edges=set()
+    for pool in registry.get("pools",[]):
+        m=pool.get("mints")
+        if isinstance(m,list) and len(m)==2 and all(isinstance(x,str) for x in m) and m[0]!=m[1]:
+            edges.add(frozenset(m))
+    pending=[];seen=set()
+    for lead in leads:
+        if not isinstance(lead,dict):continue
+        address=lead.get("address");m=lead.get("mints")
+        if (not isinstance(address,str) or address in seen or
+                not isinstance(m,list) or len(m)!=2 or m[0]==m[1] or
+                any(not isinstance(x,str) for x in m)):
+            continue
+        pending.append(lead);seen.add(address)
+    chosen=[]
+    while pending and len(chosen)<limit:
+        neighbor=defaultdict(set)
+        for edge in edges:
+            a,b=tuple(edge);neighbor[a].add(b);neighbor[b].add(a)
+        active=set(neighbor)
+        def score(lead):
+            a,b=lead["mints"];edge=frozenset((a,b))
+            # A new edge joining two already connected vertices can create
+            # a longer mint-simple route. Avoid exhausting slots on leaves.
+            return (int(a in active and b in active and edge not in edges),
+                    int(a in active)+int(b in active),
+                    int(edge not in edges),
+                    int(lead.get("matching_peer_mints") is True))
+        winner=max(range(len(pending)),key=lambda i:score(pending[i]))
+        lead=pending.pop(winner);chosen.append(lead["address"])
+        edges.add(frozenset(lead["mints"]))
+    return chosen
+
 def collect(*,limit_per_venue=12,registry=None):
     feeds={v:[] for v in PROGRAMS}
     errors={}
@@ -56,10 +98,12 @@ def collect(*,limit_per_venue=12,registry=None):
         discover_amm_v4_candidates,discover_clmm_candidates)
     # Feed the existing peer inventory to the Raydium public discovery adapters.
     # Global public enumeration is bounded and does not assume a fixed token pair.
-    attempt("raydium_amm_v4",lambda:[x["address"] for x in
-            discover_amm_v4_candidates(registry or {"pools":[]},max_pages=2)][:limit_per_venue])
-    attempt("raydium_clmm",lambda:[x["address"] for x in
-            discover_clmm_candidates(registry or {"pools":[]},max_pages=2)][:limit_per_venue])
+    attempt("raydium_amm_v4",lambda:choose_connectivity_leads(
+            discover_amm_v4_candidates(registry or {"pools":[]},max_pages=2),
+            registry or {"pools":[]},limit_per_venue))
+    attempt("raydium_clmm",lambda:choose_connectivity_leads(
+            discover_clmm_candidates(registry or {"pools":[]},max_pages=2),
+            registry or {"pools":[]},limit_per_venue))
     from arb.indexed_pool_discovery import fetch_candidates
     for v in ("meteora_dlmm","meteora_damm_v2"):
         attempt(v,lambda venue=v:fetch_candidates(venue,page_size=100))
