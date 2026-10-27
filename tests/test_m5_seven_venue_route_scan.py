@@ -40,6 +40,16 @@ class SevenVenueScanner(unittest.TestCase):
         self.assertEqual(report["cycle_coverage_by_hops"]["2"]["returned"],4)
         self.assertEqual(report["cycle_coverage_by_hops"]["6"]["returned"],0)
 
+    def test_topology_explicitly_detects_two_pool_parallel_edges(self):
+        result=analyze(snapshot(),max_cycles=25)
+        topology=result["authenticated_token_graph_topology"]
+        self.assertEqual(topology["authenticated_pools"],2)
+        self.assertEqual(topology["distinct_token_mints"],2)
+        self.assertEqual(topology["distinct_mint_pairs"],1)
+        self.assertEqual(topology["mint_pair_venue_multiplicity"]["2"],1)
+        self.assertEqual(topology["two_core_mints"],0)
+        self.assertFalse(topology["broadcast"])
+
     def test_empty_seven_venue_source_is_explicitly_empty(self):
         report = snapshot()
         report["authenticated_pools"] = {v: [] for v in ORDER}
