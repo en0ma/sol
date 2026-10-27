@@ -21,7 +21,10 @@ class FixtureNativeChainTests(unittest.TestCase):
         self.assertEqual(result["net_profitable_verified_count"],0)
         self.assertIn("MISSING_NATIVE_AUXILIARY_STATE",result["attempts"][0]["reason"])
         self.assertFalse(result["broadcast"])
-        self.assertEqual(quote.call_count,2)
+        self.assertEqual(quote.call_count,8)
+        self.assertEqual(result["independent_leg_probe_count"],6)
+        self.assertEqual({r["venue"] for r in result["independent_leg_probes"]},
+                         {"orca","meteora_dlmm","pumpswap"})
     @patch("arb.m5_source_fixture_native_chain_diagnostic.fixture_quote_leg")
     @patch("arb.m5_source_fixture_native_chain_diagnostic.extract_pool_states")
     def test_indicative_existing_adapter_cannot_be_upgraded(self,states,quote):
@@ -32,6 +35,9 @@ class FixtureNativeChainTests(unittest.TestCase):
         self.assertEqual(result["full_native_quote_count"],0)
         self.assertIn("indicative only",result["attempts"][0]["reason"])
         self.assertFalse(result["fixture_native_protocol_exact_verified"])
+        self.assertEqual(result["independent_leg_probe_count"],3)
+        self.assertTrue(all(r["protocol_exact_verified"] is False
+                            for r in result["independent_leg_probes"]))
     @patch("arb.m5_source_fixture_native_chain_diagnostic.extract_pool_states")
     def test_nonclosed_source_triangle_refused(self,states):
         states.return_value=self.rows()
