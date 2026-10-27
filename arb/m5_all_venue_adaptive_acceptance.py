@@ -32,12 +32,20 @@ def audit(root,*,batch="remaining",only_venue=None):
     failure_counts=Counter(reason for r in failures for reason in r["failure_reasons"])
     failing_venue_occurrences=Counter(venue for r in failures for venue in r["route"].split("__"))
     dlmm_affected=[r["route"] for r in failures if "meteora_dlmm" in r["route"].split("__")]
+    venue_totals=Counter(venue for route in routes for venue in route)
+    venue_verified=Counter(venue for r in rows if r["status"]=="VERIFIED_ADAPTIVE_SIGNED_OFFLINE"
+                           for venue in r["route"].split("__"))
+    venue_coverage={venue:{"attempted_route_occurrences":count,
+                           "verified_route_occurrences":venue_verified[venue],
+                           "unverified_route_occurrences":failing_venue_occurrences[venue]}
+                    for venue,count in sorted(venue_totals.items())}
     return {"status":"SEVEN_VENUE_ADAPTIVE_RESEARCH","target":len(routes),
             "unverified_route_count":len(failures),
             "unverified_routes":failures,
             "failure_reason_counts":dict(sorted(failure_counts.items())),
             "failing_venue_occurrences":dict(sorted(failing_venue_occurrences.items())),
             "dlmm_unverified_routes":dlmm_affected,
+            "venue_signed_coverage":venue_coverage,
             "verified":verified,"routes":rows,
             "full_42_adaptive_verified":False,
             "independently_validated_quote_samples":0,**SAFE}
@@ -55,6 +63,7 @@ def main():
                       "unverified_routes":result["unverified_routes"],
                       "failure_reason_counts":result["failure_reason_counts"],
                       "failing_venue_occurrences":result["failing_venue_occurrences"],
-                      "dlmm_unverified_routes":result["dlmm_unverified_routes"],**SAFE}))
+                      "dlmm_unverified_routes":result["dlmm_unverified_routes"],
+                      "venue_signed_coverage":result["venue_signed_coverage"],**SAFE}))
     return 0 if result["verified"]==result["target"] else 1
 if __name__=="__main__":raise SystemExit(main())
