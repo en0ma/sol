@@ -43,3 +43,20 @@ def research_chain(fixture, *, amount_in, observed_unix):
             "full_route_quoted":False,"indicative_all_legs":True,
             "quoted_legs":trace,"signed_simulation_verified":False,
             "net_profit_verified":False,**SAFE}
+
+def main():
+    import argparse,json
+    from pathlib import Path
+    p=argparse.ArgumentParser()
+    p.add_argument("--fixture",required=True)
+    p.add_argument("--output",required=True)
+    p.add_argument("--amount",type=int,default=100000)
+    p.add_argument("--observed-unix",type=int,required=True)
+    a=p.parse_args()
+    fixture=json.loads(Path(a.fixture).read_text())
+    result=research_chain(fixture,amount_in=a.amount,observed_unix=a.observed_unix)
+    Path(a.output).write_text(json.dumps(result,sort_keys=True,indent=2)+"\n")
+    print(json.dumps({"status":result["status"],"hops":result.get("hops"),
+                      "blocked_leg":result.get("blocked_leg_index"),
+                      "signed_simulation_verified":False,"net_profit_verified":False,**SAFE}))
+if __name__=="__main__":main()
