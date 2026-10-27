@@ -28,7 +28,9 @@ def compare(fixture,receipt,*,observed_unix):
         raise ValueError("source-slot or signed prefix identities do not reconcile")
     if any(type(x)is not int or not 0<x<2**64 for x in planned):
         raise ValueError("source signed input amounts invalid")
-    outcomes=[]
+    # Check the complete independent signed prefix trace BEFORE calling any
+    # venue quote adapter. A forged later SPL amount may otherwise be hidden
+    # by an unrelated earlier native pricing dependency or missing fee state.
     for index,observation in enumerate(observations):
         row=rows[index]
         if (not isinstance(observation,dict) or
@@ -38,6 +40,9 @@ def compare(fixture,receipt,*,observed_unix):
                 observation.get("amount_in")!=planned[index] or
                 observation.get("observed_output")!=planned[index+1]):
             raise ValueError("signed prefix SPL output or venue identity mismatch")
+    outcomes=[]
+    for index,observation in enumerate(observations):
+        row=rows[index]
         native=quote_leg(fixture,leg_index=index,amount_in=planned[index],
                          observed_unix=observed_unix)
         if (not isinstance(native,dict) or
