@@ -25,6 +25,10 @@ def sweep(fixture, *, observed_unix, amounts=(10000,100000,1000000)):
             "blocked_leg_index":result.get("blocked_leg_index"),
             "blocked_venue":result.get("blocked_venue"),
             "gross_delta_start_mint_base_units":result.get("gross_delta_start_mint_base_units"),
+            "indicative_gross_positive":(result.get("gross_delta_start_mint_base_units",0)>0
+                if result.get("indicative_all_legs") is True else None),
+            "estimated_cost_start_mint_base_units":None,
+            "net_delta_start_mint_base_units":None,
             "net_profit_verified":False,**SAFE})
         for i,row in enumerate(rows):
             q=quote_leg(fixture,leg_index=i,amount_in=amount,observed_unix=observed_unix)
@@ -34,11 +38,16 @@ def sweep(fixture, *, observed_unix, amounts=(10000,100000,1000000)):
                 "leg_index":i,"input_base_units":amount,
                 "quote_status":q.get("quote_status"),
                 "reason":q.get("reason"),"protocol_exact_verified":False,**SAFE})
+    completed=[x for x in attempts if x["indicative_gross_positive"] is not None]
+    ranked=sorted(completed,key=lambda x:(-x["gross_delta_start_mint_base_units"],x["input_base_units"]))
     return {"status":"SOURCE_FOUR_TO_SIX_HOP_NATIVE_SWEEP_INDICATIVE_ONLY",
             "hops":len(rows),"source_slot":fixture["state_accounts_observed_slot"],
             "route_venues":[row["venue"] for row in rows],
             "attempt_count":len(attempts),"venue_probe_count":len(venue_probes),
             "attempts":attempts,"venue_probes":venue_probes,
+            "complete_indicative_chain_count":len(completed),
+            "indicative_positive_gross_count":sum(x["indicative_gross_positive"] for x in completed),
+            "indicative_ranked_input_sizes":[x["input_base_units"] for x in ranked],
             "protocol_exact_route_count":0,"net_profitable_route_count":0,
             "independently_signed_verified":False,**SAFE}
 
