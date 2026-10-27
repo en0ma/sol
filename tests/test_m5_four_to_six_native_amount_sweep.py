@@ -10,11 +10,13 @@ class FourToSixNativeSweepTests(unittest.TestCase):
         return [{"venue":v,"address":"pool"+str(i),"mints":[a,b]} for i,(v,a,b) in enumerate((
             ("orca","A","B"),("meteora_dlmm","B","C"),
             ("pumpswap","C","D"),("raydium_amm_v4","D","A")))]
+    @patch("arb.m5_four_to_six_native_amount_sweep.walk")
     @patch("arb.m5_four_to_six_native_amount_sweep.research_chain")
     @patch("arb.m5_four_to_six_native_amount_sweep.quote_leg")
     @patch("arb.m5_four_to_six_native_amount_sweep.extract_pool_states")
-    def test_probes_all_four_real_venue_adapters_when_first_leg_blocks(self,states,quote,chain):
+    def test_probes_all_four_real_venue_adapters_when_first_leg_blocks(self,states,quote,chain,walk):
         states.return_value=self.rows()
+        walk.return_value={"status":"MULTIHOP_NATIVE_SOURCE_INTERVAL_BLOCKED"}
         chain.return_value={"status":"NATIVE_ROUTE_INDICATIVE_BLOCKED",
                             "blocked_leg_index":0,"blocked_venue":"orca","quoted_legs":[]}
         quote.return_value={"quote_status":"NATIVE_QUOTE_BLOCKED",

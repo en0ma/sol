@@ -265,6 +265,10 @@ jobs:
         run: |
           python3 -m py_compile arb/fixture_native_aux_inventory.py
           python3 -m unittest discover -s tests -p test_m5_pumpswap_canonical_aux.py -v
+      - name: Verify integrated four-hop mixed-venue modeled quote paths and no profit promotion
+        run: |
+          python3 -m py_compile arb/m5_source_multihop_interval_engine.py arb/next_ten_signed_atomic_offline.py
+          python3 -m unittest discover -s tests -p test_m5_source_multihop_interval_engine.py -v
       - name: Verify genuine multi-venue source quote sweeps remain nonbroadcast and unverified
         run: |
           python3 -m py_compile arb/m5_four_to_six_native_amount_sweep.py
@@ -504,24 +508,6 @@ jobs:
             ${{ runner.temp }}/m5-four-to-six-source-capture.json
             ${{ runner.temp }}/m5-four-to-six-native-chain.json
             ${{ runner.temp }}/m5-four-to-six-signed-handoff.json
-          if-no-files-found: warn
-      - name: Attempt genuine four-to-six-hop signed local-fork atomic simulation and rollback
-        if: always()
-        continue-on-error: true
-        env:
-          SURFPOOL_EXPLICITLY_OFFLINE: "1"
-        run: |
-          if [ -s "$RUNNER_TEMP/m5-four-to-six-source-fixture.json" ]; then
-            mkdir -p "$RUNNER_TEMP/m5-four-to-six-signed-attempt"
-            python3 -m arb.next_ten_signed_atomic_offline \
-              --four-to-six-venue-fixture "$RUNNER_TEMP/m5-four-to-six-source-fixture.json" \
-              --output-dir "$RUNNER_TEMP/m5-four-to-six-signed-attempt"
-          fi
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: m5-four-to-six-actual-signed-offline-atomic-receipt
-          path: ${{ runner.temp }}/m5-four-to-six-signed-attempt/
           if-no-files-found: warn
       - name: Validate authenticated source graph connectivity and disclose short-route dominance
         run: |
