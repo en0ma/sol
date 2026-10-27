@@ -42,11 +42,12 @@ class CanonicalPumpSourceAuxiliaryTests(unittest.TestCase):
         decode_global.assert_called_once()
     @patch("arb.pumpswap_global_config.ADDRESS","GLOBAL")
     @patch("arb.pumpswap_pool.PROGRAM","PUMP")
+    @patch("arb.pumpswap_fee_account.decode_authenticated",return_value={"flat_fees":{},"fee_tiers":[],"stable_fee_tiers":[]})
     @patch("arb.pumpswap_fee_account.authenticated_address",return_value=("FEE",254))
     @patch("arb.fixture_pool_fundamentals.extract")
     @patch("arb.fixture_native_aux_inventory.extract_pool_states")
     @patch("arb.fixture_native_aux_inventory.verify")
-    def test_forged_global_owner_refused(self,verify,states,fundamentals,address):
+    def test_forged_global_owner_refused(self,verify,states,fundamentals,address,decode_fee):
         states.return_value=[self.row()]
         fundamentals.return_value={"fundamentals":[{"venue":"pumpswap","address":"POOL",
             "vault_base_units":[1000,1000]}]}
