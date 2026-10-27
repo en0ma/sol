@@ -66,10 +66,20 @@ def inspect(fixture,*,pool_filter=None):
                         raise ValueError("DLMM source bin array has noncanonical PDA")
                     if raw[16] not in (0,1,2):
                         raise ValueError("DLMM bin array layout version unsupported")
+                    from arb.meteora_dlmm_source_bin_decoder import decode_bin_array
+                    inventory=decode_bin_array(raw,pool=row["address"],index=index)
+                    active_bin=next((b for b in inventory["bins"]
+                        if b["bin_id"]==pool["active_id"]),None)
                     record["decoded_auxiliary"].append({"type":"bin_array","account":address,
                         "array_index":index,
                         "contains_active_bin":index==active_bin_array_index(pool["active_id"]),
-                        "array_size":BIN_ARRAY_SIZE})
+                        "array_size":BIN_ARRAY_SIZE,
+                        "source_bin_records_decoded":inventory["bin_count"],
+                        "funded_bins_x":sum(b["amount_x"]>0 for b in inventory["bins"]),
+                        "funded_bins_y":sum(b["amount_y"]>0 for b in inventory["bins"]),
+                        "active_bin":active_bin,
+                        "dynamic_fee_verified":False,
+                        "protocol_exact_verified":False})
             if not any(a["type"]=="bin_array" and a["contains_active_bin"]
                        for a in record["decoded_auxiliary"]):
                 record["missing"].append("active_bin_array")
