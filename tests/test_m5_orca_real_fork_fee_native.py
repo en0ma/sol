@@ -63,3 +63,33 @@ class OrcaObservedForkAdaptiveFeeParity(unittest.TestCase):
                 self.state(),self.state()["token_mint_a"],173573,
                 [{"start_tick":-29216,"ticks":[],"status":"DYNAMIC_VALID"}],
                 self.oracle(),observed_unix=1793149190)
+
+    def test_actual_source_oracle_bytes_decode_to_fee_state_used_by_model(self):
+        from arb.orca_adaptive_fee_source import decode_oracle
+        # Byte-for-byte captured 254-byte Orca Oracle account from the source
+        # manifest at slot 462282629, artifact 12783955309, SHA256 of
+        # fixture: 363e36dcd0e35925383f0d6d20622028248b18fac0a85ae8a1f6db01afa58d01.
+        raw=bytes.fromhex(
+            "8bc283b38cb3e5f4108a06d8e1667fc1e4721ed3c48414a2a8cf78d3289d2262dd839e63e5984417"
+            "00000000000000001e005802881360ea0000806d0d0004000400"
+            "00000000000000000000000000000000e248e16a00000000e248e16a00000000"
+            "c25300000ee4ffffd27a0000"+("00"*144))
+        self.assertEqual(len(raw),254)
+        decoded=decode_oracle(
+            raw,"27ZbVdmoUhG639CfqG6kW8a4VXZeGBi8Dd4HUXjVDxeS")
+        self.assertEqual(decoded["constants"],self.oracle()["constants"])
+        self.assertEqual(decoded["variables"],self.oracle()["variables"])
+        self.assertTrue(decoded["oracle_layout_authenticated"])
+        self.assertFalse(decoded["effective_adaptive_fee_math_verified"])
+
+    def test_native_quote_is_clock_sensitive_not_falsely_protocol_certified(self):
+        for amount in (173573,1735834,17358368):
+            early=quote_adaptive_from_arrays(
+                self.state(),self.state()["token_mint_a"],amount,
+                self.arrays(),self.oracle(),observed_unix=1793149190)
+            late=quote_adaptive_from_arrays(
+                self.state(),self.state()["token_mint_a"],amount,
+                self.arrays(),self.oracle(),observed_unix=1793150000)
+            self.assertNotEqual(early["estimated_output_base_units"],
+                                late["estimated_output_base_units"])
+            self.assertFalse(early["signed_source_quote_exact_verified"])
