@@ -88,8 +88,9 @@ def compare_three_way(fixture,receipts,*,binary):
         raise ValueError("single Orca terminal signed leg required")
     index=indexes[0]
     base=source_core_inputs(fixture,index)
-    if not isinstance(receipts,dict) or not receipts:
-        raise ValueError("independent signed receipts missing")
+    if (not isinstance(receipts,dict) or len(receipts)<3 or
+            any(type(k) is not int or not 0<k<2**64 for k in receipts)):
+        raise ValueError("at least three distinct positive independently signed input sizes required")
     evidence=[]
     for size,receipt in sorted(receipts.items()):
         checked=assess(fixture,receipt)
@@ -109,6 +110,17 @@ def compare_three_way(fixture,receipts,*,binary):
                 type(clock.get("fork_unix_timestamp"))is not int or
                 clock["fork_unix_timestamp"]<=0):
             raise ValueError("signed Orca execution Clock evidence missing")
+        before=clock.get("fork_clock_before")
+        after_clock=clock.get("fork_clock_after")
+        if (not isinstance(before,dict) or not isinstance(after_clock,dict) or
+                before.get("clock_source")!="ISOLATED_SURFPOOL_CLOCK_SYSVAR" or
+                after_clock.get("clock_source")!="ISOLATED_SURFPOOL_CLOCK_SYSVAR" or
+                any(before.get(k)is not False or after_clock.get(k)is not False
+                    for k in SAFE) or
+                before.get("fork_clock_slot")!=after_clock.get("fork_clock_slot") or
+                before.get("fork_unix_timestamp")!=clock["fork_unix_timestamp"] or
+                after_clock.get("fork_unix_timestamp")!=clock["fork_unix_timestamp"]):
+            raise ValueError("signed fork clock slot/timestamp was not fixed for quote")
         timestamp=clock["fork_unix_timestamp"]
         request={**base,"amount_in":amounts[index],
                  "fork_unix_timestamp":timestamp}
@@ -136,6 +148,10 @@ def compare_three_way(fixture,receipts,*,binary):
                          "fork_execution_unix_timestamp":timestamp,
                          "source_slot":fixture["state_accounts_observed_slot"],
                          **SAFE})
+    if len({r["orca_exact_input_base_units"] for r in evidence})!=len(evidence):
+        raise ValueError("repeated Orca exact input cannot establish multi-size parity")
+    if len({r["source_slot"] for r in evidence})!=1:
+        raise ValueError("mixed source slots cannot establish native parity")
     matches=sum(r["official_minus_signed"]==r["python_minus_signed"]==0
                 for r in evidence)
     return {"status":("ORCA_THREE_WAY_SIGNED_NATIVE_PARITY_VERIFIED"
