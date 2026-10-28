@@ -7,11 +7,53 @@ This is the actual source pool fee scheduler, not a guessed fee rate.
 """
 import base64
 from arb.meteora_damm_v2 import PROGRAM,SIZE,DISC,decode
-from arb.meteora_damm_v2_native_fee_math import (
-    FEE_DENOMINATOR,encode_collection_mode,time_scheduler_numerator)
 from arb.source_snapshot_manifest import verify
-from arb.meteora_damm_v2_native_fee_math import source_volatility_fee_candidate
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
+
+# Source fee field decoding only; exact swap pricing lives exclusively in Meteora Rust SDK.
+FEE_DENOMINATOR=1_000_000_000
+def encode_collection_mode(value):
+    if type(value)is not int or value not in (0,1,2):
+        raise ValueError("invalid authenticated DAMM collection mode")
+    return ("BASE_AND_QUOTE","QUOTE_ONLY","QUOTE_COMPOUNDING")[value]
+
+def time_scheduler_numerator(*,cliff_fee_numerator,number_of_periods,period_frequency,
+                             reduction_factor,elapsed,mode):
+    if (any(type(v)is not int for v in (cliff_fee_numerator,number_of_periods,
+            period_frequency,reduction_factor,elapsed)) or
+            cliff_fee_numerator<0 or not 0<=number_of_periods<=1000 or
+            period_frequency<=0 or not 0<=reduction_factor<=FEE_DENOMINATOR or
+            elapsed<0 or mode not in ("linear","exponential")):
+        raise ValueError("invalid source DAMM fee scheduler")
+    completed=min(number_of_periods,elapsed//period_frequency)
+    if mode=="linear":
+        rate=max(0,cliff_fee_numerator-completed*reduction_factor)
+    else:
+        rate=cliff_fee_numerator
+        for _ in range(completed):
+            rate=rate*(FEE_DENOMINATOR-reduction_factor)//FEE_DENOMINATOR
+    return {"fee_numerator":rate,"periods_elapsed":completed,
+            "fee_precision":FEE_DENOMINATOR,"scheduler_input_authenticated":False,
+            "dynamic_fee_included":False,**SAFE}
+
+def source_volatility_fee_candidate(*,volatility_accumulator,bin_step,
+                                    variable_fee_control,max_volatility_accumulator):
+    values=(volatility_accumulator,bin_step,variable_fee_control,max_volatility_accumulator)
+    if (any(type(v)is not int for v in values) or volatility_accumulator<0
+            or bin_step<=0 or variable_fee_control<0 or max_volatility_accumulator<=0):
+        raise ValueError("invalid DAMM source volatility configuration")
+    capped=min(volatility_accumulator,max_volatility_accumulator)
+    numerator=(capped*bin_step)**2*variable_fee_control
+    rate=(numerator+100_000_000_000-1)//100_000_000_000
+    if rate>990_000_000:raise ValueError("DAMM source volatility exceeds fee ceiling")
+    return {"snapshot_dynamic_fee_numerator":rate,
+            "volatility_accumulator":volatility_accumulator,
+            "effective_capped_accumulator":capped,
+            "volatility_limit_applied":capped!=volatility_accumulator,
+            "bin_step":bin_step,
+            "dynamic_fee_source":"CAPTURED_VOLATILITY_POLYNOMIAL_NO_SWAP_UPDATE",
+            "snapshot_dynamic_fee_not_execution_verified":True,
+            "protocol_exact_verified":False,**SAFE}
 
 def decode_fee_state(raw):
     if type(raw)is not bytes or len(raw)!=SIZE or raw[:8]!=DISC:
