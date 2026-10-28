@@ -47,10 +47,12 @@ proof that the current repository's Python math exactly matches the program.
 `arb/pumpswap_native_source_capture.py` takes a bounded sample of
 already-registered identity hints and independently verifies pool owner,
 layout, mint identity, vaults, fee/configuration accounts and current on-chain
-state using the existing `pumpswap_pool.verify` implementation. It captures
-the pool bytes and reports the fee-mode diagnostic; it explicitly marks
-native pricing, signed parity and admission false. Different RPC reads have
-independent slots and are **not** misrepresented as one atomic snapshot.
+state using the existing `pumpswap_pool.verify` implementation. It captures the verified same-slot six-account bundle (pool, both vaults,
+global config, fee config, base mint), the pool account bytes, and the fee-mode diagnostic; it explicitly marks
+native pricing, signed parity and admission false. The independently retrieved initial pool account and verifier snapshot have
+separate slots; only the six verifier-snapshot accounts share a context slot.
+The report preserves both slot values rather than misrepresenting them as one
+atomic read.
 The CLI exits nonzero when the requested sample is incomplete. No DEX API,
 market scan, sendTransaction or local signing is used by this source step.
 
