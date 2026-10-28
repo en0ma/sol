@@ -81,12 +81,45 @@ def expand(rpc,registry,*,count=6,pages=4):
         key=(row["venue"],row["address"])
         if key in registered:raise ValueError("venue registry duplicate promotion")
         registered.add(key)
-    next_registry={**registry,"pools":[*registry["pools"],*accepted]}
+    # These are verified identities, NOT execution-eligible registry entries.
+    # Only signed price parity promotes an address into the usable registry.
     complete=all(r["new_authenticated_count"]==count for r in reports)
-    return next_registry,{"status":"BOTH_VENUES_SIX_NEW_POOLS_AUTHENTICATED"
+    return registry,{"status":"BOTH_VENUES_SIX_NEW_POOLS_AUTHENTICATED"
                              if complete else "POOL_DISCOVERY_INCOMPLETE",
-        "venues":reports,"registered_additional_pools":len(accepted),
+        "venues":reports,"authenticated_candidate_count":len(accepted),
+        "registered_additional_pools":0,
         "native_pricing_signed_verified":False,**SAFE}
+
+def promote_signed(registry,candidates,orca_receipt,meteora_receipt,*,required=6):
+    """Only complete 4/4 signed SDK/native execution parity enters registry."""
+    specifications=(
+        ("orca",orca_receipt,"ORCA_NEW_POOLS_SIGNED_VERIFIED"),
+        ("meteora_damm_v2",meteora_receipt,"METEORA_DAMM_V2_CONFIGURED_POOLS_SIGNED_VERIFIED"))
+    allowed={}
+    for venue,receipt,status in specifications:
+        if receipt.get("status")!=status or not isinstance(receipt.get("pools"),list):
+            raise ValueError(venue+" signed verification did not succeed")
+        validated=[]
+        for pool in receipt["pools"]:
+            if (pool.get("verified") is True and
+                    (pool.get("exact",pool.get("exact_matches"))==4) and
+                    (pool.get("trial_count",len(pool.get("trials",[])))==4) and
+                    len(pool.get("trials",[]))==4):
+                validated.append(pool.get("pool"))
+        if len(set(validated))<required:
+            raise ValueError(venue+" fewer than six distinct 4/4 signed pools")
+        allowed[venue]=set(validated)
+    existing={(row["venue"],row["address"]) for row in registry["pools"]}
+    fresh=[]
+    for row in candidates["pools"]:
+        venue,address=row.get("venue"),row.get("address")
+        if venue in allowed and address in allowed[venue] and (venue,address) not in existing:
+            fresh.append(row)
+            existing.add((venue,address))
+    if any(sum(row["venue"]==venue for row in fresh)<required for venue in allowed):
+        raise ValueError("signed pool identity not in authenticated discovery candidate list")
+    return {**registry,"pools":[*registry["pools"],*fresh]}
+
 
 def main():
     p=argparse.ArgumentParser()
@@ -105,7 +138,8 @@ def main():
     Path(a.output_new_pools).write_text(json.dumps({"pools":additions},indent=2)+"\n")
     Path(a.report).write_text(json.dumps(report,indent=2)+"\n")
     print(json.dumps({"status":report["status"],
-                      "registered_additional_pools":report["registered_additional_pools"],**SAFE}))
+                      "authenticated_candidate_count":report["authenticated_candidate_count"],
+                      "registered_additional_pools":0,**SAFE}))
     if report["status"]!="BOTH_VENUES_SIX_NEW_POOLS_AUTHENTICATED":
         raise SystemExit("six NEW authenticated pools per venue not yet discovered")
 
