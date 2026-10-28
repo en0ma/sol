@@ -228,9 +228,12 @@ def promote_signed(registry,candidates,orca_receipt,meteora_receipt,*,raydium_ca
                 if type(size)is not int or size<=0:
                     raise ValueError(venue+" signed trial has invalid input size")
                 if not (isinstance(trial.get("signed_sha256"),str) and
-                        len(trial["signed_sha256"])==64) and not (
+                        len(trial["signed_sha256"])==64 and
+                        all(ch in "0123456789abcdefABCDEF" for ch in trial["signed_sha256"])) and not (
                         venue=="raydium_cpmm" and isinstance(trial.get("signature"),str)
-                        and len(trial["signature"])>=64):
+                        and 64<=len(trial["signature"])<=88 and
+                        all(ch in "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+                            for ch in trial["signature"])):
                     raise ValueError(venue+" signed transaction evidence missing")
                 values=[trial.get(k) for k in outputs]
                 if any(type(v)is not int or v<=0 for v in values) or len(set(values))!=1:
