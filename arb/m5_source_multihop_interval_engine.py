@@ -9,6 +9,13 @@ from arb.fixture_quote_execution_pipeline import extract_pool_states
 from arb.fixture_all_venue_signed_quotes import quote_leg
 SAFE={"actionable":False,"broadcast":False,"live_execution_approved":False}
 
+def status_is_non_blocking(quote):
+    return quote.get("quote_status") in (
+        "SOURCE_BOUND_INDICATIVE",
+        "NATIVE_QUOTE_SOURCE_DERIVED_NOT_EXACT",
+        "NATIVE_QUOTE_SELECTED_FEE_MODE_NOT_EXACT",
+        "NATIVE_QUOTE_SOURCE_BASE_FEE_NOT_EXACT")
+
 def walk(fixture,*,input_base_units,observed_unix,max_branches=16):
     if (type(input_base_units)is not int or not 0<input_base_units<2**64 or
             type(observed_unix)is not int or observed_unix<0 or
@@ -38,6 +45,12 @@ def walk(fixture,*,input_base_units,observed_unix,max_branches=16):
                     or q.get("venue")!=row["venue"]
                     or q.get("source_slot")!=fixture["state_accounts_observed_slot"]):
                 raise ValueError("source native quote binding missing")
+            fee_evidence=q.get("source_fee_evidence")
+            if row["venue"]=="raydium_clmm" and status_is_non_blocking(q):
+                if (not isinstance(fee_evidence,dict) or
+                        fee_evidence.get("source_pool_fee_side_decoded") is not True or
+                        any(fee_evidence.get(k)is not False for k in SAFE)):
+                    raise ValueError("missing authenticated CLMM pool fee collection side")
             status=q.get("quote_status")
             if status=="SOURCE_BOUND_INDICATIVE":
                 output=q.get("predicted_output_base_units")
@@ -129,7 +142,13 @@ def walk(fixture,*,input_base_units,observed_unix,max_branches=16):
                     "trace":branch["trace"]+[{"leg_index":index,"venue":row["venue"],
                         "pool":row["address"],"amount_in":branch["amount"],
                         "amount_out":output,"source_slot":q["source_slot"],
-                        "quote_status":status}],
+                        "quote_status":status,
+                        "source_fee_side":(
+                            fee_evidence.get("fee_side")
+                            if isinstance(fee_evidence,dict) else None),
+                        "source_fee_on_native_enum":(
+                            fee_evidence.get("fee_on_native_enum")
+                            if isinstance(fee_evidence,dict) else None)}],
                     "hypothetical":hypothetical,"source_bounded":bounded})
         if not following:
             return {"status":"MULTIHOP_NATIVE_SOURCE_INTERVAL_BLOCKED",
