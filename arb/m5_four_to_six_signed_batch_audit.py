@@ -66,7 +66,13 @@ def audit_attempts(fixture,receipts,*,expected_amounts):
                          "audit":verified,"independently_accepted":approved,
                          "observed_gross_start_mint_delta_base_units":signed_gross,
                          "net_profit_verified":False,**SAFE})
-    # Only start-mint-convertible amounts may have an estimated net ordering.\n    # These remain explicitly local simulations and cannot become actionable.\n    comparable=[r for r in signed_gross_observations\n                if type(r["estimated_net_start_mint_delta_base_units"]) is int]\n    net_estimate_ranking=sorted(comparable,\n        key=lambda r:(-r["estimated_net_start_mint_delta_base_units"],r["size_base_units"]))\n    gross_ranking=sorted(signed_gross_observations,
+    # Only start-mint-convertible amounts have an estimated net ordering.
+    # Local simulations cannot become actionable merely through a fee estimate.
+    comparable=[r for r in signed_gross_observations
+                if type(r["estimated_net_start_mint_delta_base_units"]) is int]
+    net_estimate_ranking=sorted(comparable,
+        key=lambda r:(-r["estimated_net_start_mint_delta_base_units"],r["size_base_units"]))
+    gross_ranking=sorted(signed_gross_observations,
         key=lambda x:(-x["gross_start_mint_delta_base_units"],x["size_base_units"]))
     return {"status":"FOUR_TO_SIX_SOURCE_SIGNED_MULTISIZE_INDEPENDENT_AUDIT",
             "attempts":attempts,"attempt_count":len(attempts),
