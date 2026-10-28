@@ -10,6 +10,7 @@ from arb.meteora_damm_v2 import PROGRAM,SIZE,DISC,decode
 from arb.meteora_damm_v2_native_fee_math import (
     FEE_DENOMINATOR,encode_collection_mode,time_scheduler_numerator)
 from arb.source_snapshot_manifest import verify
+from arb.meteora_damm_v2_native_fee_math import source_volatility_fee_candidate
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
 
 def decode_fee_state(raw):
@@ -93,7 +94,19 @@ def effective_base_fee_from_pool(raw,*,source_slot,observed_unix):
             elapsed=elapsed,mode=mode)
         computed=schedule["fee_numerator"]
         periods=schedule["periods_elapsed"]
-    return {"base_fee_numerator":computed,
+    dynamic_model=None
+    if state["dynamic_fee"]["initialized"]:
+        d=state["dynamic_fee"]
+        dynamic_model=source_volatility_fee_candidate(
+            volatility_accumulator=d["volatility_accumulator"],
+            bin_step=d["bin_step"],
+            variable_fee_control=d["variable_fee_control"],
+            max_volatility_accumulator=d["max_volatility_accumulator"])
+    return {"source_snapshot_dynamic_fee_model":dynamic_model,
+            "source_snapshot_total_fee_candidate":(
+                computed+dynamic_model["snapshot_dynamic_fee_numerator"]
+                if dynamic_model is not None else computed),
+            "base_fee_numerator":computed,
             "base_fee_periods_elapsed":periods,
             "activation_clock":clock,"activation_elapsed":elapsed,
             "dynamic_fee_initialized":bool(state["dynamic_fee"]["initialized"]),
