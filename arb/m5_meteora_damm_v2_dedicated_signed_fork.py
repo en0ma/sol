@@ -180,6 +180,7 @@ def main():
     p.add_argument("--binary",required=True)
     p.add_argument("--output",required=True)
     p.add_argument("--amounts",default="10000,100000")
+    p.add_argument("--a-to-b-amounts",default="10000000,100000000")
     a=p.parse_args()
     rpc="http://127.0.0.1:8899"
     if a.capture_source:
@@ -201,7 +202,8 @@ def main():
     if selected is not None:
         hydrate(rpc,selected)
         for a_to_b in (True,False):
-            for amount in (int(x) for x in a.amounts.split(",")):
+            sizes=a.a_to_b_amounts if a_to_b else a.amounts
+            for amount in (int(x) for x in sizes.split(",")):
                 try:
                     receipt=signed_trial(rpc,selected,amount,a_to_b,a.binary)
                 except (ValueError,TypeError,KeyError,RuntimeError,OSError) as exc:
