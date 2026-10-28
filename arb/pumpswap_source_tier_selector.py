@@ -33,14 +33,19 @@ def market_cap_quote_base_units(*,base_reserve,quote_reserve,
     if base_supply_base_units is not None and (
             type(base_supply_base_units)is not int or base_supply_base_units<=0):
         raise ValueError("native source base mint supply invalid")
-    supply=(BASE_SUPPLY_HUMAN*10**base_decimals
-            if base_supply_base_units is None else base_supply_base_units)
-    market_cap=effective*supply//base_reserve
+    # PumpSwap's published fee-market-cap definition is always price times
+    # ONE BILLION human tokens, irrespective of any SPL supply burns.
+    # The independently captured mint supply authenticates mint metadata,
+    # not the economic definition of the tier threshold.
+    reference_supply=BASE_SUPPLY_HUMAN*10**base_decimals
+    market_cap=effective*reference_supply//base_reserve
     return {"market_cap_quote_base_units":market_cap,
             "reserve_implied_price_numerator":effective,
             "reserve_implied_price_denominator":base_reserve,
             "base_decimals":base_decimals,
             "source_mint_supply_authenticated":base_supply_base_units is not None,
+            "source_actual_supply_base_units":base_supply_base_units,
+            "fee_tier_supply_basis_base_units":reference_supply,
             "quote_base_units":True,**SAFE}
 
 def choose_tier_by_source_market_cap(*,pool_state,fee_config,
