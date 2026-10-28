@@ -44,8 +44,16 @@ def compare_orca(fixture,receipts,*,observed_unix):
         # assess() verifies the same-slot source manifest, signed CPI chain,
         # post-balances, positive/negative packets and atomic rollback.
         actual=balances[-1]
+        clock=receipt.get("orca_fork_clock_evidence")
+        if (not isinstance(clock,dict) or
+                clock.get("status")!="ORCA_FORK_CLOCK_STABLE_FOR_SIGNED_ATTEMPT" or
+                clock.get("fork_clock_stable_for_quote") is not True or
+                any(clock.get(k)is not False for k in SAFE) or
+                type(clock.get("fork_unix_timestamp")) is not int or
+                clock["fork_unix_timestamp"]<=0):
+            raise ValueError("Orca independently signed quote lacks stable fork Clock sysvar")
         quote=quote_leg(fixture,leg_index=index,amount_in=inputs[index],
-                        observed_unix=observed_unix)
+                        observed_unix=clock["fork_unix_timestamp"])
         if (any(quote.get(k) is not False for k in SAFE) or
                 quote.get("venue")!="orca" or
                 quote.get("pool")!=rows[index]["address"] or
@@ -61,6 +69,8 @@ def compare_orca(fixture,receipts,*,observed_unix):
                          "orca_native_output_base_units":predicted,
                          "signed_minus_native_base_units":actual-predicted,
                          "source_slot":fixture["state_accounts_observed_slot"],
+                         "fork_unix_timestamp":clock["fork_unix_timestamp"],
+                         "fork_clock_stable_for_quote":True,
                          "pool":rows[index]["address"],
                          "independent_signed_rollback_verified":True,**SAFE})
     mismatch=sum(r["signed_minus_native_base_units"]!=0 for r in measured)
