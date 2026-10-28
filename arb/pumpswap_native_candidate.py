@@ -6,7 +6,6 @@ Reference: @pump-fun/pump-swap-sdk 2.1.0 src/sdk/{buy,sell,fees,util}.ts.
 """
 ZERO="11111111111111111111111111111111"
 SOL="So11111111111111111111111111111111111111112"
-SOL_2022="9pan9bMn5HatX4EJdBwg9VgCa7Uz5HL8N1m5D3NdR3f"  # require explicit confirmation before enabling
 USDC="EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
 BPS=10_000
 MAYHEM_SUPPLY=1_000_000_000_000_000
@@ -29,7 +28,9 @@ def select_rates(pool):
     if pool.get("creator_fee_bps",0):
         # Existing GlobalConfig decoder does not expose creatorFeeConfigurable.
         raise ValueError("per-pool creator fee gate not authenticated")
-    if pool.get("is_cashback_coin",0):
+    if pool.get("is_cashback_coin") not in (0,1):
+        raise ValueError("cashback status not authenticated")
+    if pool["is_cashback_coin"]:
         raise ValueError("cashback pool does not support PumpSwap V2 swaps")
     if pool.get("is_mayhem_mode") not in (0,1):
         raise ValueError("Mayhem fee classification unverified")
@@ -65,7 +66,9 @@ def select_rates(pool):
         raise ValueError("invalid on-chain PumpSwap fee rates")
     if sum(rates[k] for k in keys)>=BPS:
         raise ValueError("excessive PumpSwap fee rates")
-    if pool.get("coin_creator")==ZERO:
+    if not isinstance(pool.get("coin_creator"),str):
+        raise ValueError("authenticated coin creator identity required")
+    if pool["coin_creator"]==ZERO:
         rates={**rates,"creator_fee_bps":0}
     return rates
 
