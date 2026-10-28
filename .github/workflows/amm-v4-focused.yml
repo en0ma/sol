@@ -683,15 +683,15 @@ jobs:
             --source-file "$RUNNER_TEMP/meteora-damm-v2-upstream-source.json" \
             --binary tools/meteora_damm_v2_reference/target/release/sol-meteora-damm-v2-official-reference \
             --output "$RUNNER_TEMP/meteora-damm-v2-capture-status.json"
-      - name: Discover six new pools per venue with existing venue discovery and registry authentication
+      - name: Reauthenticate registered Orca and Meteora identities for fresh signed regression
         run: |
           python3 -m arb.m5_venue_pool_registry_expansion \
             --registry arb/pool_registry.json \
-            --count 20 --orca-count 6 --pages 8 \
+            --count 8 --orca-count 6 --revalidate-registered --pages 8 \
             --output-registry "$RUNNER_TEMP/expanded-venue-pool-registry.json" \
             --output-new-pools "$RUNNER_TEMP/venue-six-new-pools.json" \
             --report "$RUNNER_TEMP/venue-pool-registry-expansion.json"
-      - name: Capture six NEW verified Meteora pools with existing signed-fork source capture
+      - name: Capture registered Meteora pools for fresh signed parity
         run: |
           python3 -m arb.m5_meteora_damm_v2_dedicated_signed_fork \
             --capture-source --pool-count 8 \
@@ -699,12 +699,12 @@ jobs:
             --source-file "$RUNNER_TEMP/meteora-six-new-upstream-source.json" \
             --binary tools/meteora_damm_v2_reference/target/release/sol-meteora-damm-v2-official-reference \
             --output "$RUNNER_TEMP/meteora-six-new-capture.json"
-      - name: Capture new Orca source pool fixtures
+      - name: Capture registered Orca source pool fixtures
         run: |
           python3 -m arb.m5_orca_signed_single_swap --capture-new-pools --pool-count 6 --registry "$RUNNER_TEMP/venue-six-new-pools.json" --new-pools-source "$RUNNER_TEMP/orca-new-pools-upstream-source.json" --binary tools/orca_core_quote/target/release/sol-orca-native-reference --output "$RUNNER_TEMP/orca-new-pools-capture.json"
-      - name: Discover Raydium CPMM third-venue pool candidates with venue-native eligibility
+      - name: Reauthenticate registered Raydium CPMM identities for fresh signed parity
         run: |
-          python3 -m arb.m5_venue_pool_registry_expansion --venues raydium_cpmm --count 8 --pages 5 --output-registry "$RUNNER_TEMP/raydium-cpmm-candidate-registry.json" --output-new-pools "$RUNNER_TEMP/raydium-cpmm-candidates.json" --report "$RUNNER_TEMP/raydium-cpmm-discovery.json"
+          python3 -m arb.m5_venue_pool_registry_expansion --venues raydium_cpmm --count 8 --revalidate-registered --pages 5 --output-registry "$RUNNER_TEMP/raydium-cpmm-candidate-registry.json" --output-new-pools "$RUNNER_TEMP/raydium-cpmm-candidates.json" --report "$RUNNER_TEMP/raydium-cpmm-discovery.json"
           python3 -m arb.raydium_swap --capture-source --registry "$RUNNER_TEMP/raydium-cpmm-candidates.json" --source-file "$RUNNER_TEMP/raydium-cpmm-source.json" --output "$RUNNER_TEMP/raydium-cpmm-capture.json" --pool-count 8
       - uses: actions/upload-artifact@v4
         if: always()
