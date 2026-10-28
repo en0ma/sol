@@ -105,10 +105,13 @@ def discover_new(rpc,registry,venue,*,count=6,pages=4):
             "status":"VENUE_REGISTRY_EXPANSION_READY" if len(identities)==count
                      else "VENUE_REGISTRY_EXPANSION_INCOMPLETE",**SAFE}
 
-def expand(rpc,registry,*,count=6,pages=4,venues=("orca","meteora_damm_v2")):
+def expand(rpc,registry,*,count=6,pages=4,venues=("orca","meteora_damm_v2"),counts=None):
     if not venues or len(set(venues))!=len(venues) or any(v not in ("orca","meteora_damm_v2","raydium_cpmm") for v in venues):
         raise ValueError("invalid native venue discovery selection")
-    reports=[discover_new(rpc,registry,v,count=count,pages=pages) for v in venues]
+    counts=counts or {}
+    if any(v not in venues or type(n) is not int or not 1<=n<=20 for v,n in counts.items()):
+        raise ValueError("invalid venue-specific discovery target")
+    reports=[discover_new(rpc,registry,v,count=counts.get(v,count),pages=pages) for v in venues]
     accepted=[p for report in reports for p in report["new_authenticated_pools"]]
     registered={(p["venue"],p["address"]) for p in registry["pools"]}
     for row in accepted:
@@ -117,7 +120,7 @@ def expand(rpc,registry,*,count=6,pages=4,venues=("orca","meteora_damm_v2")):
         registered.add(key)
     # These are verified identities, NOT execution-eligible registry entries.
     # Only signed price parity promotes an address into the usable registry.
-    complete=all(r["new_authenticated_count"]==count for r in reports)
+    complete=all(r["new_authenticated_count"]==r["required_new_count"] for r in reports)
     return registry,{"status":"BOTH_VENUES_SIX_NEW_POOLS_AUTHENTICATED"
                              if complete else "POOL_DISCOVERY_INCOMPLETE",
         "venues":reports,"authenticated_candidate_count":len(accepted),
@@ -234,6 +237,7 @@ def main():
     p.add_argument("--registry",default="arb/pool_registry.json")
     p.add_argument("--count",type=int,default=6)
     p.add_argument("--pages",type=int,default=4)
+    p.add_argument("--orca-count",type=int)
     p.add_argument("--venues",default="orca,meteora_damm_v2")
     p.add_argument("--output-registry",required=True)
     p.add_argument("--output-new-pools",required=True)
@@ -241,7 +245,8 @@ def main():
     a=p.parse_args()
     registry=json.loads(Path(a.registry).read_text())
     expanded,report=expand(a.rpc,registry,count=a.count,pages=a.pages,
-        venues=tuple(a.venues.split(",")))
+        venues=tuple(a.venues.split(",")),
+        counts={"orca":a.orca_count} if a.orca_count is not None else None)
     Path(a.output_registry).write_text(json.dumps(expanded,indent=2)+"\n")
     additions=[p for venue in report["venues"] for p in venue["new_authenticated_pools"]]
     Path(a.output_new_pools).write_text(json.dumps({"pools":additions},indent=2)+"\n")
@@ -249,7 +254,11 @@ def main():
     print(json.dumps({"status":report["status"],
                       "authenticated_candidate_count":report["authenticated_candidate_count"],
                       "registered_additional_pools":0,**SAFE}))
-    if any(v["new_authenticated_count"]!=a.count for v in report["venues"]):
-        raise SystemExit("six NEW authenticated pools per venue not yet discovered")
+    if any(v["new_authenticated_count"]!=v["required_new_count"] for v in report["venues"]):
+        raise SystemExit("venue-specific authenticated discovery target not met: "+
+            json.dumps({v["venue"]:{"accepted":v["new_authenticated_count"],
+                                  "required":v["required_new_count"],
+                                  "rejections":v["rejections"][:5]}
+                        for v in report["venues"] if v["new_authenticated_count"]!=v["required_new_count"]}))
 
 if __name__=="__main__":main()
