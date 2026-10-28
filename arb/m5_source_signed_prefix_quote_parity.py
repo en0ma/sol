@@ -155,6 +155,12 @@ def compare(fixture,receipt,*,observed_unix):
             "modeled_minus_signed_base_units":delta,
             "absolute_model_error_base_units":abs(delta) if delta is not None else None,
             "native_quote_status":status,"classification":classification,
+            "source_fee_side":(
+                native.get("source_fee_evidence",{}).get("fee_side")
+                if isinstance(native.get("source_fee_evidence"),dict) else None),
+            "source_fee_on_native_enum":(
+                native.get("source_fee_evidence",{}).get("fee_on_native_enum")
+                if isinstance(native.get("source_fee_evidence"),dict) else None),
             "alternate_source_fee_mode_scenarios":source_fee_mode_scenarios,
             "signed_prefix_observation_authenticated":index<n-1,
             "signed_atomic_terminal_post_account_authenticated":index==n-1,
