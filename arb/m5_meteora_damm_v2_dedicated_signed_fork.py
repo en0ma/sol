@@ -186,7 +186,8 @@ def main():
     p.add_argument("--output",required=True)
     p.add_argument("--amounts",default="10000,100000")
     p.add_argument("--pool-count",type=int,default=1)
-    p.add_argument("--a-to-b-amounts",default="10000000,100000000")
+    p.add_argument("--required-verified-pools",type=int,default=None)
+    p.add_argument("--a-to-b-amounts",default="100000000,500000000")
     a=p.parse_args()
     rpc="http://127.0.0.1:8899"
     if a.capture_source:
@@ -229,10 +230,14 @@ def main():
         reports.append({"pool":pool["pool"],"exact_matches":exact,
                         "trial_count":len(trials),"trials":trials,
                         "verified":exact==4 and len(trials)==4})
-    complete=len(reports)==a.pool_count and all(r["verified"] for r in reports)
+    required=a.required_verified_pools if a.required_verified_pools is not None else a.pool_count
+    if type(required)is not int or not 1<=required<=a.pool_count:
+        raise SystemExit("invalid required signed-verified pool count")
+    complete=sum(r["verified"] for r in reports)>=required
     report={"status":("METEORA_DAMM_V2_CONFIGURED_POOLS_SIGNED_VERIFIED"
                        if complete else "METEORA_DAMM_V2_CONFIGURED_POOLS_INCOMPLETE"),
-            "required_distinct_pools":a.pool_count,
+            "required_distinct_pools":required,
+            "authenticated_candidate_count":a.pool_count,
             "verified_pool_count":sum(r["verified"] for r in reports),
             "exact_matches":sum(r["exact_matches"] for r in reports),
             "trial_count":sum(r["trial_count"] for r in reports),
