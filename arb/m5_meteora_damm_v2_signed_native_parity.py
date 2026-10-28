@@ -7,9 +7,6 @@ import argparse,json,base64,subprocess
 from pathlib import Path
 from arb.source_snapshot_manifest import verify
 from arb.fixture_quote_execution_pipeline import extract_pool_states
-from arb.fixture_pool_fundamentals import extract
-from arb.meteora_damm_v2_source_fee_decoder import from_fixture
-from arb.meteora_damm_v2_native_fee_math import quote_native_fee
 from arb.m5_four_to_six_source_signed_acceptance import assess
 SAFE={"actionable":False,"broadcast":False,"live_execution_approved":False}
 
@@ -54,66 +51,27 @@ def compare(fixture,receipt,*,binary):
     pool_account=fixture["accounts"].get(pool)
     if not isinstance(pool_account,dict):
         raise ValueError("source Meteora pool bytes missing")
-    request={"pool_data_base64":pool_account["data"][0],
-             "amount_in":planned[i],
-             "input_is_a":fixture["route_mints"][i]==state["token_a_mint"],
-             "fork_unix_timestamp":clock["fork_unix_timestamp"],
-             "fork_clock_slot":before["fork_clock_slot"]}
-    official=subprocess.run([binary],input=json.dumps(request),
-                            text=True,capture_output=True,timeout=90)
-    if official.returncode:
-        raise ValueError("official Meteora SDK rejected quote: "+official.stderr[-220:])
-    official_quote=json.loads(official.stdout)
-    official_output=official_quote.get("amount_out")
-    if type(official_output)is not int:
-        raise ValueError("official Meteora quote missing integer output")
+    from arb.meteora_damm_v2_native_quote import quote_pool_account
+    result=quote_pool_account(pool_account,
+        mint_in=fixture["route_mints"][i],
+        amount_in=planned[i],
+        fork_unix_timestamp=clock["fork_unix_timestamp"],
+        fork_clock_slot=before["fork_clock_slot"],binary=binary)
+    official_output=result["amount_out"]
     signed=planned[i+1]
-    reference_match=official_output==signed
-    fee=from_fixture(fixture,pool=pool,observed_unix=clock["fork_unix_timestamp"])
-    fundamentals=extract(fixture)["fundamentals"]
-    source=next((f for f in fundamentals if f["address"]==pool),None)
-    if not isinstance(source,dict):
-        raise ValueError("source-authenticated DAMM SPL vault reserves absent")
-    balances=source["vault_base_units"]
-    if not isinstance(balances,list) or len(balances)!=2:
-        raise ValueError("invalid DAMM synchronized reserves")
-    direction=fixture["route_mints"][i]==state["token_a_mint"]
-    if fixture["route_mints"][i] not in (state["token_a_mint"],state["token_b_mint"]):
-        raise ValueError("DAMM source mint direction mismatch")
-    if fee["dynamic_fee_initialized"]:
-        return {"status":"DAMM_V2_DYNAMIC_FEE_NOT_YET_EXECUTION_EXACT",
-                "source_slot":fixture["state_accounts_observed_slot"],
-                "signed_output_base_units":planned[i+1],
-                "official_meteora_sdk_output_base_units":official_output,
-                "official_minus_signed":official_output-signed,
-                "official_signed_parity_verified":reference_match,
-                "base_fee_numerator":fee["base_fee_numerator"],
-                "snapshot_dynamic_fee_candidate":fee.get("source_snapshot_total_fee_candidate"),
-                "native_collection_mode":fee["native_collection_mode"],
-                "signed_execution_authenticated":True,
-                "protocol_exact_verified":False,**SAFE}
-    modeled=quote_native_fee(reserve_a=balances[0],reserve_b=balances[1],
-        amount_in=planned[i],input_is_a=direction,
-        total_fee_numerator=fee["base_fee_numerator"],
-        collection_mode=fee["native_collection_mode"],fee_version=1)
-    output=modeled["amount_out"]
-    signed=planned[i+1]
-    return {"status":("DAMM_V2_SIGNED_SOURCE_NATIVE_EXACT_MATCH"
-                       if output==signed else "DAMM_V2_SIGNED_SOURCE_NATIVE_MISMATCH"),
+    parity=official_output==signed
+    return {"status":("DAMM_V2_OFFICIAL_SDK_SIGNED_EXACT_MATCH" if parity
+                      else "DAMM_V2_OFFICIAL_SDK_SIGNED_MISMATCH"),
             "source_slot":fixture["state_accounts_observed_slot"],
-            "pool":pool,"direction":"a_to_b" if direction else "b_to_a",
-            "amount_in_base_units":planned[i],
+            "pool":pool,"amount_in_base_units":planned[i],
             "signed_output_base_units":signed,
             "official_meteora_sdk_output_base_units":official_output,
             "official_minus_signed":official_output-signed,
-            "official_signed_parity_verified":reference_match,
-            "native_modeled_output_base_units":output,
-            "native_minus_signed_base_units":output-signed,
-            "source_fee_numerator":fee["base_fee_numerator"],
-            "native_collection_mode":fee["native_collection_mode"],
+            "official_signed_parity_verified":parity,
+            "native_pricing_engine":"OFFICIAL_METEORA_RUST_SDK",
             "fork_execution_unix_timestamp":clock["fork_unix_timestamp"],
             "signed_execution_authenticated":True,
-            "protocol_exact_verified":output==signed==official_output,**SAFE}
+            "protocol_exact_verified":parity,**SAFE}
 
 def main():
     p=argparse.ArgumentParser()
