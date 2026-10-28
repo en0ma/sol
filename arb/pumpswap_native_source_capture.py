@@ -62,6 +62,21 @@ def capture(rpc, registry, *, limit=3):
                 raise ValueError("incomplete authenticated same-slot source account bundle")
             if source_accounts[0].get("address")!=address:
                 raise ValueError("authenticated source bundle pool mismatch")
+            # Candidate quotes are research evidence, NEVER signed trial receipts.
+            # Both directions and two distinct sizes reveal unsupported fee modes
+            # before investing in an isolated swap harness.
+            from arb.pumpswap_native_candidate import quote_exact_input
+            candidates=[]
+            for mint_in in (state["base_mint"],state["quote_mint"]):
+                for size in (10_000,100_000):
+                    try:
+                        candidate=quote_exact_input(verified,mint_in,size)
+                        candidates.append(candidate)
+                    except (ValueError,KeyError,TypeError) as exc:
+                        candidates.append({"mint_in":mint_in,"amount_in":size,
+                                           "status":"NATIVE_CANDIDATE_BLOCKED",
+                                           "reason":str(exc)[:160],
+                                           "actionable":False,"signed_parity_verified":False})
             results.append({"address": address, "status": "AUTHENTICATED_SOURCE_ONLY",
                             "pool_account_slot": slot,
                             "verified_snapshot_slot": verified["slot"],
@@ -69,6 +84,7 @@ def capture(rpc, registry, *, limit=3):
                             "source_pool_base64": source_accounts[0]["account_base64"],
                             "authenticated_source_accounts": source_accounts,
                             "source_fee_mode": verified["fee_mode_diagnostic"]["status"],
+                            "native_quote_candidates": candidates,
                             "effective_fee_verified": False,
                             "signed_parity_verified": False})
         except (ValueError, KeyError, TypeError, RuntimeError, OSError) as exc:
