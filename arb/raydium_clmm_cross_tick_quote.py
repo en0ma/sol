@@ -30,13 +30,15 @@ def advance_sqrt(liquidity,at,net,zero_for_one):
     return at+net*Q//liquidity
 
 def quote_across_initialized_ticks(state,mint_in,amount_in,fee_rate_ppm,ticks,
-                                  *,max_crossings=32):
+                                  *,max_crossings=32,fee_on_input=True):
     """Simulate crossing source-initialized ticks, respecting per-tick liquidity net.
 
     Fee rounding is per swap step. A limit-cross requires enough gross input to
     cover its net input plus the fee (ceil), with any unspent amount conserved.
     If the active liquidity becomes zero or a next tick is missing, reject.
     """
+    if type(fee_on_input)is not bool:
+        raise ValueError("CLMM source fee collection mode must be explicit")
     if type(amount_in)is not int or not 0<amount_in<2**64:
         raise ValueError("CLMM exact input must fit u64")
     if type(fee_rate_ppm)is not int or not 0<=fee_rate_ppm<DEN:
@@ -85,6 +87,8 @@ def quote_across_initialized_ticks(state,mint_in,amount_in,fee_rate_ppm,ticks,
     from arb.orca_tick_math import sqrt_price_from_tick_index
     remaining=amount_in
     fee_total=out=0
+    fee_input_total=0
+    fee_output_total=0
     current_tick=tick
     crossed=[]
     steps=[]
@@ -109,7 +113,8 @@ def quote_across_initialized_ticks(state,mint_in,amount_in,fee_rate_ppm,ticks,
         # A source tick at the current exact price must still apply its signed
         # liquidity delta; the zero-delta crossing does not spend swap input.
         needed=delta_input(liq,price,target,zero)
-        gross_to_limit=ceil_div(needed*DEN,DEN-fee_rate_ppm)
+        gross_to_limit=(ceil_div(needed*DEN,DEN-fee_rate_ppm)
+                        if fee_on_input else needed)
         if remaining>=gross_to_limit:
             spent=gross_to_limit
             next_price=target
@@ -117,7 +122,7 @@ def quote_across_initialized_ticks(state,mint_in,amount_in,fee_rate_ppm,ticks,
             net_in=needed
         else:
             spent=remaining
-            fee=ceil_div(spent*fee_rate_ppm,DEN)
+            fee=ceil_div(spent*fee_rate_ppm,DEN) if fee_on_input else 0
             net_in=spent-fee
             if net_in<=0:
                 raise ValueError("CLMM input entirely exhausted by swap fees")
@@ -128,16 +133,23 @@ def quote_across_initialized_ticks(state,mint_in,amount_in,fee_rate_ppm,ticks,
         if spent<0 or spent>remaining:
             raise ValueError("CLMM swap input accounting underflow")
         fee=spent-net_in
-        got=delta_output(liq,price,next_price,zero)
+        gross_out=delta_output(liq,price,next_price,zero)
+        output_fee=ceil_div(gross_out*fee_rate_ppm,DEN) if not fee_on_input else 0
+        got=gross_out-output_fee
         if got<0:
             raise ValueError("CLMM output calculation negative")
         remaining-=spent
-        fee_total+=fee
+        fee_total+=fee+output_fee
+        fee_input_total+=fee
+        fee_output_total+=output_fee
         out+=got
         steps.append({"from_sqrt_x64":price,"to_sqrt_x64":next_price,
                       "source_next_tick":target_index,"gross_input_base_units":spent,
                       "net_input_base_units":net_in,"fee_input_base_units":fee,
-                      "output_base_units":got,"liquidity_before":liq,
+                      "output_base_units":got,
+                      "gross_output_base_units":gross_out,
+                      "fee_output_base_units":output_fee,
+                      "liquidity_before":liq,
                       "initialized_tick_crossed":reached})
         price=next_price
         if not reached:
@@ -161,7 +173,11 @@ def quote_across_initialized_ticks(state,mint_in,amount_in,fee_rate_ppm,ticks,
     return {"status":"SOURCE_AUTHENTICATED_CLMM_CROSS_TICK_MODEL",
             "amount_in":amount_in,"amount_out":out,
             "input_mint":mint_in,"output_mint":m1 if zero else m0,
-            "fee_input_base_units":fee_total,"final_sqrt_price_x64":price,
+            "fee_input_base_units":fee_input_total,
+            "fee_output_base_units":fee_output_total,
+            "fee_collection_mode":"INPUT" if fee_on_input else "OUTPUT",
+            "source_fee_collection_mode_verified":False,
+            "final_sqrt_price_x64":price,
             "crossed_ticks":len(crossed),"crossed_source_liquidity":crossed,
             "steps":steps,"exact_input_filled":True,
             "tick_array_liquidity_source_verified":True,
