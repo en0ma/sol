@@ -15,15 +15,17 @@ class IndependentSignedWireVerifierTests(unittest.TestCase):
         recipient=Keypair().pubkey()
         blockhash=Hash.default()
         tx=[]
-        for lamports in (1,2):
+        for lamports in (2,3):
+            first=transfer(TransferParams(from_pubkey=payer.pubkey(),
+                to_pubkey=recipient,lamports=1))
             ix=transfer(TransferParams(from_pubkey=payer.pubkey(),
                 to_pubkey=recipient,lamports=lamports))
             if versioned:
-                msg=MessageV0.try_compile(payer.pubkey(),[ix],[],blockhash)
+                msg=MessageV0.try_compile(payer.pubkey(),[first,ix],[],blockhash)
                 signed=VersionedTransaction(msg,[payer])
             else:
                 signed=Transaction.new_signed_with_payer(
-                    [ix],payer.pubkey(),[payer],blockhash)
+                    [first,ix],payer.pubkey(),[payer],blockhash)
             tx.append(signed)
         pos,neg=tx
         pos_raw,neg_raw=bytes(pos),bytes(neg)
@@ -36,11 +38,14 @@ class IndependentSignedWireVerifierTests(unittest.TestCase):
                 "signed_transaction_signature":str(pos.signatures[0]),
                 "negative_signed_transaction_signature":str(neg.signatures[0]),
                 "signed_packet_bytes":len(pos_raw),
-                "negative_packet_bytes":len(neg_raw),**SAFE}
+                "negative_packet_bytes":len(neg_raw),
+                "legs":2,**SAFE}
     def test_real_legacy_signatures_and_hashes(self):
         result=verify_signed_pair(self.receipt())
         self.assertTrue(result["positive_signed_message_verified"])
         self.assertTrue(result["negative_signed_message_verified"])
+        self.assertTrue(result["signed_prefix_instructions_identical_verified"])
+        self.assertTrue(result["signed_final_instruction_changed_verified"])
         self.assertFalse(result["broadcast"])
     def test_real_versioned_signatures_and_hashes(self):
         result=verify_signed_pair(self.receipt(versioned=True))

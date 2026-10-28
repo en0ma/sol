@@ -63,10 +63,27 @@ def verify_signed_pair(receipt):
         raise ValueError("negative control signed by a different fee payer")
     if pos["recent_blockhash"]!=neg["recent_blockhash"]:
         raise ValueError("positive and negative transaction were not signed for the same fork blockhash")
+    count=receipt.get("legs")
+    instructions_pos=pos["transaction"].message.instructions
+    instructions_neg=neg["transaction"].message.instructions
+    if (type(count)is not int or not 2<=count<=6
+            or len(instructions_pos)!=count or len(instructions_neg)!=count):
+        raise ValueError("signed positive and negative transaction leg count mismatch")
+    # The negative control must replay precisely the same signed first N-1
+    # compiled swaps. The last swap alone changes to induce failure and
+    # establish rollback. This is verified from actual signed message bytes.
+    if any(bytes(a)!=bytes(b) for a,b in zip(
+            instructions_pos[:-1],instructions_neg[:-1])):
+        raise ValueError("negative signed control changed an earlier swap")
+    if bytes(instructions_pos[-1])==bytes(instructions_neg[-1]):
+        raise ValueError("negative signed control did not change final swap")
+
     return {"status":"CRYPTOGRAPHICALLY_VERIFIED_INDEPENDENT_SIGNED_PACKET_PAIR",
             "positive_sha256":pos["packet_sha256"],
             "negative_sha256":neg["packet_sha256"],
             "same_signer_and_blockhash_verified":True,
+            "signed_prefix_instructions_identical_verified":True,
+            "signed_final_instruction_changed_verified":True,
             "positive_signed_message_verified":True,
             "negative_signed_message_verified":True,
             "signed_wire_packet_sizes":[pos["packet_length"],neg["packet_length"]],
