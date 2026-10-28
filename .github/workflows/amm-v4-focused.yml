@@ -725,14 +725,14 @@ jobs:
             tools/orca_core_quote/target
             ~/.cargo/registry
             ~/.cargo/git
-          key: venue-native-rust-${{ runner.os }}-${{ hashFiles('tools/meteora_damm_v2_reference/Cargo.lock', 'tools/orca_core_quote/Cargo.lock', 'tools/meteora_damm_v2_reference/src/**', 'tools/orca_core_quote/src/**') }}
+          key: venue-native-rust-${{ runner.os }}-${{ hashFiles('tools/meteora_damm_v2_reference/Cargo.toml', 'tools/orca_core_quote/Cargo.toml', 'tools/meteora_damm_v2_reference/src/**', 'tools/orca_core_quote/src/**') }}
           restore-keys: |
             venue-native-rust-${{ runner.os }}-
       - name: Build official venue references once for signed tests
         if: ${{ matrix.shard == 0 }}
         run: |
-          cargo build --release --locked --manifest-path tools/meteora_damm_v2_reference/Cargo.toml
-          cargo build --release --locked --manifest-path tools/orca_core_quote/Cargo.toml
+          cargo build --release --manifest-path tools/meteora_damm_v2_reference/Cargo.toml
+          cargo build --release --manifest-path tools/orca_core_quote/Cargo.toml
       - name: Validate Meteora DAMM v2 on untouched isolated fork before multihop account hydration
         if: ${{ matrix.shard == 0 }}
         run: |
