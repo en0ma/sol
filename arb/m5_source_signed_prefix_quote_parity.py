@@ -83,6 +83,29 @@ def compare(fixture,receipt,*,observed_unix):
                 dynamic=envelope.get("source_derived_dynamic_fee_quote")
                 source_output=dynamic.get("amount_out") if isinstance(dynamic,dict) else None
             classification="NATIVE_DYNAMIC_FEE_MODEL_VERSUS_SIGNED"
+        elif status in ("NATIVE_QUOTE_SELECTED_FEE_MODE_NOT_EXACT",
+                         "NATIVE_QUOTE_SOURCE_BASE_FEE_NOT_EXACT"):
+            envelope=native.get("native_fee_envelope")
+            if (not isinstance(envelope,dict) or
+                    envelope.get("source_slot")!=fixture["state_accounts_observed_slot"]
+                    or any(envelope.get(k)is not False for k in SAFE)):
+                raise ValueError("signed parity source-selected account mismatch")
+            if status=="NATIVE_QUOTE_SELECTED_FEE_MODE_NOT_EXACT":
+                if (row["venue"]!="pumpswap" or
+                        envelope.get("fee_mode_selected_from_source") is not True
+                        or len(envelope.get("candidates",[]))!=1):
+                    raise ValueError("signed PumpSwap selected source tier missing")
+                source_output=envelope["candidates"][0].get("amount_out")
+                classification="SELECTED_SOURCE_PUMP_FEE_MODEL_VERSUS_SIGNED"
+            else:
+                state=envelope.get("source_pool_fee_schedule")
+                if (row["venue"]!="meteora_damm_v2"
+                        or not isinstance(state,dict)
+                        or state.get("dynamic_fee_initialized") is not False
+                        or state.get("source_slot")!=fixture["state_accounts_observed_slot"]):
+                    raise ValueError("signed DAMM source base fee mismatch")
+                source_output=state.get("amount_out_before_dynamic_fee")
+                classification="SOURCE_DAMM_BASE_FEE_MODEL_VERSUS_SIGNED"
         elif status in ("NATIVE_QUOTE_MODELED_NOT_EXACT",
                          "NATIVE_QUOTE_BOUNDED_NOT_EXACT"):
             classification="FEE_SCENARIO_NOT_COMPARABLE_AS_PROTOCOL_EXACT"
