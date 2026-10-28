@@ -136,10 +136,17 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix,
                 candidates.extend(initialized_ticks(raw,start,state["tick_spacing"]))
             if not candidates:
                 raise ValueError("CLMM initialized source ticks unavailable")
+            from arb.raydium_clmm import (
+                fee_collected_from_input,fee_collection_source_evidence)
+            source_fee_on_input=fee_collected_from_input(
+                state,leg["input_mint"])
+            # Alternate mode can be requested only as a non-exact scenario.
+            selected_fee_on_input=(source_fee_on_input if
+                                   clmm_fee_on_input is True else False)
             native=quote_across_initialized_ticks(
                 {**state,"authenticated_tick_array_starts":array_starts},
                 leg["input_mint"],amount_in,fee,candidates,
-                max_crossings=32,fee_on_input=clmm_fee_on_input)
+                max_crossings=32,fee_on_input=selected_fee_on_input)
             q={**leg,"amount_in":amount_in,
                "amount_out":native["amount_out"],
                "snapshot_slot":row["snapshot_slot"]}
@@ -211,15 +218,20 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix,
             q.get("snapshot_slot")!=fixture["state_accounts_observed_slot"] or
             type(q.get("amount_out"))is not int or q["amount_out"]<=0):
             raise ValueError("native quote does not match signed source identity")
+        native_mode_scenario=(v=="raydium_clmm" and
+                              clmm_fee_on_input is False and
+                              source_fee_on_input is True)
         return {"venue":v,"pool":pool,"leg_index":leg_index,
+                "source_fee_evidence":(fee_collection_source_evidence(
+                    state,leg["input_mint"]) if v=="raydium_clmm" else None),
                 "source_slot":q["snapshot_slot"],
                 "predicted_output_base_units":q["amount_out"],
-                "quote_status":("SOURCE_BOUND_INDICATIVE" if
-                                v!="raydium_clmm" or clmm_fee_on_input else
-                                "NATIVE_QUOTE_MODELED_NOT_EXACT"),
+                "quote_status":(
+                    "SOURCE_BOUND_FEE_MODE_SCENARIO_NOT_EXACT"
+                    if native_mode_scenario else "SOURCE_BOUND_INDICATIVE"),
                 "source_fee_mode_scenario":(
-                    "OUTPUT_UNATTESTED" if v=="raydium_clmm" and
-                    not clmm_fee_on_input else "DEFAULT_SOURCE_MODEL"),
+                    "OUTPUT_COUNTERFACTUAL" if native_mode_scenario
+                    else "SOURCE_POOL_FEE_ON_ENUM"),
                 "protocol_exact_verified":False,**SAFE}
     except (ValueError,KeyError,TypeError,ArithmeticError) as exc:
         return {"venue":v,"pool":pool,"leg_index":leg_index,
