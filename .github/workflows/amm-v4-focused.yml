@@ -841,6 +841,7 @@ jobs:
           else:raise SystemExit("offline RPC unavailable")
           PY
       - name: Reuse Rust venue reference compilation across CI runs
+        id: venue-rust-cache
         if: ${{ matrix.shard == 0 }}
         uses: actions/cache@v4
         with:
@@ -855,8 +856,16 @@ jobs:
       - name: Build official venue references once for signed tests
         if: ${{ matrix.shard == 0 }}
         run: |
-          cargo build --release --manifest-path tools/meteora_damm_v2_reference/Cargo.toml
-          cargo build --release --manifest-path tools/orca_core_quote/Cargo.toml
+          set -e
+          if [[ "${{ steps.venue-rust-cache.outputs.cache-hit }}" == "true" ]] && \
+             [[ -x tools/meteora_damm_v2_reference/target/release/sol-meteora-damm-v2-official-reference ]] && \
+             [[ -x tools/orca_core_quote/target/release/sol-orca-native-reference ]]; then
+            echo "Exact source-key cache hit: both venue reference binaries available; skip recompilation."
+          else
+            echo "Reference cache miss or missing binary: compile both official references."
+            cargo build --release --manifest-path tools/meteora_damm_v2_reference/Cargo.toml
+            cargo build --release --manifest-path tools/orca_core_quote/Cargo.toml
+          fi
       - name: Validate Meteora DAMM v2 on untouched isolated fork before multihop account hydration
         if: ${{ matrix.shard == 0 }}
         run: |
