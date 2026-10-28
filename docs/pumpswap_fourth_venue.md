@@ -64,14 +64,20 @@ python3 -m arb.pumpswap_native_source_capture \
   --output pumpswap-native-source-research.json
 ```
 
+Also added `arb/pumpswap_native_candidate.py`, a strict, integer-only Python translation of the SDK’s quoted-input buy and base-input sell formulas, including per-component ceil-rounded fees, the signed virtual quote reserve, market-cap tiers, stable/noncanonical/Mayhem fee selection and V2 accrued fee buckets. It returns `UNVERIFIED_NATIVE_FORMULA_CANDIDATE`, never an executable native quote. A dedicated regression test covers these calculations, invalid account state, and fee-schedule selection. Its output still requires comparison to the actual upstream SDK on authenticated snapshots and four genuine signed swaps per pool.
+
+A separate manual-only workflow, `.github/workflows/pumpswap-fourth-venue-source.yml`, runs the bounded source capture using the existing upstream RPC secret. It cannot claim signed parity or admit pools.
+
 ## Requirements before claiming the fourth venue works
 
-1. Implement exact official SDK-equivalent fee selection by quote mint and
-   pool flags; revalidate the current fee-config account and creator override.
-2. Implement exact base-unit buy/sell math including independent ceil-rounded
-   fee components, signed virtual reserve and V2 accrued fee buckets. Cross
-   check against the official SDK on identical snapshots. Do not rely on the
-   indicative `pumpswap_quote` function as the signing floor.
+1. Independently compare every candidate exact-base-unit buy/sell formula
+   against the *actual* official SDK on identical authenticated snapshots,
+   including nonzero creator override, cashier/cashback, token programs,
+   Mayhem fee modes and any program upgrades. Existing code rejects creator
+   overrides rather than inventing the unavailable GlobalConfig gate.
+   Do not rely on the indicative `pumpswap_quote` function as a signing floor.
+2. Extend genuine source capture to include the official SDK auxiliary
+   accounts and signed swap prerequisites at an audited consistent context.
 3. Sign and simulate V2 exact-input buy and sell on an isolated Surfpool with
    authenticated accounts and a verified eligible buyback recipient ATA.
    Reject cashback pools for this V2 path. Verify observed SPL debits and
