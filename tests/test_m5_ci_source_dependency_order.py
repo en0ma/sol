@@ -1,20 +1,26 @@
-"""Validate CI source-graph prerequisite ordering without network dependencies."""
+"""Ensure focused CI source dependencies match native-pricing acceptance."""
 from pathlib import Path
 import unittest
 
 class SourceGraphCiOrderingTests(unittest.TestCase):
-    def test_shortlist_runs_after_graph_producer_before_fork_shutdown(self):
+    def test_three_venue_source_handoff_precedes_signed_validation(self):
         workflow=Path(".github/workflows/amm-v4-focused.yml").read_text()
-        start=workflow.index("      - name: Enumerate broad untrusted all-seven market pool hints")
-        assess=workflow.index("      - name: Validate authenticated source graph connectivity")
-        shortlist=workflow.index("      - name: Prioritize source-authenticated four-to-six-hop venue-diverse research leads")
-        shutdown=workflow.index("      - name: Shut down upstream-backed fork before offline account writes")
-        self.assertLess(start,assess)
-        self.assertLess(assess,shortlist)
-        self.assertLess(shortlist,shutdown)
-        self.assertIn("python3 -m arb.m5_seven_venue_route_scan",workflow[start:assess])
-        self.assertIn("m5-broad-source-route-candidates.json",workflow[start:assess])
-        self.assertEqual(workflow.count("      - name: Enumerate broad untrusted all-seven market pool hints"),1)
-        self.assertEqual(workflow.count("      - name: Prioritize source-authenticated four-to-six-hop venue-diverse research leads"),1)
-        self.assertIn("m5-authenticated-multihop-shortlist.json",workflow[shortlist:shutdown])
+        capture=workflow.index("      - name: Reauthenticate registered Orca and Meteora identities")
+        publish=workflow.index("          name: three-venue-authenticated-native-sources")
+        shutdown=workflow.index("      - name: Shut down upstream-backed fork")
+        offline=workflow.index("  offline-amm-v4:")
+        download=workflow.index("      - name: Import authenticated three-venue source evidence")
+        signed=workflow.index("      - name: Check new Orca pool pricing")
+        self.assertLess(capture,publish)
+        self.assertLess(publish,shutdown)
+        self.assertLess(shutdown,offline)
+        self.assertLess(offline,download)
+        self.assertLess(download,signed)
+        for obsolete in (
+            "python3 -m arb.m5_seven_venue_route_scan",
+            "python3 -m arb.m5_authenticated_multihop_shortlist",
+            "python3 -m arb.m5_four_to_six_source_capture",
+        ):
+            self.assertNotIn(obsolete,workflow)
+
 if __name__=="__main__":unittest.main()
