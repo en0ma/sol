@@ -560,13 +560,21 @@ jobs:
             --binary tools/meteora_damm_v2_reference/target/release/sol-meteora-damm-v2-official-reference \
             --output "$RUNNER_TEMP/meteora-damm-v2-capture-status.json"
       - name: Discover six new pools per venue with existing venue discovery and registry authentication
-        continue-on-error: true
         run: |
           python3 -m arb.m5_venue_pool_registry_expansion \
             --registry arb/pool_registry.json \
             --count 6 --pages 4 \
             --output-registry "$RUNNER_TEMP/expanded-venue-pool-registry.json" \
+            --output-new-pools "$RUNNER_TEMP/venue-six-new-pools.json" \
             --report "$RUNNER_TEMP/venue-pool-registry-expansion.json"
+      - name: Capture six NEW verified Meteora pools with existing signed-fork source capture
+        run: |
+          python3 -m arb.m5_meteora_damm_v2_dedicated_signed_fork \
+            --capture-source --pool-count 6 \
+            --registry "$RUNNER_TEMP/venue-six-new-pools.json" \
+            --source-file "$RUNNER_TEMP/meteora-six-new-upstream-source.json" \
+            --binary tools/meteora_damm_v2_reference/target/release/sol-meteora-damm-v2-official-reference \
+            --output "$RUNNER_TEMP/meteora-six-new-capture.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -575,6 +583,8 @@ jobs:
             ${{ runner.temp }}/m5-seven-venue-untrusted-pool-hints.json
             ${{ runner.temp }}/meteora-damm-v2-upstream-source.json
             ${{ runner.temp }}/expanded-venue-pool-registry.json
+            ${{ runner.temp }}/venue-six-new-pools.json
+            ${{ runner.temp }}/meteora-six-new-upstream-source.json
             ${{ runner.temp }}/venue-pool-registry-expansion.json
             ${{ runner.temp }}/m5-broad-source-route-candidates.json
             ${{ runner.temp }}/m5-four-to-six-source-fixture.json
@@ -704,6 +714,14 @@ jobs:
             --source-file "$RUNNER_TEMP/meteora-damm-v2-upstream-source.json" \
             --binary tools/meteora_damm_v2_reference/target/release/sol-meteora-damm-v2-official-reference \
             --output "$RUNNER_TEMP/m5-four-to-six-signed-attempt/meteora-damm-v2-dedicated-signed-fork.json"
+      - name: Check six NEW Meteora pools against official Rust SDK and signed Surfpool
+        if: ${{ matrix.shard == 0 }}
+        run: |
+          python3 -m arb.m5_meteora_damm_v2_dedicated_signed_fork \
+            --pool-count 6 \
+            --source-file "$RUNNER_TEMP/meteora-six-new-upstream-source.json" \
+            --binary tools/meteora_damm_v2_reference/target/release/sol-meteora-damm-v2-official-reference \
+            --output "$RUNNER_TEMP/m5-four-to-six-signed-attempt/meteora-six-new-signed.json"
       - name: Execute source-captured four-to-six-hop signed isolated Surfpool trial
         if: ${{ matrix.shard == 0 }}
         run: |
