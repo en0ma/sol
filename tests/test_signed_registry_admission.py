@@ -52,6 +52,12 @@ class SignedRegistryAdmission(unittest.TestCase):
     def test_missing_orca_digest_rejected(self):
         with self.assertRaisesRegex(ValueError,"transaction evidence"):
             self.promote(lambda a,b,r:r["orca"]["pools"][0]["trials"][0].pop("signed_sha256"))
+    def test_non_hex_orca_digest_rejected(self):
+        with self.assertRaisesRegex(ValueError,"transaction evidence"):
+            self.promote(lambda a,b,r:r["orca"]["pools"][0]["trials"][0].update({"signed_sha256":"z"*64}))
+    def test_invalid_raydium_base58_signature_rejected(self):
+        with self.assertRaisesRegex(ValueError,"transaction evidence"):
+            self.promote(lambda a,b,r:r["raydium_cpmm"]["pools"][0]["trials"][0].update({"signature":"0"*88}))
     def test_missing_signature_rejected(self):
         with self.assertRaisesRegex(ValueError,"transaction evidence"):
             self.promote(lambda a,b,r:r["raydium_cpmm"]["pools"][0]["trials"][0].pop("signature"))
