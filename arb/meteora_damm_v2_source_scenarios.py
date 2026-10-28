@@ -56,6 +56,8 @@ def scenario_envelope(fixture,*,pool,mint_in,amount_in,
         from arb.meteora_damm_v2_source_fee_decoder import from_fixture
         source=from_fixture(fixture,pool=pool,observed_unix=observed_unix)
         total=source["base_fee_numerator"]
+        source_dynamic=source.get("source_snapshot_dynamic_fee_model")
+        modeled_total=source.get("source_snapshot_total_fee_candidate")
         try:
             native_quote=quote_native_fee(
                 reserve_a=reserve_a,reserve_b=reserve_b,
@@ -63,8 +65,31 @@ def scenario_envelope(fixture,*,pool,mint_in,amount_in,
                 total_fee_numerator=total,
                 collection_mode=source["native_collection_mode"],
                 fee_version=1)
+            dynamic_quote=None
+            if isinstance(source_dynamic,dict) and type(modeled_total)is int:
+                try:
+                    dynamic_result=quote_native_fee(
+                        reserve_a=reserve_a,reserve_b=reserve_b,
+                        amount_in=amount_in,input_is_a=inputs_a,
+                        total_fee_numerator=modeled_total,
+                        collection_mode=source["native_collection_mode"],
+                        fee_version=1)
+                    dynamic_quote={
+                        "status":"SOURCE_DAMM_SNAPSHOT_DYNAMIC_FEE_MODEL_NOT_EXACT",
+                        "source_slot":source["source_slot"],
+                        "source_volatility":source_dynamic,
+                        "source_total_fee_candidate_numerator":modeled_total,
+                        "amount_out":dynamic_result["amount_out"],
+                        "input_fee_base_units":dynamic_result["fee_input_units"],
+                        "output_fee_base_units":dynamic_result["fee_output_units"],
+                        "execution_volatility_update_verified":False,
+                        "curve_price_range_verified":False,
+                        "protocol_exact_verified":False,**SAFE}
+                except ValueError:
+                    pass
             native={"status":"SOURCE_DAMM_BASE_FEE_ONLY_NOT_PROTOCOL_EXACT",
                 "base_fee_numerator":total,
+                "source_snapshot_dynamic_fee_scenario":dynamic_quote,
                 "collection_mode":source["native_collection_mode"],
                 "scheduler_clock":source["activation_clock"],
                 "amount_out_before_dynamic_fee":native_quote["amount_out"],
