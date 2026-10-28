@@ -95,11 +95,40 @@ def quote_fee_candidates(fixture,*,pool,mint_in,amount_in):
             raise ValueError("malformed account-derived PumpSwap fee tier")
         rate=sum(values)*100
         if rate>=DENOM:raise ValueError("PumpSwap fee tier exhausts input")
-        net=amount_in*(DENOM-rate)//DENOM
+        # Different fee components can round independently. Only the
+        # authenticated program execution can settle that ambiguity.
+        # Preserve the existing conservative aggregate-ceil model and
+        # expose account-derived component-ceil and aggregate-floor
+        # alternatives as research scenarios, NOT executable quotes.
+        component_rates=[v*100 for v in values]
+        component_ceil=sum((amount_in*f+DENOM-1)//DENOM for f in component_rates)
+        aggregate_ceil=(amount_in*rate+DENOM-1)//DENOM
+        aggregate_floor=amount_in*rate//DENOM
+        net=amount_in-aggregate_ceil
         if not net:continue
         output=r_out*net//(r_in+net)
         if not 0<output<r_out or (from_base and output>spent_quote):continue
-        outcomes.append({"tier":name,"total_fee_ppm":rate,"amount_out":output})
+        alternative_outputs=[]
+        for deducted in (component_ceil,aggregate_floor):
+            remaining=amount_in-deducted
+            if remaining<=0:
+                continue
+            candidate_out=r_out*remaining//(r_in+remaining)
+            if 0<candidate_out<r_out and (
+                    not from_base or candidate_out<=spent_quote):
+                alternative_outputs.append(candidate_out)
+        if not alternative_outputs:
+            continue
+        outcomes.append({"tier":name,"total_fee_ppm":rate,
+                         "amount_out":output,
+                         "component_ceiling_fee_units":component_ceil,
+                         "aggregate_ceiling_fee_units":aggregate_ceil,
+                         "aggregate_floor_fee_units":aggregate_floor,
+                         "modeled_output_rounding_low":min(
+                             [output]+alternative_outputs),
+                         "modeled_output_rounding_high":max(
+                             [output]+alternative_outputs),
+                         "fee_rounding_is_protocol_verified":False})
     if not outcomes:
         return {"status":"PUMPSWAP_SOURCE_FEE_CANDIDATES_CANNOT_FILL",
                 "source_slot":fixture["state_accounts_observed_slot"],
@@ -112,5 +141,9 @@ def quote_fee_candidates(fixture,*,pool,mint_in,amount_in):
             "fee_mode_selected_from_source":selected is not None and selected.get("tier_selected") is True,
             "minimum_candidate_output":min(x["amount_out"] for x in outcomes),
             "maximum_candidate_output":max(x["amount_out"] for x in outcomes),
+            "minimum_rounding_scenario_output":min(
+                x["modeled_output_rounding_low"] for x in outcomes),
+            "maximum_rounding_scenario_output":max(
+                x["modeled_output_rounding_high"] for x in outcomes),
             "all_possible_fee_modes_exhaustively_verified":False,
             "effective_fee_verified":False,"protocol_exact_verified":False,**SAFE}
