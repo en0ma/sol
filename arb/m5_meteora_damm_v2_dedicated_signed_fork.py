@@ -57,22 +57,27 @@ def capture(rpc,address):
             "verified_vault_reserves":verified["vault_base_units"],
             "source_fee_state":decode_fee_state(raw)}
 
-def export_source(rpc,registry,output):
-    """Authenticate real upstream-backed pool BEFORE the offline-only fork starts."""
-    candidates=[row["address"] for row in registry["pools"]
-                if row.get("venue")=="meteora_damm_v2"]
+def export_source(rpc,registry,output,*,pool_count=6):
+    """Capture six DISTINCT authenticated real DAMM pools, never one pool repeated."""
+    if type(pool_count)is not int or not 1<=pool_count<=12:
+        raise ValueError("DAMM unique pool count invalid")
+    candidates=list(dict.fromkeys(row["address"] for row in registry["pools"]
+                    if row.get("venue")=="meteora_damm_v2"))
     attempts=[]
-    selected=None
+    selected=[]
     for address in candidates:
         try:
-            selected=capture(rpc,address)
-            break
+            captured=capture(rpc,address)
+            selected.append(captured)
+            if len(selected)==pool_count:
+                break
         except (ValueError,TypeError,KeyError,RuntimeError,OSError) as exc:
             attempts.append({"pool":address,"reason":str(exc)[:250]})
     Path(output).write_text(json.dumps(
-        {"selected":selected,"source_attempts":attempts,**SAFE},
+        {"selected_pools":selected,"source_attempts":attempts,
+         "required_distinct_pools":pool_count,**SAFE},
         sort_keys=True,indent=2)+"\n")
-    return selected is not None
+    return len(selected)==pool_count
 
 def hydrate(rpc,captured):
     accounts=captured["accounts"]
@@ -180,6 +185,7 @@ def main():
     p.add_argument("--binary",required=True)
     p.add_argument("--output",required=True)
     p.add_argument("--amounts",default="10000,100000")
+    p.add_argument("--pool-count",type=int,default=6)
     p.add_argument("--a-to-b-amounts",default="10000000,100000000")
     a=p.parse_args()
     rpc="http://127.0.0.1:8899"
@@ -187,7 +193,7 @@ def main():
         if not a.registry or not a.source_file:
             raise SystemExit("Meteora upstream source capture requires registry and source-file")
         registry=json.loads(Path(a.registry).read_text())
-        result=export_source(rpc,registry,a.source_file)
+        result=export_source(rpc,registry,a.source_file,pool_count=a.pool_count)
         print(json.dumps({"status":"METEORA_UPSTREAM_SOURCE_CAPTURED" if result
                           else "METEORA_UPSTREAM_SOURCE_MISSING",**SAFE}))
         if not result:
@@ -196,33 +202,49 @@ def main():
     if not a.source_file:
         raise SystemExit("Meteora offline trials require captured upstream source fixture")
     source=json.loads(Path(a.source_file).read_text())
-    selected=source.get("selected")
+    selected=source.get("selected_pools")
     attempts=source.get("source_attempts",[])
-    trials=[]
-    if selected is not None:
-        hydrate(rpc,selected)
-        for a_to_b in (True,False):
-            sizes=a.a_to_b_amounts if a_to_b else a.amounts
-            for amount in (int(x) for x in sizes.split(",")):
-                try:
-                    receipt=signed_trial(rpc,selected,amount,a_to_b,a.binary)
-                except (ValueError,TypeError,KeyError,RuntimeError,OSError) as exc:
-                    receipt={"status":"METEORA_SIGNED_FORK_BLOCKED",
-                             "direction":"a_to_b" if a_to_b else "b_to_a",
-                             "amount":amount,"reason":str(exc)[:300],**SAFE}
-                trials.append(receipt)
-    exact=sum(r.get("status")=="METEORA_DAMM_V2_OFFICIAL_SIGNED_EXACT" for r in trials)
-    report={"status":("METEORA_DAMM_V2_BOTH_DIRECTIONS_SIGNED_VERIFIED"
-                      if len(trials)==4 and exact==4
-                      else "METEORA_DAMM_V2_SIGNED_NATIVE_UNVERIFIED"),
-            "exact_matches":exact,"trial_count":len(trials),
-            "pool_selection_blockers":attempts,"trials":trials,
-            "protocol_exact_verified":len(trials)==4 and exact==4,**SAFE}
+    if (not isinstance(selected,list) or len(selected)!=a.pool_count or
+            len({p.get("pool") for p in selected})!=a.pool_count):
+        raise SystemExit("six distinct source-authenticated DAMM pools required")
+    reports=[]
+    for pool in selected:
+        trials=[]
+        try:
+            hydrate(rpc,pool)
+            for a_to_b in (True,False):
+                sizes=a.a_to_b_amounts if a_to_b else a.amounts
+                for amount in (int(x) for x in sizes.split(",")):
+                    try:
+                        receipt=signed_trial(rpc,pool,amount,a_to_b,a.binary)
+                    except (ValueError,TypeError,KeyError,RuntimeError,OSError) as exc:
+                        receipt={"status":"METEORA_SIGNED_FORK_BLOCKED",
+                                 "direction":"a_to_b" if a_to_b else "b_to_a",
+                                 "amount":amount,"reason":str(exc)[:300],**SAFE}
+                    trials.append(receipt)
+        except (ValueError,TypeError,KeyError,RuntimeError,OSError) as exc:
+            trials.append({"status":"METEORA_POOL_HYDRATION_BLOCKED",
+                           "reason":str(exc)[:300],**SAFE})
+        exact=sum(t.get("status")=="METEORA_DAMM_V2_OFFICIAL_SIGNED_EXACT" for t in trials)
+        reports.append({"pool":pool["pool"],"exact_matches":exact,
+                        "trial_count":len(trials),"trials":trials,
+                        "verified":exact==4 and len(trials)==4})
+    complete=len(reports)==a.pool_count and all(r["verified"] for r in reports)
+    report={"status":("METEORA_DAMM_V2_SIX_ADDITIONAL_POOLS_SIGNED_VERIFIED"
+                       if complete else "METEORA_DAMM_V2_SIX_POOL_VALIDATION_INCOMPLETE"),
+            "required_distinct_pools":a.pool_count,
+            "verified_pool_count":sum(r["verified"] for r in reports),
+            "exact_matches":sum(r["exact_matches"] for r in reports),
+            "trial_count":sum(r["trial_count"] for r in reports),
+            "pool_selection_blockers":attempts,
+            "pools":reports,"protocol_exact_verified":complete,**SAFE}
     Path(a.output).write_text(json.dumps(report,indent=2,sort_keys=True)+"\n")
-    print(json.dumps({"status":report["status"],"exact_matches":exact,
-                      "trial_count":len(trials),**SAFE}))
-    if not report["protocol_exact_verified"]:
-        raise SystemExit("dedicated Meteora native pricing not yet validated")
+    print(json.dumps({"status":report["status"],
+          "verified_pool_count":report["verified_pool_count"],
+          "exact_matches":report["exact_matches"],
+          "trial_count":report["trial_count"],**SAFE}))
+    if not complete:
+        raise SystemExit("six distinct Meteora pool signed prices not yet verified")
 
 if __name__=="__main__":
     main()
