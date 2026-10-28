@@ -1,0 +1,41 @@
+name: PumpSwap Fourth-Venue Source Research
+
+on:
+  workflow_dispatch:
+    inputs:
+      pool_count:
+        description: "Registered PumpSwap pool identities to authenticate (1–3)"
+        required: false
+        default: "3"
+
+permissions:
+  contents: read
+
+jobs:
+  authenticated-source-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SOLANA_RPC_URL: ${{ secrets.SURFPOOL_DATASOURCE_RPC_URL }}
+      POOL_COUNT: ${{ inputs.pool_count }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require read-only upstream RPC
+        run: test -n "$SOLANA_RPC_URL"
+      - name: Install account decoder dependency
+        run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Authenticate and capture existing PumpSwap source pools
+        run: |
+          set -euo pipefail
+          [[ "$POOL_COUNT" =~ ^[1-3]$ ]] || { echo "::error::pool_count must be 1 to 3"; exit 1; }
+          python3 -m arb.pumpswap_native_source_capture \
+            --rpc "$SOLANA_RPC_URL" \
+            --registry arb/pool_registry.json \
+            --limit "$POOL_COUNT" \
+            --output "$RUNNER_TEMP/pumpswap-native-source.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pumpswap-authenticated-source-research
+          path: ${{ runner.temp }}/pumpswap-native-source.json
+          if-no-files-found: warn
