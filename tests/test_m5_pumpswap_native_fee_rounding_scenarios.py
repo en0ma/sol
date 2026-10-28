@@ -16,7 +16,7 @@ class NativePumpSwapSourceFeeRoundingTests(unittest.TestCase):
         self.assertFalse(data["broadcast"])
 
     def test_source_output_liquidity_limit_is_strict(self):
-        with self.assertRaisesRegex(ValueError,"cannot"):
+        with self.assertRaisesRegex(ValueError,"prevent"):
             quote_component_rounding_scenarios(
                 amount_in=500000,reserve_in=1000,reserve_out=2000,
                 component_fee_bps=[10,10,10],
