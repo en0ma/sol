@@ -731,6 +731,27 @@ jobs:
         run: |
           cargo build --release --manifest-path tools/orca_core_quote/Cargo.toml
           python3 -m arb.m5_orca_signed_single_swap --new-pools-source "$RUNNER_TEMP/orca-new-pools-upstream-source.json" --pool-count 6 --required-verified-pools 6 --binary tools/orca_core_quote/target/release/sol-orca-native-reference --output "$RUNNER_TEMP/m5-four-to-six-signed-attempt/orca-new-pools-signed.json"
+      - name: Admit only signed native-priced pools into the usable venue registry
+        if: ${{ matrix.shard == 0 }}
+        run: |
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          from arb.m5_venue_pool_registry_expansion import promote_signed
+          temp=Path(os.environ["RUNNER_TEMP"])
+          read=lambda name:json.loads((temp/name).read_text())
+          receipts=temp/"m5-four-to-six-signed-attempt"
+          promoted=promote_signed(
+              json.loads(Path("arb/pool_registry.json").read_text()),
+              read("venue-six-new-pools.json"),
+              json.loads((receipts/"orca-new-pools-signed.json").read_text()),
+              json.loads((receipts/"meteora-six-new-signed.json").read_text()),
+              required=6)
+          target=temp/"signed-verified-expanded-pool-registry.json"
+          target.write_text(json.dumps(promoted,indent=2)+"\n")
+          print(json.dumps({"status":"SIGNED_PRICING_REGISTRY_ADMISSION",
+              "total_registered_pools":len(promoted["pools"])}))
+          PY
       - name: Execute source-captured four-to-six-hop signed isolated Surfpool trial
         if: ${{ matrix.shard == 0 }}
         run: |
