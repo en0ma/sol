@@ -508,6 +508,9 @@ def run_three_venue(rpc,fixture,*,amount_in=100_000_000,program_cache=None):
                      keys[-2],keys[-1],mints[-2],mints[-1],
                      amounts[-1],2**64-1)
         return list(instructions[:-1])+[ix]
+    receipt=simulate_adaptive_n_leg_offline(
+        rpc,route,mints,states,evidence,owner,keys,amount_in,None,signer,
+        negative_instructions=negative,require_closed=True)
     receipt.update(route_venues=venues,route_pool_addresses=pools,route_mints=mints,
         fixture_kind=fixture["fixture_kind"],
         source_snapshot_slot=None,
