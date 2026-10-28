@@ -22,12 +22,44 @@ def decode(raw):
            "tick_spacing":int.from_bytes(raw[235:237],"little"),
            "liquidity":int.from_bytes(raw[237:253],"little"),
            "sqrt_price_x64":int.from_bytes(raw[253:269],"little"),
-           "tick_current":int.from_bytes(raw[269:273],"little",signed=True)}
+           "tick_current":int.from_bytes(raw[269:273],"little",signed=True),
+           "swap_status_bits":raw[389],
+           "fee_on":raw[390]}
+    if state["fee_on"] not in (0,1,2):
+        raise ValueError("unsupported source CLMM fee collection mode")
+    if state["swap_status_bits"] & (1<<4):
+        raise ValueError("source CLMM pool swap disabled")
     if state["tick_spacing"]<=0 or state["sqrt_price_x64"]<=0:
         raise ValueError("invalid CLMM tick spacing or sqrt price")
     if len({state["token_mint_0"],state["token_mint_1"],state["token_vault_0"],state["token_vault_1"]})!=4:
         raise ValueError("duplicate CLMM token mint/vault")
     return state
+
+def fee_collected_from_input(state,mint_in):
+    """Return the exact native fee side from source-captured PoolState.
+
+    FeeOn::FromInput=0, Token0Only=1, Token1Only=2.
+    This controls the fee side, not the dynamic fee's effective RATE.
+    """
+    if (not isinstance(state,dict) or
+            state.get("fee_on") not in (0,1,2) or
+            mint_in not in (state.get("token_mint_0"),state.get("token_mint_1")) or
+            state.get("token_mint_0")==state.get("token_mint_1")):
+        raise ValueError("authenticated CLMM pool fee side and input mint required")
+    input0=mint_in==state["token_mint_0"]
+    return (state["fee_on"]==0 or
+            (state["fee_on"]==1 and input0) or
+            (state["fee_on"]==2 and not input0))
+
+def fee_collection_source_evidence(state,mint_in):
+    on_input=fee_collected_from_input(state,mint_in)
+    return {"fee_on_native_enum":state["fee_on"],
+            "fee_on_input":on_input,
+            "fee_side":"INPUT" if on_input else "OUTPUT",
+            "source_pool_fee_side_decoded":True,
+            "dynamic_fee_rate_protocol_exact_verified":False,
+            "protocol_exact_quote_verified":False,
+            "actionable":False,"broadcast":False,"live_execution_approved":False}
 
 def verify(rpc,address,state):
     keys=[address,state["token_vault_0"],state["token_vault_1"]]
