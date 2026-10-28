@@ -274,6 +274,10 @@ jobs:
           python3 -m py_compile arb/next_ten_signed_atomic_offline.py arb/m5_four_to_six_signed_batch_audit.py
           python3 -m unittest discover -s tests -p test_m5_signed_four_to_six_multisize.py -v
           python3 -m unittest discover -s tests -p test_m5_four_to_six_signed_batch_audit.py -v
+      - name: Cryptographically validate actual signed positive and rollback Solana transactions
+        run: |
+          python3 -m py_compile arb/m5_independent_signed_wire_verifier.py arb/atomic_graph_coordinator.py
+          python3 -m unittest discover -s tests -p test_m5_independent_signed_wire_verifier.py -v
       - name: Independently check four-to-six-source signed acceptance report code
         run: |
           python3 -m py_compile arb/m5_four_to_six_source_signed_acceptance.py
