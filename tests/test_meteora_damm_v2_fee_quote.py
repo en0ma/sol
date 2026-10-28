@@ -1,18 +1,21 @@
 import unittest
-from arb.meteora_damm_v2_quote import quote_exact_input
-class Tests(unittest.TestCase):
- def test_fee_on_input_and_output_venues(self):
-  base=dict(reserve_a=100000,reserve_b=200000,amount_in=1000,
-            input_is_a=True,effective_fee_ppm=3000)
-  inp=quote_exact_input(**base,fee_token_side="input")
-  out=quote_exact_input(**base,fee_token_side="output")
-  self.assertGreater(inp["fee_input_units"],0)
-  self.assertEqual(inp["fee_output_units"],0)
-  self.assertGreater(out["fee_output_units"],0)
-  self.assertEqual(out["fee_input_units"],0)
-  self.assertFalse(out["protocol_exact_verified"])
- def test_unknown_fee_side_rejected(self):
-  with self.assertRaises(ValueError):
-   quote_exact_input(100000,200000,1000,input_is_a=True,
-       effective_fee_ppm=3000,fee_token_side="unknown")
+from arb.meteora_damm_v2_native_quote import quote_pool_account
+class SDKQuoteFailClosedTests(unittest.TestCase):
+ def test_rejects_partial_python_reserve_fee_model(self):
+  with self.assertRaisesRegex(ValueError,"authenticated Meteora"):
+   quote_pool_account({"vault_base_units":[10000,20000],
+                       "effective_fee_ppm":3000},
+                       mint_in="A",amount_in=100,
+                       fork_unix_timestamp=10,fork_clock_slot=20)
+ def test_rejects_missing_clock(self):
+  from unittest.mock import patch
+  from arb.meteora_damm_v2 import PROGRAM
+  import base64
+  pool={"owner":PROGRAM,"executable":False,
+        "data":[base64.b64encode(b"fake").decode(),"base64"]}
+  with patch("arb.meteora_damm_v2_native_quote.decode",
+             return_value={"token_a_mint":"A","token_b_mint":"B"}):
+   with self.assertRaisesRegex(ValueError,"Clock"):
+    quote_pool_account(pool,mint_in="A",amount_in=100,
+                       fork_unix_timestamp=0,fork_clock_slot=20)
 if __name__=="__main__":unittest.main()
