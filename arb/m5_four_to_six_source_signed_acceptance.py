@@ -103,6 +103,14 @@ def assess(fixture,receipt):
             or not isinstance(neg_sig,str) or len(neg_sig)<64
             or pos_sig==neg_sig):
         errors.append("distinct verified signed control signatures missing")
+    # Signed local-fork acceptance needs a successful positive transaction,
+    # nonzero executed compute and an independently failing negative packet.
+    # A return status alone cannot stand in for those RPC observations.
+    if receipt.get("positive_error")!="None":
+        errors.append("positive signed transaction did not record a successful simulation")
+    compute=receipt.get("positive_units_consumed")
+    if type(compute)is not int or not 0<compute<=1_400_000:
+        errors.append("positive signed transaction compute measurement invalid")
     packet=receipt.get("signed_packet_bytes")
     if type(packet)is not int or not 100<=packet<=1232:
         errors.append("actual signed Solana packet size unverified")
@@ -114,8 +122,9 @@ def assess(fixture,receipt):
         idx=None
     if type(idx)is not int or idx!=n-1 or receipt.get("negative_failure_instruction_index")!=idx:
         errors.append("negative final-leg control did not fail exactly on last swap")
-    if type(receipt.get("negative_packet_bytes"))is not int:
-        errors.append("negative signed rollback packet missing")
+    neg_size=receipt.get("negative_packet_bytes")
+    if type(neg_size)is not int or not 100<=neg_size<=1232:
+        errors.append("negative signed rollback packet absent or exceeds Solana packet limit")
     # A superficially green receipt must include actual fork readback.
     hydrated=receipt.get("hydrated_fork_state_readback")
     if (not isinstance(hydrated,dict) or
