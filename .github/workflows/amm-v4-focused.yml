@@ -295,6 +295,10 @@ jobs:
         run: |
           python3 -m py_compile arb/fixture_all_venue_signed_quotes.py
           python3 -m unittest discover -s tests -p test_m5_orca_source_array_quote_integration.py -v
+      - name: Verify source-bound CPMM creator fee projection works across four to six authenticated pools
+        run: |
+          python3 -m py_compile arb/fixture_config_quote_projection.py
+          python3 -m unittest discover -s tests -p test_m5_native_four_to_six_pool_projection.py -v
       - name: Verify integrated four-hop mixed-venue modeled quote paths and no profit promotion
         run: |
           python3 -m py_compile arb/m5_source_multihop_interval_engine.py arb/next_ten_signed_atomic_offline.py
