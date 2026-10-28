@@ -6,15 +6,15 @@ class SourceGraphCiOrderingTests(unittest.TestCase):
     def test_each_venue_has_explicit_authenticated_capture_and_signed_stage(self):
         workflow=Path(".github/workflows/amm-v4-focused.yml").read_text()
         stages=(
-            ("Reauthenticate registered Orca and Meteora identities",
-             "Capture registered Orca source pool fixtures",
-             "Check new Orca pool pricing"),
-            ("Reauthenticate registered Orca and Meteora identities",
-             "Capture registered Meteora pools for fresh signed parity",
-             "Check six NEW Meteora pools against official Rust SDK and signed Surfpool"),
+            ("Authenticate registered Orca Whirlpool and Meteora DAMM v2 pools",
+             "Capture authenticated Orca Whirlpool pricing source accounts",
+             "Verify registered Orca Whirlpool native pricing against signed Surfpool"),
+            ("Authenticate registered Orca Whirlpool and Meteora DAMM v2 pools",
+             "Capture authenticated Meteora DAMM v2 pricing source accounts",
+             "Verify registered Meteora DAMM v2 native pricing against signed Surfpool"),
             ("Authenticate registered Raydium CPMM pools",
              "Capture authenticated Raydium CPMM pricing source accounts",
-             "Require Raydium CPMM native signed parity for six distinct pools"),
+             "Verify registered Raydium CPMM native pricing against signed Surfpool"),
         )
         for auth,capture,signed in stages:
             with self.subTest(capture=capture):
@@ -27,12 +27,12 @@ class SourceGraphCiOrderingTests(unittest.TestCase):
 
     def test_three_venue_source_handoff_precedes_signed_validation(self):
         workflow=Path(".github/workflows/amm-v4-focused.yml").read_text()
-        capture=workflow.index("      - name: Reauthenticate registered Orca and Meteora identities")
+        capture=workflow.index("      - name: Authenticate registered Orca Whirlpool and Meteora DAMM v2 pools")
         publish=workflow.index("          name: three-venue-authenticated-native-sources")
         shutdown=workflow.index("      - name: Shut down upstream-backed fork")
         offline=workflow.index("  offline-amm-v4:")
         download=workflow.index("      - name: Import authenticated three-venue source evidence")
-        signed=workflow.index("      - name: Check new Orca pool pricing")
+        signed=workflow.index("      - name: Verify registered Orca Whirlpool native pricing against signed Surfpool")
         self.assertLess(capture,publish)
         self.assertLess(publish,shutdown)
         self.assertLess(shutdown,offline)
