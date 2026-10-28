@@ -13,6 +13,57 @@ from arb.pumpswap_quote import DENOM
 from arb.source_snapshot_manifest import verify
 import base64
 SAFE={"actionable":False,"broadcast":False,"live_execution_approved":False}
+def quote_component_rounding_scenarios(*,amount_in,reserve_in,reserve_out,
+                                      component_fee_bps,output_liquidity_cap=None):
+    """Integer constant-product gross exact-in outputs under fee-rounding modes.
+
+    Each rate comes from authenticated fee account bytes in the caller.
+    The independent-component and aggregate fee ceilings are deliberately
+    retained as *possible outcomes*, not a claim of source-exact execution.
+    """
+    if (any(type(x)is not int for x in (amount_in,reserve_in,reserve_out))
+            or not 0<amount_in<2**64 or not 0<reserve_in<2**64
+            or not 0<reserve_out<2**64 or
+            not isinstance(component_fee_bps,(list,tuple)) or
+            len(component_fee_bps)!=3 or
+            any(type(x)is not int or x<0 for x in component_fee_bps)
+            or sum(component_fee_bps)>=10000 or
+            (output_liquidity_cap is not None and
+             (type(output_liquidity_cap)is not int or
+              not 0<output_liquidity_cap<=reserve_out))):
+        raise ValueError("invalid source PumpSwap reserves or native fee components")
+    rates=[v*100 for v in component_fee_bps]
+    rate=sum(rates)
+    aggregate_ceil=(amount_in*rate+DENOM-1)//DENOM
+    aggregate_floor=amount_in*rate//DENOM
+    independent_ceil=sum((amount_in*x+DENOM-1)//DENOM for x in rates)
+    results=[]
+    for mode,deduction in (("AGGREGATE_CEIL",aggregate_ceil),
+                           ("COMPONENT_CEIL",independent_ceil),
+                           ("AGGREGATE_FLOOR",aggregate_floor)):
+        net=amount_in-deduction
+        if net<=0:
+            continue
+        output=reserve_out*net//(reserve_in+net)
+        if output<=0 or output>=reserve_out:
+            continue
+        if output_liquidity_cap is not None and output>output_liquidity_cap:
+            continue
+        results.append({"rounding_mode":mode,"fee_input_base_units":deduction,
+                        "modeled_output_base_units":output})
+    if not results:
+        raise ValueError("source PumpSwap fees or liquidity prevent an exact-in fill")
+    return {"modeled_outputs":results,
+            "minimum_modeled_output_base_units":min(
+                x["modeled_output_base_units"] for x in results),
+            "maximum_modeled_output_base_units":max(
+                x["modeled_output_base_units"] for x in results),
+            "aggregate_ceiling_fee_units":aggregate_ceil,
+            "aggregate_floor_fee_units":aggregate_floor,
+            "component_ceiling_fee_units":independent_ceil,
+            "effective_fee_rounding_verified":False,
+            "protocol_exact_verified":False,**SAFE}
+
 def quote_fee_candidates(fixture,*,pool,mint_in,amount_in):
     if type(amount_in)is not int or not 0<amount_in<2**64 or any(fixture.get(k)is not False for k in SAFE):
         raise ValueError("safe integer source amount required")
@@ -95,39 +146,25 @@ def quote_fee_candidates(fixture,*,pool,mint_in,amount_in):
             raise ValueError("malformed account-derived PumpSwap fee tier")
         rate=sum(values)*100
         if rate>=DENOM:raise ValueError("PumpSwap fee tier exhausts input")
-        # Different fee components can round independently. Only the
-        # authenticated program execution can settle that ambiguity.
-        # Preserve the existing conservative aggregate-ceil model and
-        # expose account-derived component-ceil and aggregate-floor
-        # alternatives as research scenarios, NOT executable quotes.
-        component_rates=[v*100 for v in values]
-        component_ceil=sum((amount_in*f+DENOM-1)//DENOM for f in component_rates)
-        aggregate_ceil=(amount_in*rate+DENOM-1)//DENOM
-        aggregate_floor=amount_in*rate//DENOM
-        net=amount_in-aggregate_ceil
-        if not net:continue
-        output=r_out*net//(r_in+net)
-        if not 0<output<r_out or (from_base and output>spent_quote):continue
-        alternative_outputs=[]
-        for deducted in (component_ceil,aggregate_floor):
-            remaining=amount_in-deducted
-            if remaining<=0:
-                continue
-            candidate_out=r_out*remaining//(r_in+remaining)
-            if 0<candidate_out<r_out and (
-                    not from_base or candidate_out<=spent_quote):
-                alternative_outputs.append(candidate_out)
-        if not alternative_outputs:
+        try:
+            model=quote_component_rounding_scenarios(
+                amount_in=amount_in,reserve_in=r_in,reserve_out=r_out,
+                component_fee_bps=values,
+                output_liquidity_cap=spent_quote if from_base else None)
+        except ValueError:
+            continue
+        conservative=next((x["modeled_output_base_units"]
+            for x in model["modeled_outputs"]
+            if x["rounding_mode"]=="AGGREGATE_CEIL"),None)
+        if conservative is None:
             continue
         outcomes.append({"tier":name,"total_fee_ppm":rate,
-                         "amount_out":output,
-                         "component_ceiling_fee_units":component_ceil,
-                         "aggregate_ceiling_fee_units":aggregate_ceil,
-                         "aggregate_floor_fee_units":aggregate_floor,
-                         "modeled_output_rounding_low":min(
-                             [output]+alternative_outputs),
-                         "modeled_output_rounding_high":max(
-                             [output]+alternative_outputs),
+                         "amount_out":conservative,
+                         "component_ceiling_fee_units":model["component_ceiling_fee_units"],
+                         "aggregate_ceiling_fee_units":model["aggregate_ceiling_fee_units"],
+                         "aggregate_floor_fee_units":model["aggregate_floor_fee_units"],
+                         "modeled_output_rounding_low":model["minimum_modeled_output_base_units"],
+                         "modeled_output_rounding_high":model["maximum_modeled_output_base_units"],
                          "fee_rounding_is_protocol_verified":False})
     if not outcomes:
         return {"status":"PUMPSWAP_SOURCE_FEE_CANDIDATES_CANNOT_FILL",
