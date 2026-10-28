@@ -91,16 +91,19 @@ def source_volatility_fee_candidate(*, volatility_accumulator, bin_step,
     values=(volatility_accumulator,bin_step,variable_fee_control,
             max_volatility_accumulator)
     if (any(type(v)is not int for v in values) or
-            not 0<=volatility_accumulator<=max_volatility_accumulator or
+            volatility_accumulator<0 or
             bin_step<=0 or variable_fee_control<0 or
             max_volatility_accumulator<=0):
         raise ValueError("invalid source DAMM volatility configuration")
-    numerator=(volatility_accumulator*bin_step)**2*variable_fee_control
+    capped_volatility=min(volatility_accumulator,max_volatility_accumulator)
+    numerator=(capped_volatility*bin_step)**2*variable_fee_control
     result=ceil_div(numerator,100_000_000_000)
     if result>MAX_FEE_V1:
         raise ValueError("DAMM volatility fee exceeds native version ceiling")
     return {"snapshot_dynamic_fee_numerator":result,
             "volatility_accumulator":volatility_accumulator,
+            "effective_capped_accumulator":capped_volatility,
+            "volatility_limit_applied":capped_volatility!=volatility_accumulator,
             "bin_step":bin_step,
             "dynamic_fee_source":"CAPTURED_VOLATILITY_POLYNOMIAL_NO_SWAP_UPDATE",
             "snapshot_dynamic_fee_not_execution_verified":True,
