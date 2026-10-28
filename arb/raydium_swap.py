@@ -220,7 +220,7 @@ def validate_native_source(rpc,source,output,*,required=6,amounts=(1000000,10000
                    else "RAYDIUM_CPMM_SIGNED_INCOMPLETE",
             "verified_pool_count":count,"required_verified_pools":required,
             "pools":reports,"actionable":False,"broadcast":False,"live_execution_approved":False}
-    Path(output).write_text(json.dumps(report,indent=2)+"\\n")
+    Path(output).write_text(json.dumps(report,indent=2)+"\n")
     print(json.dumps({"status":report["status"],"verified_pool_count":count,
         "candidate_count":len(reports),"failed_pools":[{"pool":r["pool"],
         "reasons":[t.get("reason",t["status"]) for t in r["trials"] if t["status"]!="RAYDIUM_CPMM_SIGNED_NATIVE_EXACT"]}
