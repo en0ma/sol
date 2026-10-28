@@ -30,6 +30,7 @@ def decode(raw):
         "token_0_program":keys[7],"token_1_program":keys[8],
         "observation":keys[9],
         "auth_bump":raw[328],"status":raw[329],
+        "open_time":int.from_bytes(raw[373:381],"little"),
         "mint_0_decimals":raw[331],"mint_1_decimals":raw[332],
         "swap_enabled":not bool(raw[329]&4),
         "protocol_fees_token_0":int.from_bytes(raw[341:349],"little"),
