@@ -13,16 +13,12 @@ class Tests(unittest.TestCase):
   self.assertFalse(a["protocol_exact_verified"])
   e["fee_snapshot_slot"]=9
   with self.assertRaises(ValueError):quote("meteora_dlmm",s,"A",1000,evidence=e)
- def test_damm_quote_requires_curve_and_fee_config(self):
-  s={"token_a_mint":"A","token_b_mint":"B","vault_base_units":[100000,200000],
-     "snapshot_slot":10}
+ def test_damm_quote_requires_authenticated_pool_and_clock(self):
+  s={"token_a_mint":"A","token_b_mint":"B","snapshot_slot":10}
   e={"source_authenticated":True,"dynamic_fee_authenticated":True,
-      "fee_collection_mode_authenticated":True,"fee_snapshot_slot":10,
-      "range_curve_compatible":True,"effective_fee_ppm":2500,
-      "fee_token_side":"output"}
-  r=quote("meteora_damm_v2",s,"A",1000,evidence=e)
-  self.assertGreater(r["amount_out"],0)
-  self.assertFalse(r["protocol_exact_verified"])
-  e["range_curve_compatible"]=False
-  with self.assertRaises(ValueError):quote("meteora_damm_v2",s,"A",1000,evidence=e)
+     "fee_collection_mode_authenticated":True,"fee_snapshot_slot":10,
+     "range_curve_compatible":True,"effective_fee_ppm":2500,
+     "fee_token_side":"output"}
+  with self.assertRaises(ValueError):
+   quote("meteora_damm_v2",s,"A",1000,evidence=e)
 if __name__=="__main__":unittest.main()
