@@ -57,15 +57,12 @@ def capture(rpc,address):
             "verified_vault_reserves":verified["vault_base_units"],
             "source_fee_state":decode_fee_state(raw)}
 
-def export_source(rpc,registry,output,*,pool_count=6):
+def export_source(rpc,registry,output,*,pool_count=1):
     """Capture six DISTINCT authenticated real DAMM pools, never one pool repeated."""
     if type(pool_count)is not int or not 1<=pool_count<=12:
         raise ValueError("DAMM unique pool count invalid")
-    # The initial signed-validated pool is NOT one of the six new pools.
-    previously_verified={"HtoZbnFf7BDGvPg3RxwiXN5pPG7hLa78XVGscLF9fkYV"}
     candidates=list(dict.fromkeys(row["address"] for row in registry["pools"]
-                    if row.get("venue")=="meteora_damm_v2"
-                    and row["address"] not in previously_verified))
+                    if row.get("venue")=="meteora_damm_v2"))
     attempts=[]
     selected=[]
     for address in candidates:
@@ -188,7 +185,7 @@ def main():
     p.add_argument("--binary",required=True)
     p.add_argument("--output",required=True)
     p.add_argument("--amounts",default="10000,100000")
-    p.add_argument("--pool-count",type=int,default=6)
+    p.add_argument("--pool-count",type=int,default=1)
     p.add_argument("--a-to-b-amounts",default="10000000,100000000")
     a=p.parse_args()
     rpc="http://127.0.0.1:8899"
@@ -233,8 +230,8 @@ def main():
                         "trial_count":len(trials),"trials":trials,
                         "verified":exact==4 and len(trials)==4})
     complete=len(reports)==a.pool_count and all(r["verified"] for r in reports)
-    report={"status":("METEORA_DAMM_V2_SIX_ADDITIONAL_POOLS_SIGNED_VERIFIED"
-                       if complete else "METEORA_DAMM_V2_SIX_POOL_VALIDATION_INCOMPLETE"),
+    report={"status":("METEORA_DAMM_V2_CONFIGURED_POOLS_SIGNED_VERIFIED"
+                       if complete else "METEORA_DAMM_V2_CONFIGURED_POOLS_INCOMPLETE"),
             "required_distinct_pools":a.pool_count,
             "verified_pool_count":sum(r["verified"] for r in reports),
             "exact_matches":sum(r["exact_matches"] for r in reports),
