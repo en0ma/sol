@@ -153,7 +153,7 @@ def quote_from_decoded_arrays(state, mint_in, amount_in, arrays, sqrt_price_at_t
     first_gap = None
     while covered < len(indexed):
         entry = indexed.get(start)
-        if entry is None or entry.get("status") != "FIXED_VALID":
+        if entry is None or entry.get("status") not in ("FIXED_VALID","DYNAMIC_VALID"):
             if covered == 0:
                 raise ValueError("missing or unsupported tick array")
             first_gap = start
