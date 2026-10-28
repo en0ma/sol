@@ -50,7 +50,19 @@ def compare(fixture,receipt,*,observed_unix):
               and receipt.get("signed_cpi_per_leg_verified") is True
               and receipt.get("rollback_failure_case_verified") is True)
     terminal=None
+    independent_accepted=False
     if complete:
+        # A claimed success flag and terminal SPL balance are not an
+        # authenticated transaction. For a source-captured 4–6-hop route,
+        # require the independent account-byte/CPI/rollback AND signed wire
+        # verifier before interpreting the final post-balance as observed.
+        if fixture.get("fixture_kind")!="AUTHENTICATED_FOUR_TO_SIX_HOP_SOURCE_ROUTE":
+            raise ValueError("signed atomic terminal requires authenticated four-to-six-hop source fixture")
+        from arb.m5_four_to_six_source_signed_acceptance import assess
+        verdict=assess(fixture,receipt)
+        if verdict.get("status")!="VERIFIED_SIGNED_FOUR_TO_SIX_HOP_ROLLBACK":
+            raise ValueError("signed terminal independent source/CPI/cryptographic audit failed")
+        independent_accepted=True
         if (not isinstance(post,list) or not isinstance(before,list)
                 or len(post)!=n+1 or len(before)!=n+1
                 or before!=[planned[0]]+[0]*n
@@ -139,7 +151,7 @@ def compare(fixture,receipt,*,observed_unix):
         "source_slot":fixture["state_accounts_observed_slot"],
         "comparisons":outcomes,
         "quote_accuracy_verified":False,
-        "atomic_execution_independently_accepted":False,
+        "atomic_execution_independently_accepted":independent_accepted,
         "net_profit_verified":False,**SAFE}
 
 def main():
