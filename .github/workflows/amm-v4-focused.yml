@@ -104,6 +104,8 @@ jobs:
           python3 -m unittest discover -s tests -p test_signed_gross_loss_economics.py -v
       - name: Test source-derived Raydium CPMM fee rounding both directions
         run: python3 -m unittest discover -s tests -p test_cpmm_fee_rounding_interval.py -v
+      - name: Test source-native PumpSwap fee component rounding arithmetic
+        run: python3 -m unittest discover -s tests -p test_m5_pumpswap_native_fee_rounding_scenarios.py -v
       - name: Test native AMM v4 floor/ceiling fee output interval and non-WSOL economics
         run: |
           python3 -m unittest discover -s tests -p test_ammv4_native_fee_output_interval.py -v
