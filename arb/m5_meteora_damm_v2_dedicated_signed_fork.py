@@ -61,8 +61,11 @@ def export_source(rpc,registry,output,*,pool_count=6):
     """Capture six DISTINCT authenticated real DAMM pools, never one pool repeated."""
     if type(pool_count)is not int or not 1<=pool_count<=12:
         raise ValueError("DAMM unique pool count invalid")
+    # The initial signed-validated pool is NOT one of the six new pools.
+    previously_verified={"HtoZbnFf7BDGvPg3RxwiXN5pPG7hLa78XVGscLF9fkYV"}
     candidates=list(dict.fromkeys(row["address"] for row in registry["pools"]
-                    if row.get("venue")=="meteora_damm_v2"))
+                    if row.get("venue")=="meteora_damm_v2"
+                    and row["address"] not in previously_verified))
     attempts=[]
     selected=[]
     for address in candidates:
