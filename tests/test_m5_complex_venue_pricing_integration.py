@@ -37,26 +37,24 @@ class ComplexVenuePricingIntegrationTests(unittest.TestCase):
         self.assertLessEqual(result["minimum_candidate_output"],result["maximum_candidate_output"])
         self.assertFalse(result["effective_fee_verified"])
         self.assertFalse(result["protocol_exact_verified"])
+    @patch("arb.meteora_damm_v2_source_scenarios.verify")
     @patch("arb.meteora_damm_v2_source_scenarios.extract_pool_states")
-    @patch("arb.meteora_damm_v2_source_scenarios.extract")
-    def test_damm_modes_from_source_reserves_do_not_invent_scheduler(self,extract,rows):
-        rows.return_value=[{"venue":"meteora_damm_v2","address":"pool",
-            "decoded_pool_state":{"pool_status":0,"token_a_flag":0,
-                "token_b_flag":0,"token_a_mint":"X","token_b_mint":"Y"}}]
-        extract.return_value={"fundamentals":[{"address":"pool","vault_base_units":[1000000,2000000]}]}
-        result=scenario_envelope({"state_accounts_observed_slot":123,**SAFE},
-            pool="pool",mint_in="X",amount_in=100000)
-        self.assertGreater(len(result["scenarios"]),4)
-        self.assertFalse(result["effective_fee_verified"])
-        self.assertFalse(result["curve_model_verified"])
-        self.assertFalse(result["broadcast"])
+    @patch("arb.meteora_damm_v2_source_scenarios.quote_pool_account",
+           return_value={"amount_out":999})
+    def test_damm_source_uses_only_official_sdk(self,quote,rows,verify):
+        rows.return_value=[{"venue":"meteora_damm_v2","address":"pool"}]
+        result=scenario_envelope({"state_accounts_observed_slot":123,
+            "accounts":{"pool":{"data":["AA==","base64"]}},**SAFE},
+            pool="pool",mint_in="X",amount_in=100000,observed_unix=1000)
+        self.assertEqual(result["amount_out"],999)
+        self.assertEqual(result["native_pricing_engine"],"OFFICIAL_METEORA_RUST_SDK")
+        self.assertFalse(result["signed_execution_parity_verified"])
+        self.assertTrue(quote.called)
+    @patch("arb.meteora_damm_v2_source_scenarios.verify")
     @patch("arb.meteora_damm_v2_source_scenarios.extract_pool_states")
-    @patch("arb.meteora_damm_v2_source_scenarios.extract")
-    def test_damm_rejects_non_source_fee_rates(self,extract,rows):
-        rows.return_value=[{"venue":"meteora_damm_v2","address":"pool",
-            "decoded_pool_state":{"pool_status":0,"token_a_flag":0,"token_b_flag":0,
-                "token_a_mint":"X","token_b_mint":"Y"}}]
-        with self.assertRaises(ValueError):
+    def test_damm_rejects_missing_real_fork_clock(self,rows,verify):
+        rows.return_value=[{"venue":"meteora_damm_v2","address":"pool"}]
+        with self.assertRaisesRegex(ValueError,"observed fork unix"):
             scenario_envelope({"state_accounts_observed_slot":123,**SAFE},
-                pool="pool",mint_in="X",amount_in=10,fee_rates_ppm=(100,10))
+                pool="pool",mint_in="X",amount_in=10)
 if __name__=="__main__":unittest.main()
