@@ -563,7 +563,7 @@ jobs:
         run: |
           python3 -m arb.m5_venue_pool_registry_expansion \
             --registry arb/pool_registry.json \
-            --count 8 --pages 5 \
+            --count 20 --pages 8 \
             --output-registry "$RUNNER_TEMP/expanded-venue-pool-registry.json" \
             --output-new-pools "$RUNNER_TEMP/venue-six-new-pools.json" \
             --report "$RUNNER_TEMP/venue-pool-registry-expansion.json"
@@ -577,7 +577,7 @@ jobs:
             --output "$RUNNER_TEMP/meteora-six-new-capture.json"
       - name: Capture new Orca source pool fixtures
         run: |
-          python3 -m arb.m5_orca_signed_single_swap --capture-new-pools --pool-count 8 --registry "$RUNNER_TEMP/venue-six-new-pools.json" --new-pools-source "$RUNNER_TEMP/orca-new-pools-upstream-source.json" --binary tools/orca_core_quote/target/release/sol-orca-native-reference --output "$RUNNER_TEMP/orca-new-pools-capture.json"
+          python3 -m arb.m5_orca_signed_single_swap --capture-new-pools --pool-count 6 --registry "$RUNNER_TEMP/venue-six-new-pools.json" --new-pools-source "$RUNNER_TEMP/orca-new-pools-upstream-source.json" --binary tools/orca_core_quote/target/release/sol-orca-native-reference --output "$RUNNER_TEMP/orca-new-pools-capture.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -730,7 +730,7 @@ jobs:
         if: ${{ matrix.shard == 0 }}
         run: |
           cargo build --release --manifest-path tools/orca_core_quote/Cargo.toml
-          python3 -m arb.m5_orca_signed_single_swap --new-pools-source "$RUNNER_TEMP/orca-new-pools-upstream-source.json" --pool-count 8 --required-verified-pools 6 --binary tools/orca_core_quote/target/release/sol-orca-native-reference --output "$RUNNER_TEMP/m5-four-to-six-signed-attempt/orca-new-pools-signed.json"
+          python3 -m arb.m5_orca_signed_single_swap --new-pools-source "$RUNNER_TEMP/orca-new-pools-upstream-source.json" --pool-count 6 --required-verified-pools 6 --binary tools/orca_core_quote/target/release/sol-orca-native-reference --output "$RUNNER_TEMP/m5-four-to-six-signed-attempt/orca-new-pools-signed.json"
       - name: Execute source-captured four-to-six-hop signed isolated Surfpool trial
         if: ${{ matrix.shard == 0 }}
         run: |
