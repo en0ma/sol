@@ -79,3 +79,42 @@ class IndependentSignedWireVerifierTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"nonbroadcast"):
             verify_signed_pair(receipt)
 if __name__=="__main__":unittest.main()
+
+class SignedFeeMessageBindingTests(IndependentSignedWireVerifierTests):
+    def test_matching_fee_message_digest_is_independently_accepted(self):
+        from solders.message import to_bytes_versioned
+        receipt=self.receipt(versioned=True)
+        raw=base64.b64decode(receipt["signed_transaction_wire_base64"])
+        tx=VersionedTransaction.from_bytes(raw)
+        receipt["signed_message_fee_estimate"]={
+            "status":"SIGNED_MESSAGE_FEE_ESTIMATE_ONLY",
+            "signed_message_sha256":hashlib.sha256(
+                to_bytes_versioned(tx.message)).hexdigest(),
+            "estimated_fee_lamports":5000,"paid_fee_verified":False,
+            "fee_payer_asset":"SOL",**SAFE}
+        verdict=verify_signed_pair(receipt)
+        self.assertTrue(verdict["signed_message_fee_digest_bound"])
+
+    def test_forged_signed_fee_quote_cannot_price_receipt(self):
+        receipt=self.receipt()
+        receipt["signed_message_fee_estimate"]={
+            "status":"SIGNED_MESSAGE_FEE_ESTIMATE_ONLY",
+            "signed_message_sha256":"f"*64,"estimated_fee_lamports":5000,
+            "paid_fee_verified":False,"fee_payer_asset":"SOL",**SAFE}
+        with self.assertRaisesRegex(ValueError,"fee estimate"):
+            verify_signed_pair(receipt)
+
+    def test_negative_fee_and_unsafe_fee_provenance_rejected(self):
+        for field,value in (("estimated_fee_lamports",-1),("broadcast",True),
+                            ("paid_fee_verified",True)):
+            with self.subTest(field=field):
+                receipt=self.receipt()
+                receipt["signed_message_fee_estimate"]={
+                    "status":"SIGNED_MESSAGE_FEE_ESTIMATE_ONLY",
+                    "signed_message_sha256":"f"*64,
+                    "estimated_fee_lamports":5000,
+                    "paid_fee_verified":False,
+                    "fee_payer_asset":"SOL",**SAFE}
+                receipt["signed_message_fee_estimate"][field]=value
+                with self.assertRaises(ValueError):
+                    verify_signed_pair(receipt)
