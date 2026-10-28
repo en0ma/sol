@@ -10,7 +10,7 @@ from arb.pool_registry_batches import refresh_batched
 SAFE={"actionable":False,"broadcast":False,"live_execution_approved":False}
 
 def discover_new(rpc,registry,venue,*,count=6,pages=4):
-    if venue not in ("orca","meteora_damm_v2") or type(count)is not int or not 1<=count<=20:
+    if venue not in ("orca","meteora_damm_v2","raydium_cpmm") or type(count)is not int or not 1<=count<=20:
         raise ValueError("unsupported venue/count")
     existing={r["address"] for r in registry["pools"] if r.get("venue")==venue}
     candidates=[]
@@ -23,6 +23,15 @@ def discover_new(rpc,registry,venue,*,count=6,pages=4):
             if not next_cursor:break
             if next_cursor in seen_cursors:raise ValueError("Orca cursor cycle")
             seen_cursors.add(next_cursor);cursor=next_cursor
+    elif venue=="raydium_cpmm":
+        from arb.onchain_pool_discovery import search_pair,MINTS
+        from itertools import combinations
+        for left,right in combinations(MINTS.values(),2):
+            try:
+                found=search_pair(rpc,venue,left,right,limit=32)
+                candidates.extend({"venue":venue,"address":a} for a in found)
+            except (ValueError,RuntimeError,OSError):
+                continue
     else:
         from arb.indexed_pool_discovery import fetch_candidates
         for page in range(1,pages+1):
@@ -57,6 +66,22 @@ def discover_new(rpc,registry,venue,*,count=6,pages=4):
                 except (ValueError,TypeError,KeyError,RuntimeError,OSError) as exc:
                     rejected.append({"venue":venue,"address":pool["address"],
                         "reason":"VENUE_FEE_DECODER_UNSUPPORTED: "+str(exc)[:150]})
+                    continue
+            if venue=="raydium_cpmm":
+                from arb.cpmm_config import read_pool_config
+                try:
+                    config=read_pool_config(rpc,pool)
+                    if not config["fee_verified_onchain"] or config["creator_fee_placement_verified"]:
+                        raise ValueError("CPMM fee evidence not independently verified")
+                    from arb.rpc import call
+                    import base64
+                    from arb.raydium_cpmm import decode
+                    info=call(rpc,"getAccountInfo",[pool["address"],{"encoding":"base64","commitment":"confirmed"}])["value"]
+                    if not decode(base64.b64decode(info["data"][0],validate=True))["swap_enabled"]:
+                        raise ValueError("CPMM swaps disabled")
+                except (ValueError,TypeError,KeyError,RuntimeError,OSError) as exc:
+                    rejected.append({"venue":venue,"address":pool["address"],
+                        "reason":"CPMM_NATIVE_PRICING_ELIGIBILITY_BLOCKED: "+str(exc)[:150]})
                     continue
             verified.append(pool)
     accepted=verified[:count]
