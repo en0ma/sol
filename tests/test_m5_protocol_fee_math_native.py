@@ -103,8 +103,10 @@ class SourceVolatilityPolynomialTests(unittest.TestCase):
         self.assertEqual(r["snapshot_dynamic_fee_numerator"],
                          ((100*25)**2*14460000+100_000_000_000-1)//100_000_000_000)
         self.assertFalse(r["protocol_exact_verified"])
-    def test_out_of_source_volatility_bounds_rejected(self):
+    def test_source_volatility_cap_is_applied_without_guessing_swap_update(self):
         from arb.meteora_damm_v2_native_fee_math import source_volatility_fee_candidate
-        with self.assertRaises(ValueError):
-            source_volatility_fee_candidate(volatility_accumulator=240,bin_step=25,
+        result=source_volatility_fee_candidate(volatility_accumulator=240,bin_step=25,
                 variable_fee_control=14460000,max_volatility_accumulator=239)
+        self.assertEqual(result["effective_capped_accumulator"],239)
+        self.assertTrue(result["volatility_limit_applied"])
+        self.assertFalse(result["protocol_exact_verified"])
