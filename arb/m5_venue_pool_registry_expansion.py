@@ -40,8 +40,25 @@ def discover_new(rpc,registry,venue,*,count=6,pages=4):
     for offset in range(0,len(unseen),100):
         if len(verified)>=count:break
         result=refresh_batched(rpc,unseen[offset:offset+100],batch_size=100)
-        verified.extend(result["verified_pools"])
         rejected.extend(result["rejected"])
+        for pool in result["verified_pools"]:
+            if venue=="meteora_damm_v2":
+                # Existing venue-specific source fee decoder must accept the
+                # actual on-chain bytes before pool admission for native quote.
+                import base64
+                from arb.rpc import call
+                from arb.meteora_damm_v2_source_fee_decoder import decode_fee_state
+                try:
+                    info=call(rpc,"getAccountInfo",[pool["address"],
+                         {"encoding":"base64","commitment":"confirmed"}])["value"]
+                    if not isinstance(info,dict):
+                        raise ValueError("source DAMM account missing")
+                    decode_fee_state(base64.b64decode(info["data"][0],validate=True))
+                except (ValueError,TypeError,KeyError,RuntimeError,OSError) as exc:
+                    rejected.append({"venue":venue,"address":pool["address"],
+                        "reason":"VENUE_FEE_DECODER_UNSUPPORTED: "+str(exc)[:150]})
+                    continue
+            verified.append(pool)
     accepted=verified[:count]
     if len({p["address"] for p in accepted})!=len(accepted):
         raise ValueError("duplicate validated venue pool")
