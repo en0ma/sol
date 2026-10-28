@@ -56,18 +56,14 @@ def quote(venue,state,input_mint,amount,*,evidence=None):
             raise ValueError("DLMM mint not in pool")
         native={"estimated_output_base_units":x["amount_out"],**x}
     elif venue=="meteora_damm_v2":
-        from arb.meteora_damm_v2_quote import quote_exact_input
-        if (evidence.get("dynamic_fee_authenticated") is not True or
-                evidence.get("fee_collection_mode_authenticated") is not True or
-                state.get("snapshot_slot")!=evidence.get("fee_snapshot_slot")
-                or evidence.get("range_curve_compatible") is not True):
-            raise ValueError("DAMM fee and curve provenance unavailable")
-        if input_mint not in (state["token_a_mint"],state["token_b_mint"]):
-            raise ValueError("DAMM input mint not in pool")
-        x=quote_exact_input(state["vault_base_units"][0],state["vault_base_units"][1],
-            amount,input_is_a=input_mint==state["token_a_mint"],
-            effective_fee_ppm=evidence["effective_fee_ppm"],
-            fee_token_side=evidence["fee_token_side"])
+        from arb.meteora_damm_v2_native_quote import quote_pool_account
+        account=evidence.get("authenticated_pool_account")
+        clock=evidence.get("fork_clock")
+        if not isinstance(clock,dict):
+            raise ValueError("Meteora pricing requires authenticated fork Clock")
+        x=quote_pool_account(account,mint_in=input_mint,amount_in=amount,
+            fork_unix_timestamp=clock.get("fork_unix_timestamp"),
+            fork_clock_slot=clock.get("fork_clock_slot"))
         native={"estimated_output_base_units":x["amount_out"],**x}
     elif venue=="pumpswap":
         from arb.pumpswap_quote import quote_exact_input
