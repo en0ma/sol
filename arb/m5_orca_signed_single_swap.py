@@ -156,6 +156,9 @@ def export_source(rpc,registry,output,*,pool_count=6,excluded=()):
     result={"selected_pools":selected,"required_distinct_pools":pool_count,
             "selection_blockers":blockers,**SAFE}
     Path(output).write_text(json.dumps(result,sort_keys=True,indent=2)+"\n")
+    print(json.dumps({"status":"ORCA_NEW_POOL_CAPTURE_REPORT",
+        "captured":len(selected),"requested":pool_count,
+        "candidate_count":len(seen),"blockers":blockers[:25],**SAFE}))
     return len(selected)==pool_count
 
 def quote_args(captured,direction):
