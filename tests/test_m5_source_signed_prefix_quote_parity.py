@@ -152,6 +152,9 @@ class CLMMSourceFeeModeReconciliationTests(unittest.TestCase):
                     if clmm_fee_on_input else
                     "SOURCE_BOUND_FEE_MODE_SCENARIO_NOT_EXACT"),
                 "predicted_output_base_units":100 if clmm_fee_on_input else 95,
+                "source_fee_evidence":{"fee_on_input":True,
+                    "source_pool_fee_side_decoded":True,
+                    "fee_on_native_enum":0,"fee_side":"INPUT",**SAFE},
                 **SAFE}
         quote.side_effect=native
         result=compare(self.fixture(),self.receipt(),observed_unix=123)
