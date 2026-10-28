@@ -575,6 +575,9 @@ jobs:
             --source-file "$RUNNER_TEMP/meteora-six-new-upstream-source.json" \
             --binary tools/meteora_damm_v2_reference/target/release/sol-meteora-damm-v2-official-reference \
             --output "$RUNNER_TEMP/meteora-six-new-capture.json"
+      - name: Capture new Orca source pool fixtures
+        run: |
+          python3 -m arb.m5_orca_signed_single_swap --capture-new-pools --pool-count 8 --registry "$RUNNER_TEMP/venue-six-new-pools.json" --new-pools-source "$RUNNER_TEMP/orca-new-pools-upstream-source.json" --binary tools/orca_core_quote/target/release/sol-orca-native-reference --output "$RUNNER_TEMP/orca-new-pools-capture.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -584,6 +587,7 @@ jobs:
             ${{ runner.temp }}/meteora-damm-v2-upstream-source.json
             ${{ runner.temp }}/expanded-venue-pool-registry.json
             ${{ runner.temp }}/venue-six-new-pools.json
+            ${{ runner.temp }}/orca-new-pools-upstream-source.json
             ${{ runner.temp }}/meteora-six-new-upstream-source.json
             ${{ runner.temp }}/venue-pool-registry-expansion.json
             ${{ runner.temp }}/m5-broad-source-route-candidates.json
@@ -722,6 +726,11 @@ jobs:
             --source-file "$RUNNER_TEMP/meteora-six-new-upstream-source.json" \
             --binary tools/meteora_damm_v2_reference/target/release/sol-meteora-damm-v2-official-reference \
             --output "$RUNNER_TEMP/m5-four-to-six-signed-attempt/meteora-six-new-signed.json"
+      - name: Check new Orca pool pricing
+        if: ${{ matrix.shard == 0 }}
+        run: |
+          cargo build --release --manifest-path tools/orca_core_quote/Cargo.toml
+          python3 -m arb.m5_orca_signed_single_swap --new-pools-source "$RUNNER_TEMP/orca-new-pools-upstream-source.json" --pool-count 8 --required-verified-pools 6 --binary tools/orca_core_quote/target/release/sol-orca-native-reference --output "$RUNNER_TEMP/m5-four-to-six-signed-attempt/orca-new-pools-signed.json"
       - name: Execute source-captured four-to-six-hop signed isolated Surfpool trial
         if: ${{ matrix.shard == 0 }}
         run: |
