@@ -8,6 +8,7 @@ connection to a live RPC endpoint or broadcast method exists in this module.
 import base64
 import hashlib
 from solders.transaction import VersionedTransaction
+from solders.message import to_bytes_versioned
 
 SAFETY={"actionable":False,"broadcast":False,"live_execution_approved":False}
 
@@ -46,7 +47,9 @@ def _packet(receipt,prefix):
     account_keys=tx.message.account_keys
     if not account_keys or not hasattr(tx.message,"recent_blockhash"):
         raise ValueError(prefix+" missing signed fee payer or recent blockhash")
+    message_sha256=hashlib.sha256(to_bytes_versioned(tx.message)).hexdigest()
     return {"packet_sha256":digest,"packet_length":size,
+            "message_sha256":message_sha256,
             "fee_payer":str(account_keys[0]),
             "recent_blockhash":str(tx.message.recent_blockhash),
             "signature":signature,"transaction":tx}
@@ -63,6 +66,20 @@ def verify_signed_pair(receipt):
         raise ValueError("negative control signed by a different fee payer")
     if pos["recent_blockhash"]!=neg["recent_blockhash"]:
         raise ValueError("positive and negative transaction were not signed for the same fork blockhash")
+    fee=receipt.get("signed_message_fee_estimate")
+    if fee is not None:
+        if not isinstance(fee,dict) or any(
+                fee.get(key)is not False for key in SAFETY):
+            raise ValueError("signed fee quote has unsafe provenance")
+        if fee.get("status")=="SIGNED_MESSAGE_FEE_ESTIMATE_ONLY":
+            if (fee.get("signed_message_sha256")!=pos["message_sha256"] or
+                    fee.get("fee_payer_asset")!="SOL" or
+                    type(fee.get("estimated_fee_lamports"))is not int or
+                    fee["estimated_fee_lamports"]<0 or
+                    fee.get("paid_fee_verified") is not False):
+                raise ValueError("fee estimate does not belong to signed positive message")
+        elif fee.get("status")!="FEE_ESTIMATE_UNAVAILABLE":
+            raise ValueError("unrecognized signed-message fee provenance")
     count=receipt.get("legs")
     instructions_pos=pos["transaction"].message.instructions
     instructions_neg=neg["transaction"].message.instructions
@@ -81,6 +98,9 @@ def verify_signed_pair(receipt):
     return {"status":"CRYPTOGRAPHICALLY_VERIFIED_INDEPENDENT_SIGNED_PACKET_PAIR",
             "positive_sha256":pos["packet_sha256"],
             "negative_sha256":neg["packet_sha256"],
+            "signed_message_fee_digest_bound":(
+                isinstance(fee,dict) and
+                fee.get("status")=="SIGNED_MESSAGE_FEE_ESTIMATE_ONLY"),
             "same_signer_and_blockhash_verified":True,
             "signed_prefix_instructions_identical_verified":True,
             "signed_final_instruction_changed_verified":True,
