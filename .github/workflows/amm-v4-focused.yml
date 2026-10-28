@@ -559,6 +559,15 @@ jobs:
             --source-file "$RUNNER_TEMP/meteora-damm-v2-upstream-source.json" \
             --binary tools/meteora_damm_v2_reference/target/release/sol-meteora-damm-v2-official-reference \
             --output "$RUNNER_TEMP/meteora-damm-v2-capture-status.json"
+      - name: Capture six additional authentic Orca Whirlpool source pools and program ELF
+        run: |
+          python3 -m arb.m5_orca_six_pool_signed_fork \
+            --capture-source \
+            --registry "$RUNNER_TEMP/m5-seven-venue-untrusted-pool-hints.json" \
+            --exclude-fixture "$RUNNER_TEMP/m5-four-to-six-source-fixture.json" \
+            --source-file "$RUNNER_TEMP/orca-six-new-pools-source.json" \
+            --binary tools/orca_core_quote/target/release/sol-orca-native-reference \
+            --output "$RUNNER_TEMP/orca-six-new-pools-capture.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -566,6 +575,7 @@ jobs:
           path: |
             ${{ runner.temp }}/m5-seven-venue-untrusted-pool-hints.json
             ${{ runner.temp }}/meteora-damm-v2-upstream-source.json
+            ${{ runner.temp }}/orca-six-new-pools-source.json
             ${{ runner.temp }}/m5-broad-source-route-candidates.json
             ${{ runner.temp }}/m5-four-to-six-source-fixture.json
             ${{ runner.temp }}/m5-four-to-six-source-capture.json
@@ -685,6 +695,15 @@ jobs:
               except Exception:time.sleep(2)
           else:raise SystemExit("offline RPC unavailable")
           PY
+      - name: Validate six additional Orca pools against signed swaps and official Core
+        if: ${{ matrix.shard == 0 }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/m5-four-to-six-signed-attempt"
+          cargo build --release --manifest-path tools/orca_core_quote/Cargo.toml
+          python3 -m arb.m5_orca_six_pool_signed_fork \
+            --source-file "$RUNNER_TEMP/orca-six-new-pools-source.json" \
+            --binary tools/orca_core_quote/target/release/sol-orca-native-reference \
+            --output "$RUNNER_TEMP/m5-four-to-six-signed-attempt/orca-six-new-pools-signed.json"
       - name: Validate Meteora DAMM v2 on untouched isolated fork before multihop account hydration
         if: ${{ matrix.shard == 0 }}
         run: |
