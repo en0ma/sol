@@ -701,6 +701,12 @@ jobs:
         with:
           name: amm-v4-focused-source
           path: ${{ runner.temp }}
+      - name: Import authenticated three-venue source evidence
+        if: ${{ matrix.shard == 0 }}
+        uses: actions/download-artifact@v4
+        with:
+          name: three-venue-authenticated-native-sources
+          path: ${{ runner.temp }}
       - name: Start disposable explicitly offline Surfpool
         run: |
           nohup surfpool start --ci --offline > "$RUNNER_TEMP/offline.log" 2>&1 < /dev/null &
