@@ -10,7 +10,7 @@ from solders.hash import Hash
 from solders.transaction import Transaction
 from arb.rpc import call
 from arb.next_ten_pair_fixture_export import venue_accounts,program_data_accounts
-from arb.meteora_damm_v2_dedicated_signed_fork import hydrate as hydrate_program, _balances
+from arb.m5_meteora_damm_v2_dedicated_signed_fork import hydrate as hydrate_program, _balances
 from arb.orca_whirlpool import PROGRAM,decode as decode_pool,b58
 from arb.whirlpool_ticks import FIXED_LEN,DISC,DYNAMIC_DISC,DYNAMIC_MIN_LEN,DYNAMIC_MAX_LEN,decode_fixed_ticks,decode_dynamic_ticks,addresses,start_tick
 from arb.orca_adaptive_fee_source import source_oracle,quote_adaptive_from_arrays
@@ -22,11 +22,6 @@ from arb.damm_cpmm_atomic_offline import _simulate
 from arb.pumpswap_local_simulation import local_rpc_only
 SAFE={"actionable":False,"broadcast":False,"live_execution_approved":False}
 SYSTEM="11111111111111111111111111111111"
-
-def capture(rpc,pool):
-    extra,aux=venue_accounts(rpc,"orca",pool,[])
-    # The helper checks pool mint identities: re-fetch decoded mints first.
-    return extra,aux
 
 def capture_pool(rpc,pool):
     from arb.next_ten_fork_pool_probe import snapshot
