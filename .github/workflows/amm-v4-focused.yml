@@ -707,6 +707,16 @@ jobs:
               --output "$RUNNER_TEMP/m5-four-to-six-signed-attempt/source-signed-native-parity.json" \
               --observed-unix "$(date +%s)"
           fi
+          # Use published Orca Core as an independent integer quote oracle.
+          # Build once per isolated fork job; reject every signed mismatch.
+          cargo build --release --manifest-path tools/orca_core_quote/Cargo.toml
+          if [ -s "$RUNNER_TEMP/m5-four-to-six-source-fixture.json" ]; then
+            python3 -m arb.m5_orca_official_core_parity \
+              --fixture "$RUNNER_TEMP/m5-four-to-six-source-fixture.json" \
+              --receipts "$RUNNER_TEMP/m5-four-to-six-signed-attempt" \
+              --binary tools/orca_core_quote/target/release/sol-orca-native-reference \
+              --output "$RUNNER_TEMP/m5-four-to-six-signed-attempt/orca-official-core-vs-python-vs-signed.json"
+          fi
           if [ -s "$RUNNER_TEMP/m5-four-to-six-source-fixture.json" ]; then
             python3 -m arb.m5_orca_fork_parity \
               --fixture "$RUNNER_TEMP/m5-four-to-six-source-fixture.json" \
