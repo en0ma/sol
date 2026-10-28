@@ -45,18 +45,28 @@ def audit_attempts(fixture,receipts,*,expected_amounts):
                     and all(type(v)is int and v>=0 for v in post)
                     and all(v==0 for v in post[:-1])):
                 signed_gross=post[-1]-size
+                from arb.m5_signed_start_mint_economics import signed_net_economics
+                economics=signed_net_economics(
+                    receipt,start_mint=fixture["route_mints"][0],
+                    source_slot=fixture["state_accounts_observed_slot"])
+                if economics["observed_local_fork_gross_delta_start_mint_base_units"]!=signed_gross:
+                    raise ValueError("independent signed economic output disagrees with audit")
                 signed_gross_observations.append({
                     "size_base_units":size,"terminal_output_base_units":post[-1],
                     "gross_start_mint_delta_base_units":signed_gross,
                     "signed_compute_units":receipt.get("positive_units_consumed"),
                     "signed_message_fee":receipt.get("signed_message_fee_estimate"),
+                    "estimated_start_mint_cost_base_units":
+                        economics["estimated_cost_start_mint_base_units"],
+                    "estimated_net_start_mint_delta_base_units":
+                        economics["estimated_net_delta_start_mint_base_units"],
                     "source_manifest_sha256":verified.get("source_manifest_sha256"),
                     "net_profit_verified":False,**SAFE})
         attempts.append({"size_base_units":size,"receipt_status":receipt.get("status"),
                          "audit":verified,"independently_accepted":approved,
                          "observed_gross_start_mint_delta_base_units":signed_gross,
                          "net_profit_verified":False,**SAFE})
-    gross_ranking=sorted(signed_gross_observations,
+    # Only start-mint-convertible amounts may have an estimated net ordering.\n    # These remain explicitly local simulations and cannot become actionable.\n    comparable=[r for r in signed_gross_observations\n                if type(r["estimated_net_start_mint_delta_base_units"]) is int]\n    net_estimate_ranking=sorted(comparable,\n        key=lambda r:(-r["estimated_net_start_mint_delta_base_units"],r["size_base_units"]))\n    gross_ranking=sorted(signed_gross_observations,
         key=lambda x:(-x["gross_start_mint_delta_base_units"],x["size_base_units"]))
     return {"status":"FOUR_TO_SIX_SOURCE_SIGNED_MULTISIZE_INDEPENDENT_AUDIT",
             "attempts":attempts,"attempt_count":len(attempts),
@@ -66,6 +76,8 @@ def audit_attempts(fixture,receipts,*,expected_amounts):
             "signed_gross_only_research_ranking":gross_ranking,
             "positive_signed_gross_count":sum(x["gross_start_mint_delta_base_units"]>0
                                               for x in gross_ranking),
+            "estimated_net_start_mint_comparable_count":len(net_estimate_ranking),
+            "estimated_net_research_only_ranking":net_estimate_ranking,
             "starting_mint":fixture.get("route_mints",[None])[0],
             "ranked_net_profitable_candidates":[],
             "net_profit_verified":False,
