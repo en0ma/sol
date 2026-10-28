@@ -64,6 +64,26 @@ class SourceSignedPrefixParityTests(unittest.TestCase):
      initial_balances_base_units=[100,0,0,0,0])
   with self.assertRaisesRegex(ValueError,"final balances"):
    compare(self.fixture(),r,observed_unix=123)
+ @patch("arb.m5_source_signed_prefix_quote_parity.quote_leg")
+ @patch("arb.m5_source_signed_prefix_quote_parity.extract_pool_states")
+ def test_selected_fee_native_price_remains_signed_model_comparison_only(self,rows,quote):
+  rows.return_value=self.rows()
+  def native(f,*,leg_index,amount_in,observed_unix):
+   base={"venue":self.rows()[leg_index]["venue"],
+         "pool":"p"+str(leg_index),"source_slot":200,**SAFE}
+   if leg_index==2:
+    return {**base,"quote_status":"NATIVE_QUOTE_SOURCE_BASE_FEE_NOT_EXACT",
+      "native_fee_envelope":{"source_slot":200,
+        "source_pool_fee_schedule":{"dynamic_fee_initialized":False,
+          "source_slot":200,"amount_out_before_dynamic_fee":80,**SAFE},**SAFE}}
+   return {**base,"quote_status":"SOURCE_BOUND_INDICATIVE",
+     "predicted_output_base_units":amount_in-5}
+  quote.side_effect=native
+  result=compare(self.fixture(),self.receipt(),observed_unix=123)
+  self.assertEqual(result["comparisons"][2]["absolute_model_error_base_units"],0)
+  self.assertEqual(result["comparisons"][2]["classification"],
+                   "SOURCE_DAMM_BASE_FEE_MODEL_VERSUS_SIGNED")
+  self.assertFalse(result["quote_accuracy_verified"])
  @patch("arb.m5_source_signed_prefix_quote_parity.extract_pool_states")
  def test_source_replay_manifest_rejected(self,rows):
   rows.return_value=self.rows()
