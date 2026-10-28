@@ -34,6 +34,9 @@ class SignedRegistryAdmission(unittest.TestCase):
         promoted=self.promote()
         self.assertEqual({p["venue"] for p in promoted["pools"]},set(SPECS))
         self.assertEqual(self.promote(registry=promoted),promoted)
+    def test_conflicting_exact_counters_rejected(self):
+        with self.assertRaisesRegex(ValueError,"reported exact count"):
+            self.promote(lambda a,b,r:r["orca"]["pools"][0].update({"exact":4,"exact_matches":3}))
     def test_missing_raydium_amount_rejected(self):
         with self.assertRaisesRegex(ValueError,"invalid input size"):
             self.promote(lambda a,b,r:r["raydium_cpmm"]["pools"][0]["trials"][0].pop("amount_in"))
