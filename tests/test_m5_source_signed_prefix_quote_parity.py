@@ -129,12 +129,14 @@ class SourceSignedPrefixParityTests(unittest.TestCase):
   self.assertEqual(result["numeric_comparison_count"],0)
 if __name__=="__main__":unittest.main()
 
-class CLMMSourceFeeModeReconciliationTests(SourceSignedPrefixParityTests):
+class CLMMSourceFeeModeReconciliationTests(unittest.TestCase):
+    def fixture(self):
+        return SourceSignedPrefixParityTests().fixture()
     def rows(self):
         return [{"venue":v,"address":"p"+str(i)} for i,v in enumerate(
             ("raydium_clmm","meteora_dlmm","meteora_damm_v2","pumpswap"))]
     def receipt(self):
-        result=super().receipt()
+        result=SourceSignedPrefixParityTests().receipt()
         result["signed_prefix_observations"][0]["venue"]="raydium_clmm"
         return result
 
