@@ -64,6 +64,8 @@ jobs:
         run: |
           python3 -m py_compile arb/orca_adaptive_fee_source.py arb/m5_orca_fork_parity.py
           python3 -m unittest discover -s tests -p test_m5_orca_real_fork_fee_native.py -v
+          python3 -m unittest discover -s tests -p test_m5_orca_fork_clock.py -v
+          python3 -m unittest discover -s tests -p test_m5_orca_fork_parity.py -v
       - name: Test bounded Whirlpool native tick prices
         run: python3 -m unittest discover -s tests -p test_orca_native_tick_range_guard.py -v
       - name: Test authenticated CLMM tick source availability blockers
