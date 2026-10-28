@@ -54,14 +54,20 @@ def capture(rpc, registry, *, limit=3):
                     len(expected_mints) != 2 or
                     set(expected_mints) != {state["base_mint"], state["quote_mint"]}):
                 raise ValueError("tracked pool mint identity mismatch")
-            verified = verify(rpc, address, state)
+            verified = verify(rpc, address, state, include_source_bytes=True)
             if verified.get("verified") is not True:
                 raise ValueError("on-chain pool verifier rejected source")
+            source_accounts=verified.get("authenticated_source_accounts")
+            if not isinstance(source_accounts,list) or len(source_accounts)!=6:
+                raise ValueError("incomplete authenticated same-slot source account bundle")
+            if source_accounts[0].get("address")!=address:
+                raise ValueError("authenticated source bundle pool mismatch")
             results.append({"address": address, "status": "AUTHENTICATED_SOURCE_ONLY",
                             "pool_account_slot": slot,
                             "verified_snapshot_slot": verified["slot"],
                             "mints": [state["base_mint"], state["quote_mint"]],
-                            "source_pool_base64": info["data"][0],
+                            "source_pool_base64": source_accounts[0]["account_base64"],
+                            "authenticated_source_accounts": source_accounts,
                             "source_fee_mode": verified["fee_mode_diagnostic"]["status"],
                             "effective_fee_verified": False,
                             "signed_parity_verified": False})
