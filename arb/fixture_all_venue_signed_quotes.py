@@ -11,7 +11,10 @@ SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
 VENUES=frozenset(("orca","raydium_cpmm","raydium_clmm","meteora_dlmm",
                   "meteora_damm_v2","pumpswap","raydium_amm_v4"))
 
-def quote_leg(fixture,*,leg_index,amount_in,observed_unix):
+def quote_leg(fixture,*,leg_index,amount_in,observed_unix,
+              clmm_fee_on_input=True):
+    if type(clmm_fee_on_input)is not bool:
+        raise ValueError("CLMM source fee mode must be explicit")
     if type(leg_index)is not int or not 0<=leg_index<6 or type(amount_in)is not int or not 0<amount_in<2**64:
         raise ValueError("invalid signed leg number or amount")
     rows=extract_pool_states(fixture)
@@ -136,7 +139,7 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix):
             native=quote_across_initialized_ticks(
                 {**state,"authenticated_tick_array_starts":array_starts},
                 leg["input_mint"],amount_in,fee,candidates,
-                max_crossings=32)
+                max_crossings=32,fee_on_input=clmm_fee_on_input)
             q={**leg,"amount_in":amount_in,
                "amount_out":native["amount_out"],
                "snapshot_slot":row["snapshot_slot"]}
@@ -211,7 +214,9 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix):
         return {"venue":v,"pool":pool,"leg_index":leg_index,
                 "source_slot":q["snapshot_slot"],
                 "predicted_output_base_units":q["amount_out"],
-                "quote_status":"SOURCE_BOUND_INDICATIVE",
+                "quote_status":("SOURCE_BOUND_INDICATIVE" if
+                                v!="raydium_clmm" or clmm_fee_on_input else
+                                "NATIVE_QUOTE_MODELED_NOT_EXACT"),
                 "protocol_exact_verified":False,**SAFE}
     except (ValueError,KeyError,TypeError,ArithmeticError) as exc:
         return {"venue":v,"pool":pool,"leg_index":leg_index,
