@@ -57,6 +57,23 @@ def capture(rpc,address):
             "verified_vault_reserves":verified["vault_base_units"],
             "source_fee_state":decode_fee_state(raw)}
 
+def export_source(rpc,registry,output):
+    """Authenticate real upstream-backed pool BEFORE the offline-only fork starts."""
+    candidates=[row["address"] for row in registry["pools"]
+                if row.get("venue")=="meteora_damm_v2"]
+    attempts=[]
+    selected=None
+    for address in candidates:
+        try:
+            selected=capture(rpc,address)
+            break
+        except (ValueError,TypeError,KeyError,RuntimeError,OSError) as exc:
+            attempts.append({"pool":address,"reason":str(exc)[:250]})
+    Path(output).write_text(json.dumps(
+        {"selected":selected,"source_attempts":attempts,**SAFE},
+        sort_keys=True,indent=2)+"\\n")
+    return selected is not None
+
 def hydrate(rpc,captured):
     accounts=captured["accounts"]
     program=accounts[PROGRAM]
@@ -157,25 +174,32 @@ def signed_trial(rpc,captured,amount,input_is_a,binary):
 
 def main():
     p=argparse.ArgumentParser()
-    p.add_argument("--registry",required=True)
+    p.add_argument("--registry")
+    p.add_argument("--capture-source",action="store_true")
+    p.add_argument("--source-file")
     p.add_argument("--binary",required=True)
     p.add_argument("--output",required=True)
     p.add_argument("--amounts",default="10000,100000")
     a=p.parse_args()
     rpc="http://127.0.0.1:8899"
-    registry=json.loads(Path(a.registry).read_text())
-    candidates=[r["address"] for r in registry["pools"] if r["venue"]=="meteora_damm_v2"]
+    if a.capture_source:
+        if not a.registry or not a.source_file:
+            raise SystemExit("Meteora upstream source capture requires registry and source-file")
+        registry=json.loads(Path(a.registry).read_text())
+        result=export_source(rpc,registry,a.source_file)
+        print(json.dumps({"status":"METEORA_UPSTREAM_SOURCE_CAPTURED" if result
+                          else "METEORA_UPSTREAM_SOURCE_MISSING",**SAFE}))
+        if not result:
+            raise SystemExit("No source authenticated DAMM pool")
+        return
+    if not a.source_file:
+        raise SystemExit("Meteora offline trials require captured upstream source fixture")
+    source=json.loads(Path(a.source_file).read_text())
+    selected=source.get("selected")
+    attempts=source.get("source_attempts",[])
     trials=[]
-    attempts=[]
-    selected=None
-    for candidate in candidates:
-        try:
-            pool=capture(rpc,candidate)
-            hydrate(rpc,pool)
-            selected=pool
-            break
-        except (ValueError,TypeError,KeyError,RuntimeError,OSError) as exc:
-            attempts.append({"pool":candidate,"reason":str(exc)[:250]})
+    if selected is not None:
+        hydrate(rpc,selected)
     if selected is not None:
         for a_to_b in (True,False):
             for amount in (int(x) for x in a.amounts.split(",")):
