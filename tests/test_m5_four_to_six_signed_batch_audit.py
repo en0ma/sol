@@ -95,3 +95,45 @@ class SignedPacketReplayAcrossSizesTests(unittest.TestCase):
         report=audit_attempts({},receipts,expected_amounts=(100,200))
         self.assertEqual(report["independently_accepted_count"],1)
         self.assertIn("replay",report["attempts"][1]["audit"]["failure_reasons"][0])
+
+class VenueNativeAccuracyDiagnosticsTests(unittest.TestCase):
+    @patch("arb.m5_four_to_six_signed_batch_audit.assess")
+    @patch("arb.m5_source_signed_prefix_quote_parity.compare")
+    def test_independent_native_errors_aggregate_by_venue(self,compare,assess):
+        assess.return_value={
+            "status":"VERIFIED_SIGNED_FOUR_TO_SIX_HOP_ROLLBACK","hops":4,
+            "failure_reasons":[],"source_manifest_sha256":"a",
+            "signed_atomic_simulation_verified":True,
+            "rollback_failure_case_verified":True,**SAFE}
+        compare.return_value={
+            "status":"SOURCE_NATIVE_TO_SIGNED_ALL_LEGS_COMPARISON",
+            "atomic_execution_independently_accepted":True,
+            "source_slot":50,"compared_signed_legs":4,
+            "atomic_terminal_observation_used":True,
+            "numeric_comparison_count":2,
+            "comparisons":[
+                {"venue":"orca","modeled_minus_signed_base_units":-4},
+                {"venue":"raydium_clmm","modeled_minus_signed_base_units":12},
+                {"venue":"raydium_clmm","modeled_minus_signed_base_units":None},
+                {"venue":"meteora_dlmm","modeled_minus_signed_base_units":None}],**SAFE}
+        fee={"status":"SIGNED_MESSAGE_FEE_ESTIMATE_ONLY",
+             "fee_payer_asset":"SOL","estimated_fee_lamports":5,**SAFE}
+        from arb.m5_signed_start_mint_economics import WSOL
+        fixture={"state_accounts_observed_slot":50,
+                 "route_mints":[WSOL,"B","C","D",WSOL],**SAFE}
+        receipt={"planned_inputs":[100,70,60,50],
+                 "signed_transaction_sha256":"a"*64,
+                 "negative_signed_transaction_sha256":"b"*64,
+                 "state_accounts_observed_slot":50,
+                 "positive_post_balances_base_units":[0,0,0,0,95],
+                 "signed_message_fee_estimate":fee,
+                 "signed_atomic_simulation_verified":True,**SAFE}
+        report=audit_attempts(fixture,{100:receipt},
+            expected_amounts=(100,),observed_unix=123)
+        venues={r["venue"]:r for r in report[
+            "per_venue_signed_native_error_diagnostics"]}
+        self.assertEqual(venues["raydium_clmm"]["absolute_source_model_error_sum_base_units"],12)
+        self.assertEqual(venues["raydium_clmm"]["signed_native_unresolved_comparisons"],1)
+        self.assertEqual(report["signed_start_mint_break_even_cost_budgets"][0][
+            "maximum_start_mint_cost_for_nonnegative_net_base_units"],0)
+        self.assertFalse(report["net_profit_verified"])
