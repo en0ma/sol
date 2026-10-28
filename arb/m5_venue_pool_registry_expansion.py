@@ -55,6 +55,28 @@ def discover_new(rpc,registry,venue,*,count=6,pages=4):
                         raise ValueError("non-adaptive Whirlpool unsupported by native quote")
                     if set((state["token_mint_a"],state["token_mint_b"]))!=set(pool["mints"]):
                         raise ValueError("Whirlpool mint identity changed")
+                    # Both swap directions need actual on-chain tick-array accounts.
+                    # Do not count a pool as signable merely because its pool bytes decode.
+                    from arb.whirlpool_swap import select_tick_arrays
+                    from arb.orca_whirlpool import PROGRAM as ORCA_PROGRAM
+                    from arb.rpc import call
+                    keys=list(dict.fromkeys(
+                        select_tick_arrays(pool["address"],state["tick_current_index"],
+                                           state["tick_spacing"],True)+
+                        select_tick_arrays(pool["address"],state["tick_current_index"],
+                                           state["tick_spacing"],False)))
+                    snapshot=call(rpc,"getMultipleAccounts",
+                        [keys,{"encoding":"base64","commitment":"confirmed"}])
+                    accounts=snapshot.get("value")
+                    if (type(snapshot.get("context",{}).get("slot")) is not int or
+                            not isinstance(accounts,list) or len(accounts)!=len(keys)):
+                        raise ValueError("Whirlpool tick-array source snapshot incomplete")
+                    missing=[key for key,info in zip(keys,accounts)
+                             if not isinstance(info,dict) or info.get("owner")!=ORCA_PROGRAM
+                             or info.get("executable") is not False]
+                    if missing:
+                        raise ValueError("Whirlpool signed-direction tick arrays missing or unauthenticated: "+
+                                         ",".join(missing[:3]))
                 except (ValueError,TypeError,KeyError,RuntimeError,OSError) as exc:
                     rejected.append({"venue":venue,"address":pool["address"],
                         "reason":"ORCA_NATIVE_PRICE_ELIGIBILITY_BLOCKED: "+str(exc)[:150]})
