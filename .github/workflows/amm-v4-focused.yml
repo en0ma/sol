@@ -655,9 +655,11 @@ jobs:
       - name: Capture registered Orca source pool fixtures
         run: |
           python3 -m arb.m5_orca_signed_single_swap --capture-new-pools --pool-count 6 --registry "$RUNNER_TEMP/venue-six-new-pools.json" --new-pools-source "$RUNNER_TEMP/orca-new-pools-upstream-source.json" --binary tools/orca_core_quote/target/release/sol-orca-native-reference --output "$RUNNER_TEMP/orca-new-pools-capture.json"
-      - name: Reauthenticate registered Raydium CPMM identities for fresh signed parity
+      - name: Authenticate registered Raydium CPMM pools
         run: |
           python3 -m arb.m5_venue_pool_registry_expansion --venues raydium_cpmm --count 8 --revalidate-registered --pages 5 --output-registry "$RUNNER_TEMP/raydium-cpmm-candidate-registry.json" --output-new-pools "$RUNNER_TEMP/raydium-cpmm-candidates.json" --report "$RUNNER_TEMP/raydium-cpmm-discovery.json"
+      - name: Capture authenticated Raydium CPMM pricing source accounts
+        run: |
           python3 -m arb.raydium_swap --capture-source --registry "$RUNNER_TEMP/raydium-cpmm-candidates.json" --source-file "$RUNNER_TEMP/raydium-cpmm-source.json" --output "$RUNNER_TEMP/raydium-cpmm-capture.json" --pool-count 8
       - uses: actions/upload-artifact@v4
         if: always()
