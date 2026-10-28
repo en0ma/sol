@@ -61,6 +61,35 @@ def walk(fixture,*,input_base_units,observed_unix,max_branches=16):
                 candidates=[output]
                 hypothetical=branch["hypothetical"]
                 bounded=True
+            elif status in ("NATIVE_QUOTE_SELECTED_FEE_MODE_NOT_EXACT",
+                                "NATIVE_QUOTE_SOURCE_BASE_FEE_NOT_EXACT"):
+                envelope=q.get("native_fee_envelope")
+                if (not isinstance(envelope,dict) or
+                        envelope.get("source_slot")!=fixture["state_accounts_observed_slot"]
+                        or any(envelope.get(key)is not False for key in SAFE)):
+                    raise ValueError("selected fee source account binding invalid")
+                if status=="NATIVE_QUOTE_SELECTED_FEE_MODE_NOT_EXACT":
+                    if (row["venue"]!="pumpswap" or
+                            envelope.get("fee_mode_selected_from_source") is not True
+                            or not isinstance(envelope.get("candidates"),list)
+                            or len(envelope["candidates"])!=1):
+                        raise ValueError("effective PumpSwap tier selection not authenticated")
+                    output=envelope["candidates"][0].get("amount_out")
+                else:
+                    source=envelope.get("source_pool_fee_schedule")
+                    if (row["venue"]!="meteora_damm_v2" or
+                            not isinstance(source,dict) or
+                            source.get("status")!="SOURCE_DAMM_BASE_FEE_ONLY_NOT_PROTOCOL_EXACT"
+                            or source.get("dynamic_fee_initialized") is not False
+                            or source.get("source_slot")!=fixture["state_accounts_observed_slot"]
+                            or any(source.get(key)is not False for key in SAFE)):
+                        raise ValueError("non-dynamic DAMM source scheduler unverified")
+                    output=source.get("amount_out_before_dynamic_fee")
+                if type(output)is not int or not 0<output<2**64:
+                    raise ValueError("source selected fee quote lacks native output")
+                candidates=[output]
+                hypothetical=branch["hypothetical"]
+                bounded=True
             elif status in ("NATIVE_QUOTE_BOUNDED_NOT_EXACT","NATIVE_QUOTE_MODELED_NOT_EXACT"):
                 envelope=q.get("native_fee_envelope")
                 if not isinstance(envelope,dict) or any(
