@@ -663,6 +663,15 @@ jobs:
             "source_slot":fixture["state_accounts_observed_slot"],
             "accounts":fixture["state_account_count"],"broadcast":False}))
           PY
+      - name: Capture authentic Meteora pool, vaults and program ELF from upstream-backed fork
+        if: ${{ matrix.shard == 0 }}
+        run: |
+          python3 -m arb.m5_meteora_damm_v2_dedicated_signed_fork \
+            --capture-source \
+            --registry "$RUNNER_TEMP/m5-seven-venue-untrusted-pool-hints.json" \
+            --source-file "$RUNNER_TEMP/meteora-damm-v2-upstream-source.json" \
+            --binary tools/meteora_damm_v2_reference/target/release/sol-meteora-damm-v2-official-reference \
+            --output "$RUNNER_TEMP/meteora-damm-v2-capture-status.json"
       - name: Start disposable explicitly offline Surfpool
         run: |
           nohup surfpool start --ci --offline > "$RUNNER_TEMP/offline.log" 2>&1 < /dev/null &
@@ -682,7 +691,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/m5-four-to-six-signed-attempt"
           cargo build --release --manifest-path tools/meteora_damm_v2_reference/Cargo.toml
           python3 -m arb.m5_meteora_damm_v2_dedicated_signed_fork \
-            --registry "$RUNNER_TEMP/m5-seven-venue-untrusted-pool-hints.json" \
+            --source-file "$RUNNER_TEMP/meteora-damm-v2-upstream-source.json" \
             --binary tools/meteora_damm_v2_reference/target/release/sol-meteora-damm-v2-official-reference \
             --output "$RUNNER_TEMP/m5-four-to-six-signed-attempt/meteora-damm-v2-dedicated-signed-fork.json"
       - name: Execute source-captured four-to-six-hop signed isolated Surfpool trial
