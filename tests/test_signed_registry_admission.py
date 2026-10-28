@@ -15,7 +15,7 @@ def fixture():
         trials=[]
         for d in directions:
             for amount in (100,1000):
-                t={"status":trial_status,"pool":pool,"direction":d,"input":amount}
+                t={"status":trial_status,"pool":pool,"direction":d,("amount_in" if venue=="raydium_cpmm" else "input"):amount}
                 t.update({k:42 for k in outputs})
                 t[proof]="a"*64 if proof=="signed_sha256" else "1"*88
                 trials.append(t)
@@ -34,6 +34,12 @@ class SignedRegistryAdmission(unittest.TestCase):
         promoted=self.promote()
         self.assertEqual({p["venue"] for p in promoted["pools"]},set(SPECS))
         self.assertEqual(self.promote(registry=promoted),promoted)
+    def test_missing_raydium_amount_rejected(self):
+        with self.assertRaisesRegex(ValueError,"invalid input size"):
+            self.promote(lambda a,b,r:r["raydium_cpmm"]["pools"][0]["trials"][0].pop("amount_in"))
+    def test_missing_orca_digest_rejected(self):
+        with self.assertRaisesRegex(ValueError,"transaction evidence"):
+            self.promote(lambda a,b,r:r["orca"]["pools"][0]["trials"][0].pop("signed_sha256"))
     def test_missing_signature_rejected(self):
         with self.assertRaisesRegex(ValueError,"transaction evidence"):
             self.promote(lambda a,b,r:r["raydium_cpmm"]["pools"][0]["trials"][0].pop("signature"))
