@@ -79,3 +79,29 @@ def time_scheduler_numerator(*,cliff_fee_numerator,number_of_periods,
             "fee_precision":FEE_DENOMINATOR,
             "scheduler_input_authenticated":False,
             "dynamic_fee_included":False,**SAFE}
+
+def source_volatility_fee_candidate(*, volatility_accumulator, bin_step,
+                                    variable_fee_control, max_volatility_accumulator):
+    """Compute the published DAMM v2 dynamic-fee integer polynomial.
+
+    The source accumulator is a snapshot input, NOT the post-swap volatility
+    accumulator. The caller may compare the result to a signed observation,
+    but must not treat this model as protocol-exact execution pricing.
+    """
+    values=(volatility_accumulator,bin_step,variable_fee_control,
+            max_volatility_accumulator)
+    if (any(type(v)is not int for v in values) or
+            not 0<=volatility_accumulator<=max_volatility_accumulator or
+            bin_step<=0 or variable_fee_control<0 or
+            max_volatility_accumulator<=0):
+        raise ValueError("invalid source DAMM volatility configuration")
+    numerator=(volatility_accumulator*bin_step)**2*variable_fee_control
+    result=ceil_div(numerator,100_000_000_000)
+    if result>MAX_FEE_V1:
+        raise ValueError("DAMM volatility fee exceeds native version ceiling")
+    return {"snapshot_dynamic_fee_numerator":result,
+            "volatility_accumulator":volatility_accumulator,
+            "bin_step":bin_step,
+            "dynamic_fee_source":"CAPTURED_VOLATILITY_POLYNOMIAL_NO_SWAP_UPDATE",
+            "snapshot_dynamic_fee_not_execution_verified":True,
+            "protocol_exact_verified":False,**SAFE}
