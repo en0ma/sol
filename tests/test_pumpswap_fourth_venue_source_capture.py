@@ -24,6 +24,7 @@ class PumpSwapFourthVenueCaptureTests(unittest.TestCase):
             "arb.pumpswap_native_source_capture.verify",return_value=verified):
             report=capture("http://127.0.0.1:8899",REG,limit=1)
         self.assertEqual(report["authenticated"],1)
+        self.assertEqual(len(report["pools"][0]["authenticated_source_sha256"]),64)
         self.assertEqual(report["pools"][0]["source_fee_mode"],"FEE_MODE_AMBIGUOUS")
         self.assertEqual(len(report["pools"][0]["native_quote_candidates"]),4)
         self.assertTrue(all(not x["signed_parity_verified"] for x in report["pools"][0]["native_quote_candidates"]))
@@ -44,6 +45,23 @@ class PumpSwapFourthVenueCaptureTests(unittest.TestCase):
             report=capture("http://127.0.0.1:8899",REG,limit=1)
         self.assertEqual(report["authenticated"],0)
         self.assertEqual(report["pools"][0]["status"],"SOURCE_REJECTED")
+
+    def test_rejects_duplicate_authenticated_source_account(self):
+        import base64
+        from arb.pumpswap_pool import PROGRAM
+        account={"owner":PROGRAM,"executable":False,
+                 "data":[base64.b64encode(b"snapshot").decode(),"base64"]}
+        sources=[{"address":POOL,"owner":PROGRAM,"account_base64":"AA=="} for _ in range(6)]
+        verified={"verified":True,"slot":12,"authenticated_source_accounts":sources,
+                  "fee_mode_diagnostic":{"status":"FEE_MODE_AMBIGUOUS"}}
+        with patch("arb.pumpswap_native_source_capture.call",
+                   return_value={"value":account,"context":{"slot":11}}),patch(
+            "arb.pumpswap_native_source_capture.decode",
+            return_value={"base_mint":MINT_A,"quote_mint":MINT_B}),patch(
+            "arb.pumpswap_native_source_capture.verify",return_value=verified):
+            report=capture("http://127.0.0.1:8899",REG,limit=1)
+        self.assertEqual(report["authenticated"],0)
+        self.assertIn("duplicate",report["pools"][0]["reason"])
 
     def test_rejects_mint_identity_change(self):
         import base64
