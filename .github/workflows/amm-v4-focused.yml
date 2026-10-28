@@ -16,402 +16,524 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install builder dependency
         run: python3 -m pip install --disable-pip-version-check solders==0.26.0
-      - name: Test independent real signed three-hop acceptance
-        run: python3 -m unittest discover -s tests -p test_m5_three_hop_signed_acceptance.py -v
-      - name: Test strict four-to-six-hop independent signed acceptance
-        run: python3 -m unittest discover -s tests -p test_m5_n_hop_signed_acceptance.py -v
-      - name: Test 3-to-6 signed trial parameter gates
-        run: python3 -m unittest discover -s tests -p test_adaptive_n_hop_trial_arguments.py -v
-      - name: Test synchronized N-leg SPL fork snapshot reader
-        run: python3 -m unittest discover -s tests -p test_n_leg_snapshot.py -v
-      - name: Test repeatable signed observer failure without partial plan mutation
-        run: python3 -m unittest discover -s tests -p test_adaptive_signed_prefix_observer.py -v
-      - name: Test captured CPMM native fee bounds and manifest config identity
-        run: python3 -m unittest discover -s tests -p test_native_cpmm_config_fee_integrity.py -v
-      - name: Test CLMM native fee bytes spacing and account owner
-        run: python3 -m unittest discover -s tests -p test_native_clmm_config_fee_integrity.py -v
-      - name: Test independently bound native fee decoder identities
-        run: python3 -m unittest discover -s tests -p test_native_fee_source_identity.py -v
-      - name: Test actual three-pool source-backed quote input extraction
-        run: python3 -m unittest discover -s tests -p test_three_venue_source_quote_extraction.py -v
-      - name: Test fixture quote projection source identity joins and fee proof boundaries
-        run: python3 -m unittest discover -s tests -p test_fixture_quote_projection_identity.py -v
-      - name: Test evidence-based multi-venue distinct triple acceptance and costs
+      - name: Fast safety regression batch 1 (16 existing checks)
         run: |
+          set -e
+          echo "::group::Test independent real signed three-hop acceptance"
+          python3 -m unittest discover -s tests -p test_m5_three_hop_signed_acceptance.py -v
+          echo "::endgroup::"
+          echo "::group::Test strict four-to-six-hop independent signed acceptance"
+          python3 -m unittest discover -s tests -p test_m5_n_hop_signed_acceptance.py -v
+          echo "::endgroup::"
+          echo "::group::Test 3-to-6 signed trial parameter gates"
+          python3 -m unittest discover -s tests -p test_adaptive_n_hop_trial_arguments.py -v
+          echo "::endgroup::"
+          echo "::group::Test synchronized N-leg SPL fork snapshot reader"
+          python3 -m unittest discover -s tests -p test_n_leg_snapshot.py -v
+          echo "::endgroup::"
+          echo "::group::Test repeatable signed observer failure without partial plan mutation"
+          python3 -m unittest discover -s tests -p test_adaptive_signed_prefix_observer.py -v
+          echo "::endgroup::"
+          echo "::group::Test captured CPMM native fee bounds and manifest config identity"
+          python3 -m unittest discover -s tests -p test_native_cpmm_config_fee_integrity.py -v
+          echo "::endgroup::"
+          echo "::group::Test CLMM native fee bytes spacing and account owner"
+          python3 -m unittest discover -s tests -p test_native_clmm_config_fee_integrity.py -v
+          echo "::endgroup::"
+          echo "::group::Test independently bound native fee decoder identities"
+          python3 -m unittest discover -s tests -p test_native_fee_source_identity.py -v
+          echo "::endgroup::"
+          echo "::group::Test actual three-pool source-backed quote input extraction"
+          python3 -m unittest discover -s tests -p test_three_venue_source_quote_extraction.py -v
+          echo "::endgroup::"
+          echo "::group::Test fixture quote projection source identity joins and fee proof boundaries"
+          python3 -m unittest discover -s tests -p test_fixture_quote_projection_identity.py -v
+          echo "::endgroup::"
+          echo "::group::Test evidence-based multi-venue distinct triple acceptance and costs"
           python3 -m unittest discover -s tests -p test_m5_three_venue_coverage_acceptance.py -v
           python3 -m unittest discover -s tests -p test_m5_three_venue_observed_economics.py -v
-      - name: Test fee payer asset separation, signed AMM v4 fee rounding and multi-asset economics
-        run: |
+          echo "::endgroup::"
+          echo "::group::Test fee payer asset separation, signed AMM v4 fee rounding and multi-asset economics"
           python3 -m unittest discover -s tests -p test_fee_payer_separate_from_output.py -v
           python3 -m unittest discover -s tests -p test_native_fraction_rounding_diagnostics.py -v
           python3 -m unittest discover -s tests -p test_separate_sol_fee_asset_ledger.py -v
-      - name: Test signed fee quote break-even stress threshold
-        run: python3 -m unittest discover -s tests -p test_signed_fee_break_even_haircut.py -v
-      - name: Test exact signed-message RPC fee estimation without broadcast or paid-fee claim
-        run: python3 -m unittest discover -s tests -p test_signed_message_fee_estimate.py -v
-      - name: Test PumpSwap native accrued fee buckets and priced versus spendable liquidity
-        run: python3 -m unittest discover -s tests -p test_four_venue_auxiliary_state.py -v
-      - name: Compile four-venue manifest-owned auxiliary fee and liquidity extraction
-        run: |
+          echo "::endgroup::"
+          echo "::group::Test signed fee quote break-even stress threshold"
+          python3 -m unittest discover -s tests -p test_signed_fee_break_even_haircut.py -v
+          echo "::endgroup::"
+          echo "::group::Test exact signed-message RPC fee estimation without broadcast or paid-fee claim"
+          python3 -m unittest discover -s tests -p test_signed_message_fee_estimate.py -v
+          echo "::endgroup::"
+          echo "::group::Test PumpSwap native accrued fee buckets and priced versus spendable liquidity"
+          python3 -m unittest discover -s tests -p test_four_venue_auxiliary_state.py -v
+          echo "::endgroup::"
+          echo "::group::Compile four-venue manifest-owned auxiliary fee and liquidity extraction"
           python3 -m py_compile arb/fixture_native_aux_inventory.py arb/fixture_all_venue_signed_quotes.py arb/m5_distinct_venue_coverage_batch.py
-      - name: Test seven venue price evidence anti-forgery and source safety
-        run: python3 -m unittest discover -s tests -p test_seven_venue_evidence_integrity.py -v
-      - name: Test seven-venue signed-fork source parity matrix and exact integer accounting
+          echo "::endgroup::"
+      - name: Fast safety regression batch 2 (16 existing checks)
         run: |
+          set -e
+          echo "::group::Test seven venue price evidence anti-forgery and source safety"
+          python3 -m unittest discover -s tests -p test_seven_venue_evidence_integrity.py -v
+          echo "::endgroup::"
+          echo "::group::Test seven-venue signed-fork source parity matrix and exact integer accounting"
           python3 -m py_compile arb/seven_venue_signed_parity_gate.py arb/m5_distinct_venue_coverage_batch.py
           python3 -m unittest discover -s tests -p test_seven_venue_signed_parity_gate.py -v
-      - name: Reproduce actual signed Orca fork outputs with native adaptive fee and source Oracle
-        run: |
+          echo "::endgroup::"
+          echo "::group::Reproduce actual signed Orca fork outputs with native adaptive fee and source Oracle"
           python3 -m py_compile arb/orca_adaptive_fee_source.py arb/m5_orca_fork_parity.py
           python3 -m unittest discover -s tests -p test_m5_orca_real_fork_fee_native.py -v
           python3 -m unittest discover -s tests -p test_m5_orca_fork_clock.py -v
           python3 -m unittest discover -s tests -p test_m5_orca_fork_parity.py -v
-      - name: Test bounded Whirlpool native tick prices
-        run: python3 -m unittest discover -s tests -p test_orca_native_tick_range_guard.py -v
-      - name: Test authenticated CLMM tick source availability blockers
-        run: python3 -m unittest discover -s tests -p test_source_tick_bin_pda_guards.py -v
-      - name: Test all-seven native source quote dispatch and signed leg parity wiring
-        run: |
+          echo "::endgroup::"
+          echo "::group::Test bounded Whirlpool native tick prices"
+          python3 -m unittest discover -s tests -p test_orca_native_tick_range_guard.py -v
+          echo "::endgroup::"
+          echo "::group::Test authenticated CLMM tick source availability blockers"
+          python3 -m unittest discover -s tests -p test_source_tick_bin_pda_guards.py -v
+          echo "::endgroup::"
+          echo "::group::Test all-seven native source quote dispatch and signed leg parity wiring"
           python3 -m py_compile arb/fixture_all_venue_signed_quotes.py arb/m5_three_venue_signed_quote_parity.py
           python3 -m unittest discover -s tests -p test_fixture_all_venue_signed_quotes.py -v
-      - name: Syntax-check signed fork comparison and venue batch artifacts
-        run: python3 -m py_compile arb/venue_signed_quote_experiments.py arb/m5_distinct_venue_coverage_batch.py
-      - name: Test actual signed Surfpool venue quote parity evidence accounting
-        run: python3 -m unittest discover -s tests -p test_venue_signed_quote_experiments.py -v
-      - name: Test authenticated multi-bin DLMM fee variations and source-bound adapter
-        run: |
+          echo "::endgroup::"
+          echo "::group::Syntax-check signed fork comparison and venue batch artifacts"
+          python3 -m py_compile arb/venue_signed_quote_experiments.py arb/m5_distinct_venue_coverage_batch.py
+          echo "::endgroup::"
+          echo "::group::Test actual signed Surfpool venue quote parity evidence accounting"
+          python3 -m unittest discover -s tests -p test_venue_signed_quote_experiments.py -v
+          echo "::endgroup::"
+          echo "::group::Test authenticated multi-bin DLMM fee variations and source-bound adapter"
           python3 -m unittest discover -s tests -p test_meteora_dlmm_multibin_quote.py -v
           python3 -m unittest discover -s tests -p test_venue_dlmm_multibin_integration.py -v
           python3 -m unittest discover -s tests -p test_meteora_dlmm_per_bin_fees.py -v
-      - name: Test Meteora DAMM v2 collection mode fee denomination by swap direction
-        run: python3 -m unittest discover -s tests -p test_damm_v2_native_fee_modes.py -v
-      - name: Test Meteora DLMM bounded bin and DAMM v2 fee denomination models
-        run: |
+          echo "::endgroup::"
+          echo "::group::Test Meteora DAMM v2 collection mode fee denomination by swap direction"
+          python3 -m unittest discover -s tests -p test_damm_v2_native_fee_modes.py -v
+          echo "::endgroup::"
+          echo "::group::Test Meteora DLMM bounded bin and DAMM v2 fee denomination models"
           python3 -m unittest discover -s tests -p test_meteora_dlmm_one_bin_quote.py -v
           python3 -m unittest discover -s tests -p test_meteora_damm_v2_fee_quote.py -v
           python3 -m unittest discover -s tests -p test_meteora_venue_quote_integration.py -v
-      - name: Test independent venue quote adapters and same-slot fee and tick authentication
-        run: |
+          echo "::endgroup::"
+          echo "::group::Test independent venue quote adapters and same-slot fee and tick authentication"
           python3 -m unittest discover -s tests -p test_venue_quote_adapter.py -v
           python3 -m unittest discover -s tests -p test_source_bound_concentrated_quotes.py -v
           python3 -m unittest discover -s tests -p test_source_bound_pumpswap_quotes.py -v
-      - name: Test venue-owned CPMM accrued fee liabilities and effective vault reserves
-        run: |
+          echo "::endgroup::"
+          echo "::group::Test venue-owned CPMM accrued fee liabilities and effective vault reserves"
           python3 -m unittest discover -s tests -p test_cpmm_accrued_fee_state.py -v
           python3 -m unittest discover -s tests -p test_cpmm_effective_reserves.py -v
-      - name: Test venue-owned CPMM creator-fee source quotation
-        run: |
+          echo "::endgroup::"
+          echo "::group::Test venue-owned CPMM creator-fee source quotation"
           python3 -m unittest discover -s tests -p test_cpmm_creator_fee_pool_decode.py -v
           python3 -m unittest discover -s tests -p test_cpmm_creator_fee_venue_math.py -v
-      - name: Test CPMM integer fee candidate classification and gross-loss economics
-        run: |
+          echo "::endgroup::"
+          echo "::group::Test CPMM integer fee candidate classification and gross-loss economics"
           python3 -m unittest discover -s tests -p test_cpmm_native_fee_candidates.py -v
           python3 -m unittest discover -s tests -p test_signed_cpmm_fee_model_classification.py -v
           python3 -m unittest discover -s tests -p test_signed_gross_loss_economics.py -v
-      - name: Test source-derived Raydium CPMM fee rounding both directions
-        run: python3 -m unittest discover -s tests -p test_cpmm_fee_rounding_interval.py -v
-      - name: Test source-native PumpSwap fee component rounding arithmetic
-        run: python3 -m unittest discover -s tests -p test_m5_pumpswap_native_fee_rounding_scenarios.py -v
-      - name: Test native AMM v4 floor/ceiling fee output interval and non-WSOL economics
+          echo "::endgroup::"
+          echo "::group::Test source-derived Raydium CPMM fee rounding both directions"
+          python3 -m unittest discover -s tests -p test_cpmm_fee_rounding_interval.py -v
+          echo "::endgroup::"
+      - name: Fast safety regression batch 3 (16 existing checks)
         run: |
+          set -e
+          echo "::group::Test source-native PumpSwap fee component rounding arithmetic"
+          python3 -m unittest discover -s tests -p test_m5_pumpswap_native_fee_rounding_scenarios.py -v
+          echo "::endgroup::"
+          echo "::group::Test native AMM v4 floor/ceiling fee output interval and non-WSOL economics"
           python3 -m unittest discover -s tests -p test_ammv4_native_fee_output_interval.py -v
           python3 -m unittest discover -s tests -p test_nonwsol_fee_sensitivity.py -v
           python3 -m unittest discover -s tests -p test_invalid_signed_message_fee_rejection.py -v
-      - name: Test AMM v4 native fractional fee quoting and authentication
-        run: |
+          echo "::endgroup::"
+          echo "::group::Test AMM v4 native fractional fee quoting and authentication"
           python3 -m unittest discover -s tests -p test_ammv4_native_fraction_quote.py -v
           python3 -m unittest discover -s tests -p test_ammv4_nonppm_source_quote.py -v
-      - name: Test native fractional fee against actual signed route outputs and cost scenarios
-        run: |
+          echo "::endgroup::"
+          echo "::group::Test native fractional fee against actual signed route outputs and cost scenarios"
           python3 -m unittest discover -s tests -p test_native_fraction_signed_parity.py -v
           python3 -m unittest discover -s tests -p test_signed_wsol_estimated_network_economics.py -v
-      - name: Test signed-quote integer precision and independent fee provenance
-        run: |
+          echo "::endgroup::"
+          echo "::group::Test signed-quote integer precision and independent fee provenance"
           python3 -m unittest discover -s tests -p test_signed_quote_integer_precision.py -v
           python3 -m unittest discover -s tests -p test_signed_fee_provenance_economics.py -v
-      - name: Test source-exact quote and observed fee/economics fail-closed gates
-        run: python3 -m unittest discover -s tests -p test_m5_source_quote_economic_gate.py -v
-      - name: Test signed route breadth, actual pricing gap and economic risk aggregation
-        run: python3 -m unittest discover -s tests -p test_m5_research_evidence_rollup.py -v
-      - name: Test isolated native pricing account evidence across four venues
-        run: |
+          echo "::endgroup::"
+          echo "::group::Test source-exact quote and observed fee/economics fail-closed gates"
+          python3 -m unittest discover -s tests -p test_m5_source_quote_economic_gate.py -v
+          echo "::endgroup::"
+          echo "::group::Test signed route breadth, actual pricing gap and economic risk aggregation"
+          python3 -m unittest discover -s tests -p test_m5_research_evidence_rollup.py -v
+          echo "::endgroup::"
+          echo "::group::Test isolated native pricing account evidence across four venues"
           python3 -m py_compile arb/fixture_native_aux_inventory.py arb/m5_distinct_venue_coverage_batch.py
           python3 -m unittest discover -s tests -p test_native_aux_isolation.py -v
-      - name: Compile signed source experiment isolation and artifact emission
-        run: python3 -m py_compile arb/m5_distinct_venue_coverage_batch.py arb/fixture_native_aux_inventory.py
-      - name: Test multiple real three-venue source/receipt batch accounting
-        run: python3 -m unittest discover -s tests -p test_m5_distinct_venue_coverage_batch.py -v
-      - name: Test signed three-venue per-leg source-quote comparisons stay non-actionable
-        run: python3 -m unittest discover -s tests -p test_m5_three_venue_signed_quote_parity.py -v
-      - name: Test independent actual three-distinct-venue signed receipt acceptance
-        run: python3 -m unittest discover -s tests -p test_three_distinct_venue_signed_acceptance.py -v
-      - name: Test universal signed three-venue runner source and topology gates
-        run: python3 -m unittest discover -s tests -p test_signed_three_venue_runner.py -v
-      - name: Test read-only three-distinct-venue fixture export
-        run: python3 -m unittest discover -s tests -p test_three_venue_fixture_export.py -v
-      - name: Test diversity-first source triangle selection
-        run: python3 -m unittest discover -s tests -p test_distinct_triangle_coverage_selection.py -v
-      - name: Test real authenticated three-distinct-venue closed route discovery
-        run: python3 -m unittest discover -s tests -p test_distinct_venue_triangle_discovery.py -v
-      - name: Test source quote and signed execution blocker grouping
-        run: python3 -m unittest discover -s tests -p test_m5_source_blocker_priorities.py -v
-      - name: Test signed simulation compute unit caps for all route lengths
-        run: python3 -m unittest discover -s tests -p test_signed_compute_budget.py -v
-      - name: Test signed cumulative prefix full token-balance continuity
-        run: python3 -m unittest discover -s tests -p test_signed_prefix_balance_integrity.py -v
-      - name: Test sequential cumulative signed prefix amount observations
-        run: python3 -m unittest discover -s tests -p test_adaptive_signed_prefix_observer.py -v
-      - name: Test positive signed N-leg post-account identity
-        run: python3 -m unittest discover -s tests -p test_adaptive_n_leg_post_balances.py -v
-      - name: Test integrated signed adaptive N-leg offline execution fail-closed path
-        run: python3 -m unittest discover -s tests -p test_adaptive_n_leg_execution.py -v
-      - name: Test signed N-leg inner SPL CPI continuity
-        run: python3 -m unittest discover -s tests -p test_adaptive_n_leg_cpi.py -v
-      - name: Test shared 2-to-6 offline signing and ordered intermediate-account linkage
-        run: python3 -m unittest discover -s tests -p test_adaptive_n_leg_packet.py -v
-      - name: Test signed N-leg SPL amount and rollback reconciliation
-        run: python3 -m unittest discover -s tests -p test_adaptive_n_leg_balances.py -v
-      - name: Test adaptive signed observation into existing coordinator
-        run: python3 -m unittest discover -s tests -p test_adaptive_runner_coordinator.py -v
-      - name: Test generic adaptive coordinator and existing venue compiler
-        run: python3 -m unittest discover -s tests -p test_adaptive_compiler_integration.py -v
-      - name: Test general 2-to-6 leg signed-observation adaptive planning
-        run: python3 -m unittest discover -s tests -p test_adaptive_route_amount_planner.py -v
-      - name: Test all-venue signed adaptive research acceptance
-        run: python3 -m unittest discover -s tests -p test_m5_all_venue_adaptive_acceptance.py -v
-      - name: Test independent adaptive signed amount-continuity acceptance
-        run: python3 -m unittest discover -s tests -p test_m5_adaptive_signed_acceptance.py -v
-      - name: Test signed first-leg adaptive amount preflight
-        run: python3 -m unittest discover -s tests -p test_m5_adaptive_cpmm_v4.py -v
-      - name: Test empirical signed quote and creator-fee blocker summary
-        run: python3 -m unittest discover -s tests -p test_m5_experiment_blocker_summary.py -v
-      - name: Test signed declared input versus actual SPL token consumption
-        run: python3 -m unittest discover -s tests -p test_m5_signed_amount_declarations.py -v
-      - name: Test source-derived CPMM creator-fee and observed compute evidence
-        run: python3 -m unittest discover -s tests -p test_m5_captured_fee_compute_audit.py -v
-      - name: Test focused real-source fixture receipt batch assessment
-        run: python3 -m unittest discover -s tests -p test_m5_focused_signed_experiment_batch.py -v
-      - name: Test reproducible fixture-to-signed receipt experiment diagnostics
-        run: python3 -m unittest discover -s tests -p test_m5_signed_fixture_experiment_report.py -v
-      - name: Test native account-derived CPMM/AMM v4 two-leg quote parity and observed cost risk
-        run: python3 -m unittest discover -s tests -p test_cpmm_ammv4_signed_experiment.py -v
-      - name: Validate consolidated three-priority signed experiment acceptance gates
-        run: python3 -m unittest discover -s tests -p test_m5_experiment_acceptance.py -v
-      - name: Prevent unsigned simulated PnL and enumerate all missing tick arrays
-        run: python3 -m unittest discover -s tests -p test_m5_signed_risk_tick_gap_regressions.py -v
-      - name: Test captured PumpSwap fee parsing and observed downside sensitivity
-        run: python3 -m unittest discover -s tests -p test_m5_pump_fee_and_risk_sensitivity.py -v
-      - name: Test three-priority signed risk, quote parity and missing tick source request planning
-        run: python3 -m unittest discover -s tests -p test_m5_parallel_three_priorities.py -v
-      - name: Test empirical two-leg parity portfolio and conservative cost accounting
-        run: python3 -m unittest discover -s tests -p test_signed_quote_parity_portfolio.py -v
-      - name: Test contextual CLMM and Whirlpool tick array coverage diagnostics
-        run: python3 -m unittest discover -s tests -p test_fixture_tick_coverage.py -v
-      - name: Test observed signed two-leg quote deviation diagnostic without accuracy self-certification
-        run: python3 -m unittest discover -s tests -p test_signed_quote_accuracy_report.py -v
-      - name: Test captured Orca and CLMM initialized tick array extraction
-        run: python3 -m unittest discover -s tests -p test_fixture_concentrated_ticks.py -v
-      - name: Test signed intermediate SPL consumption against quoted second-leg input
-        run: python3 -m unittest discover -s tests -p test_signed_intermediate_quote_parity.py -v
-      - name: Test contextual hydrated fork account byte equality
-        run: python3 -m unittest discover -s tests -p test_hydrated_fork_state_audit.py -v
-      - name: Verify signed fixture receipt identity and prevent manufactured execution slot claims
-        run: python3 -m unittest discover -s tests -p test_signed_fixture_provenance_gate.py -v
-      - name: Test end-to-end AMM v4 fixture fee and adjusted-reserve quote adapter
-        run: python3 -m unittest discover -s tests -p test_raydium_amm_v4_fixture_quote.py -v
-      - name: Test source-derived AMM v4 trade fee and adjusted-reserve integration
-        run: python3 -m unittest discover -s tests -p test_raydium_amm_v4_fee_state.py -v
-      - name: Test source-captured AMM v4 OpenOrders market balances and adjusted reserves
-        run: python3 -m unittest discover -s tests -p test_raydium_amm_v4_open_orders_reserves.py -v
-      - name: Test account-derived CPMM and CLMM quote projections and safety gates
-        run: python3 -m unittest discover -s tests -p test_fixture_config_quote_projection.py -v
-      - name: Test actual manifest-captured CPMM and CLMM configuration fee decoding
-        run: python3 -m unittest discover -s tests -p test_fixture_aux_fee_decoder.py -v
-      - name: Test seven-venue auxiliary pricing requirements and no unsupported verification promotion
-        run: python3 -m unittest discover -s tests -p test_seven_venue_aux_pricing_requirements.py -v
-      - name: Test native pool fee derivation and conservative missing auxiliary-account gates
-        run: python3 -m unittest discover -s tests -p test_fixture_native_quote_state.py -v
-      - name: Verify all seven venue pool vaults, native liquidity and price fields from captured SPL accounts
-        run: python3 -m unittest discover -s tests -p test_fixture_pool_fundamentals.py -v
-      - name: Prevent injected pricing-state providers from self-certifying measured accuracy
-        run: python3 -m unittest discover -s tests -p test_m5_accuracy_provenance_gate.py -v
-      - name: Test seven-venue source fixture decoding and signed quote comparison orchestration
-        run: python3 -m unittest discover -s tests -p test_fixture_quote_execution_pipeline.py -v
-      - name: Test quote-to-source-fixture identity and exact slot/manifest matching
-        run: python3 -m unittest discover -s tests -p test_fixture_quote_binding.py -v
-      - name: Verify contextual source-state account checksum integrity
-        run: python3 -m unittest discover -s tests -p test_source_snapshot_manifest.py -v
-      - name: Verify signed receipt provenance extension never self-certifies quote accuracy
-        run: python3 -m unittest discover -s tests -p test_m5_receipt_provenance.py -v
-      - name: Test quote accuracy against independently signed atomic receipts and source identity
-        run: python3 -m unittest discover -s tests -p test_quote_simulation_reconciliation.py -v
-      - name: Test seven venue indicative quote adapters and missing-state safety gates
-        run: python3 -m unittest discover -s tests -p test_remaining_venue_quote_provider.py -v
-      - name: Test reproducible offline research JSON evidence and conservative provenance
-        run: python3 -m unittest discover -s tests -p test_offline_research_report.py -v
-      - name: Test bounded exact-input multi-size research sweeps without profit promotion
-        run: python3 -m unittest discover -s tests -p test_research_trade_size_sweep.py -v
-      - name: Test authenticated pool-to-quote-to-graph research integration
-        run: python3 -m unittest discover -s tests -p test_snapshot_research_runner.py -v
-      - name: Test authenticated PumpSwap directional reserve and fee quote adapter
-        run: python3 -m unittest discover -s tests -p test_authenticated_pumpswap_quote_provider.py -v
-      - name: Test authenticated Orca Whirlpool bounded in-tick quote adapter
-        run: python3 -m unittest discover -s tests -p test_authenticated_orca_quote_provider.py -v
-      - name: Test authenticated Raydium CLMM within-tick quote adapter
-        run: python3 -m unittest discover -s tests -p test_authenticated_clmm_quote_provider.py -v
-      - name: Test authenticated Raydium CPMM amount-aware quote adapter
-        run: python3 -m unittest discover -s tests -p test_authenticated_quote_provider.py -v
-      - name: Test isolated authenticated market-state registry and common quote evidence boundary
-        run: python3 -m unittest discover -s tests -p test_market_state_and_quote_contract.py -v
-      - name: Test strict adaptive audit failure reason visibility
+          echo "::endgroup::"
+          echo "::group::Compile signed source experiment isolation and artifact emission"
+          python3 -m py_compile arb/m5_distinct_venue_coverage_batch.py arb/fixture_native_aux_inventory.py
+          echo "::endgroup::"
+          echo "::group::Test multiple real three-venue source/receipt batch accounting"
+          python3 -m unittest discover -s tests -p test_m5_distinct_venue_coverage_batch.py -v
+          echo "::endgroup::"
+          echo "::group::Test signed three-venue per-leg source-quote comparisons stay non-actionable"
+          python3 -m unittest discover -s tests -p test_m5_three_venue_signed_quote_parity.py -v
+          echo "::endgroup::"
+          echo "::group::Test independent actual three-distinct-venue signed receipt acceptance"
+          python3 -m unittest discover -s tests -p test_three_distinct_venue_signed_acceptance.py -v
+          echo "::endgroup::"
+          echo "::group::Test universal signed three-venue runner source and topology gates"
+          python3 -m unittest discover -s tests -p test_signed_three_venue_runner.py -v
+          echo "::endgroup::"
+          echo "::group::Test read-only three-distinct-venue fixture export"
+          python3 -m unittest discover -s tests -p test_three_venue_fixture_export.py -v
+          echo "::endgroup::"
+          echo "::group::Test diversity-first source triangle selection"
+          python3 -m unittest discover -s tests -p test_distinct_triangle_coverage_selection.py -v
+          echo "::endgroup::"
+          echo "::group::Test real authenticated three-distinct-venue closed route discovery"
+          python3 -m unittest discover -s tests -p test_distinct_venue_triangle_discovery.py -v
+          echo "::endgroup::"
+      - name: Fast safety regression batch 4 (16 existing checks)
         run: |
+          set -e
+          echo "::group::Test source quote and signed execution blocker grouping"
+          python3 -m unittest discover -s tests -p test_m5_source_blocker_priorities.py -v
+          echo "::endgroup::"
+          echo "::group::Test signed simulation compute unit caps for all route lengths"
+          python3 -m unittest discover -s tests -p test_signed_compute_budget.py -v
+          echo "::endgroup::"
+          echo "::group::Test signed cumulative prefix full token-balance continuity"
+          python3 -m unittest discover -s tests -p test_signed_prefix_balance_integrity.py -v
+          echo "::endgroup::"
+          echo "::group::Test sequential cumulative signed prefix amount observations"
+          python3 -m unittest discover -s tests -p test_adaptive_signed_prefix_observer.py -v
+          echo "::endgroup::"
+          echo "::group::Test positive signed N-leg post-account identity"
+          python3 -m unittest discover -s tests -p test_adaptive_n_leg_post_balances.py -v
+          echo "::endgroup::"
+          echo "::group::Test integrated signed adaptive N-leg offline execution fail-closed path"
+          python3 -m unittest discover -s tests -p test_adaptive_n_leg_execution.py -v
+          echo "::endgroup::"
+          echo "::group::Test signed N-leg inner SPL CPI continuity"
+          python3 -m unittest discover -s tests -p test_adaptive_n_leg_cpi.py -v
+          echo "::endgroup::"
+          echo "::group::Test shared 2-to-6 offline signing and ordered intermediate-account linkage"
+          python3 -m unittest discover -s tests -p test_adaptive_n_leg_packet.py -v
+          echo "::endgroup::"
+          echo "::group::Test signed N-leg SPL amount and rollback reconciliation"
+          python3 -m unittest discover -s tests -p test_adaptive_n_leg_balances.py -v
+          echo "::endgroup::"
+          echo "::group::Test adaptive signed observation into existing coordinator"
+          python3 -m unittest discover -s tests -p test_adaptive_runner_coordinator.py -v
+          echo "::endgroup::"
+          echo "::group::Test generic adaptive coordinator and existing venue compiler"
+          python3 -m unittest discover -s tests -p test_adaptive_compiler_integration.py -v
+          echo "::endgroup::"
+          echo "::group::Test general 2-to-6 leg signed-observation adaptive planning"
+          python3 -m unittest discover -s tests -p test_adaptive_route_amount_planner.py -v
+          echo "::endgroup::"
+          echo "::group::Test all-venue signed adaptive research acceptance"
+          python3 -m unittest discover -s tests -p test_m5_all_venue_adaptive_acceptance.py -v
+          echo "::endgroup::"
+          echo "::group::Test independent adaptive signed amount-continuity acceptance"
+          python3 -m unittest discover -s tests -p test_m5_adaptive_signed_acceptance.py -v
+          echo "::endgroup::"
+          echo "::group::Test signed first-leg adaptive amount preflight"
+          python3 -m unittest discover -s tests -p test_m5_adaptive_cpmm_v4.py -v
+          echo "::endgroup::"
+          echo "::group::Test empirical signed quote and creator-fee blocker summary"
+          python3 -m unittest discover -s tests -p test_m5_experiment_blocker_summary.py -v
+          echo "::endgroup::"
+      - name: Fast safety regression batch 5 (16 existing checks)
+        run: |
+          set -e
+          echo "::group::Test signed declared input versus actual SPL token consumption"
+          python3 -m unittest discover -s tests -p test_m5_signed_amount_declarations.py -v
+          echo "::endgroup::"
+          echo "::group::Test source-derived CPMM creator-fee and observed compute evidence"
+          python3 -m unittest discover -s tests -p test_m5_captured_fee_compute_audit.py -v
+          echo "::endgroup::"
+          echo "::group::Test focused real-source fixture receipt batch assessment"
+          python3 -m unittest discover -s tests -p test_m5_focused_signed_experiment_batch.py -v
+          echo "::endgroup::"
+          echo "::group::Test reproducible fixture-to-signed receipt experiment diagnostics"
+          python3 -m unittest discover -s tests -p test_m5_signed_fixture_experiment_report.py -v
+          echo "::endgroup::"
+          echo "::group::Test native account-derived CPMM/AMM v4 two-leg quote parity and observed cost risk"
+          python3 -m unittest discover -s tests -p test_cpmm_ammv4_signed_experiment.py -v
+          echo "::endgroup::"
+          echo "::group::Validate consolidated three-priority signed experiment acceptance gates"
+          python3 -m unittest discover -s tests -p test_m5_experiment_acceptance.py -v
+          echo "::endgroup::"
+          echo "::group::Prevent unsigned simulated PnL and enumerate all missing tick arrays"
+          python3 -m unittest discover -s tests -p test_m5_signed_risk_tick_gap_regressions.py -v
+          echo "::endgroup::"
+          echo "::group::Test captured PumpSwap fee parsing and observed downside sensitivity"
+          python3 -m unittest discover -s tests -p test_m5_pump_fee_and_risk_sensitivity.py -v
+          echo "::endgroup::"
+          echo "::group::Test three-priority signed risk, quote parity and missing tick source request planning"
+          python3 -m unittest discover -s tests -p test_m5_parallel_three_priorities.py -v
+          echo "::endgroup::"
+          echo "::group::Test empirical two-leg parity portfolio and conservative cost accounting"
+          python3 -m unittest discover -s tests -p test_signed_quote_parity_portfolio.py -v
+          echo "::endgroup::"
+          echo "::group::Test contextual CLMM and Whirlpool tick array coverage diagnostics"
+          python3 -m unittest discover -s tests -p test_fixture_tick_coverage.py -v
+          echo "::endgroup::"
+          echo "::group::Test observed signed two-leg quote deviation diagnostic without accuracy self-certification"
+          python3 -m unittest discover -s tests -p test_signed_quote_accuracy_report.py -v
+          echo "::endgroup::"
+          echo "::group::Test captured Orca and CLMM initialized tick array extraction"
+          python3 -m unittest discover -s tests -p test_fixture_concentrated_ticks.py -v
+          echo "::endgroup::"
+          echo "::group::Test signed intermediate SPL consumption against quoted second-leg input"
+          python3 -m unittest discover -s tests -p test_signed_intermediate_quote_parity.py -v
+          echo "::endgroup::"
+          echo "::group::Test contextual hydrated fork account byte equality"
+          python3 -m unittest discover -s tests -p test_hydrated_fork_state_audit.py -v
+          echo "::endgroup::"
+          echo "::group::Verify signed fixture receipt identity and prevent manufactured execution slot claims"
+          python3 -m unittest discover -s tests -p test_signed_fixture_provenance_gate.py -v
+          echo "::endgroup::"
+      - name: Fast safety regression batch 6 (16 existing checks)
+        run: |
+          set -e
+          echo "::group::Test end-to-end AMM v4 fixture fee and adjusted-reserve quote adapter"
+          python3 -m unittest discover -s tests -p test_raydium_amm_v4_fixture_quote.py -v
+          echo "::endgroup::"
+          echo "::group::Test source-derived AMM v4 trade fee and adjusted-reserve integration"
+          python3 -m unittest discover -s tests -p test_raydium_amm_v4_fee_state.py -v
+          echo "::endgroup::"
+          echo "::group::Test source-captured AMM v4 OpenOrders market balances and adjusted reserves"
+          python3 -m unittest discover -s tests -p test_raydium_amm_v4_open_orders_reserves.py -v
+          echo "::endgroup::"
+          echo "::group::Test account-derived CPMM and CLMM quote projections and safety gates"
+          python3 -m unittest discover -s tests -p test_fixture_config_quote_projection.py -v
+          echo "::endgroup::"
+          echo "::group::Test actual manifest-captured CPMM and CLMM configuration fee decoding"
+          python3 -m unittest discover -s tests -p test_fixture_aux_fee_decoder.py -v
+          echo "::endgroup::"
+          echo "::group::Test seven-venue auxiliary pricing requirements and no unsupported verification promotion"
+          python3 -m unittest discover -s tests -p test_seven_venue_aux_pricing_requirements.py -v
+          echo "::endgroup::"
+          echo "::group::Test native pool fee derivation and conservative missing auxiliary-account gates"
+          python3 -m unittest discover -s tests -p test_fixture_native_quote_state.py -v
+          echo "::endgroup::"
+          echo "::group::Verify all seven venue pool vaults, native liquidity and price fields from captured SPL accounts"
+          python3 -m unittest discover -s tests -p test_fixture_pool_fundamentals.py -v
+          echo "::endgroup::"
+          echo "::group::Prevent injected pricing-state providers from self-certifying measured accuracy"
+          python3 -m unittest discover -s tests -p test_m5_accuracy_provenance_gate.py -v
+          echo "::endgroup::"
+          echo "::group::Test seven-venue source fixture decoding and signed quote comparison orchestration"
+          python3 -m unittest discover -s tests -p test_fixture_quote_execution_pipeline.py -v
+          echo "::endgroup::"
+          echo "::group::Test quote-to-source-fixture identity and exact slot/manifest matching"
+          python3 -m unittest discover -s tests -p test_fixture_quote_binding.py -v
+          echo "::endgroup::"
+          echo "::group::Verify contextual source-state account checksum integrity"
+          python3 -m unittest discover -s tests -p test_source_snapshot_manifest.py -v
+          echo "::endgroup::"
+          echo "::group::Verify signed receipt provenance extension never self-certifies quote accuracy"
+          python3 -m unittest discover -s tests -p test_m5_receipt_provenance.py -v
+          echo "::endgroup::"
+          echo "::group::Test quote accuracy against independently signed atomic receipts and source identity"
+          python3 -m unittest discover -s tests -p test_quote_simulation_reconciliation.py -v
+          echo "::endgroup::"
+          echo "::group::Test seven venue indicative quote adapters and missing-state safety gates"
+          python3 -m unittest discover -s tests -p test_remaining_venue_quote_provider.py -v
+          echo "::endgroup::"
+          echo "::group::Test reproducible offline research JSON evidence and conservative provenance"
+          python3 -m unittest discover -s tests -p test_offline_research_report.py -v
+          echo "::endgroup::"
+      - name: Fast safety regression batch 7 (16 existing checks)
+        run: |
+          set -e
+          echo "::group::Test bounded exact-input multi-size research sweeps without profit promotion"
+          python3 -m unittest discover -s tests -p test_research_trade_size_sweep.py -v
+          echo "::endgroup::"
+          echo "::group::Test authenticated pool-to-quote-to-graph research integration"
+          python3 -m unittest discover -s tests -p test_snapshot_research_runner.py -v
+          echo "::endgroup::"
+          echo "::group::Test authenticated PumpSwap directional reserve and fee quote adapter"
+          python3 -m unittest discover -s tests -p test_authenticated_pumpswap_quote_provider.py -v
+          echo "::endgroup::"
+          echo "::group::Test authenticated Orca Whirlpool bounded in-tick quote adapter"
+          python3 -m unittest discover -s tests -p test_authenticated_orca_quote_provider.py -v
+          echo "::endgroup::"
+          echo "::group::Test authenticated Raydium CLMM within-tick quote adapter"
+          python3 -m unittest discover -s tests -p test_authenticated_clmm_quote_provider.py -v
+          echo "::endgroup::"
+          echo "::group::Test authenticated Raydium CPMM amount-aware quote adapter"
+          python3 -m unittest discover -s tests -p test_authenticated_quote_provider.py -v
+          echo "::endgroup::"
+          echo "::group::Test isolated authenticated market-state registry and common quote evidence boundary"
+          python3 -m unittest discover -s tests -p test_market_state_and_quote_contract.py -v
+          echo "::endgroup::"
+          echo "::group::Test strict adaptive audit failure reason visibility"
           python3 -m py_compile arb/m5_all_venue_adaptive_acceptance.py
           python3 -m unittest discover -s tests -p test_m5_adaptive_failure_diagnostics.py -v
-      - name: Enforce authenticated graph prerequisite CI step ordering
-        run: python3 -m unittest discover -s tests -p test_m5_ci_source_dependency_order.py -v
-      - name: Test captured canonical PumpSwap fee PDA and global config remain insufficient for dynamic exact quotes
-        run: |
+          echo "::endgroup::"
+          echo "::group::Enforce authenticated graph prerequisite CI step ordering"
+          python3 -m unittest discover -s tests -p test_m5_ci_source_dependency_order.py -v
+          echo "::endgroup::"
+          echo "::group::Test captured canonical PumpSwap fee PDA and global config remain insufficient for dynamic exact quotes"
           python3 -m py_compile arb/fixture_native_aux_inventory.py
           python3 -m unittest discover -s tests -p test_m5_pumpswap_canonical_aux.py -v
-      - name: Validate actual signed start-mint economic cost accounting without false profit acceptance
-        run: |
+          echo "::endgroup::"
+          echo "::group::Validate actual signed start-mint economic cost accounting without false profit acceptance"
           python3 -m py_compile arb/m5_signed_start_mint_economics.py
           python3 -m unittest discover -s tests -p test_m5_signed_start_mint_economics.py -v
-      - name: Test all genuine multi-size signed local-fork attempts and independent receipt audits
-        run: |
+          echo "::endgroup::"
+          echo "::group::Test all genuine multi-size signed local-fork attempts and independent receipt audits"
           python3 -m py_compile arb/next_ten_signed_atomic_offline.py arb/m5_four_to_six_signed_batch_audit.py
           python3 -m unittest discover -s tests -p test_m5_signed_four_to_six_multisize.py -v
           python3 -m unittest discover -s tests -p test_m5_four_to_six_signed_batch_audit.py -v
-      - name: Cryptographically validate actual signed positive and rollback Solana transactions
-        run: |
+          echo "::endgroup::"
+          echo "::group::Cryptographically validate actual signed positive and rollback Solana transactions"
           python3 -m py_compile arb/m5_independent_signed_wire_verifier.py arb/atomic_graph_coordinator.py
           python3 -m unittest discover -s tests -p test_m5_independent_signed_wire_verifier.py -v
-      - name: Independently check four-to-six-source signed acceptance report code
-        run: |
+          echo "::endgroup::"
+          echo "::group::Independently check four-to-six-source signed acceptance report code"
           python3 -m py_compile arb/m5_four_to_six_source_signed_acceptance.py
           python3 -m unittest discover -s tests -p test_m5_four_to_six_source_signed_acceptance.py -v
-      - name: Test versioned v0 signed fee-for-message wire encoding and unavailable cost safety
-        run: |
+          echo "::endgroup::"
+          echo "::group::Test versioned v0 signed fee-for-message wire encoding and unavailable cost safety"
           python3 -m py_compile arb/m5_signed_message_fee_estimate.py
           python3 -m unittest discover -s tests -p test_m5_versioned_signed_fee_message.py -v
-      - name: Test source-native Raydium CLMM initialized-tick crossing and zeroed source tick decode
-        run: |
+          echo "::endgroup::"
+          echo "::group::Test source-native Raydium CLMM initialized-tick crossing and zeroed source tick decode"
           python3 -m py_compile arb/raydium_clmm_cross_tick_quote.py arb/raydium_clmm_tick_decode.py
           python3 -m unittest discover -s tests -p test_raydium_clmm_cross_tick_quote.py -v
           python3 -m unittest discover -s tests -p test_raydium_clmm_tick_decode.py -v
-      - name: Test source-authenticated Orca multittick tick-array PDA binding
+          echo "::endgroup::"
+      - name: Fast safety regression batch 8 (16 existing checks)
         run: |
+          set -e
+          echo "::group::Test source-authenticated Orca multittick tick-array PDA binding"
           python3 -m py_compile arb/fixture_all_venue_signed_quotes.py
           python3 -m unittest discover -s tests -p test_m5_orca_source_array_quote_integration.py -v
-      - name: Verify source-bound CPMM creator fee projection works across four to six authenticated pools
-        run: |
+          echo "::endgroup::"
+          echo "::group::Verify source-bound CPMM creator fee projection works across four to six authenticated pools"
           python3 -m py_compile arb/fixture_config_quote_projection.py
           python3 -m unittest discover -s tests -p test_m5_native_four_to_six_pool_projection.py -v
-      - name: Verify integrated four-hop mixed-venue modeled quote paths and no profit promotion
-        run: |
+          echo "::endgroup::"
+          echo "::group::Verify integrated four-hop mixed-venue modeled quote paths and no profit promotion"
           python3 -m py_compile arb/m5_source_multihop_interval_engine.py arb/next_ten_signed_atomic_offline.py
           python3 -m unittest discover -s tests -p test_m5_source_multihop_interval_engine.py -v
-      - name: Verify genuine multi-venue source quote sweeps remain nonbroadcast and unverified
-        run: |
+          echo "::endgroup::"
+          echo "::group::Verify genuine multi-venue source quote sweeps remain nonbroadcast and unverified"
           python3 -m py_compile arb/m5_four_to_six_native_amount_sweep.py
           python3 -m unittest discover -s tests -p test_m5_four_to_six_native_amount_sweep.py -v
-      - name: Verify source-native DLMM bin fee-envelope implementation with adversarial fixtures
-        run: |
+          echo "::endgroup::"
+          echo "::group::Verify source-native DLMM bin fee-envelope implementation with adversarial fixtures"
           python3 -m py_compile arb/meteora_dlmm_source_fee_envelope.py
           python3 -m unittest discover -s tests -p test_meteora_dlmm_source_fee_envelope.py -v
-      - name: Verify actual DLMM pool static and volatility fee parsing with explicit dynamic fee limits
-        run: |
+          echo "::endgroup::"
+          echo "::group::Verify actual DLMM pool static and volatility fee parsing with explicit dynamic fee limits"
           python3 -m py_compile arb/meteora_dlmm_source_fee_decoder.py
           python3 -m unittest discover -s tests -p test_meteora_dlmm_source_fee_decoder.py -v
-      - name: Validate source-decoded canonical DLMM bin inventories without promoting missing fee evidence
-        run: |
+          echo "::endgroup::"
+          echo "::group::Validate source-decoded canonical DLMM bin inventories without promoting missing fee evidence"
           python3 -m py_compile arb/meteora_dlmm_source_bin_decoder.py
           python3 -m unittest discover -s tests -p test_meteora_dlmm_source_bin_decoder.py -v
-      - name: Verify authentic DAMM v2 source pool fee scheduler and dynamic fields
-        run: |
+          echo "::endgroup::"
+          echo "::group::Verify authentic DAMM v2 source pool fee scheduler and dynamic fields"
           python3 -m py_compile arb/meteora_damm_v2_source_fee_decoder.py
           python3 -m unittest discover -s tests -p test_m5_damm_native_source_fee.py -v
-      - name: Verify billion-denominator DAMM fees and true PumpSwap source tier selection
-        run: |
+          echo "::endgroup::"
+          echo "::group::Verify billion-denominator DAMM fees and true PumpSwap source tier selection"
           python3 -m py_compile arb/meteora_damm_v2_native_quote.py arb/pumpswap_source_tier_selector.py
           python3 -m unittest discover -s tests -p test_m5_protocol_fee_math_native.py -v
-      - name: Verify multihop native-versus-signed SPL prefix parity fail-closed
-        run: |
+          echo "::endgroup::"
+          echo "::group::Verify multihop native-versus-signed SPL prefix parity fail-closed"
           python3 -m py_compile arb/m5_source_signed_prefix_quote_parity.py
           python3 -m unittest discover -s tests -p test_m5_source_signed_prefix_quote_parity.py -v
-      - name: Validate integrated PumpSwap DAMM v2 source price scenarios and nonbroadcast fee bounds
-        run: |
+          echo "::endgroup::"
+          echo "::group::Validate integrated PumpSwap DAMM v2 source price scenarios and nonbroadcast fee bounds"
           python3 -m py_compile arb/pumpswap_source_fee_envelope.py arb/meteora_damm_v2_source_scenarios.py arb/fixture_all_venue_signed_quotes.py
           python3 -m unittest discover -s tests -p test_m5_complex_venue_pricing_integration.py -v
-      - name: Verify three independent M5 milestone integrations
-        run: |
+          echo "::endgroup::"
+          echo "::group::Verify three independent M5 milestone integrations"
           python3 -m py_compile arb/m5_four_to_six_source_capture.py arb/m5_source_indicative_route_chain.py arb/m5_four_to_six_signed_handoff.py
           python3 -m unittest discover -s tests -p test_m5_three_milestone_integration.py -v
-      - name: Verify captured source triangle invokes actual native quote adapters without false full-route pricing
-        run: |
+          echo "::endgroup::"
+          echo "::group::Verify captured source triangle invokes actual native quote adapters without false full-route pricing"
           python3 -m py_compile arb/m5_source_fixture_native_chain_diagnostic.py
           python3 -m unittest discover -s tests -p test_m5_source_fixture_native_chain_diagnostic.py -v
-      - name: Validate real-source multihop quote attempts fail closed on missing native pricing
-        run: |
+          echo "::endgroup::"
+          echo "::group::Validate real-source multihop quote attempts fail closed on missing native pricing"
           python3 -m py_compile arb/m5_native_route_quote_attempts.py
           python3 -m unittest discover -s tests -p test_m5_native_route_quote_attempts.py -v
-      - name: Verify authenticated 2–6-hop native quote chain refuses incomplete source evidence
-        run: |
+          echo "::endgroup::"
+          echo "::group::Verify authenticated 2–6-hop native quote chain refuses incomplete source evidence"
           python3 -m py_compile arb/m5_authenticated_native_route_chain.py
           python3 -m unittest discover -s tests -p test_m5_authenticated_native_route_chain.py -v
-      - name: Validate native adapters for DLMM DAMM v2 and PumpSwap require authenticated auxiliary state
-        run: |
+          echo "::endgroup::"
+          echo "::group::Validate native adapters for DLMM DAMM v2 and PumpSwap require authenticated auxiliary state"
           python3 -m py_compile arb/m5_complex_venue_native_quote.py arb/fixture_all_venue_signed_quotes.py
           python3 -m unittest discover -s tests -p test_m5_complex_venue_native_quote.py -v
-      - name: Test genuine source-cycle venue-diverse shortlist
+          echo "::endgroup::"
+      - name: Fast safety regression batch 9 (16 existing checks)
         run: |
+          set -e
+          echo "::group::Test genuine source-cycle venue-diverse shortlist"
           python3 -m unittest discover -s tests -p test_m5_authenticated_multihop_shortlist.py -v
-      - name: Test bounded public seven-venue pool discovery and source trust boundary
-        run: |
+          echo "::endgroup::"
+          echo "::group::Test bounded public seven-venue pool discovery and source trust boundary"
           python3 -m py_compile arb/m5_seven_venue_public_hints.py
           python3 -m unittest discover -s tests -p test_m5_seven_venue_public_hints.py -v
-      - name: Test native source-bound multi-venue gross opportunity ranking
-        run: |
+          echo "::endgroup::"
+          echo "::group::Test native source-bound multi-venue gross opportunity ranking"
           python3 -m py_compile arb/m5_source_triangle_quote_ranking.py arb/m5_seven_venue_route_scan.py
           python3 -m unittest discover -s tests -p test_m5_source_triangle_quote_ranking.py -v
-      - name: Test bounded multi-size native source candidate sweep
-        run: |
+          echo "::endgroup::"
+          echo "::group::Test bounded multi-size native source candidate sweep"
           python3 -m py_compile arb/m5_source_trade_size_sweep.py
           python3 -m unittest discover -s tests -p test_m5_source_trade_size_sweep.py -v
-      - name: Test source-native quote ranking joined to real signed acceptance artifacts
-        run: |
+          echo "::endgroup::"
+          echo "::group::Test source-native quote ranking joined to real signed acceptance artifacts"
           python3 -m py_compile arb/m5_existing_source_research.py
           python3 -m unittest discover -s tests -p test_m5_existing_source_research.py -v
-      - name: Test M5 seven-venue discovery through source export and isolated signed Surfpool batch
-        run: |
+          echo "::endgroup::"
+          echo "::group::Test M5 seven-venue discovery through source export and isolated signed Surfpool batch"
           python3 -m py_compile arb/m5_seven_venue_route_scan.py arb/m5_distinct_venue_coverage_batch.py
           python3 -m unittest discover -s tests -p test_m5_seven_venue_route_scan.py -v
           python3 -m unittest discover -s tests -p test_m5_research_full_fork_flow.py -v
-      - name: Test genuine source-registry six-hop native quote and cost-screen orchestration
-        run: |
+          echo "::endgroup::"
+          echo "::group::Test genuine source-registry six-hop native quote and cost-screen orchestration"
           python3 -m py_compile arb/opportunity_graph.py arb/opportunity_research.py arb/opportunity_quote_pipeline.py arb/research_engine_pipeline.py
           python3 -m unittest discover -s tests -p test_research_engine_pipeline.py -v
-      - name: Test agreed discovery-to-verification research engine orchestration
-        run: python3 -m unittest discover -s tests -p test_research_engine_pipeline.py -v
-      - name: Test M5 conservative observed quote route integration
-        run: python3 -m unittest discover -s tests -p test_opportunity_quote_pipeline.py -v
-      - name: Test M5 fail-closed quote and common-mint cost research boundaries
-        run: python3 -m unittest discover -s tests -p test_opportunity_research.py -v
-      - name: Check focused evidence cannot misrepresent historic coverage
-        run: python3 -m unittest discover -s tests -p test_focused_amm_v4_evidence.py -v
-      - name: Check AMM v4 accounts, ownership and market roles
-        run: |
+          echo "::endgroup::"
+          echo "::group::Test agreed discovery-to-verification research engine orchestration"
+          python3 -m unittest discover -s tests -p test_research_engine_pipeline.py -v
+          echo "::endgroup::"
+          echo "::group::Test M5 conservative observed quote route integration"
+          python3 -m unittest discover -s tests -p test_opportunity_quote_pipeline.py -v
+          echo "::endgroup::"
+          echo "::group::Test M5 fail-closed quote and common-mint cost research boundaries"
+          python3 -m unittest discover -s tests -p test_opportunity_research.py -v
+          echo "::endgroup::"
+          echo "::group::Check focused evidence cannot misrepresent historic coverage"
+          python3 -m unittest discover -s tests -p test_focused_amm_v4_evidence.py -v
+          echo "::endgroup::"
+          echo "::group::Check AMM v4 accounts, ownership and market roles"
           python3 -m unittest discover -s tests -p test_amm_v4_open_orders_market_owner.py -v
           python3 -m unittest discover -s tests -p test_amm_v4_market_roles.py -v
           python3 -m unittest discover -s tests -p test_raydium_v4_market_preflight.py -v
-      - name: Verify oversized CLMM and AMM v4 packets report exact size and v0 prerequisite
-        run: python3 -m unittest discover -s tests -p test_atomic_packet_diagnostics.py -v
-      - name: Test shared transaction packing independent of venue name
-        run: python3 -m unittest discover -s tests -p test_shared_atomic_packet_selection.py -v
-      - name: Test local-only v0 lookup table safety boundaries
-        run: python3 -m unittest discover -s tests -p test_atomic_v0_lookup.py -v
-      - name: Check focused source export and execution scripts parse
-        run: python3 -m compileall -q arb/
+          echo "::endgroup::"
+          echo "::group::Verify oversized CLMM and AMM v4 packets report exact size and v0 prerequisite"
+          python3 -m unittest discover -s tests -p test_atomic_packet_diagnostics.py -v
+          echo "::endgroup::"
+          echo "::group::Test shared transaction packing independent of venue name"
+          python3 -m unittest discover -s tests -p test_shared_atomic_packet_selection.py -v
+          echo "::endgroup::"
+          echo "::group::Test local-only v0 lookup table safety boundaries"
+          python3 -m unittest discover -s tests -p test_atomic_v0_lookup.py -v
+          echo "::endgroup::"
+          echo "::group::Check focused source export and execution scripts parse"
+          python3 -m compileall -q arb/
+          echo "::endgroup::"
   authenticate-amm-v4:
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
