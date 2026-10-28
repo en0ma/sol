@@ -522,7 +522,7 @@ jobs:
         run: |
           python3 -m arb.m5_seven_venue_public_hints \
             --registry arb/pool_registry.json \
-            --max-per-venue 8 \
+            --max-per-venue 12 \
             --output "$RUNNER_TEMP/m5-seven-venue-untrusted-pool-hints.json"
           python3 -m arb.m5_seven_venue_route_scan \
             --registry "$RUNNER_TEMP/m5-seven-venue-untrusted-pool-hints.json" \
@@ -744,7 +744,7 @@ jobs:
           # DAMM v2 must use a real DAMM source pool, not the Orca route.
           # This is acceptance, not a silently passing diagnostic.
           python3 -m arb.m5_meteora_damm_v2_dedicated_signed_fork \
-            --registry arb/pool_registry.json \
+            --registry "$RUNNER_TEMP/m5-seven-venue-untrusted-pool-hints.json" \
             --binary tools/meteora_damm_v2_reference/target/release/sol-meteora-damm-v2-official-reference \
             --output "$RUNNER_TEMP/m5-four-to-six-signed-attempt/meteora-damm-v2-dedicated-signed-fork.json"
           python3 - <<'PY'
