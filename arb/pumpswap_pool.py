@@ -54,7 +54,7 @@ def decode(raw):
     return fields
 
 
-def verify(rpc, address, state):
+def verify(rpc, address, state, *, include_source_bytes=False):
     from arb.pumpswap_global_config import ADDRESS as CONFIG_ADDRESS, decode as decode_config
     from arb.pumpswap_fee_account import authenticated_address, decode_authenticated
     fee_address,_ = authenticated_address()
@@ -140,4 +140,9 @@ def verify(rpc, address, state):
             "canonical_pool_verified": canonical["canonical_pool_verified"],
             "fee_mode_verified": False,
             "effective_fee_verified": False, "fee_verified_onchain": False,
-            "actionable": False, "executable_quote": False}
+            "actionable": False, "executable_quote": False,
+            **({"authenticated_source_accounts": [
+                {"address": key, "owner": item["owner"],
+                 "account_base64": item["data"][0]}
+                for key, item in zip(keys, accounts)
+            ]} if include_source_bytes else {})}
