@@ -9,12 +9,17 @@ from pathlib import Path
 from arb.pool_registry_batches import refresh_batched
 SAFE={"actionable":False,"broadcast":False,"live_execution_approved":False}
 
-def discover_new(rpc,registry,venue,*,count=6,pages=4):
+def discover_new(rpc,registry,venue,*,count=6,pages=4,revalidate_registered=False):
     if venue not in ("orca","meteora_damm_v2","raydium_cpmm") or type(count)is not int or not 1<=count<=20:
         raise ValueError("unsupported venue/count")
     existing={r["address"] for r in registry["pools"] if r.get("venue")==venue}
     candidates=[]
-    if venue=="orca":
+    if revalidate_registered:
+        # Tracked addresses are identity hints, never historical signed proof.
+        # Reauthenticate them against current RPC before fresh signed trials.
+        candidates=[{"address":r["address"]} for r in registry["pools"]
+                    if r.get("venue")==venue and isinstance(r.get("address"),str)]
+    elif venue=="orca":
         from arb.orca_api_discovery import fetch_page,parse_page
         cursor=None;seen_cursors=set()
         for _ in range(pages):
@@ -33,7 +38,7 @@ def discover_new(rpc,registry,venue,*,count=6,pages=4):
     unseen=[];seen=set()
     for row in candidates:
         a=row.get("address") if isinstance(row,dict) else None
-        if not isinstance(a,str) or not a or a in existing or a in seen:continue
+        if not isinstance(a,str) or not a or (a in existing and not revalidate_registered) or a in seen:continue
         seen.add(a)
         unseen.append({"venue":venue,"address":a})
     # Existing decoder/owner/mint/vault checks; untrusted API output never
@@ -127,18 +132,20 @@ def discover_new(rpc,registry,venue,*,count=6,pages=4):
             "status":"VENUE_REGISTRY_EXPANSION_READY" if len(identities)==count
                      else "VENUE_REGISTRY_EXPANSION_INCOMPLETE",**SAFE}
 
-def expand(rpc,registry,*,count=6,pages=4,venues=("orca","meteora_damm_v2"),counts=None):
+def expand(rpc,registry,*,count=6,pages=4,venues=("orca","meteora_damm_v2"),counts=None,revalidate_registered=False):
     if not venues or len(set(venues))!=len(venues) or any(v not in ("orca","meteora_damm_v2","raydium_cpmm") for v in venues):
         raise ValueError("invalid native venue discovery selection")
     counts=counts or {}
     if any(v not in venues or type(n) is not int or not 1<=n<=20 for v,n in counts.items()):
         raise ValueError("invalid venue-specific discovery target")
-    reports=[discover_new(rpc,registry,v,count=counts.get(v,count),pages=pages) for v in venues]
+    reports=[discover_new(rpc,registry,v,count=counts.get(v,count),pages=pages,
+                          revalidate_registered=revalidate_registered) for v in venues]
     accepted=[p for report in reports for p in report["new_authenticated_pools"]]
     registered={(p["venue"],p["address"]) for p in registry["pools"]}
     for row in accepted:
         key=(row["venue"],row["address"])
-        if key in registered:raise ValueError("venue registry duplicate promotion")
+        if key in registered and not revalidate_registered:
+            raise ValueError("venue registry duplicate promotion")
         registered.add(key)
     # These are verified identities, NOT execution-eligible registry entries.
     # Only signed price parity promotes an address into the usable registry.
@@ -260,6 +267,7 @@ def main():
     p.add_argument("--count",type=int,default=6)
     p.add_argument("--pages",type=int,default=4)
     p.add_argument("--orca-count",type=int)
+    p.add_argument("--revalidate-registered",action="store_true")
     p.add_argument("--venues",default="orca,meteora_damm_v2")
     p.add_argument("--output-registry",required=True)
     p.add_argument("--output-new-pools",required=True)
@@ -268,7 +276,8 @@ def main():
     registry=json.loads(Path(a.registry).read_text())
     expanded,report=expand(a.rpc,registry,count=a.count,pages=a.pages,
         venues=tuple(a.venues.split(",")),
-        counts={"orca":a.orca_count} if a.orca_count is not None else None)
+        counts={"orca":a.orca_count} if a.orca_count is not None else None,
+        revalidate_registered=a.revalidate_registered)
     Path(a.output_registry).write_text(json.dumps(expanded,indent=2)+"\n")
     additions=[p for venue in report["venues"] for p in venue["new_authenticated_pools"]]
     Path(a.output_new_pools).write_text(json.dumps({"pools":additions},indent=2)+"\n")
