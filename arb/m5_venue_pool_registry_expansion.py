@@ -111,40 +111,104 @@ def expand(rpc,registry,*,count=6,pages=4,venues=("orca","meteora_damm_v2")):
         "native_pricing_signed_verified":False,**SAFE}
 
 def promote_signed(registry,candidates,orca_receipt,meteora_receipt,*,raydium_candidates=None,raydium_receipt=None,required=6):
-    """Only complete 4/4 signed SDK/native execution parity enters registry."""
-    specifications=(
-        ("orca",orca_receipt,"ORCA_NEW_POOLS_SIGNED_VERIFIED"),
-        ("meteora_damm_v2",meteora_receipt,"METEORA_DAMM_V2_CONFIGURED_POOLS_SIGNED_VERIFIED"))
+    """Fail-closed discovery -> authenticated identity -> signed parity -> registry.
+
+    A summary boolean or exact counter is never sufficient: each trial must
+    include its signed execution proof, exact output and both directions.
+    """
+    if type(required) is not int or required<1:
+        raise ValueError("invalid signed pool admission threshold")
     if (raydium_candidates is None)!=(raydium_receipt is None):
-        raise ValueError("Raydium source and signed receipt must both be provided")
+        raise ValueError("Raydium authenticated candidates and signed receipt must occur together")
+    specifications=[
+        ("orca",orca_receipt,"ORCA_NEW_POOLS_SIGNED_VERIFIED",
+         "ORCA_NEW_POOL_SIGNED_EXACT",("a_to_b","b_to_a"),
+         ("signed_spl_output","official_core_output","local_native_output")),
+        ("meteora_damm_v2",meteora_receipt,"METEORA_DAMM_V2_CONFIGURED_POOLS_SIGNED_VERIFIED",
+         "METEORA_DAMM_V2_OFFICIAL_SIGNED_EXACT",("a_to_b","b_to_a"),
+         ("signed_output","official_output")),
+    ]
     if raydium_receipt is not None:
-        specifications+= (("raydium_cpmm",raydium_receipt,"RAYDIUM_CPMM_SIGNED_VERIFIED"),)
-    allowed={}
-    for venue,receipt,status in specifications:
-        if receipt.get("status")!=status or not isinstance(receipt.get("pools"),list):
-            raise ValueError(venue+" signed verification did not succeed")
-        validated=[]
+        specifications.append(
+            ("raydium_cpmm",raydium_receipt,"RAYDIUM_CPMM_SIGNED_VERIFIED",
+             "RAYDIUM_CPMM_SIGNED_NATIVE_EXACT",("0_to_1","1_to_0"),
+             ("signed_output","native_output")))
+    authenticated={}
+    for bundle in (candidates,raydium_candidates or {"pools":[]}):
+        if not isinstance(bundle,dict) or not isinstance(bundle.get("pools"),list):
+            raise ValueError("authenticated candidate manifest missing")
+        for entry in bundle["pools"]:
+            if not isinstance(entry,dict) or not isinstance(entry.get("address"),str):
+                raise ValueError("malformed authenticated pool candidate")
+            key=(entry.get("venue"),entry["address"])
+            if key in authenticated:
+                raise ValueError("duplicate authenticated pool candidate")
+            mints=entry.get("mints")
+            if not isinstance(mints,list) or len(mints)!=2 or len(set(mints))!=2:
+                raise ValueError("authenticated candidate mint identity required")
+            authenticated[key]=entry
+    existing={}
+    for row in registry["pools"]:
+        key=(row["venue"],row["address"])
+        if key in existing:raise ValueError("duplicate pool already in tracked registry")
+        existing[key]=row
+    verified={}
+    for venue,receipt,status,trial_status,directions,outputs in specifications:
+        if not isinstance(receipt,dict) or receipt.get("status")!=status or not isinstance(receipt.get("pools"),list):
+            raise ValueError(venue+" signed verification missing or failed")
+        approved=set()
         for pool in receipt["pools"]:
-            if (pool.get("verified") is True and
-                    (pool.get("exact",pool.get("exact_matches"))==4) and
-                    (pool.get("trial_count",len(pool.get("trials",[])))==4) and
-                    len(pool.get("trials",[]))==4):
-                validated.append(pool.get("pool"))
-        if len(set(validated))<required:
-            raise ValueError(venue+" fewer than six distinct 4/4 signed pools")
-        allowed[venue]=set(validated)
-    existing={(row["venue"],row["address"]) for row in registry["pools"]}
+            if not isinstance(pool,dict) or pool.get("verified") is not True:continue
+            address=pool.get("pool")
+            if not isinstance(address,str) or (venue,address) not in authenticated:
+                raise ValueError(venue+" signed pool absent from authenticated discovery")
+            trials=pool.get("trials")
+            if not isinstance(trials,list) or len(trials)!=4:
+                raise ValueError(venue+" requires four signed trials per pool")
+            observations={}
+            for trial in trials:
+                if not isinstance(trial,dict) or trial.get("status")!=trial_status:
+                    raise ValueError(venue+" signed trial lacks exact execution proof")
+                if trial.get("pool")!=address or trial.get("direction") not in directions:
+                    raise ValueError(venue+" signed trial pool/direction identity mismatch")
+                size=trial.get("input",trial.get("amount_in"))
+                if type(size)is not int or size<=0:
+                    raise ValueError(venue+" signed trial has invalid input size")
+                if not (isinstance(trial.get("signed_sha256"),str) and
+                        len(trial["signed_sha256"])==64) and not (
+                        venue=="raydium_cpmm" and isinstance(trial.get("signature"),str)
+                        and len(trial["signature"])>=64):
+                    raise ValueError(venue+" signed transaction evidence missing")
+                values=[trial.get(k) for k in outputs]
+                if any(type(v)is not int or v<=0 for v in values) or len(set(values))!=1:
+                    raise ValueError(venue+" source-native and signed SPL outputs differ")
+                key=(trial["direction"],size)
+                if key in observations:
+                    raise ValueError(venue+" duplicate signed trial size/direction")
+                observations[key]=True
+            if any(sum(direction==x[0] for x in observations)!=2 for direction in directions):
+                raise ValueError(venue+" both swap directions require two sizes")
+            if pool.get("exact",pool.get("exact_matches"))!=4:
+                raise ValueError(venue+" reported exact count disagrees with evidence")
+            if pool.get("trial_count",4)!=4:
+                raise ValueError(venue+" reported trial count disagrees with evidence")
+            if address in approved:raise ValueError(venue+" duplicate approved signed pool")
+            approved.add(address)
+        if len(approved)<required:
+            raise ValueError(venue+" fewer than required distinct fully signed pools")
+        verified[venue]=approved
     fresh=[]
-    for row in [*candidates["pools"],*(raydium_candidates or {}).get("pools",[])]:
-        venue,address=row.get("venue"),row.get("address")
-        if venue in allowed and address in allowed[venue] and (venue,address) not in existing:
-            fresh.append(row)
-            existing.add((venue,address))
-    for venue in allowed:
-        admitted={r["address"] for r in fresh if r["venue"]==venue}
-        already={r["address"] for r in registry["pools"] if r["venue"]==venue}
-        if len((admitted|already)&allowed[venue])<required:
-            raise ValueError(venue+" signed pool identity missing from authenticated candidates and registry")
+    for (venue,address),row in authenticated.items():
+        if address in verified.get(venue,set()):
+            old=existing.get((venue,address))
+            if old is None:
+                fresh.append({"venue":venue,"address":address,"mints":row["mints"]})
+            elif "mints" in old and sorted(old["mints"])!=sorted(row["mints"]):
+                raise ValueError(venue+" tracked mint identity disagrees with authenticated state")
+    for venue,approved in verified.items():
+        if len({p["address"] for p in fresh if p["venue"]==venue}|
+               {address for v,address in existing if v==venue and address in approved})<required:
+            raise ValueError(venue+" incomplete authenticated registry admission")
     return {**registry,"pools":[*registry["pools"],*fresh]}
 
 
