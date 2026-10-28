@@ -9,7 +9,7 @@ from pathlib import Path
 from arb.m5_four_to_six_source_signed_acceptance import assess
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
 
-def audit_attempts(fixture,receipts,*,expected_amounts):
+def audit_attempts(fixture,receipts,*,expected_amounts,observed_unix=None):
     if (not isinstance(receipts,dict) or
             not isinstance(expected_amounts,(list,tuple)) or
             not 1<=len(expected_amounts)<=8 or
@@ -48,7 +48,9 @@ def audit_attempts(fixture,receipts,*,expected_amounts):
                 from arb.m5_signed_start_mint_economics import signed_net_economics
                 economics=signed_net_economics(
                     receipt,start_mint=fixture["route_mints"][0],
-                    source_slot=fixture["state_accounts_observed_slot"])
+                    source_slot=fixture["state_accounts_observed_slot"],
+                    fixture=fixture if observed_unix is not None else None,
+                    observed_unix=observed_unix)
                 if economics["observed_local_fork_gross_delta_start_mint_base_units"]!=signed_gross:
                     raise ValueError("independent signed economic output disagrees with audit")
                 signed_gross_observations.append({
@@ -61,6 +63,7 @@ def audit_attempts(fixture,receipts,*,expected_amounts):
                     "estimated_net_start_mint_delta_base_units":
                         economics["estimated_net_delta_start_mint_base_units"],
                     "source_manifest_sha256":verified.get("source_manifest_sha256"),
+                    "source_native_fee_conversion":economics["source_native_fee_conversion"],
                     "net_profit_verified":False,**SAFE})
         attempts.append({"size_base_units":size,"receipt_status":receipt.get("status"),
                          "audit":verified,"independently_accepted":approved,
@@ -96,6 +99,7 @@ def main():
     p.add_argument("--receipts",required=True)
     p.add_argument("--amounts",default="10000,100000,1000000")
     p.add_argument("--output",required=True)
+    p.add_argument("--observed-unix",type=int)
     a=p.parse_args()
     amounts=tuple(int(v) for v in a.amounts.split(","))
     root=Path(a.receipts)
@@ -107,7 +111,7 @@ def main():
         except (OSError,ValueError):
             receipts[amount]={"status":"SIGNATURE_OR_TRIAL_MISSING",**SAFE}
     report=audit_attempts(json.loads(Path(a.fixture).read_text()),
-        receipts,expected_amounts=amounts)
+        receipts,expected_amounts=amounts,observed_unix=a.observed_unix)
     Path(a.output).write_text(json.dumps(report,sort_keys=True,indent=2)+"\n")
     print(json.dumps({"status":report["status"],
         "independently_accepted_count":report["independently_accepted_count"],
