@@ -3,6 +3,28 @@ from pathlib import Path
 import unittest
 
 class SourceGraphCiOrderingTests(unittest.TestCase):
+    def test_each_venue_has_explicit_authenticated_capture_and_signed_stage(self):
+        workflow=Path(".github/workflows/amm-v4-focused.yml").read_text()
+        stages=(
+            ("Reauthenticate registered Orca and Meteora identities",
+             "Capture registered Orca source pool fixtures",
+             "Check new Orca pool pricing"),
+            ("Reauthenticate registered Orca and Meteora identities",
+             "Capture registered Meteora pools for fresh signed parity",
+             "Check six NEW Meteora pools against official Rust SDK and signed Surfpool"),
+            ("Authenticate registered Raydium CPMM pools",
+             "Capture authenticated Raydium CPMM pricing source accounts",
+             "Require Raydium CPMM native signed parity for six distinct pools"),
+        )
+        for auth,capture,signed in stages:
+            with self.subTest(capture=capture):
+                a=workflow.index("      - name: "+auth)
+                c=workflow.index("      - name: "+capture)
+                v=workflow.index("      - name: "+signed)
+                self.assertLess(a,c)
+                self.assertLess(c,v)
+                self.assertEqual(workflow.count("      - name: "+capture),1)
+
     def test_three_venue_source_handoff_precedes_signed_validation(self):
         workflow=Path(".github/workflows/amm-v4-focused.yml").read_text()
         capture=workflow.index("      - name: Reauthenticate registered Orca and Meteora identities")
