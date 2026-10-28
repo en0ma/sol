@@ -27,6 +27,7 @@ def compare_orca(fixture,receipts,*,observed_unix):
     if not isinstance(receipts,dict) or not receipts:
         raise ValueError("genuine per-size signed receipts missing")
     measured=[]
+    blockers=[]
     for size,receipt in sorted(receipts.items()):
         if type(size) is not int or not 0<size<2**64 or not isinstance(receipt,dict):
             raise ValueError("invalid per-size signed inventory")
@@ -51,7 +52,12 @@ def compare_orca(fixture,receipts,*,observed_unix):
                 any(clock.get(k)is not False for k in SAFE) or
                 type(clock.get("fork_unix_timestamp")) is not int or
                 clock["fork_unix_timestamp"]<=0):
-            raise ValueError("Orca independently signed quote lacks stable fork Clock sysvar")
+            blockers.append({"size_base_units":size,
+                             "reason":"STABLE_ISOLATED_FORK_CLOCK_MISSING",
+                             "clock_evidence_status":(
+                                 clock.get("status") if isinstance(clock,dict)
+                                 else "ABSENT_FROM_SIGNED_RECEIPT"),**SAFE})
+            continue
         quote=quote_leg(fixture,leg_index=index,amount_in=inputs[index],
                         observed_unix=clock["fork_unix_timestamp"])
         if (any(quote.get(k) is not False for k in SAFE) or
@@ -74,12 +80,17 @@ def compare_orca(fixture,receipts,*,observed_unix):
                          "pool":rows[index]["address"],
                          "independent_signed_rollback_verified":True,**SAFE})
     mismatch=sum(r["signed_minus_native_base_units"]!=0 for r in measured)
-    return {"status":("ORCA_FORK_SIGNED_NATIVE_PARITY_ALL_SIZES" if mismatch==0
-                       else "ORCA_FORK_SIGNED_NATIVE_PARITY_MISMATCH"),
+    return {"status":(
+                "ORCA_FORK_SIGNED_NATIVE_PARITY_BLOCKED_CLOCK" if blockers
+                else "ORCA_FORK_SIGNED_NATIVE_PARITY_ALL_SIZES" if mismatch==0
+                else "ORCA_FORK_SIGNED_NATIVE_PARITY_MISMATCH"),
             "source_slot":fixture["state_accounts_observed_slot"],
             "pool":rows[index]["address"],"size_count":len(measured),
             "exact_match_count":len(measured)-mismatch,
             "mismatch_count":mismatch,"measurements":measured,
+            "clock_blocked_size_count":len(blockers),
+            "clock_blockers":blockers,
+            "all_signed_sizes_parity_verified":not blockers and mismatch==0,
             "protocol_exact_for_all_pools_verified":False,**SAFE}
 
 def main():
