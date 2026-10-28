@@ -151,8 +151,11 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix):
                     return {"venue":v,"pool":pool,"leg_index":leg_index,
                         "source_slot":row["snapshot_slot"],
                         "predicted_output_base_units":None,
-                        "quote_status":"NATIVE_QUOTE_MODELED_NOT_EXACT"
-                            if "minimum_candidate_output" in candidate else "NATIVE_QUOTE_BLOCKED",
+                        "quote_status":("NATIVE_QUOTE_SELECTED_FEE_MODE_NOT_EXACT"
+                            if candidate.get("fee_mode_selected_from_source") is True
+                            and len(candidate.get("candidates",[]))==1
+                            else "NATIVE_QUOTE_MODELED_NOT_EXACT"
+                            if "minimum_candidate_output" in candidate else "NATIVE_QUOTE_BLOCKED"),
                         "native_fee_envelope":candidate,
                         "reason":"effective PumpSwap market-cap tier and mode unverified",
                         "protocol_exact_verified":False,**SAFE}
@@ -164,9 +167,14 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix):
                     return {"venue":v,"pool":pool,"leg_index":leg_index,
                         "source_slot":row["snapshot_slot"],
                         "predicted_output_base_units":None,
-                        "quote_status":"NATIVE_QUOTE_MODELED_NOT_EXACT",
+                        "quote_status":("NATIVE_QUOTE_SOURCE_BASE_FEE_NOT_EXACT"
+                            if isinstance(candidate.get("source_pool_fee_schedule"),dict)
+                            and candidate["source_pool_fee_schedule"].get("status")==
+                                "SOURCE_DAMM_BASE_FEE_ONLY_NOT_PROTOCOL_EXACT"
+                            and candidate["source_pool_fee_schedule"].get("dynamic_fee_initialized") is False
+                            else "NATIVE_QUOTE_MODELED_NOT_EXACT"),
                         "native_fee_envelope":candidate,
-                        "reason":"DAMM v2 fee scheduler and curve model unverified",
+                        "reason":"DAMM v2 effective dynamic fee or curve parity unverified",
                         "protocol_exact_verified":False,**SAFE}
                 raise ValueError("MISSING_NATIVE_AUXILIARY_STATE: "+v+
                     " source-verified effective fees, reserves and/or bin arrays")
