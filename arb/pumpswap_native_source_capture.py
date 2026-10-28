@@ -6,6 +6,7 @@ admission, or authorization for live execution. Only reused registry hints.
 import argparse
 import base64
 import json
+import hashlib
 from pathlib import Path
 
 from arb.pumpswap_pool import PROGRAM, decode, verify
@@ -62,6 +63,21 @@ def capture(rpc, registry, *, limit=3):
                 raise ValueError("incomplete authenticated same-slot source account bundle")
             if source_accounts[0].get("address")!=address:
                 raise ValueError("authenticated source bundle pool mismatch")
+            verified_slot=verified.get("slot")
+            if type(verified_slot) is not int or verified_slot<0:
+                raise ValueError("missing verifier snapshot slot")
+            if len({a.get("address") for a in source_accounts})!=6:
+                raise ValueError("duplicate authenticated source account")
+            for account in source_accounts:
+                if (not isinstance(account.get("address"),str)
+                        or not isinstance(account.get("owner"),str)
+                        or not isinstance(account.get("account_base64"),str)):
+                    raise ValueError("invalid authenticated source account")
+                base64.b64decode(account["account_base64"],validate=True)
+            # Digest binds exact bytes, identities, owners and source-slot context.
+            source_digest=hashlib.sha256(json.dumps({
+                "slot":verified_slot,"accounts":source_accounts
+            },sort_keys=True,separators=(",",":")).encode()).hexdigest()
             # Candidate quotes are research evidence, NEVER signed trial receipts.
             # Both directions and two distinct sizes reveal unsupported fee modes
             # before investing in an isolated swap harness.
@@ -79,7 +95,8 @@ def capture(rpc, registry, *, limit=3):
                                            "actionable":False,"signed_parity_verified":False})
             results.append({"address": address, "status": "AUTHENTICATED_SOURCE_ONLY",
                             "pool_account_slot": slot,
-                            "verified_snapshot_slot": verified["slot"],
+                            "verified_snapshot_slot": verified_slot,
+                            "authenticated_source_sha256": source_digest,
                             "mints": [state["base_mint"], state["quote_mint"]],
                             "source_pool_base64": source_accounts[0]["account_base64"],
                             "authenticated_source_accounts": source_accounts,
