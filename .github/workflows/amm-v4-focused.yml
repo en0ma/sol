@@ -563,14 +563,14 @@ jobs:
         run: |
           python3 -m arb.m5_venue_pool_registry_expansion \
             --registry arb/pool_registry.json \
-            --count 6 --pages 4 \
+            --count 8 --pages 5 \
             --output-registry "$RUNNER_TEMP/expanded-venue-pool-registry.json" \
             --output-new-pools "$RUNNER_TEMP/venue-six-new-pools.json" \
             --report "$RUNNER_TEMP/venue-pool-registry-expansion.json"
       - name: Capture six NEW verified Meteora pools with existing signed-fork source capture
         run: |
           python3 -m arb.m5_meteora_damm_v2_dedicated_signed_fork \
-            --capture-source --pool-count 6 \
+            --capture-source --pool-count 8 \
             --registry "$RUNNER_TEMP/venue-six-new-pools.json" \
             --source-file "$RUNNER_TEMP/meteora-six-new-upstream-source.json" \
             --binary tools/meteora_damm_v2_reference/target/release/sol-meteora-damm-v2-official-reference \
@@ -718,7 +718,7 @@ jobs:
         if: ${{ matrix.shard == 0 }}
         run: |
           python3 -m arb.m5_meteora_damm_v2_dedicated_signed_fork \
-            --pool-count 6 \
+            --pool-count 8 --required-verified-pools 6 \
             --source-file "$RUNNER_TEMP/meteora-six-new-upstream-source.json" \
             --binary tools/meteora_damm_v2_reference/target/release/sol-meteora-damm-v2-official-reference \
             --output "$RUNNER_TEMP/m5-four-to-six-signed-attempt/meteora-six-new-signed.json"
