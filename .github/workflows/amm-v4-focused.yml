@@ -636,7 +636,7 @@ jobs:
             --source-file "$RUNNER_TEMP/meteora-damm-v2-upstream-source.json" \
             --binary tools/meteora_damm_v2_reference/target/release/sol-meteora-damm-v2-official-reference \
             --output "$RUNNER_TEMP/meteora-damm-v2-capture-status.json"
-      - name: Reauthenticate registered Orca and Meteora identities for fresh signed regression
+      - name: Authenticate registered Orca Whirlpool and Meteora DAMM v2 pools
         run: |
           python3 -m arb.m5_venue_pool_registry_expansion \
             --registry arb/pool_registry.json \
@@ -644,7 +644,7 @@ jobs:
             --output-registry "$RUNNER_TEMP/expanded-venue-pool-registry.json" \
             --output-new-pools "$RUNNER_TEMP/venue-six-new-pools.json" \
             --report "$RUNNER_TEMP/venue-pool-registry-expansion.json"
-      - name: Capture registered Meteora pools for fresh signed parity
+      - name: Capture authenticated Meteora DAMM v2 pricing source accounts
         run: |
           python3 -m arb.m5_meteora_damm_v2_dedicated_signed_fork \
             --capture-source --pool-count 8 \
@@ -652,7 +652,7 @@ jobs:
             --source-file "$RUNNER_TEMP/meteora-six-new-upstream-source.json" \
             --binary tools/meteora_damm_v2_reference/target/release/sol-meteora-damm-v2-official-reference \
             --output "$RUNNER_TEMP/meteora-six-new-capture.json"
-      - name: Capture registered Orca source pool fixtures
+      - name: Capture authenticated Orca Whirlpool pricing source accounts
         run: |
           python3 -m arb.m5_orca_signed_single_swap --capture-new-pools --pool-count 6 --registry "$RUNNER_TEMP/venue-six-new-pools.json" --new-pools-source "$RUNNER_TEMP/orca-new-pools-upstream-source.json" --binary tools/orca_core_quote/target/release/sol-orca-native-reference --output "$RUNNER_TEMP/orca-new-pools-capture.json"
       - name: Authenticate registered Raydium CPMM pools
@@ -756,7 +756,7 @@ jobs:
             --source-file "$RUNNER_TEMP/meteora-damm-v2-upstream-source.json" \
             --binary tools/meteora_damm_v2_reference/target/release/sol-meteora-damm-v2-official-reference \
             --output "$RUNNER_TEMP/m5-four-to-six-signed-attempt/meteora-damm-v2-dedicated-signed-fork.json"
-      - name: Check six NEW Meteora pools against official Rust SDK and signed Surfpool
+      - name: Verify registered Meteora DAMM v2 native pricing against signed Surfpool
         if: ${{ matrix.shard == 0 }}
         run: |
           python3 -m arb.m5_meteora_damm_v2_dedicated_signed_fork \
@@ -764,11 +764,11 @@ jobs:
             --source-file "$RUNNER_TEMP/meteora-six-new-upstream-source.json" \
             --binary tools/meteora_damm_v2_reference/target/release/sol-meteora-damm-v2-official-reference \
             --output "$RUNNER_TEMP/m5-four-to-six-signed-attempt/meteora-six-new-signed.json"
-      - name: Check new Orca pool pricing
+      - name: Verify registered Orca Whirlpool native pricing against signed Surfpool
         if: ${{ matrix.shard == 0 }}
         run: |
           python3 -m arb.m5_orca_signed_single_swap --new-pools-source "$RUNNER_TEMP/orca-new-pools-upstream-source.json" --pool-count 6 --required-verified-pools 6 --binary tools/orca_core_quote/target/release/sol-orca-native-reference --output "$RUNNER_TEMP/m5-four-to-six-signed-attempt/orca-new-pools-signed.json"
-      - name: Require Raydium CPMM native signed parity for six distinct pools
+      - name: Verify registered Raydium CPMM native pricing against signed Surfpool
         if: ${{ matrix.shard == 0 }}
         run: |
           test -s "$RUNNER_TEMP/raydium-cpmm-source.json" || { echo "::error::Raydium CPMM source capture missing"; exit 1; }
