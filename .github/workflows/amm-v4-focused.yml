@@ -579,7 +579,6 @@ jobs:
         run: |
           python3 -m arb.m5_orca_signed_single_swap --capture-new-pools --pool-count 6 --registry "$RUNNER_TEMP/venue-six-new-pools.json" --new-pools-source "$RUNNER_TEMP/orca-new-pools-upstream-source.json" --binary tools/orca_core_quote/target/release/sol-orca-native-reference --output "$RUNNER_TEMP/orca-new-pools-capture.json"
       - name: Discover Raydium CPMM third-venue pool candidates with venue-native eligibility
-        continue-on-error: true
         run: |
           python3 -m arb.m5_venue_pool_registry_expansion --venues raydium_cpmm --count 8 --pages 5 --output-registry "$RUNNER_TEMP/raydium-cpmm-candidate-registry.json" --output-new-pools "$RUNNER_TEMP/raydium-cpmm-candidates.json" --report "$RUNNER_TEMP/raydium-cpmm-discovery.json"
           python3 -m arb.raydium_swap --capture-source --registry "$RUNNER_TEMP/raydium-cpmm-candidates.json" --source-file "$RUNNER_TEMP/raydium-cpmm-source.json" --output "$RUNNER_TEMP/raydium-cpmm-capture.json" --pool-count 8
@@ -760,13 +759,12 @@ jobs:
           print(json.dumps({"status":"SIGNED_PRICING_REGISTRY_ADMISSION",
               "total_registered_pools":len(promoted["pools"])}))
           PY
-      - name: Research Raydium CPMM source-native quote versus signed offline swap
+      - name: Require Raydium CPMM native signed parity for six distinct pools
         if: ${{ matrix.shard == 0 }}
-        continue-on-error: true
         run: |
-          if [ -s "$RUNNER_TEMP/raydium-cpmm-source.json" ]; then
-            python3 -m arb.raydium_swap --source-file "$RUNNER_TEMP/raydium-cpmm-source.json" --output "$RUNNER_TEMP/m5-four-to-six-signed-attempt/raydium-cpmm-native-signed.json" --required-verified-pools 6
-          fi
+          test -s "$RUNNER_TEMP/raydium-cpmm-source.json" || { echo "::error::Raydium CPMM source capture missing"; exit 1; }
+          python3 -m arb.raydium_swap --source-file "$RUNNER_TEMP/raydium-cpmm-source.json" --output "$RUNNER_TEMP/m5-four-to-six-signed-attempt/raydium-cpmm-native-signed.json" --required-verified-pools 6
+          test -s "$RUNNER_TEMP/m5-four-to-six-signed-attempt/raydium-cpmm-native-signed.json" || { echo "::error::Raydium signed receipt missing"; exit 1; }
       - name: Execute source-captured four-to-six-hop signed isolated Surfpool trial
         if: ${{ matrix.shard == 0 }}
         run: |
