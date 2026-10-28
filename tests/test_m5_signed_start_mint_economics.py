@@ -38,3 +38,37 @@ class SignedStartMintEconomicsTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"accounting"):
             signed_net_economics(r,start_mint=WSOL,source_slot=42)
 if __name__=="__main__":unittest.main()
+
+class AuthenticatedSourceMintFeeConversionTests(unittest.TestCase):
+    def test_native_wsol_to_start_mint_cost_remains_model(self):
+        from unittest.mock import patch
+        fixture={"route_mints":["RAY",WSOL,"RAY"],
+                 "state_accounts_observed_slot":42,**SAFE}
+        rows=[{"venue":"raydium_cpmm","address":"p0"},
+              {"venue":"orca","address":"p1"}]
+        def quote(fixture,*,leg_index,amount_in,observed_unix):
+            self.assertEqual((leg_index,amount_in,observed_unix),(1,5000,100))
+            return {"quote_status":"SOURCE_BOUND_INDICATIVE",
+                    "predicted_output_base_units":250,
+                    "venue":"orca","pool":"p1","source_slot":42,**SAFE}
+        with patch("arb.fixture_quote_execution_pipeline.extract_pool_states",
+                   return_value=rows),patch("arb.fixture_all_venue_signed_quotes.quote_leg",
+                                            side_effect=quote):
+            result=signed_net_economics(self.receipt(),start_mint="RAY",
+                source_slot=42,fixture=fixture,observed_unix=100)
+        self.assertEqual(result["estimated_cost_start_mint_base_units"],250)
+        self.assertFalse(result["net_profit_verified"])
+        self.assertFalse(result["cost_conversion_protocol_exact_verified"])
+
+    def test_cross_slot_fee_conversion_rejected(self):
+        fixture={"route_mints":["RAY",WSOL,"RAY"],
+                 "state_accounts_observed_slot":41,**SAFE}
+        with self.assertRaisesRegex(ValueError,"fee conversion source"):
+            signed_net_economics(self.receipt(),start_mint="RAY",
+                source_slot=42,fixture=fixture,observed_unix=100)
+
+    def test_no_conversion_source_preserves_unconverted_status(self):
+        result=signed_net_economics(self.receipt(),start_mint="RAY",
+            source_slot=42)
+        self.assertIsNone(result["source_native_fee_conversion"])
+        self.assertIsNone(result["estimated_cost_start_mint_base_units"])
