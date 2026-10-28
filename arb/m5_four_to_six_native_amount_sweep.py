@@ -50,6 +50,8 @@ def sweep(fixture, *, observed_unix, amounts=(10000,100000,1000000)):
                     "exact_input_base_units":previous,
                     "modeled_output_base_units":leg["amount_out"],
                     "quote_status":leg.get("quote_status"),
+                    "source_fee_side":leg.get("source_fee_side"),
+                    "source_fee_on_native_enum":leg.get("source_fee_on_native_enum"),
                     "source_slot":leg["source_slot"],
                     "protocol_exact_verified":False,**SAFE})
                 previous=leg["amount_out"]
