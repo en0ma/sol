@@ -25,6 +25,8 @@ class PumpSwapFourthVenueCaptureTests(unittest.TestCase):
             report=capture("http://127.0.0.1:8899",REG,limit=1)
         self.assertEqual(report["authenticated"],1)
         self.assertEqual(report["pools"][0]["source_fee_mode"],"FEE_MODE_AMBIGUOUS")
+        self.assertEqual(len(report["pools"][0]["native_quote_candidates"]),4)
+        self.assertTrue(all(not x["signed_parity_verified"] for x in report["pools"][0]["native_quote_candidates"]))
         for name in ("actionable","broadcast","native_pricing_verified",
                      "signed_parity_verified","registry_admission_approved"):
             self.assertIs(report[name],False)
