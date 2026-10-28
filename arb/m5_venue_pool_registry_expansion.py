@@ -45,6 +45,20 @@ def discover_new(rpc,registry,venue,*,count=6,pages=4):
         result=refresh_batched(rpc,unseen[offset:offset+100],batch_size=100)
         rejected.extend(result["rejected"])
         for pool in result["verified_pools"]:
+            if venue=="orca":
+                # This discovery feeds the adaptive native-price signed gate.
+                # Generic on-chain identity validity alone is insufficient.
+                from arb.orca_whirlpool import fetch_pool
+                try:
+                    state=fetch_pool(rpc,pool["address"])
+                    if state["tick_spacing"]==state["fee_tier_index_seed"]:
+                        raise ValueError("non-adaptive Whirlpool unsupported by native quote")
+                    if set((state["token_mint_a"],state["token_mint_b"]))!=set(pool["mints"]):
+                        raise ValueError("Whirlpool mint identity changed")
+                except (ValueError,TypeError,KeyError,RuntimeError,OSError) as exc:
+                    rejected.append({"venue":venue,"address":pool["address"],
+                        "reason":"ORCA_NATIVE_PRICE_ELIGIBILITY_BLOCKED: "+str(exc)[:150]})
+                    continue
             if venue=="meteora_damm_v2":
                 # Existing venue-specific source fee decoder must accept the
                 # actual on-chain bytes before pool admission for native quote.
