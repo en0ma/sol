@@ -122,8 +122,11 @@ def capture_pool(rpc,pool):
     response=call(rpc,"getMultipleAccounts",[keys,{"encoding":"base64","commitment":"confirmed"}])
     values=response.get("value")
     slot=response.get("context",{}).get("slot")
-    if type(slot)is not int or not isinstance(values,list) or any(not isinstance(v,dict) for v in values):
-        raise ValueError("Orca source pool+tick/vault accounts not from one slot")
+    if type(slot) is not int or not isinstance(values,list) or len(values)!=len(keys):
+        raise ValueError("Orca source batch lacks consistent slot/account count")
+    missing=[key for key,value in zip(keys,values) if not isinstance(value,dict)]
+    if missing:
+        raise ValueError("Orca source required accounts missing at snapshot slot "+str(slot)+": "+",".join(missing[:5]))
     accounts=dict(zip(keys,values))
     raw=base64.b64decode(accounts[pool]["data"][0],validate=True)
     if accounts[pool]["owner"]!=PROGRAM or accounts[pool].get("executable") is not False:
