@@ -3,7 +3,7 @@
 Read signed per-leg SPL transfers, authenticated Pool fee schedule and reserves.
 A dynamic fee or curve discrepancy is reported, never replaced by a guessed fee.
 """
-import argparse,json
+import argparse,json,base64,subprocess
 from pathlib import Path
 from arb.source_snapshot_manifest import verify
 from arb.fixture_quote_execution_pipeline import extract_pool_states
@@ -13,7 +13,7 @@ from arb.meteora_damm_v2_native_fee_math import quote_native_fee
 from arb.m5_four_to_six_source_signed_acceptance import assess
 SAFE={"actionable":False,"broadcast":False,"live_execution_approved":False}
 
-def compare(fixture,receipt):
+def compare(fixture,receipt,*,binary):
     verify(fixture)
     if any(fixture.get(k)is not False or receipt.get(k)is not False for k in SAFE):
         raise ValueError("safe authenticated fixture and signed receipt required")
@@ -44,6 +44,31 @@ def compare(fixture,receipt):
     row=rows[i]
     state=row["decoded_pool_state"]
     pool=row["address"]
+    before=clock.get("fork_clock_before")
+    after=clock.get("fork_clock_after")
+    if (not isinstance(before,dict) or not isinstance(after,dict) or
+            before.get("fork_clock_slot")!=after.get("fork_clock_slot") or
+            before.get("fork_unix_timestamp")!=after.get("fork_unix_timestamp") or
+            before.get("fork_unix_timestamp")!=clock["fork_unix_timestamp"]):
+        raise ValueError("DAMM signed Clock slot and time not pinned")
+    pool_account=fixture["accounts"].get(pool)
+    if not isinstance(pool_account,dict):
+        raise ValueError("source Meteora pool bytes missing")
+    request={"pool_data_base64":pool_account["data"][0],
+             "amount_in":planned[i],
+             "input_is_a":fixture["route_mints"][i]==state["token_a_mint"],
+             "fork_unix_timestamp":clock["fork_unix_timestamp"],
+             "fork_clock_slot":before["fork_clock_slot"]}
+    official=subprocess.run([binary],input=json.dumps(request),
+                            text=True,capture_output=True,timeout=90)
+    if official.returncode:
+        raise ValueError("official Meteora SDK rejected quote: "+official.stderr[-220:])
+    official_quote=json.loads(official.stdout)
+    official_output=official_quote.get("amount_out")
+    if type(official_output)is not int:
+        raise ValueError("official Meteora quote missing integer output")
+    signed=planned[i+1]
+    reference_match=official_output==signed
     fee=from_fixture(fixture,pool=pool,observed_unix=clock["fork_unix_timestamp"])
     fundamentals=extract(fixture)["fundamentals"]
     source=next((f for f in fundamentals if f["address"]==pool),None)
@@ -59,6 +84,9 @@ def compare(fixture,receipt):
         return {"status":"DAMM_V2_DYNAMIC_FEE_NOT_YET_EXECUTION_EXACT",
                 "source_slot":fixture["state_accounts_observed_slot"],
                 "signed_output_base_units":planned[i+1],
+                "official_meteora_sdk_output_base_units":official_output,
+                "official_minus_signed":official_output-signed,
+                "official_signed_parity_verified":reference_match,
                 "base_fee_numerator":fee["base_fee_numerator"],
                 "snapshot_dynamic_fee_candidate":fee.get("source_snapshot_total_fee_candidate"),
                 "native_collection_mode":fee["native_collection_mode"],
@@ -76,19 +104,23 @@ def compare(fixture,receipt):
             "pool":pool,"direction":"a_to_b" if direction else "b_to_a",
             "amount_in_base_units":planned[i],
             "signed_output_base_units":signed,
+            "official_meteora_sdk_output_base_units":official_output,
+            "official_minus_signed":official_output-signed,
+            "official_signed_parity_verified":reference_match,
             "native_modeled_output_base_units":output,
             "native_minus_signed_base_units":output-signed,
             "source_fee_numerator":fee["base_fee_numerator"],
             "native_collection_mode":fee["native_collection_mode"],
             "fork_execution_unix_timestamp":clock["fork_unix_timestamp"],
             "signed_execution_authenticated":True,
-            "protocol_exact_verified":output==signed,**SAFE}
+            "protocol_exact_verified":output==signed==official_output,**SAFE}
 
 def main():
     p=argparse.ArgumentParser()
     p.add_argument("--fixture",required=True)
     p.add_argument("--receipts",required=True)
     p.add_argument("--output",required=True)
+    p.add_argument("--binary",required=True)
     p.add_argument("--amounts",default="10000,100000,1000000")
     a=p.parse_args()
     fixture=json.loads(Path(a.fixture).read_text())
@@ -96,19 +128,22 @@ def main():
     for amount in (int(x) for x in a.amounts.split(",")):
         receipt=json.loads((Path(a.receipts)/("signed-size-"+str(amount)+".json")).read_text())
         try:
-            evidence=compare(fixture,receipt)
+            evidence=compare(fixture,receipt,binary=a.binary)
         except (ValueError,TypeError,KeyError,OverflowError) as exc:
             evidence={"status":"DAMM_V2_SOURCE_SIGNED_RECONCILIATION_BLOCKED",
                       "reason":str(exc)[:300],"protocol_exact_verified":False,**SAFE}
         evidence["initial_route_input_base_units"]=amount
         trials.append(evidence)
     matched=sum(x.get("protocol_exact_verified") is True for x in trials)
+    official_matched=sum(x.get("official_signed_parity_verified") is True for x in trials)
     result={"status":("DAMM_V2_SIGNED_NATIVE_PRICING_VALIDATED" if matched==len(trials)
                       else "DAMM_V2_SIGNED_NATIVE_PRICING_UNVERIFIED"),
-            "matched":matched,"sample_count":len(trials),"trials":trials,
+            "matched":matched,"official_signed_matches":official_matched,
+            "sample_count":len(trials),"trials":trials,
             "protocol_exact_verified":matched==len(trials),**SAFE}
     Path(a.output).write_text(json.dumps(result,indent=2,sort_keys=True)+"\n")
     print(json.dumps({"status":result["status"],"matched":matched,
+                      "official_signed_matches":official_matched,
                       "sample_count":len(trials),**SAFE}))
     # A blocked actual fee regime is never promoted to pricing acceptance.
     # This diagnostic runner does not block other-venue CI independently.
