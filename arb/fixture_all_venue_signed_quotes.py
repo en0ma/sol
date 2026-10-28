@@ -43,6 +43,8 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix,
             from arb.orca_tick_math import sqrt_price_from_tick_index
             from arb.orca_spot_quote import quote_bounded_single_tick
             state=row["decoded_pool_state"]
+            from arb.orca_adaptive_fee_source import source_oracle
+            orca_fee_oracle=source_oracle(fixture,pool,state)
             spacing=state["tick_spacing"]
             tick=state["tick_current_index"]
             boundary=(tick//spacing)*spacing
@@ -223,7 +225,8 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix,
                               source_fee_on_input is True)
         return {"venue":v,"pool":pool,"leg_index":leg_index,
                 "source_fee_evidence":(fee_collection_source_evidence(
-                    state,leg["input_mint"]) if v=="raydium_clmm" else None),
+                    state,leg["input_mint"]) if v=="raydium_clmm" else
+                    orca_fee_oracle if v=="orca" else None),
                 "source_slot":q["snapshot_slot"],
                 "predicted_output_base_units":q["amount_out"],
                 "quote_status":(
