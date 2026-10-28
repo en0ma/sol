@@ -69,6 +69,21 @@ class MultitickIndicativeTests(unittest.TestCase):
         self.assertEqual(q["tick_arrays_examined"], 1)
         self.assertFalse(q["executable_quote"])
 
+    def test_native_bridge_accepts_dynamic_initialized_array_with_same_liquidity(self):
+        state=self.state()
+        state["tick_spacing"]=1
+        raw_ticks=[{"tick_index":10,"liquidity_net":"10000000000"},
+                   {"tick_index":0,"liquidity_net":"0"}]
+        def price(ix):
+            return {10:Q-1000000000000,0:Q-101000000000000}[ix]
+        fixed=quote_from_decoded_arrays(state,"a",1000000,
+             [{"start_tick":0,"status":"FIXED_VALID","ticks":raw_ticks}],price)
+        dynamic=quote_from_decoded_arrays(state,"a",1000000,
+             [{"start_tick":0,"status":"DYNAMIC_VALID","ticks":raw_ticks}],price)
+        self.assertEqual(fixed["estimated_output_base_units"],
+                         dynamic["estimated_output_base_units"])
+        self.assertEqual(fixed["ticks_crossed"],dynamic["ticks_crossed"])
+        self.assertFalse(dynamic["executable_quote"])
     def test_decoded_array_bridge_rejects_missing_current_array(self):
         state = self.state()
         state["tick_spacing"] = 1
