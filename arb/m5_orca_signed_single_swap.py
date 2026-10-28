@@ -131,6 +131,8 @@ def capture_pool(rpc,pool):
     state=decode_pool(raw)
     if set((state["token_mint_a"],state["token_mint_b"]))!=set(mints):
         raise ValueError("Orca source mint identities changed")
+    if state["tick_spacing"]==state["fee_tier_index_seed"]:
+        raise ValueError("Orca source native adaptive fee model requires adaptive pool")
     accounts.update(program_data_accounts(rpc,{PROGRAM}))
     if state["tick_spacing"]!=state["fee_tier_index_seed"] and aux.get("oracle") not in accounts:
         raise ValueError("Orca adaptive oracle source unavailable")
