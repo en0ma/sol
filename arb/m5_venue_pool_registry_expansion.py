@@ -110,11 +110,15 @@ def expand(rpc,registry,*,count=6,pages=4,venues=("orca","meteora_damm_v2")):
         "registered_additional_pools":0,
         "native_pricing_signed_verified":False,**SAFE}
 
-def promote_signed(registry,candidates,orca_receipt,meteora_receipt,*,required=6):
+def promote_signed(registry,candidates,orca_receipt,meteora_receipt,*,raydium_candidates=None,raydium_receipt=None,required=6):
     """Only complete 4/4 signed SDK/native execution parity enters registry."""
     specifications=(
         ("orca",orca_receipt,"ORCA_NEW_POOLS_SIGNED_VERIFIED"),
         ("meteora_damm_v2",meteora_receipt,"METEORA_DAMM_V2_CONFIGURED_POOLS_SIGNED_VERIFIED"))
+    if (raydium_candidates is None)!=(raydium_receipt is None):
+        raise ValueError("Raydium source and signed receipt must both be provided")
+    if raydium_receipt is not None:
+        specifications+= (("raydium_cpmm",raydium_receipt,"RAYDIUM_CPMM_SIGNED_VERIFIED"),)
     allowed={}
     for venue,receipt,status in specifications:
         if receipt.get("status")!=status or not isinstance(receipt.get("pools"),list):
@@ -131,13 +135,16 @@ def promote_signed(registry,candidates,orca_receipt,meteora_receipt,*,required=6
         allowed[venue]=set(validated)
     existing={(row["venue"],row["address"]) for row in registry["pools"]}
     fresh=[]
-    for row in candidates["pools"]:
+    for row in [*candidates["pools"],*(raydium_candidates or {}).get("pools",[])]:
         venue,address=row.get("venue"),row.get("address")
         if venue in allowed and address in allowed[venue] and (venue,address) not in existing:
             fresh.append(row)
             existing.add((venue,address))
-    if any(sum(row["venue"]==venue for row in fresh)<required for venue in allowed):
-        raise ValueError("signed pool identity not in authenticated discovery candidate list")
+    for venue in allowed:
+        admitted={r["address"] for r in fresh if r["venue"]==venue}
+        already={r["address"] for r in registry["pools"] if r["venue"]==venue}
+        if len((admitted|already)&allowed[venue])<required:
+            raise ValueError(venue+" signed pool identity missing from authenticated candidates and registry")
     return {**registry,"pools":[*registry["pools"],*fresh]}
 
 
