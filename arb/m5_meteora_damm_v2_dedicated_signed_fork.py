@@ -71,7 +71,7 @@ def export_source(rpc,registry,output):
             attempts.append({"pool":address,"reason":str(exc)[:250]})
     Path(output).write_text(json.dumps(
         {"selected":selected,"source_attempts":attempts,**SAFE},
-        sort_keys=True,indent=2)+"\\n")
+        sort_keys=True,indent=2)+"\n")
     return selected is not None
 
 def hydrate(rpc,captured):
@@ -200,7 +200,6 @@ def main():
     trials=[]
     if selected is not None:
         hydrate(rpc,selected)
-    if selected is not None:
         for a_to_b in (True,False):
             for amount in (int(x) for x in a.amounts.split(",")):
                 try:
