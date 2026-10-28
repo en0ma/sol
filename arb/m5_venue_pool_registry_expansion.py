@@ -97,9 +97,10 @@ def discover_new(rpc,registry,venue,*,count=6,pages=4):
             "status":"VENUE_REGISTRY_EXPANSION_READY" if len(identities)==count
                      else "VENUE_REGISTRY_EXPANSION_INCOMPLETE",**SAFE}
 
-def expand(rpc,registry,*,count=6,pages=4):
-    reports=[discover_new(rpc,registry,v,count=count,pages=pages)
-             for v in ("orca","meteora_damm_v2")]
+def expand(rpc,registry,*,count=6,pages=4,venues=("orca","meteora_damm_v2")):
+    if not venues or len(set(venues))!=len(venues) or any(v not in ("orca","meteora_damm_v2","raydium_cpmm") for v in venues):
+        raise ValueError("invalid native venue discovery selection")
+    reports=[discover_new(rpc,registry,v,count=count,pages=pages) for v in venues]
     accepted=[p for report in reports for p in report["new_authenticated_pools"]]
     registered={(p["venue"],p["address"]) for p in registry["pools"]}
     for row in accepted:
@@ -152,12 +153,14 @@ def main():
     p.add_argument("--registry",default="arb/pool_registry.json")
     p.add_argument("--count",type=int,default=6)
     p.add_argument("--pages",type=int,default=4)
+    p.add_argument("--venues",default="orca,meteora_damm_v2")
     p.add_argument("--output-registry",required=True)
     p.add_argument("--output-new-pools",required=True)
     p.add_argument("--report",required=True)
     a=p.parse_args()
     registry=json.loads(Path(a.registry).read_text())
-    expanded,report=expand(a.rpc,registry,count=a.count,pages=a.pages)
+    expanded,report=expand(a.rpc,registry,count=a.count,pages=a.pages,
+        venues=tuple(a.venues.split(",")))
     Path(a.output_registry).write_text(json.dumps(expanded,indent=2)+"\n")
     additions=[p for venue in report["venues"] for p in venue["new_authenticated_pools"]]
     Path(a.output_new_pools).write_text(json.dumps({"pools":additions},indent=2)+"\n")
@@ -165,7 +168,7 @@ def main():
     print(json.dumps({"status":report["status"],
                       "authenticated_candidate_count":report["authenticated_candidate_count"],
                       "registered_additional_pools":0,**SAFE}))
-    if report["status"]!="BOTH_VENUES_SIX_NEW_POOLS_AUTHENTICATED":
+    if any(v["new_authenticated_count"]!=a.count for v in report["venues"]):
         raise SystemExit("six NEW authenticated pools per venue not yet discovered")
 
 if __name__=="__main__":main()
