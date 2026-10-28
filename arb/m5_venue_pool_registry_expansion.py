@@ -118,8 +118,8 @@ def promote_signed(registry,candidates,orca_receipt,meteora_receipt,*,raydium_ca
     """
     if type(required) is not int or required<1:
         raise ValueError("invalid signed pool admission threshold")
-    if (raydium_candidates is None)!=(raydium_receipt is None):
-        raise ValueError("Raydium authenticated candidates and signed receipt must occur together")
+    if raydium_candidates is None or raydium_receipt is None:
+        raise ValueError("all three venues require authenticated candidates and signed receipts")
     specifications=[
         ("orca",orca_receipt,"ORCA_NEW_POOLS_SIGNED_VERIFIED",
          "ORCA_NEW_POOL_SIGNED_EXACT",("a_to_b","b_to_a"),
