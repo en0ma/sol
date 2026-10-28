@@ -56,7 +56,7 @@ class SignedRegistryAdmission(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"fewer than required"):
             self.promote(lambda a,b,r:r["raydium_cpmm"]["pools"][0].update({"verified":False}))
     def test_missing_raydium_manifest_rejected(self):
-        with self.assertRaisesRegex(ValueError,"occur together"):
+        with self.assertRaisesRegex(ValueError,"all three venues"):
             c,rc,r=fixture()
             promote_signed({"pools":[]},c,r["orca"],r["meteora_damm_v2"],raydium_receipt=r["raydium_cpmm"],required=1)
 
