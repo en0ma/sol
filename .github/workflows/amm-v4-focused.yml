@@ -716,11 +716,27 @@ jobs:
               except Exception:time.sleep(2)
           else:raise SystemExit("offline RPC unavailable")
           PY
+      - name: Reuse Rust venue reference compilation across CI runs
+        if: ${{ matrix.shard == 0 }}
+        uses: actions/cache@v4
+        with:
+          path: |
+            tools/meteora_damm_v2_reference/target
+            tools/orca_core_quote/target
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: venue-native-rust-${{ runner.os }}-${{ hashFiles('tools/meteora_damm_v2_reference/Cargo.lock', 'tools/orca_core_quote/Cargo.lock', 'tools/meteora_damm_v2_reference/src/**', 'tools/orca_core_quote/src/**') }}
+          restore-keys: |
+            venue-native-rust-${{ runner.os }}-
+      - name: Build official venue references once for signed tests
+        if: ${{ matrix.shard == 0 }}
+        run: |
+          cargo build --release --locked --manifest-path tools/meteora_damm_v2_reference/Cargo.toml
+          cargo build --release --locked --manifest-path tools/orca_core_quote/Cargo.toml
       - name: Validate Meteora DAMM v2 on untouched isolated fork before multihop account hydration
         if: ${{ matrix.shard == 0 }}
         run: |
           mkdir -p "$RUNNER_TEMP/m5-four-to-six-signed-attempt"
-          cargo build --release --manifest-path tools/meteora_damm_v2_reference/Cargo.toml
           python3 -m arb.m5_meteora_damm_v2_dedicated_signed_fork \
             --source-file "$RUNNER_TEMP/meteora-damm-v2-upstream-source.json" \
             --binary tools/meteora_damm_v2_reference/target/release/sol-meteora-damm-v2-official-reference \
@@ -736,7 +752,6 @@ jobs:
       - name: Check new Orca pool pricing
         if: ${{ matrix.shard == 0 }}
         run: |
-          cargo build --release --manifest-path tools/orca_core_quote/Cargo.toml
           python3 -m arb.m5_orca_signed_single_swap --new-pools-source "$RUNNER_TEMP/orca-new-pools-upstream-source.json" --pool-count 6 --required-verified-pools 6 --binary tools/orca_core_quote/target/release/sol-orca-native-reference --output "$RUNNER_TEMP/m5-four-to-six-signed-attempt/orca-new-pools-signed.json"
       - name: Admit only signed native-priced pools into the usable venue registry
         if: ${{ matrix.shard == 0 }}
@@ -798,7 +813,6 @@ jobs:
           fi
           # Use published Orca Core as an independent integer quote oracle.
           # Build once per isolated fork job; reject every signed mismatch.
-          cargo build --release --manifest-path tools/orca_core_quote/Cargo.toml
           python3 -m arb.m5_orca_official_bidirectional_matrix \
             --binary tools/orca_core_quote/target/release/sol-orca-native-reference \
             --output "$RUNNER_TEMP/m5-four-to-six-signed-attempt/orca-official-bidirectional-crossing-matrix.json"
@@ -823,7 +837,6 @@ jobs:
               --output "$RUNNER_TEMP/m5-four-to-six-signed-attempt/orca-three-size-fork-native-parity.json"
           fi
           if [ -s "$RUNNER_TEMP/m5-four-to-six-source-fixture.json" ]; then
-            cargo build --release --manifest-path tools/meteora_damm_v2_reference/Cargo.toml
             python3 -m arb.m5_meteora_damm_v2_signed_native_parity \
               --binary tools/meteora_damm_v2_reference/target/release/sol-meteora-damm-v2-official-reference \
               --fixture "$RUNNER_TEMP/m5-four-to-six-source-fixture.json" \
