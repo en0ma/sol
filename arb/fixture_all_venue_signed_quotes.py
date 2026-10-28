@@ -48,12 +48,14 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix):
             lower=sqrt_price_from_tick_index(boundary)
             upper=sqrt_price_from_tick_index(boundary+spacing)
             from arb.whirlpool_ticks import (
-                FIXED_LEN,DISC as ORCA_TICK_DISC,decode_fixed_ticks,
-                addresses as orca_array_addresses)
+                FIXED_LEN,DISC as ORCA_TICK_DISC,DYNAMIC_DISC,
+                DYNAMIC_MIN_LEN,DYNAMIC_MAX_LEN,decode_fixed_ticks,
+                decode_dynamic_ticks,addresses as orca_array_addresses)
             from arb.orca_multitick_quote import quote_from_decoded_arrays
-            from arb.orca_whirlpool import PROGRAM as ORCA_PROGRAM
+            from arb.orca_whirlpool import PROGRAM as ORCA_PROGRAM,b58
             import base64
             decoded_arrays=[]
+            seen_starts=set()
             for address in fixture["state_account_addresses"]:
                 account=fixture["accounts"].get(address)
                 if not isinstance(account,dict) or account.get("owner")!=ORCA_PROGRAM:
@@ -64,14 +66,31 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix):
                 if not isinstance(data,list) or len(data)!=2 or data[1]!="base64":
                     raise ValueError("unauthenticated Whirlpool source array encoding")
                 raw=base64.b64decode(data[0],validate=True)
-                if len(raw)!=FIXED_LEN or raw[:8]!=ORCA_TICK_DISC:
+                if len(raw)<12:
+                    continue
+                is_fixed=len(raw)==FIXED_LEN and raw[:8]==ORCA_TICK_DISC
+                is_dynamic=(DYNAMIC_MIN_LEN<=len(raw)<=DYNAMIC_MAX_LEN
+                            and raw[:8]==DYNAMIC_DISC)
+                if not (is_fixed or is_dynamic):
+                    continue
+                # A single route can capture arrays belonging to OTHER
+                # Whirlpool pools. Only the source-array parent key for this
+                # leg is relevant. Never treat unrelated arrays as forged.
+                parent=b58(raw[-32:]) if is_fixed else b58(raw[12:44])
+                if parent!=pool:
                     continue
                 start=int.from_bytes(raw[8:12],"little",signed=True)
+                if start in seen_starts:
+                    raise ValueError("duplicate Whirlpool tick array start")
                 if address!=orca_array_addresses(pool,[start])[0]:
                     raise ValueError("Whirlpool captured tick array PDA mismatch")
-                records=decode_fixed_ticks(raw,pool,start,spacing)
+                if is_fixed:
+                    records=decode_fixed_ticks(raw,pool,start,spacing)
+                else:
+                    records=decode_dynamic_ticks(raw,pool,start,spacing)
+                seen_starts.add(start)
                 decoded_arrays.append({"start_tick":start,"ticks":records,
-                                       "status":"FIXED_VALID"})
+                    "status":"FIXED_VALID" if is_fixed else "DYNAMIC_VALID"})
             if decoded_arrays:
                 # Reuse the existing exact-input Orca venue model, rather than
                 # pretending the current tick has infinite constant liquidity.
