@@ -94,3 +94,17 @@ class PumpSourceTierSelectionTests(unittest.TestCase):
             market_cap_quote_base_units(base_reserve=100,quote_reserve=100,
                 virtual_quote_reserves=-200,base_decimals=6)
 if __name__=="__main__":unittest.main()
+
+class SourceVolatilityPolynomialTests(unittest.TestCase):
+    def test_native_polynomial_is_integer_ceiling(self):
+        from arb.meteora_damm_v2_native_fee_math import source_volatility_fee_candidate
+        r=source_volatility_fee_candidate(volatility_accumulator=100,bin_step=25,
+            variable_fee_control=14460000,max_volatility_accumulator=239)
+        self.assertEqual(r["snapshot_dynamic_fee_numerator"],
+                         ((100*25)**2*14460000+100_000_000_000-1)//100_000_000_000)
+        self.assertFalse(r["protocol_exact_verified"])
+    def test_out_of_source_volatility_bounds_rejected(self):
+        from arb.meteora_damm_v2_native_fee_math import source_volatility_fee_candidate
+        with self.assertRaises(ValueError):
+            source_volatility_fee_candidate(volatility_accumulator=240,bin_step=25,
+                variable_fee_control=14460000,max_volatility_accumulator=239)
