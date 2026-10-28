@@ -85,3 +85,32 @@ class RaydiumCrossTickSourceNativeTests(unittest.TestCase):
         self.assertTrue(all(s["gross_input_base_units"]==
             s["net_input_base_units"]+s["fee_input_base_units"] for s in result["steps"]))
 if __name__=="__main__":unittest.main()
+
+class RaydiumFeeOnOutputResearchModels(RaydiumCrossTickSourceNativeTests):
+    def test_fee_on_output_deducts_from_output_not_input(self):
+        for mint in ("mint0","mint1"):
+            with self.subTest(mint=mint):
+                modeled=quote_across_initialized_ticks(
+                    self.pool(),mint,100000,2500,self.ticks(),fee_on_input=False)
+                self.assertEqual(modeled["amount_in"],100000)
+                self.assertEqual(modeled["fee_input_base_units"],0)
+                self.assertGreater(modeled["fee_output_base_units"],0)
+                self.assertEqual(sum(step["fee_output_base_units"]
+                    for step in modeled["steps"]),modeled["fee_output_base_units"])
+                self.assertEqual(modeled["fee_collection_mode"],"OUTPUT")
+                self.assertFalse(modeled["source_fee_collection_mode_verified"])
+                self.assertFalse(modeled["protocol_exact_verified"])
+
+    def test_fee_on_output_zero_fee_equals_input_fee_mode(self):
+        for mint in ("mint0","mint1"):
+            base=quote_across_initialized_ticks(
+                self.pool(),mint,100000,0,self.ticks(),fee_on_input=True)
+            alt=quote_across_initialized_ticks(
+                self.pool(),mint,100000,0,self.ticks(),fee_on_input=False)
+            self.assertEqual(base["amount_out"],alt["amount_out"])
+            self.assertEqual(alt["fee_output_base_units"],0)
+
+    def test_invalid_unattested_fee_mode_refused(self):
+        with self.assertRaisesRegex(ValueError,"fee collection mode"):
+            quote_across_initialized_ticks(
+                self.pool(),"mint0",1000,2500,self.ticks(),fee_on_input="output")
