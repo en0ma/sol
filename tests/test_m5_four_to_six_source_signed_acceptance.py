@@ -3,6 +3,11 @@ from unittest.mock import patch
 from arb.m5_four_to_six_source_signed_acceptance import assess
 SAFE={"actionable":False,"broadcast":False,"live_execution_approved":False}
 class AuthenticatedSignedSourceAcceptanceTests(unittest.TestCase):
+    def setUp(self):
+        verifier=patch("arb.m5_four_to_six_source_signed_acceptance.verify_signed_pair",
+                       return_value={"status":"CRYPTOGRAPHICALLY_VERIFIED_INDEPENDENT_SIGNED_PACKET_PAIR"})
+        verifier.start()
+        self.addCleanup(verifier.stop)
     def fixture(self):
         return {"fixture_kind":"AUTHENTICATED_FOUR_TO_SIX_HOP_SOURCE_ROUTE",
             "state_accounts_observed_slot":42,

@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 from arb.source_snapshot_manifest import verify
 from arb.fixture_quote_execution_pipeline import extract_pool_states
+from arb.m5_independent_signed_wire_verifier import verify_signed_pair
 SAFE={"actionable":False,"broadcast":False,"live_execution_approved":False}
 
 def assess(fixture,receipt):
@@ -125,6 +126,14 @@ def assess(fixture,receipt):
     neg_size=receipt.get("negative_packet_bytes")
     if type(neg_size)is not int or not 100<=neg_size<=1232:
         errors.append("negative signed rollback packet absent or exceeds Solana packet limit")
+    # Independently parse and cryptographically verify the actual serialized
+    # signed transactions, not merely their claimed digests and signatures.
+    try:
+        wire=verify_signed_pair(receipt)
+        if wire["status"]!="CRYPTOGRAPHICALLY_VERIFIED_INDEPENDENT_SIGNED_PACKET_PAIR":
+            errors.append("signed transaction wire pair not independently verified")
+    except (ValueError,TypeError,KeyError) as exc:
+        errors.append("signed wire cryptographic acceptance failed: "+str(exc)[:180])
     # A superficially green receipt must include actual fork readback.
     hydrated=receipt.get("hydrated_fork_state_readback")
     if (not isinstance(hydrated,dict) or
