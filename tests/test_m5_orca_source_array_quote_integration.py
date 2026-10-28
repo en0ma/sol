@@ -16,7 +16,8 @@ class SourceOrcaArrayTests(unittest.TestCase):
  def rows(self):
   return [{"venue":"orca","address":"POOL","mints":["A","B"],
      "snapshot_slot":77,"decoded_pool_state":{
-       "token_mint_a":"A","token_mint_b":"B","tick_spacing":10,\n       "fee_tier_index_seed":10,
+       "token_mint_a":"A","token_mint_b":"B","tick_spacing":10,
+       "fee_tier_index_seed":10,
        "tick_current_index":5,"sqrt_price_x64":sqrt_price_from_tick_index(5),
        "liquidity":10**9,"fee_rate_hundredths_bps":1000}},
        {"venue":"raydium_cpmm","address":"OTHER","mints":["B","C"],"snapshot_slot":77}]
