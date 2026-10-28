@@ -16,6 +16,9 @@ class SourceSignedMultisizeAuditTests(unittest.TestCase):
         receipts={10:{"planned_inputs":[10,9,8,7],"real":False},
                   100:{"planned_inputs":[100,90,80,70],"real":True},
                   1000:{"planned_inputs":[1000,900,800,700],"real":True}}
+        for size,receipt in receipts.items():
+            receipt["signed_transaction_sha256"]=f"{size:064x}"
+            receipt["negative_signed_transaction_sha256"]=f"{size+1:064x}"
         r=audit_attempts({},receipts,expected_amounts=(10,100,1000))
         self.assertEqual(r["independently_accepted_amounts_base_units"],[100,1000])
         self.assertEqual(assess.call_count,3)
@@ -53,6 +56,9 @@ class SourceSignedMultisizeAuditTests(unittest.TestCase):
                  "positive_post_balances_base_units":[0,0,0,0,208000],
                  "signed_message_fee_estimate":fee,
                  "signed_atomic_simulation_verified":True,**SAFE}}
+        for size,receipt in receipts.items():
+            receipt["signed_transaction_sha256"]=f"{size:064x}"
+            receipt["negative_signed_transaction_sha256"]=f"{size+1:064x}"
         wsol={"route_mints":[WSOL,"B","C","D",WSOL],
               "state_accounts_observed_slot":88}
         result=audit_attempts(wsol,receipts,expected_amounts=(100000,200000))
@@ -71,3 +77,21 @@ class SourceSignedMultisizeAuditTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 audit_attempts({}, {},expected_amounts=sizes)
 if __name__=="__main__":unittest.main()
+
+class SignedPacketReplayAcrossSizesTests(unittest.TestCase):
+    @patch("arb.m5_four_to_six_signed_batch_audit.assess")
+    def test_second_claim_reusing_signed_packet_is_not_accepted(self,assess):
+        assess.return_value={
+            "status":"VERIFIED_SIGNED_FOUR_TO_SIX_HOP_ROLLBACK",
+            "hops":4,"failure_reasons":[],
+            "signed_atomic_simulation_verified":True,
+            "rollback_failure_case_verified":True,**SAFE}
+        receipts={}
+        for amount in (100,200):
+            receipts[amount]={
+                "planned_inputs":[amount,90,80,70],
+                "signed_transaction_sha256":"a"*64,
+                "negative_signed_transaction_sha256":"b"*64}
+        report=audit_attempts({},receipts,expected_amounts=(100,200))
+        self.assertEqual(report["independently_accepted_count"],1)
+        self.assertIn("replay",report["attempts"][1]["audit"]["failure_reasons"][0])
