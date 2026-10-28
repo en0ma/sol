@@ -31,7 +31,10 @@ def capture(rpc,address):
     proof=call(rpc,"getAccountInfo",[address,{"encoding":"base64","commitment":"confirmed"}])
     entry=proof.get("value")
     if not isinstance(entry,dict) or entry.get("owner")!=PROGRAM or entry.get("executable") is not False:
-        raise ValueError("unverified source Meteora pool owner")
+        raise ValueError("unverified source Meteora pool owner: "+
+                         ("missing_account" if entry is None else
+                          "observed_owner="+str(entry.get("owner"))+
+                          " executable="+str(entry.get("executable"))))
     raw=base64.b64decode(entry["data"][0],validate=True)
     state=decode(raw)
     if state["pool_status"]!=0 or state["token_a_flag"] or state["token_b_flag"]:
@@ -172,7 +175,7 @@ def main():
             selected=pool
             break
         except (ValueError,TypeError,KeyError,RuntimeError,OSError) as exc:
-            attempts.append({"pool":candidate,"reason":str(exc)[:200]})
+            attempts.append({"pool":candidate,"reason":str(exc)[:250]})
     if selected is not None:
         for a_to_b in (True,False):
             for amount in (int(x) for x in a.amounts.split(",")):
