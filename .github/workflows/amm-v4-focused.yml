@@ -710,6 +710,9 @@ jobs:
           # Use published Orca Core as an independent integer quote oracle.
           # Build once per isolated fork job; reject every signed mismatch.
           cargo build --release --manifest-path tools/orca_core_quote/Cargo.toml
+          python3 -m arb.m5_orca_official_bidirectional_matrix \
+            --binary tools/orca_core_quote/target/release/sol-orca-native-reference \
+            --output "$RUNNER_TEMP/m5-four-to-six-signed-attempt/orca-official-bidirectional-crossing-matrix.json"
           if [ -s "$RUNNER_TEMP/m5-four-to-six-source-fixture.json" ]; then
             python3 -m arb.m5_orca_official_core_parity \
               --fixture "$RUNNER_TEMP/m5-four-to-six-source-fixture.json" \
