@@ -217,6 +217,13 @@ def promote_signed(registry,candidates,orca_receipt,meteora_receipt,*,raydium_ca
                     raise ValueError(venue+" signed trial lacks exact execution proof")
                 if trial.get("pool")!=address or trial.get("direction") not in directions:
                     raise ValueError(venue+" signed trial pool/direction identity mismatch")
+                # Different venue runners use input or amount_in. If both
+                # are supplied they must identify the same signed input.
+                if "input" in trial and "amount_in" in trial and (
+                        type(trial["input"]) is not int or
+                        type(trial["amount_in"]) is not int or
+                        trial["input"]!=trial["amount_in"]):
+                    raise ValueError(venue+" conflicting signed trial input amounts")
                 size=trial.get("input",trial.get("amount_in"))
                 if type(size)is not int or size<=0:
                     raise ValueError(venue+" signed trial has invalid input size")
@@ -238,7 +245,7 @@ def promote_signed(registry,candidates,orca_receipt,meteora_receipt,*,raydium_ca
                     type(pool[k]) is not int or pool[k]!=4
                     for k in ("exact","exact_matches") if k in pool):
                 raise ValueError(venue+" reported exact count disagrees with evidence")
-            if pool.get("trial_count",4)!=4:
+            if "trial_count" in pool and (type(pool["trial_count"]) is not int or pool["trial_count"]!=4):
                 raise ValueError(venue+" reported trial count disagrees with evidence")
             if address in approved:raise ValueError(venue+" duplicate approved signed pool")
             approved.add(address)
