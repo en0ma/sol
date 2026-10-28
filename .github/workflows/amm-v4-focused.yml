@@ -683,6 +683,7 @@ jobs:
             python3 -m arb.m5_four_to_six_signed_batch_audit \
               --fixture "$RUNNER_TEMP/m5-four-to-six-source-fixture.json" \
               --receipts "$RUNNER_TEMP/m5-four-to-six-signed-attempt" \
+              --observed-unix "$(date +%s)" \
               --output "$RUNNER_TEMP/m5-four-to-six-signed-attempt/all-signed-size-acceptance.json"
           fi
           if [ -s "$RUNNER_TEMP/m5-four-to-six-source-fixture.json" ]; then
