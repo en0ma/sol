@@ -38,7 +38,10 @@ def audit_attempts(fixture,receipts,*,expected_amounts,observed_unix=None):
         if approved:
             positive=receipt.get("signed_transaction_sha256")
             negative=receipt.get("negative_signed_transaction_sha256")
-            if positive in seen_signed_packets or negative in seen_negative_packets:
+            import re
+            if (not isinstance(positive,str) or not re.fullmatch(r"[0-9a-f]{64}",positive)
+                    or not isinstance(negative,str) or not re.fullmatch(r"[0-9a-f]{64}",negative)
+                    or positive in seen_signed_packets or negative in seen_negative_packets):
                 verified["failure_reasons"].append(
                     "signed packet replay across independently claimed input amounts")
                 verified["status"]="SOURCE_FOUR_TO_SIX_SIGNED_ROLLBACK_UNVERIFIED"
