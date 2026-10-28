@@ -59,6 +59,24 @@ class RaydiumCrossTickSourceNativeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"crossing budget"):
             quote_across_initialized_ticks(self.pool(),"mint0",8_000_000,2500,
                 self.ticks(),max_crossings=0)
+    def test_unobserved_intermediate_tick_array_cannot_be_skipped(self):
+        state=self.pool()
+        state["tick_spacing"]=1
+        state["authenticated_tick_array_starts"]=[0,-120]
+        source=[{"tick_index":0,"liquidity_net":0,
+                 "liquidity_gross":10_000_000_000},
+                {"tick_index":-121,"liquidity_net":0,
+                 "liquidity_gross":10_000_000_000}]
+        with self.assertRaisesRegex(ValueError,"unobserved gap"):
+            quote_across_initialized_ticks(state,"mint0",100_000_000,
+                2500,source)
+    def test_missing_current_array_fails_before_quote(self):
+        state=self.pool()
+        state["tick_spacing"]=1
+        state["authenticated_tick_array_starts"]=[-60]
+        with self.assertRaisesRegex(ValueError,"active tick array"):
+            quote_across_initialized_ticks(state,"mint0",1000,
+                2500,self.ticks())
     def test_nonzero_fee_and_input_conservation(self):
         result=quote_across_initialized_ticks(self.pool(),"mint1",
             3_000_000,12000,self.ticks())
