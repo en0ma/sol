@@ -194,7 +194,7 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix,
                             and candidate["source_pool_fee_schedule"].get("status")==
                                 "SOURCE_DAMM_BASE_FEE_ONLY_NOT_PROTOCOL_EXACT"
                             and candidate["source_pool_fee_schedule"].get("dynamic_fee_initialized") is False
-                            else "NATIVE_QUOTE_MODELED_NOT_EXACT"),
+                            else "SOURCE_BOUND_FEE_MODE_SCENARIO_NOT_EXACT"),
                         "native_fee_envelope":candidate,
                         "reason":"DAMM v2 effective dynamic fee or curve parity unverified",
                         "protocol_exact_verified":False,**SAFE}
@@ -217,6 +217,9 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix,
                 "quote_status":("SOURCE_BOUND_INDICATIVE" if
                                 v!="raydium_clmm" or clmm_fee_on_input else
                                 "NATIVE_QUOTE_MODELED_NOT_EXACT"),
+                "source_fee_mode_scenario":(
+                    "OUTPUT_UNATTESTED" if v=="raydium_clmm" and
+                    not clmm_fee_on_input else "DEFAULT_SOURCE_MODEL"),
                 "protocol_exact_verified":False,**SAFE}
     except (ValueError,KeyError,TypeError,ArithmeticError) as exc:
         return {"venue":v,"pool":pool,"leg_index":leg_index,
