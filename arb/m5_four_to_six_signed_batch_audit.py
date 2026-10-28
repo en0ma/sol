@@ -146,6 +146,25 @@ def audit_attempts(fixture,receipts,*,expected_amounts,observed_unix=None):
                 if type(r["estimated_net_start_mint_delta_base_units"]) is int]
     net_estimate_ranking=sorted(comparable,
         key=lambda r:(-r["estimated_net_start_mint_delta_base_units"],r["size_base_units"]))
+    # Sensitivity is tied to *signed* terminal SPL deltas. A breakeven
+    # threshold is merely a measured upper cost budget, not a profitability
+    # certification: priority rent, token-account costs and conversion
+    # execution may remain unpriced.
+    signed_break_even_cost_budgets=[
+        {"size_base_units":entry["size_base_units"],
+         "gross_delta_start_mint_base_units":entry["gross_start_mint_delta_base_units"],
+         "maximum_start_mint_cost_for_nonnegative_net_base_units":max(
+             0,entry["gross_start_mint_delta_base_units"]),
+         "has_positive_gross_cost_budget":entry["gross_start_mint_delta_base_units"]>0,
+         "network_fee_estimate_available":
+             type(entry["estimated_start_mint_cost_base_units"])is int,
+         "estimated_cost_within_signed_gross_budget":(
+             entry["gross_start_mint_delta_base_units"]>=
+             entry["estimated_start_mint_cost_base_units"]
+             if type(entry["estimated_start_mint_cost_base_units"])is int else None),
+         "priority_fee_and_external_costs_fully_verified":False,
+         "net_profit_verified":False,**SAFE}
+        for entry in signed_gross_observations]
     gross_ranking=sorted(signed_gross_observations,
         key=lambda x:(-x["gross_start_mint_delta_base_units"],x["size_base_units"]))
     return {"status":"FOUR_TO_SIX_SOURCE_SIGNED_MULTISIZE_INDEPENDENT_AUDIT",
@@ -159,6 +178,7 @@ def audit_attempts(fixture,receipts,*,expected_amounts,observed_unix=None):
             "signed_native_model_numeric_comparison_count":sum(
                 r.get("numeric_comparison_count",0) for r in signed_native_parity),
             "signed_gross_only_research_ranking":gross_ranking,
+            "signed_start_mint_break_even_cost_budgets":signed_break_even_cost_budgets,
             "positive_signed_gross_count":sum(x["gross_start_mint_delta_base_units"]>0
                                               for x in gross_ranking),
             "estimated_net_start_mint_comparable_count":len(net_estimate_ranking),
