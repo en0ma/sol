@@ -125,7 +125,8 @@ def compare(fixture,receipt,*,observed_unix):
                 type(source_output)is not int or not 0<source_output<2**64):
             raise ValueError("invalid independently source-derived amount")
         source_fee_mode_scenarios=[]
-        if row["venue"]=="raydium_clmm":
+        if row["venue"]=="raydium_clmm" and native.get(
+                "source_fee_evidence",{}).get("fee_on_input") is True:
             alternate=quote_leg(fixture,leg_index=index,
                 amount_in=planned[index],observed_unix=observed_unix,
                 clmm_fee_on_input=False)
