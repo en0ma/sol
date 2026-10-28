@@ -82,16 +82,14 @@ def quote_auxiliary(fixture, row, *, venue, mint_in, amount_in, auxiliary):
                           bins=bins,total_fee_rate=auxiliary["total_fee_rate"])
         output=result["amount_out"]
     elif venue=="meteora_damm_v2":
-        from arb.meteora_damm_v2_quote import quote_collection_mode
-        if any(k not in auxiliary for k in ("vault_base_units","effective_fee_ppm","collection_mode")):
-            raise ValueError("MISSING_NATIVE_AUXILIARY_STATE: DAMM fee scheduler, collection mode and reserves")
-        reserves=auxiliary["vault_base_units"]
-        if not isinstance(reserves,list) or len(reserves)!=2:
-            raise ValueError("DAMM native source vaults missing")
-        result=quote_collection_mode(reserves[0],reserves[1],amount_in,
-            input_is_a=mint_in==state["token_a_mint"],
-            effective_fee_ppm=auxiliary["effective_fee_ppm"],
-            collection_mode=auxiliary["collection_mode"])
+        from arb.meteora_damm_v2_native_quote import quote_pool_account
+        clock=auxiliary.get("fork_clock")
+        if not isinstance(clock,dict):
+            raise ValueError("Meteora SDK quote requires verified fork execution Clock")
+        result=quote_pool_account(fixture["accounts"][row["address"]],
+            mint_in=mint_in,amount_in=amount_in,
+            fork_unix_timestamp=clock.get("fork_unix_timestamp"),
+            fork_clock_slot=clock.get("fork_clock_slot"))
         output=result["amount_out"]
     else:
         from arb.pumpswap_quote import quote_exact_input
