@@ -44,6 +44,18 @@ class PumpSourceTierSelectionTests(unittest.TestCase):
             quote_reserve=2000_000000,virtual_quote_reserves=-200_000000,
             base_decimals=6)
         self.assertEqual(result["market_cap_quote_base_units"],1_800_000_000_000_000)
+    def test_published_market_cap_uses_billion_tokens_not_mutable_mint_supply(self):
+        burn=market_cap_quote_base_units(base_reserve=1000_000000,
+            quote_reserve=2000_000000,virtual_quote_reserves=0,
+            base_decimals=6,base_supply_base_units=500_000000)
+        full=market_cap_quote_base_units(base_reserve=1000_000000,
+            quote_reserve=2000_000000,virtual_quote_reserves=0,
+            base_decimals=6,base_supply_base_units=1_000_000_000_000000)
+        self.assertEqual(burn["market_cap_quote_base_units"],
+                         full["market_cap_quote_base_units"])
+        self.assertEqual(burn["fee_tier_supply_basis_base_units"],1_000_000_000_000000)
+        self.assertEqual(burn["source_actual_supply_base_units"],500_000000)
+        self.assertFalse(burn["actionable"])
     def test_initialized_classic_mint_decimals(self):
         raw=bytearray(82)
         raw[44]=6
