@@ -48,7 +48,8 @@ proof that the current repository's Python math exactly matches the program.
 already-registered identity hints and independently verifies pool owner,
 layout, mint identity, vaults, fee/configuration accounts and current on-chain
 state using the existing `pumpswap_pool.verify` implementation. It captures the verified same-slot six-account bundle (pool, both vaults,
-global config, fee config, base mint), the pool account bytes, and the fee-mode diagnostic; it explicitly marks
+global config, fee config, base mint), the pool account bytes, the fee-mode diagnostic, and four clearly unverified
+candidate exact-input quotes (two directions × two sizes); it explicitly marks
 native pricing, signed parity and admission false. The independently retrieved initial pool account and verifier snapshot have
 separate slots; only the six verifier-snapshot accounts share a context slot.
 The report preserves both slot values rather than misrepresenting them as one
