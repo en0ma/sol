@@ -55,6 +55,30 @@ class PumpSwapNativeCandidateTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"creator fee gate"):
             quote_exact_input(p,SOL,1000)
 
+    def test_stable_quote_selects_stable_schedule(self):
+        p=fixture()
+        p["quote_mint"]="EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+        p["fee_config"]["stable_fee_tiers"]=[{
+            "market_cap_threshold":0,
+            "fees":{"lp_fee_bps":300,"protocol_fee_bps":100,"creator_fee_bps":0}}]
+        r=quote_exact_input(p,p["base_mint"],1000)
+        self.assertEqual(r["fee_rates_bps"]["lp_fee_bps"],300)
+
+    def test_noncanonical_uses_flat_fees_even_for_sol(self):
+        p=fixture()
+        p["canonical"]=False
+        r=quote_exact_input(p,p["base_mint"],1000)
+        self.assertEqual(r["fee_rates_bps"]["lp_fee_bps"],10)
+
+    def test_mayhem_uses_fixed_supply_for_fee_tier(self):
+        p=fixture()
+        p["is_mayhem_mode"]=1
+        p["fee_config"]["fee_tiers"].append({
+            "market_cap_threshold":1_000_000_000,
+            "fees":{"lp_fee_bps":80,"protocol_fee_bps":40,"creator_fee_bps":0}})
+        r=quote_exact_input(p,p["base_mint"],1000)
+        self.assertEqual(r["fee_rates_bps"]["lp_fee_bps"],80)
+
     def test_spendable_liquidity_is_not_virtual_reserve(self):
         p=fixture();p["protocol_fees_accrued"]=199999
         with self.assertRaisesRegex(ValueError,"invalid PumpSwap physical"):
