@@ -551,12 +551,21 @@ jobs:
               "blockers":report["blockers"],"broadcast":False}))
           PY
           fi
+      - name: Capture authentic Meteora pool, vaults and program ELF from upstream-backed fork
+        run: |
+          python3 -m arb.m5_meteora_damm_v2_dedicated_signed_fork \
+            --capture-source \
+            --registry "$RUNNER_TEMP/m5-seven-venue-untrusted-pool-hints.json" \
+            --source-file "$RUNNER_TEMP/meteora-damm-v2-upstream-source.json" \
+            --binary tools/meteora_damm_v2_reference/target/release/sol-meteora-damm-v2-official-reference \
+            --output "$RUNNER_TEMP/meteora-damm-v2-capture-status.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: m5-broad-seven-venue-discovery-and-source-cycles
           path: |
             ${{ runner.temp }}/m5-seven-venue-untrusted-pool-hints.json
+            ${{ runner.temp }}/meteora-damm-v2-upstream-source.json
             ${{ runner.temp }}/m5-broad-source-route-candidates.json
             ${{ runner.temp }}/m5-four-to-six-source-fixture.json
             ${{ runner.temp }}/m5-four-to-six-source-capture.json
@@ -663,15 +672,6 @@ jobs:
             "source_slot":fixture["state_accounts_observed_slot"],
             "accounts":fixture["state_account_count"],"broadcast":False}))
           PY
-      - name: Capture authentic Meteora pool, vaults and program ELF from upstream-backed fork
-        if: ${{ matrix.shard == 0 }}
-        run: |
-          python3 -m arb.m5_meteora_damm_v2_dedicated_signed_fork \
-            --capture-source \
-            --registry "$RUNNER_TEMP/m5-seven-venue-untrusted-pool-hints.json" \
-            --source-file "$RUNNER_TEMP/meteora-damm-v2-upstream-source.json" \
-            --binary tools/meteora_damm_v2_reference/target/release/sol-meteora-damm-v2-official-reference \
-            --output "$RUNNER_TEMP/meteora-damm-v2-capture-status.json"
       - name: Start disposable explicitly offline Surfpool
         run: |
           nohup surfpool start --ci --offline > "$RUNNER_TEMP/offline.log" 2>&1 < /dev/null &
