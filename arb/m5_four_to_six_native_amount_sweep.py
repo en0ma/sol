@@ -20,9 +20,51 @@ def sweep(fixture, *, observed_unix, amounts=(10000,100000,1000000)):
     attempts=[]
     venue_probes=[]
     modeled_intervals=[]
+    chained_venue_probes=[]
+    source_scenario_rankings=[]
     for amount in amounts:
         result=research_chain(fixture,amount_in=amount,observed_unix=observed_unix)
         modeled=walk(fixture,input_base_units=amount,observed_unix=observed_unix)
+        for branch_index,branch in enumerate(modeled.get("completed_branches",[])):
+            trace=branch.get("trace") if isinstance(branch,dict) else None
+            if (not isinstance(trace,list) or len(trace)!=len(rows) or
+                    type(branch.get("amount"))is not int or
+                    not 0<branch["amount"]<2**64):
+                raise ValueError("malformed source scenario route amount chain")
+            previous=amount
+            for i,(row,leg) in enumerate(zip(rows,trace)):
+                if (not isinstance(leg,dict) or
+                        leg.get("leg_index")!=i or
+                        leg.get("venue")!=row["venue"] or
+                        leg.get("pool")!=row["address"] or
+                        leg.get("source_slot")!=fixture["state_accounts_observed_slot"] or
+                        leg.get("amount_in")!=previous or
+                        type(leg.get("amount_out"))is not int or
+                        not 0<leg["amount_out"]<2**64):
+                    raise ValueError("unbound venue-native amount chain")
+                chained_venue_probes.append({
+                    "initial_input_base_units":amount,
+                    "scenario_branch_index":branch_index,
+                    "leg_index":i,"venue":row["venue"],
+                    "pool":row["address"],
+                    "exact_input_base_units":previous,
+                    "modeled_output_base_units":leg["amount_out"],
+                    "quote_status":leg.get("quote_status"),
+                    "source_slot":leg["source_slot"],
+                    "protocol_exact_verified":False,**SAFE})
+                previous=leg["amount_out"]
+            if previous!=branch["amount"]:
+                raise ValueError("source scenario terminal amount discontinuity")
+            source_scenario_rankings.append({
+                "initial_input_base_units":amount,
+                "scenario_branch_index":branch_index,
+                "modeled_output_base_units":previous,
+                "modeled_gross_start_mint_delta_base_units":previous-amount,
+                "hypothetical_fee_model_present":branch.get("hypothetical") is True,
+                "source_bounded_scenario_present":branch.get("source_bounded") is True,
+                "source_slot":fixture["state_accounts_observed_slot"],
+                "route_exact_parity_verified":False,
+                "signed_execution_verified":False,"net_profit_verified":False,**SAFE})
         modeled_intervals.append({"input_base_units":amount,"status":modeled["status"],
             "minimum_modeled_output":modeled.get("minimum_modeled_output"),
             "maximum_modeled_output":modeled.get("maximum_modeled_output"),
@@ -48,11 +90,18 @@ def sweep(fixture, *, observed_unix, amounts=(10000,100000,1000000)):
                 "reason":q.get("reason"),"protocol_exact_verified":False,**SAFE})
     completed=[x for x in attempts if x["indicative_gross_positive"] is not None]
     ranked=sorted(completed,key=lambda x:(-x["gross_delta_start_mint_base_units"],x["input_base_units"]))
+    source_scenario_rankings.sort(
+        key=lambda x:(-x["modeled_gross_start_mint_delta_base_units"],
+                      x["initial_input_base_units"],x["scenario_branch_index"]))
     return {"status":"SOURCE_FOUR_TO_SIX_HOP_NATIVE_SWEEP_INDICATIVE_ONLY",
             "hops":len(rows),"source_slot":fixture["state_accounts_observed_slot"],
             "route_venues":[row["venue"] for row in rows],
             "attempt_count":len(attempts),"venue_probe_count":len(venue_probes),
             "attempts":attempts,"venue_probes":venue_probes,
+            "chained_venue_probe_count":len(chained_venue_probes),
+            "chained_venue_probes":chained_venue_probes,
+            "modeled_scenario_candidate_count":len(source_scenario_rankings),
+            "modeled_scenario_ranking_not_profitable":source_scenario_rankings,
             "source_native_multihop_modeled_intervals":modeled_intervals,
             "complete_indicative_chain_count":len(completed),
             "indicative_positive_gross_count":sum(x["indicative_gross_positive"] for x in completed),
