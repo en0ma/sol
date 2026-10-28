@@ -904,6 +904,13 @@ jobs:
           print(json.dumps({"status":"SIGNED_PRICING_REGISTRY_ADMISSION",
               "total_registered_pools":len(promoted["pools"])}))
           PY
+      - name: Export three-venue signed-verified pool registry for promotion
+        if: ${{ matrix.shard == 0 }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: three-venue-signed-verified-pool-registry
+          path: ${{ runner.temp }}/signed-verified-expanded-pool-registry.json
+          if-no-files-found: error
       - name: Execute source-captured four-to-six-hop signed isolated Surfpool trial
         if: ${{ matrix.shard == 0 }}
         run: |
@@ -1198,3 +1205,52 @@ jobs:
           name: focused-twelve-atomic-acceptance
           path: ${{ runner.temp }}/amm-v4-audit.json
           if-no-files-found: error
+
+  persist-verified-pool-registry:
+    needs: [authenticate-amm-v4, offline-amm-v4, independent-amm-v4-audit]
+    if: ${{ github.event_name == 'workflow_dispatch' && needs.authenticate-amm-v4.result == 'success' && needs.offline-amm-v4.result == 'success' && needs.independent-amm-v4-audit.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          persist-credentials: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: three-venue-signed-verified-pool-registry
+          path: ${{ runner.temp }}/verified-registry
+      - name: Persist only signed-verified pool identities in tracked registry
+        run: |
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          src=Path(os.environ["RUNNER_TEMP"])/"verified-registry/signed-verified-expanded-pool-registry.json"
+          target=Path("arb/pool_registry.json")
+          verified=json.loads(src.read_text())
+          current=json.loads(target.read_text())
+          if not isinstance(verified.get("pools"),list) or not isinstance(current.get("pools"),list):
+              raise SystemExit("missing verified registry inventory")
+          seen={(p["venue"],p["address"]) for p in current["pools"]}
+          promoted=0
+          for pool in verified["pools"]:
+              key=(pool["venue"],pool["address"])
+              if key not in seen:
+                  current["pools"].append(pool)
+                  seen.add(key)
+                  promoted+=1
+          target.write_text(json.dumps(current,indent=2)+"\n")
+          print(json.dumps({"promoted_to_tracked_registry":promoted,"tracked_pool_count":len(current["pools"])}))
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add arb/pool_registry.json
+          if git diff --cached --quiet; then
+            echo "No new signed-verified pools to persist"
+          else
+            git commit -m "Persist signed-verified native venue pool identities"
+            git push origin "HEAD:${{ github.ref_name }}"
+          fi
