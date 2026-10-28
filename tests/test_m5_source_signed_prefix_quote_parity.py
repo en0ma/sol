@@ -128,3 +128,35 @@ class SourceSignedPrefixParityTests(unittest.TestCase):
   result=compare(self.fixture(),self.receipt(),observed_unix=123)
   self.assertEqual(result["numeric_comparison_count"],0)
 if __name__=="__main__":unittest.main()
+
+class CLMMSourceFeeModeReconciliationTests(SourceSignedPrefixParityTests):
+    def rows(self):
+        return [{"venue":v,"address":"p"+str(i)} for i,v in enumerate(
+            ("raydium_clmm","meteora_dlmm","meteora_damm_v2","pumpswap"))]
+    def receipt(self):
+        result=super().receipt()
+        result["signed_prefix_observations"][0]["venue"]="raydium_clmm"
+        return result
+
+    @patch("arb.m5_source_signed_prefix_quote_parity.quote_leg")
+    @patch("arb.m5_source_signed_prefix_quote_parity.extract_pool_states")
+    def test_both_clmm_fee_modes_compare_but_never_select_profitable_mode(self,rows,quote):
+        rows.return_value=self.rows()
+        def native(f,*,leg_index,amount_in,observed_unix,
+                   clmm_fee_on_input=True):
+            return {"venue":self.rows()[leg_index]["venue"],
+                "pool":"p"+str(leg_index),"source_slot":200,
+                "quote_status":("SOURCE_BOUND_INDICATIVE"
+                    if clmm_fee_on_input else
+                    "SOURCE_BOUND_FEE_MODE_SCENARIO_NOT_EXACT"),
+                "predicted_output_base_units":100 if clmm_fee_on_input else 95,
+                **SAFE}
+        quote.side_effect=native
+        result=compare(self.fixture(),self.receipt(),observed_unix=123)
+        leg=result["comparisons"][0]
+        self.assertEqual(leg["modeled_minus_signed_base_units"],5)
+        self.assertEqual(leg["alternate_source_fee_mode_scenarios"][0]
+                         ["modeled_minus_signed_base_units"],0)
+        self.assertEqual(result["clmm_alternate_fee_mode_comparison_count"],1)
+        self.assertFalse(result["quote_accuracy_verified"])
+        self.assertFalse(result["net_profit_verified"])
