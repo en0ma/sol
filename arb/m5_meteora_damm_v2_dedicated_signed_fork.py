@@ -79,11 +79,11 @@ def export_source(rpc,registry,output,*,pool_count=6):
         sort_keys=True,indent=2)+"\n")
     return len(selected)==pool_count
 
-def hydrate(rpc,captured):
+def hydrate(rpc,captured,*,program=PROGRAM):
     accounts=captured["accounts"]
-    program=accounts[PROGRAM]
-    header=base64.b64decode(program["data"][0],validate=True)
-    if program["owner"]!=LOADER or program.get("executable") is not True or header[:4]!=bytes([2,0,0,0]):
+    executable=accounts[program]
+    header=base64.b64decode(executable["data"][0],validate=True)
+    if executable["owner"]!=LOADER or executable.get("executable") is not True or header[:4]!=bytes([2,0,0,0]):
         raise ValueError("invalid Meteora executable provenance")
     address=str(Pubkey.from_bytes(header[4:36]))
     pd=accounts[address]
@@ -92,7 +92,7 @@ def hydrate(rpc,captured):
         raise ValueError("invalid Meteora program ELF")
     elf=raw[45:]
     for addr,entry in accounts.items():
-        if addr in (PROGRAM,address):continue
+        if addr in (program,address):continue
         if entry.get("executable") is not False:
             raise ValueError("non-program executable source account")
         call(rpc,"surfnet_setAccount",[addr,{
@@ -100,7 +100,7 @@ def hydrate(rpc,captured):
              "data":base64.b64decode(entry["data"][0],validate=True).hex(),
              "owner":entry["owner"],"executable":False}])
     for offset in range(0,len(elf),16384):
-        call(rpc,"surfnet_writeProgram",[PROGRAM,elf[offset:offset+16384].hex(),offset])
+        call(rpc,"surfnet_writeProgram",[program,elf[offset:offset+16384].hex(),offset])
     return hashlib.sha256(elf).hexdigest()
 
 def _balances(positive,mints,authority):
