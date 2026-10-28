@@ -43,13 +43,13 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix,
             from arb.orca_tick_math import sqrt_price_from_tick_index
             from arb.orca_spot_quote import quote_bounded_single_tick
             state=row["decoded_pool_state"]
-            from arb.orca_adaptive_fee_source import source_oracle
-            orca_fee_oracle=source_oracle(fixture,pool,state)
             spacing=state["tick_spacing"]
             tick=state["tick_current_index"]
             boundary=(tick//spacing)*spacing
             if spacing<=0 or not -443636<=boundary<boundary+spacing<=443636:
                 raise ValueError("Whirlpool tick span outside native protocol bounds")
+            from arb.orca_adaptive_fee_source import source_oracle
+            orca_fee_oracle=source_oracle(fixture,pool,state)
             lower=sqrt_price_from_tick_index(boundary)
             upper=sqrt_price_from_tick_index(boundary+spacing)
             from arb.whirlpool_ticks import (
