@@ -24,14 +24,8 @@ def discover_new(rpc,registry,venue,*,count=6,pages=4):
             if next_cursor in seen_cursors:raise ValueError("Orca cursor cycle")
             seen_cursors.add(next_cursor);cursor=next_cursor
     elif venue=="raydium_cpmm":
-        from arb.onchain_pool_discovery import search_pair,MINTS
-        from itertools import combinations
-        for left,right in combinations(MINTS.values(),2):
-            try:
-                found=search_pair(rpc,venue,left,right,limit=32)
-                candidates.extend({"venue":venue,"address":a} for a in found)
-            except (ValueError,RuntimeError,OSError):
-                continue
+        from arb.raydium_cpmm import api_candidate_addresses
+        candidates.extend(api_candidate_addresses(pages=pages,page_size=100))
     else:
         from arb.indexed_pool_discovery import fetch_candidates
         for page in range(1,pages+1):
