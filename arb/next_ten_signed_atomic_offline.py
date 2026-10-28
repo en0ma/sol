@@ -597,31 +597,41 @@ def run_four_to_six_venue(rpc,fixture,*,amount_in=100_000,program_cache=None):
             evidence[(venues[last],pools[last])],owner,
             keys[-2],keys[-1],mints[-2],mints[-1],amounts[-1],2**64-1)
         return list(instructions[:-1])+[bad]
-    # Capture the actual fork Clock across the genuine signed CPI/SPL
-    # operation. Wall-clock time is not the source of truth for adaptive fees.
-    orca_clock_before=orca_clock_after=None
+    # Orca's fee manager uses Clock::get(). Freeze real Surfpool Clock while
+    # the isolated signed positive and rollback negative packets are executed.
+    # This is Surfpool's documented surfnet_pauseClock cheatcode, NOT a stubbed
+    # account or a fabricated timestamp.
     if "orca" in venues:
-        from arb.orca_fork_clock import fork_clock,stable_orca_fork_clock
-        try:
-            orca_clock_before=fork_clock(rpc)
-        except (ValueError,TypeError,KeyError) as exc:
-            orca_clock_before={"status":"ORCA_FORK_CLOCK_UNAVAILABLE",
-                               "reason":str(exc)[:200],**SAFETY}
-    receipt=simulate_adaptive_n_leg_offline(
-        rpc,route,mints,states,evidence,owner,keys,amount_in,None,signer,
-        negative_instructions=negative,require_closed=True)
-    if "orca" in venues:
-        try:
-            orca_clock_after=fork_clock(rpc)
-            if orca_clock_before.get("clock_source")=="ISOLATED_SURFPOOL_CLOCK_SYSVAR":
-                receipt["orca_fork_clock_evidence"]=stable_orca_fork_clock(
-                    orca_clock_before,orca_clock_after)
-            else:
-                receipt["orca_fork_clock_evidence"]=orca_clock_before
-        except (ValueError,TypeError,KeyError) as exc:
-            receipt["orca_fork_clock_evidence"]={
-                "status":"ORCA_FORK_CLOCK_UNAVAILABLE",
-                "reason":str(exc)[:200],**SAFETY}
+        call(rpc,"surfnet_pauseClock",[])
+    try:
+        # Capture the actual fork Clock across the genuine signed CPI/SPL
+        # operation. Wall-clock time is not the source of truth for adaptive fees.
+        orca_clock_before=orca_clock_after=None
+        if "orca" in venues:
+            from arb.orca_fork_clock import fork_clock,stable_orca_fork_clock
+            try:
+                orca_clock_before=fork_clock(rpc)
+            except (ValueError,TypeError,KeyError) as exc:
+                orca_clock_before={"status":"ORCA_FORK_CLOCK_UNAVAILABLE",
+                                   "reason":str(exc)[:200],**SAFETY}
+        receipt=simulate_adaptive_n_leg_offline(
+            rpc,route,mints,states,evidence,owner,keys,amount_in,None,signer,
+            negative_instructions=negative,require_closed=True)
+        if "orca" in venues:
+            try:
+                orca_clock_after=fork_clock(rpc)
+                if orca_clock_before.get("clock_source")=="ISOLATED_SURFPOOL_CLOCK_SYSVAR":
+                    receipt["orca_fork_clock_evidence"]=stable_orca_fork_clock(
+                        orca_clock_before,orca_clock_after)
+                else:
+                    receipt["orca_fork_clock_evidence"]=orca_clock_before
+            except (ValueError,TypeError,KeyError) as exc:
+                receipt["orca_fork_clock_evidence"]={
+                    "status":"ORCA_FORK_CLOCK_UNAVAILABLE",
+                    "reason":str(exc)[:200],**SAFETY}
+    finally:
+        if "orca" in venues:
+            call(rpc,"surfnet_resumeClock",[])
     receipt.update(route_venues=venues,route_pool_addresses=pools,route_mints=mints,
         fixture_kind=fixture["fixture_kind"],
         source_snapshot_slot=None,
