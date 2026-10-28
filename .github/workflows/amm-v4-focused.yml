@@ -687,7 +687,7 @@ jobs:
         run: |
           python3 -m arb.m5_venue_pool_registry_expansion \
             --registry arb/pool_registry.json \
-            --count 20 --pages 8 \
+            --count 20 --orca-count 6 --pages 8 \
             --output-registry "$RUNNER_TEMP/expanded-venue-pool-registry.json" \
             --output-new-pools "$RUNNER_TEMP/venue-six-new-pools.json" \
             --report "$RUNNER_TEMP/venue-pool-registry-expansion.json"
