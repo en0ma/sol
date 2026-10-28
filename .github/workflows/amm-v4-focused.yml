@@ -333,7 +333,7 @@ jobs:
           python3 -m unittest discover -s tests -p test_m5_damm_native_source_fee.py -v
       - name: Verify billion-denominator DAMM fees and true PumpSwap source tier selection
         run: |
-          python3 -m py_compile arb/meteora_damm_v2_native_fee_math.py arb/pumpswap_source_tier_selector.py
+          python3 -m py_compile arb/meteora_damm_v2_native_quote.py arb/pumpswap_source_tier_selector.py
           python3 -m unittest discover -s tests -p test_m5_protocol_fee_math_native.py -v
       - name: Verify multihop native-versus-signed SPL prefix parity fail-closed
         run: |
