@@ -166,3 +166,33 @@ class MultitickIndicativeTests(unittest.TestCase):
         self.assertEqual(result["ticks_crossed"],0)
         self.assertGreater(result["estimated_output_base_units"],0)
         self.assertFalse(result["actionable"])
+
+    def test_dynamic_empty_array_can_quote_without_crossing(self):
+        from arb.orca_tick_math import sqrt_price_from_tick_index
+        state={**self.state(), "tick_spacing":1,
+               "sqrt_price_x64":str(sqrt_price_from_tick_index(15))}
+        arrays=[{"start_tick":0,"status":"DYNAMIC_VALID","ticks":[]}]
+        for mint in ("a","b"):
+            with self.subTest(mint=mint):
+                result=quote_from_decoded_arrays(state,mint,100000,arrays)
+                self.assertEqual(result["ticks_crossed"],0)
+                self.assertEqual(result["source_array_layout"],"DYNAMIC_VALID")
+                self.assertFalse(result["executable_quote"])
+
+    def test_empty_boundary_never_promotes_unsupported_array(self):
+        from arb.orca_tick_math import sqrt_price_from_tick_index
+        state={**self.state(), "tick_spacing":1,
+               "sqrt_price_x64":str(sqrt_price_from_tick_index(15))}
+        for status in ("MISSING","UNVERIFIED",None):
+            with self.subTest(status=status):
+                with self.assertRaisesRegex(ValueError,"missing or unsupported"):
+                    quote_from_decoded_arrays(state,"a",100000,
+                        [{"start_tick":0,"status":status,"ticks":[]}])
+
+    def test_empty_dynamic_array_cannot_cross_without_next_source(self):
+        from arb.orca_tick_math import sqrt_price_from_tick_index
+        state={**self.state(), "tick_spacing":1,
+               "sqrt_price_x64":str(sqrt_price_from_tick_index(15))}
+        with self.assertRaisesRegex(ValueError,"crossing budget exceeded"):
+            quote_from_decoded_arrays(state,"a",100000000000,
+                [{"start_tick":0,"status":"DYNAMIC_VALID","ticks":[]}])
