@@ -97,11 +97,18 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix,
                 decoded_arrays.append({"start_tick":start,"ticks":records,
                     "status":"FIXED_VALID" if is_fixed else "DYNAMIC_VALID"})
             if decoded_arrays:
-                # Reuse the existing exact-input Orca venue model, rather than
-                # pretending the current tick has infinite constant liquidity.
-                native=quote_from_decoded_arrays(state,leg["input_mint"],amount_in,
-                    decoded_arrays,max_crossings=12)
+                if orca_fee_oracle is not None:
+                    from arb.orca_adaptive_fee_source import quote_adaptive_from_arrays
+                    native=quote_adaptive_from_arrays(
+                        state,leg["input_mint"],amount_in,decoded_arrays,
+                        orca_fee_oracle,observed_unix=observed_unix)
+                else:
+                    native=quote_from_decoded_arrays(
+                        state,leg["input_mint"],amount_in,
+                        decoded_arrays,max_crossings=12)
             else:
+                if orca_fee_oracle is not None:
+                    raise ValueError("adaptive Whirlpool must have authenticated tick arrays")
                 native=quote_bounded_single_tick(state,leg["input_mint"],amount_in,
                     lower_sqrt_x64=lower,upper_sqrt_x64=upper)
             q={**leg,"amount_in":amount_in,
