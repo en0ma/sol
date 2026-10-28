@@ -188,7 +188,9 @@ def promote_signed(registry,candidates,orca_receipt,meteora_receipt,*,raydium_ca
                 observations[key]=True
             if any(sum(direction==x[0] for x in observations)!=2 for direction in directions):
                 raise ValueError(venue+" both swap directions require two sizes")
-            if pool.get("exact",pool.get("exact_matches"))!=4:
+            if not any(k in pool for k in ("exact","exact_matches")) or any(
+                    type(pool[k]) is not int or pool[k]!=4
+                    for k in ("exact","exact_matches") if k in pool):
                 raise ValueError(venue+" reported exact count disagrees with evidence")
             if pool.get("trial_count",4)!=4:
                 raise ValueError(venue+" reported trial count disagrees with evidence")
