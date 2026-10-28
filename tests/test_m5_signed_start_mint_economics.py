@@ -40,6 +40,9 @@ class SignedStartMintEconomicsTests(unittest.TestCase):
 if __name__=="__main__":unittest.main()
 
 class AuthenticatedSourceMintFeeConversionTests(unittest.TestCase):
+    def receipt(self):
+        return SignedStartMintEconomicsTests().receipt()
+
     def test_native_wsol_to_start_mint_cost_remains_model(self):
         from unittest.mock import patch
         fixture={"route_mints":["RAY",WSOL,"RAY"],
