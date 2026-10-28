@@ -19,6 +19,9 @@ def audit_attempts(fixture,receipts,*,expected_amounts,observed_unix=None):
     attempts=[]
     accepted=[]
     signed_gross_observations=[]
+    signed_native_parity=[]
+    seen_signed_packets=set()
+    seen_negative_packets=set()
     for size in expected_amounts:
         receipt=receipts.get(size)
         if not isinstance(receipt,dict):
@@ -32,7 +35,46 @@ def audit_attempts(fixture,receipts,*,expected_amounts,observed_unix=None):
             verified["signed_atomic_simulation_verified"]=False
             verified["rollback_failure_case_verified"]=False
         approved=verified["status"]=="VERIFIED_SIGNED_FOUR_TO_SIX_HOP_ROLLBACK"
+        if approved:
+            positive=receipt.get("signed_transaction_sha256")
+            negative=receipt.get("negative_signed_transaction_sha256")
+            if positive in seen_signed_packets or negative in seen_negative_packets:
+                verified["failure_reasons"].append(
+                    "signed packet replay across independently claimed input amounts")
+                verified["status"]="SOURCE_FOUR_TO_SIX_SIGNED_ROLLBACK_UNVERIFIED"
+                verified["signed_atomic_simulation_verified"]=False
+                verified["rollback_failure_case_verified"]=False
+                approved=False
+            else:
+                seen_signed_packets.add(positive)
+                seen_negative_packets.add(negative)
         if approved:accepted.append(size)
+        if approved and observed_unix is not None:
+            from arb.m5_source_signed_prefix_quote_parity import compare
+            try:
+                parity=compare(fixture,receipt,observed_unix=observed_unix)
+                if (parity.get("atomic_execution_independently_accepted") is not True or
+                        parity.get("source_slot")!=fixture["state_accounts_observed_slot"] or
+                        parity.get("compared_signed_legs")!=verified["hops"] or
+                        parity.get("atomic_terminal_observation_used") is not True or
+                        any(parity.get(key)is not False for key in SAFE)):
+                    raise ValueError("source native parity evidence not independently bound")
+                signed_native_parity.append({
+                    "size_base_units":size,
+                    "status":parity["status"],
+                    "source_slot":parity["source_slot"],
+                    "numeric_comparison_count":parity["numeric_comparison_count"],
+                    "compared_signed_legs":parity["compared_signed_legs"],
+                    "comparisons":parity["comparisons"],
+                    "protocol_exact_parity_verified":False,
+                    "net_profit_verified":False,**SAFE})
+            except (ValueError,TypeError,KeyError,RuntimeError) as exc:
+                signed_native_parity.append({
+                    "size_base_units":size,
+                    "status":"SOURCE_NATIVE_SIGNED_PARITY_BLOCKED",
+                    "reason":str(exc)[:200],
+                    "protocol_exact_parity_verified":False,
+                    "net_profit_verified":False,**SAFE})
         # The source-bound independent audit establishes that the transaction
         # actually consumed the full starting amount, left no intermediate
         # user balances, and credited the final account. Gross deltas are
@@ -82,6 +124,10 @@ def audit_attempts(fixture,receipts,*,expected_amounts,observed_unix=None):
             "independently_accepted_amounts_base_units":accepted,
             "independently_accepted_count":len(accepted),
             "signed_gross_observation_count":len(signed_gross_observations),
+            "signed_native_parity_attempt_count":len(signed_native_parity),
+            "signed_native_per_size_parity":signed_native_parity,
+            "signed_native_model_numeric_comparison_count":sum(
+                r.get("numeric_comparison_count",0) for r in signed_native_parity),
             "signed_gross_only_research_ranking":gross_ranking,
             "positive_signed_gross_count":sum(x["gross_start_mint_delta_base_units"]>0
                                               for x in gross_ranking),
