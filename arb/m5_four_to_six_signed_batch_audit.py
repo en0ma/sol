@@ -114,6 +114,32 @@ def audit_attempts(fixture,receipts,*,expected_amounts,observed_unix=None):
                          "audit":verified,"independently_accepted":approved,
                          "observed_gross_start_mint_delta_base_units":signed_gross,
                          "net_profit_verified":False,**SAFE})
+    # Pair every independently authenticated signed observation with the
+    # native amount that was actually presented to its corresponding pool.
+    # A simulated exact-input receipt is stronger evidence than a fabricated
+    # graph ranking, but the native model can still differ by venue/version.
+    per_venue_error_sums={}
+    per_venue_numeric_counts={}
+    per_venue_blockers={}
+    for trial in signed_native_parity:
+        if trial.get("status")!="SOURCE_NATIVE_TO_SIGNED_ALL_LEGS_COMPARISON":
+            continue
+        for comparison in trial["comparisons"]:
+            venue=comparison["venue"]
+            delta=comparison.get("modeled_minus_signed_base_units")
+            if type(delta)is int:
+                per_venue_error_sums[venue]=per_venue_error_sums.get(venue,0)+abs(delta)
+                per_venue_numeric_counts[venue]=per_venue_numeric_counts.get(venue,0)+1
+            else:
+                per_venue_blockers[venue]=per_venue_blockers.get(venue,0)+1
+    venue_accuracy_diagnostics=[
+        {"venue":venue,
+         "signed_native_numeric_comparisons":per_venue_numeric_counts.get(venue,0),
+         "signed_native_unresolved_comparisons":per_venue_blockers.get(venue,0),
+         "absolute_source_model_error_sum_base_units":per_venue_error_sums.get(venue,0),
+         "source_native_protocol_exact_verified":False,
+         "source_execution_quote_accuracy_verified":False,**SAFE}
+        for venue in sorted(set(per_venue_numeric_counts)|set(per_venue_blockers))]
     # Only start-mint-convertible amounts have an estimated net ordering.
     # Local simulations cannot become actionable merely through a fee estimate.
     comparable=[r for r in signed_gross_observations
@@ -129,6 +155,7 @@ def audit_attempts(fixture,receipts,*,expected_amounts,observed_unix=None):
             "signed_gross_observation_count":len(signed_gross_observations),
             "signed_native_parity_attempt_count":len(signed_native_parity),
             "signed_native_per_size_parity":signed_native_parity,
+            "per_venue_signed_native_error_diagnostics":venue_accuracy_diagnostics,
             "signed_native_model_numeric_comparison_count":sum(
                 r.get("numeric_comparison_count",0) for r in signed_native_parity),
             "signed_gross_only_research_ranking":gross_ranking,
