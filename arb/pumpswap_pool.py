@@ -124,6 +124,8 @@ def verify(rpc, address, state):
             "base_mint": state["base_mint"], "quote_mint": state["quote_mint"],
             "base_vault":state["base_vault"],"quote_vault":state["quote_vault"],
             "coin_creator":state["coin_creator"],
+            "is_mayhem_mode":state["is_mayhem_mode"],
+            "is_cashback_coin":state["is_cashback_coin"],
             "base_reserve": balances[0], "quote_vault_balance": balances[1],
             "base_mint_supply": base_supply,
             "native_wsol_zero_supply": native_wsol_zero_supply,
