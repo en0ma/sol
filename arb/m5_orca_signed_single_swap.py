@@ -117,6 +117,14 @@ def capture_pool(rpc,pool):
     from arb.next_ten_fork_pool_probe import snapshot
     proof=snapshot(rpc,pool,"orca")
     mints=proof["mints"]
+    # Only adaptive Whirlpool pools are supported by this exact-price runner.
+    # Reject unsupported candidates before expensive tick-array source capture.
+    from arb.orca_whirlpool import fetch_pool
+    initial=fetch_pool(rpc,pool)
+    if set((initial["token_mint_a"],initial["token_mint_b"]))!=set(mints):
+        raise ValueError("Orca source mint identities changed")
+    if initial["tick_spacing"]==initial["fee_tier_index_seed"]:
+        raise ValueError("Orca source native adaptive fee model requires adaptive pool")
     extra,aux=venue_accounts(rpc,"orca",pool,mints)
     keys=list(dict.fromkeys(extra))
     response=call(rpc,"getMultipleAccounts",[keys,{"encoding":"base64","commitment":"confirmed"}])
@@ -126,7 +134,12 @@ def capture_pool(rpc,pool):
         raise ValueError("Orca source batch lacks consistent slot/account count")
     missing=[key for key,value in zip(keys,values) if not isinstance(value,dict)]
     if missing:
-        raise ValueError("Orca source required accounts missing at snapshot slot "+str(slot)+": "+",".join(missing[:5]))
+        tick_addresses=set(aux.get("tick_arrays",[]))
+        missing_ticks=[key for key in missing if key in tick_addresses]
+        missing_other=[key for key in missing if key not in tick_addresses]
+        raise ValueError("Orca source required accounts missing at snapshot slot "+str(slot)+
+                         " (tick_arrays="+str(len(missing_ticks))+",other="+str(len(missing_other))+") "+
+                         ",".join(missing[:5]))
     accounts=dict(zip(keys,values))
     raw=base64.b64decode(accounts[pool]["data"][0],validate=True)
     if accounts[pool]["owner"]!=PROGRAM or accounts[pool].get("executable") is not False:
