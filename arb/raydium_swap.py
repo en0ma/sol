@@ -213,13 +213,18 @@ def validate_native_source(rpc,source,output,*,required=6,amounts=(1000000,10000
         exact=sum(t["status"]=="RAYDIUM_CPMM_SIGNED_NATIVE_EXACT" for t in trials)
         reports.append({"pool":captured["pool"],"exact_matches":exact,
             "trial_count":len(trials),"verified":exact==4 and len(trials)==4,"trials":trials})
+    if len({r["pool"] for r in reports})!=len(reports):
+        raise ValueError("duplicate Raydium signed pool identity")
     count=sum(r["verified"] for r in reports)
     report={"status":"RAYDIUM_CPMM_SIGNED_VERIFIED" if count>=required
                    else "RAYDIUM_CPMM_SIGNED_INCOMPLETE",
             "verified_pool_count":count,"required_verified_pools":required,
             "pools":reports,"actionable":False,"broadcast":False,"live_execution_approved":False}
     Path(output).write_text(json.dumps(report,indent=2)+"\\n")
-    print(json.dumps({"status":report["status"],"verified_pool_count":count}))
+    print(json.dumps({"status":report["status"],"verified_pool_count":count,
+        "candidate_count":len(reports),"failed_pools":[{"pool":r["pool"],
+        "reasons":[t.get("reason",t["status"]) for t in r["trials"] if t["status"]!="RAYDIUM_CPMM_SIGNED_NATIVE_EXACT"]}
+        for r in reports if not r["verified"]]}))
     if count<required:raise SystemExit("six Raydium pools not exact signed verified")
 
 def native_main():
