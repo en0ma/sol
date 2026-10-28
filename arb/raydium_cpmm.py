@@ -42,6 +42,38 @@ def decode(raw):
         "creator_fee_on":raw[389],
         "enable_creator_fee":bool(raw[390])}
 
+def api_candidate_addresses(*,pages=5,page_size=100):
+    """Untrusted ID discovery from Raydium's official API v3.
+
+    Never trust API fees/prices or pool type without our existing on-chain
+    registry owner, layout, mint, vault and AMM-config verification.
+    """
+    from urllib.parse import urlencode
+    from urllib.request import Request,urlopen
+    if type(pages)is not int or not 1<=pages<=20 or type(page_size)is not int or not 1<=page_size<=100:
+        raise ValueError("invalid Raydium discovery pagination")
+    result=[];seen=set()
+    for page in range(1,pages+1):
+        url="https://api-v3.raydium.io/pools/info/list?"+urlencode({
+            "poolType":"standard","poolSortField":"liquidity","sortType":"desc",
+            "pageSize":page_size,"page":page})
+        with urlopen(Request(url,headers={"Accept":"application/json",
+                "User-Agent":"sol-cpmm-authenticated-pool-discovery/1"}),timeout=25) as response:
+            payload=json.load(response)
+        if not isinstance(payload,dict) or payload.get("success") is not True:
+            raise ValueError("Raydium pool indexer request unsuccessful")
+        data=payload.get("data")
+        rows=data.get("data") if isinstance(data,dict) else None
+        if not isinstance(rows,list) or len(rows)>page_size:
+            raise ValueError("Raydium pool indexer payload invalid")
+        for row in rows:
+            if not isinstance(row,dict) or row.get("programId")!=PROGRAM:continue
+            address=row.get("id")
+            if not isinstance(address,str) or not 32<=len(address)<=44 or address in seen:continue
+            seen.add(address);result.append({"venue":"raydium_cpmm","address":address})
+        if len(rows)<page_size:break
+    return result
+
 def candidates(rpc,max_candidates=12):
     if type(max_candidates)!=int or not 1<=max_candidates<=50:
         raise ValueError("candidate limit must be 1-50")
