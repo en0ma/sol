@@ -16,20 +16,20 @@ CLOCK=1793159406
 A="So11111111111111111111111111111111111111112"
 B="4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R"
 
-def oracle():
+def oracle(*,clock=CLOCK,fee_age=40):
     return {"trade_enable_timestamp":0,"oracle_layout_authenticated":True,
         "constants":{"filter_period":30,"decay_period":600,
             "reduction_factor":5000,"adaptive_fee_control_factor":60000,
             "max_volatility_accumulator":880000,"tick_group_size":4,
             "major_swap_threshold_ticks":4},
-        "variables":{"last_reference_update_timestamp":CLOCK-40,
-            "last_major_swap_timestamp":CLOCK-40,
+        "variables":{"last_reference_update_timestamp":clock-fee_age,
+            "last_major_swap_timestamp":clock-fee_age,
             "volatility_reference":14000,
             "tick_group_index_reference":0,
             "volatility_accumulator":24000},
         **SAFE}
 
-def scenario(direction,amount,cross):
+def scenario(direction,amount,cross,*,fee_age=40):
     if direction not in ("a_to_b","b_to_a"):
         raise ValueError("invalid test direction")
     if type(amount)is not int or amount<=0:
@@ -52,7 +52,7 @@ def scenario(direction,amount,cross):
             rows=[{"tick_index":tick,"liquidity_net":str(liquidity),
                    "liquidity_gross":str(abs(liquidity))}]
         arrays.append({"status":"FIXED_VALID","start_tick":st,"ticks":rows})
-    return state,arrays,oracle()
+    return state,arrays,oracle(fee_age=fee_age)
 
 def run(binary):
     scenarios=[
@@ -62,41 +62,42 @@ def run(binary):
         ("a_to_b",50_000_000,True),("b_to_a",50_000_000,True),
     ]
     rows=[]
-    for direction,amount,cross in scenarios:
-        state,arrays,fee= scenario(direction,amount,cross)
-        request={"pool":state,"oracle":fee,"arrays":arrays,
-                 "amount_in":amount,"specified_token_a":direction=="a_to_b",
-                 "fork_unix_timestamp":CLOCK}
-        result=subprocess.run([binary],input=json.dumps(request),text=True,
-            capture_output=True,timeout=30,check=False)
-        if result.returncode:
-            rows.append({"direction":direction,"amount_in":amount,
-                         "cross":cross,"status":"OFFICIAL_ORCA_CORE_REJECTED",
-                         "reason":result.stderr[-500:],**SAFE})
-            continue
-        reference=json.loads(result.stdout)["amount_out"]
-        try:
-            model=quote_adaptive_from_arrays(
-                state,A if direction=="a_to_b" else B,amount,
-                arrays,fee,observed_unix=CLOCK)
-            native=model["estimated_output_base_units"]
-            crossed=model["crossed_initialized_ticks"]
-            actual_cross=bool(crossed)
-            correct=(reference==native and (not cross or actual_cross))
-            rows.append({"direction":direction,"amount_in":amount,
-                         "cross_requested":cross,
-                         "cross_observed":actual_cross,
-                         "initialized_ticks_crossed":crossed,
-                         "official_orca_core_output_base_units":reference,
-                         "local_python_output_base_units":native,
-                         "difference":native-reference,
-                         "status":("OFFICIAL_NATIVE_PARITY" if correct
-                                   else "OFFICIAL_NATIVE_MISMATCH"),**SAFE})
-        except (ValueError,TypeError,KeyError) as exc:
-            rows.append({"direction":direction,"amount_in":amount,
-                         "cross_requested":cross,
-                         "status":"LOCAL_NATIVE_QUOTE_REJECTED",
-                         "reason":str(exc),**SAFE})
+    for fee_age in (0,40,300,700,4000):
+      for direction,amount,cross in scenarios:
+        state,arrays,fee= scenario(direction,amount,cross,fee_age=fee_age)
+          request={"pool":state,"oracle":fee,"arrays":arrays,
+                   "amount_in":amount,"specified_token_a":direction=="a_to_b",
+                   "fork_unix_timestamp":CLOCK}
+          result=subprocess.run([binary],input=json.dumps(request),text=True,
+              capture_output=True,timeout=30,check=False)
+          if result.returncode:
+              rows.append({"direction":direction,"amount_in":amount,
+                           "cross":cross,"fee_reference_age_seconds":fee_age,"status":"OFFICIAL_ORCA_CORE_REJECTED",
+                           "reason":result.stderr[-500:],**SAFE})
+              continue
+          reference=json.loads(result.stdout)["amount_out"]
+          try:
+              model=quote_adaptive_from_arrays(
+                  state,A if direction=="a_to_b" else B,amount,
+                  arrays,fee,observed_unix=CLOCK)
+              native=model["estimated_output_base_units"]
+              crossed=model["crossed_initialized_ticks"]
+              actual_cross=bool(crossed)
+              correct=(reference==native and (not cross or actual_cross))
+              rows.append({"direction":direction,"amount_in":amount,
+                           "cross_requested":cross,"fee_reference_age_seconds":fee_age,
+                           "cross_observed":actual_cross,
+                           "initialized_ticks_crossed":crossed,
+                           "official_orca_core_output_base_units":reference,
+                           "local_python_output_base_units":native,
+                           "difference":native-reference,
+                           "status":("OFFICIAL_NATIVE_PARITY" if correct
+                                     else "OFFICIAL_NATIVE_MISMATCH"),**SAFE})
+          except (ValueError,TypeError,KeyError) as exc:
+              rows.append({"direction":direction,"amount_in":amount,
+                           "cross_requested":cross,
+                           "status":"LOCAL_NATIVE_QUOTE_REJECTED",
+                           "reason":str(exc),**SAFE})
     accepted=sum(x["status"]=="OFFICIAL_NATIVE_PARITY" for x in rows)
     return {"status":("ORCA_OFFICIAL_REFERENCE_BIDIRECTIONAL_ALL_MATCH"
                       if accepted==len(rows)
