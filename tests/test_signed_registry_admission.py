@@ -37,6 +37,15 @@ class SignedRegistryAdmission(unittest.TestCase):
     def test_conflicting_exact_counters_rejected(self):
         with self.assertRaisesRegex(ValueError,"reported exact count"):
             self.promote(lambda a,b,r:r["orca"]["pools"][0].update({"exact":4,"exact_matches":3}))
+    def test_conflicting_signed_input_aliases_rejected(self):
+        with self.assertRaisesRegex(ValueError,"conflicting signed trial input amounts"):
+            self.promote(lambda a,b,r:r["raydium_cpmm"]["pools"][0]["trials"][0].update({"input":999}))
+    def test_boolean_trial_count_rejected(self):
+        with self.assertRaisesRegex(ValueError,"reported trial count"):
+            self.promote(lambda a,b,r:r["orca"]["pools"][0].update({"trial_count":True}))
+    def test_missing_optional_trial_count_uses_actual_four_trials(self):
+        result=self.promote(lambda a,b,r:r["orca"]["pools"][0].pop("trial_count"))
+        self.assertEqual({p["venue"] for p in result["pools"]},set(SPECS))
     def test_missing_raydium_amount_rejected(self):
         with self.assertRaisesRegex(ValueError,"invalid input size"):
             self.promote(lambda a,b,r:r["raydium_cpmm"]["pools"][0]["trials"][0].pop("amount_in"))
