@@ -1,7 +1,6 @@
 import unittest
 from unittest.mock import patch
-from arb.meteora_damm_v2_native_fee_math import (
-    quote_native_fee,time_scheduler_numerator,FEE_DENOMINATOR)
+from arb.meteora_damm_v2_source_fee_decoder import time_scheduler_numerator,FEE_DENOMINATOR,source_volatility_fee_candidate
 from arb.pumpswap_source_tier_selector import (
     market_cap_quote_base_units,choose_tier_by_source_market_cap,
     mint_decimals_from_account,USDC)
@@ -11,22 +10,6 @@ SAFE={"actionable":False,"broadcast":False,"live_execution_approved":False}
 class NativeDAMMFeeMathTests(unittest.TestCase):
     def test_fee_denominator_is_native_billion(self):
         self.assertEqual(FEE_DENOMINATOR,1000000000)
-        buy=quote_native_fee(reserve_a=1000000,reserve_b=1000000,
-            amount_in=10000,input_is_a=True,total_fee_numerator=10000000,
-            collection_mode="BASE_AND_QUOTE",fee_version=1)
-        sell=quote_native_fee(reserve_a=1000000,reserve_b=1000000,
-            amount_in=10000,input_is_a=False,total_fee_numerator=10000000,
-            collection_mode="QUOTE_ONLY",fee_version=1)
-        self.assertGreater(buy["fee_output_units"],0)
-        self.assertEqual(buy["fee_input_units"],0)
-        self.assertGreater(sell["fee_input_units"],0)
-        self.assertEqual(sell["fee_output_units"],0)
-        self.assertFalse(buy["protocol_exact_verified"])
-    def test_fee_version_ceiling(self):
-        with self.assertRaisesRegex(ValueError,"ceiling"):
-            quote_native_fee(reserve_a=100,reserve_b=100,amount_in=10,
-                input_is_a=True,total_fee_numerator=600000000,
-                collection_mode="BASE_AND_QUOTE",fee_version=0)
     def test_time_scheduler_boundary_and_reduction(self):
         linear=time_scheduler_numerator(cliff_fee_numerator=100000000,
             number_of_periods=3,period_frequency=10,reduction_factor=10000000,
@@ -97,14 +80,12 @@ if __name__=="__main__":unittest.main()
 
 class SourceVolatilityPolynomialTests(unittest.TestCase):
     def test_native_polynomial_is_integer_ceiling(self):
-        from arb.meteora_damm_v2_native_fee_math import source_volatility_fee_candidate
         r=source_volatility_fee_candidate(volatility_accumulator=100,bin_step=25,
             variable_fee_control=14460000,max_volatility_accumulator=239)
         self.assertEqual(r["snapshot_dynamic_fee_numerator"],
                          ((100*25)**2*14460000+100_000_000_000-1)//100_000_000_000)
         self.assertFalse(r["protocol_exact_verified"])
     def test_source_volatility_cap_is_applied_without_guessing_swap_update(self):
-        from arb.meteora_damm_v2_native_fee_math import source_volatility_fee_candidate
         result=source_volatility_fee_candidate(volatility_accumulator=240,bin_step=25,
                 variable_fee_control=14460000,max_volatility_accumulator=239)
         self.assertEqual(result["effective_capped_accumulator"],239)
