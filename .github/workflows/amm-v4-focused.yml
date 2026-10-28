@@ -733,6 +733,12 @@ jobs:
               --observed-unix "$(date +%s)" \
               --output "$RUNNER_TEMP/m5-four-to-six-signed-attempt/orca-three-size-fork-native-parity.json"
           fi
+          if [ -s "$RUNNER_TEMP/m5-four-to-six-source-fixture.json" ]; then
+            python3 -m arb.m5_meteora_damm_v2_signed_native_parity \
+              --fixture "$RUNNER_TEMP/m5-four-to-six-source-fixture.json" \
+              --receipts "$RUNNER_TEMP/m5-four-to-six-signed-attempt" \
+              --output "$RUNNER_TEMP/m5-four-to-six-signed-attempt/meteora-damm-v2-source-signed-parity.json"
+          fi
           python3 - <<'PY'
           import json,os
           from pathlib import Path
