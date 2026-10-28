@@ -78,11 +78,14 @@ def main():
     p.add_argument("--count",type=int,default=6)
     p.add_argument("--pages",type=int,default=4)
     p.add_argument("--output-registry",required=True)
+    p.add_argument("--output-new-pools",required=True)
     p.add_argument("--report",required=True)
     a=p.parse_args()
     registry=json.loads(Path(a.registry).read_text())
     expanded,report=expand(a.rpc,registry,count=a.count,pages=a.pages)
     Path(a.output_registry).write_text(json.dumps(expanded,indent=2)+"\n")
+    additions=[p for venue in report["venues"] for p in venue["new_authenticated_pools"]]
+    Path(a.output_new_pools).write_text(json.dumps({"pools":additions},indent=2)+"\n")
     Path(a.report).write_text(json.dumps(report,indent=2)+"\n")
     print(json.dumps({"status":report["status"],
                       "registered_additional_pools":report["registered_additional_pools"],**SAFE}))
