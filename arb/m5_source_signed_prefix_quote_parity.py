@@ -124,6 +124,25 @@ def compare(fixture,receipt,*,observed_unix):
         if source_output is not None and (
                 type(source_output)is not int or not 0<source_output<2**64):
             raise ValueError("invalid independently source-derived amount")
+        source_fee_mode_scenarios=[]
+        if row["venue"]=="raydium_clmm":
+            alternate=quote_leg(fixture,leg_index=index,
+                amount_in=planned[index],observed_unix=observed_unix,
+                clmm_fee_on_input=False)
+            if (not isinstance(alternate,dict) or
+                    any(alternate.get(k)is not False for k in SAFE) or
+                    alternate.get("venue")!=row["venue"] or
+                    alternate.get("pool")!=row["address"] or
+                    alternate.get("source_slot")!=fixture["state_accounts_observed_slot"]):
+                raise ValueError("CLMM alternate source fee mode identity mismatch")
+            alt_amount=alternate.get("predicted_output_base_units")
+            if (alternate.get("quote_status")=="SOURCE_BOUND_FEE_MODE_SCENARIO_NOT_EXACT"
+                    and type(alt_amount)is int and 0<alt_amount<2**64):
+                source_fee_mode_scenarios.append({
+                    "scenario":"OUTPUT_FEE_COLLECTION_UNATTESTED",
+                    "amount_out":alt_amount,
+                    "modeled_minus_signed_base_units":alt_amount-signed,
+                    "protocol_exact_parity_verified":False,**SAFE})
         delta=source_output-signed if source_output is not None else None
         outcomes.append({"leg_index":index,"venue":row["venue"],"pool":row["address"],
             "source_slot":fixture["state_accounts_observed_slot"],
@@ -135,6 +154,7 @@ def compare(fixture,receipt,*,observed_unix):
             "modeled_minus_signed_base_units":delta,
             "absolute_model_error_base_units":abs(delta) if delta is not None else None,
             "native_quote_status":status,"classification":classification,
+            "alternate_source_fee_mode_scenarios":source_fee_mode_scenarios,
             "signed_prefix_observation_authenticated":index<n-1,
             "signed_atomic_terminal_post_account_authenticated":index==n-1,
             "protocol_exact_parity_verified":False,**SAFE})
@@ -146,6 +166,8 @@ def compare(fixture,receipt,*,observed_unix):
         "signed_atomic_terminal_output_base_units":terminal,
         "signed_atomic_gross_delta_start_mint_base_units":
             terminal-planned[0] if terminal is not None else None,
+        "clmm_alternate_fee_mode_comparison_count":sum(
+            len(r["alternate_source_fee_mode_scenarios"]) for r in outcomes),
         "numeric_comparison_count":sum(r["modeled_minus_signed_base_units"] is not None
                                        for r in outcomes),
         "source_slot":fixture["state_accounts_observed_slot"],
