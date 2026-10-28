@@ -21,7 +21,7 @@ from arb.whirlpool_ticks import (
 from arb.source_snapshot_manifest import verify
 SAFE={"actionable":False,"broadcast":False,"live_execution_approved":False}
 
-def source_core_inputs(fixture,index):
+def source_core_inputs(fixture,index,*,specified_token_a=None):
     """Reconstruct exactly the official native quote inputs from the manifest."""
     verify(fixture)
     rows=extract_pool_states(fixture)
@@ -64,7 +64,10 @@ def source_core_inputs(fixture,index):
         arrays[start]={"start_tick":start,"ticks":ticks}
     if not arrays:
         raise ValueError("no source authenticated Orca tick array")
-    direction=fixture["route_mints"][index]==state["token_mint_a"]
+    direction=(fixture["route_mints"][index]==state["token_mint_a"] if specified_token_a is None
+               else specified_token_a)
+    if type(direction) is not bool:
+        raise ValueError("Orca directional source selection must be boolean")
     if fixture["route_mints"][index] not in (state["token_mint_a"],state["token_mint_b"]):
         raise ValueError("source input mint missing from Whirlpool")
     from arb.whirlpool_ticks import start_tick
