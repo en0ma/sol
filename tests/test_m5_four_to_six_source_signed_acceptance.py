@@ -37,6 +37,8 @@ class AuthenticatedSignedSourceAcceptanceTests(unittest.TestCase):
                     "planned_input_base_units":amount,
                     "received_base_units":amount,"consumed_base_units":amount}
                     for i,amount in enumerate((90,80,70),1)],
+                "positive_error":"None",
+                "positive_units_consumed":156000,
                 "signed_packet_bytes":1100,
                 "signed_transaction_sha256":"a"*64,
                 "negative_signed_transaction_sha256":"b"*64,
@@ -86,6 +88,23 @@ class AuthenticatedSignedSourceAcceptanceTests(unittest.TestCase):
         states.return_value=self.rows()
         r=self.receipt()
         r["negative_signed_transaction_sha256"]=r["signed_transaction_sha256"]
+        self.assertTrue(assess(self.fixture(),r)["failure_reasons"])
+    @patch("arb.m5_four_to_six_source_signed_acceptance.extract_pool_states")
+    @patch("arb.m5_four_to_six_source_signed_acceptance.verify")
+    def test_fake_positive_success_without_compute_receipt_is_rejected(self,verify,states):
+        states.return_value=self.rows()
+        r=self.receipt()
+        r["positive_units_consumed"]=0
+        self.assertTrue(assess(self.fixture(),r)["failure_reasons"])
+        r=self.receipt()
+        r["positive_error"]="{'InstructionError':[0, 'Custom']}"
+        self.assertTrue(assess(self.fixture(),r)["failure_reasons"])
+    @patch("arb.m5_four_to_six_source_signed_acceptance.extract_pool_states")
+    @patch("arb.m5_four_to_six_source_signed_acceptance.verify")
+    def test_negative_packet_overflow_refused(self,verify,states):
+        states.return_value=self.rows()
+        r=self.receipt()
+        r["negative_packet_bytes"]=1300
         self.assertTrue(assess(self.fixture(),r)["failure_reasons"])
     @patch("arb.m5_four_to_six_source_signed_acceptance.extract_pool_states")
     @patch("arb.m5_four_to_six_source_signed_acceptance.verify")
