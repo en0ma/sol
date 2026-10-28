@@ -676,6 +676,15 @@ jobs:
               except Exception:time.sleep(2)
           else:raise SystemExit("offline RPC unavailable")
           PY
+      - name: Validate Meteora DAMM v2 on untouched isolated fork before multihop account hydration
+        if: ${{ matrix.shard == 0 }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/m5-four-to-six-signed-attempt"
+          cargo build --release --manifest-path tools/meteora_damm_v2_reference/Cargo.toml
+          python3 -m arb.m5_meteora_damm_v2_dedicated_signed_fork \
+            --registry "$RUNNER_TEMP/m5-seven-venue-untrusted-pool-hints.json" \
+            --binary tools/meteora_damm_v2_reference/target/release/sol-meteora-damm-v2-official-reference \
+            --output "$RUNNER_TEMP/m5-four-to-six-signed-attempt/meteora-damm-v2-dedicated-signed-fork.json"
       - name: Execute source-captured four-to-six-hop signed isolated Surfpool trial
         if: ${{ matrix.shard == 0 }}
         run: |
@@ -741,12 +750,6 @@ jobs:
               --receipts "$RUNNER_TEMP/m5-four-to-six-signed-attempt" \
               --output "$RUNNER_TEMP/m5-four-to-six-signed-attempt/meteora-damm-v2-source-signed-parity.json"
           fi
-          # DAMM v2 must use a real DAMM source pool, not the Orca route.
-          # This is acceptance, not a silently passing diagnostic.
-          python3 -m arb.m5_meteora_damm_v2_dedicated_signed_fork \
-            --registry "$RUNNER_TEMP/m5-seven-venue-untrusted-pool-hints.json" \
-            --binary tools/meteora_damm_v2_reference/target/release/sol-meteora-damm-v2-official-reference \
-            --output "$RUNNER_TEMP/m5-four-to-six-signed-attempt/meteora-damm-v2-dedicated-signed-fork.json"
           python3 - <<'PY'
           import json,os
           from pathlib import Path
