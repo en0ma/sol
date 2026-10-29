@@ -65,8 +65,21 @@ def capture_pool(rpc,address,expected_mints):
     accounts=result.get("value")
     if type(slot) is not int or slot<0 or not isinstance(accounts,list) or len(accounts)!=len(keys):
         raise ValueError("DLMM complete same-slot source snapshot missing")
-    if decode(_raw(accounts[0],PROGRAM))!=state:
-        raise ValueError("DLMM pool changed during source capture")
+    synchronized=decode(_raw(accounts[0],PROGRAM))
+    # A DLMM pool's active price/fee state is mutable. The initial read
+    # discovers address roles, but ONLY the second, synchronized
+    # getMultipleAccounts state is priced. Permit price/fee changes when
+    # ALL account-role PDAs and the active-array index remain identical.
+    if (any(synchronized[k]!=state[k] for k in (
+            "reserve_x","reserve_y","token_x_mint","token_y_mint",
+            "oracle","amm_config")) or
+            active_bin_array_index(synchronized["active_id"])!=idx):
+        raise ValueError("DLMM pool account roles or active array changed during capture")
+    if (synchronized["status"]!=0 or
+            synchronized["token_mint_x_program_flag"]!=0 or
+            synchronized["token_mint_y_program_flag"]!=0):
+        raise ValueError("DLMM synchronized pool disabled or unsupported")
+    state=synchronized
     reserves=[decode_token_account(_raw(accounts[i],TOKEN_PROGRAM)) for i in (1,2)]
     if ([r["mint"] for r in reserves]!=mints or
             reserves[0]["authority"]!=reserves[1]["authority"] or
