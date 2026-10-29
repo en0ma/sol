@@ -87,6 +87,11 @@ def evaluate(tick_source,*,amounts=(10000,100000)):
     results=[]
     for row in tick_source["pools"]:
         captured=row.get("tick_capture",{})
+        import hashlib
+        digest=hashlib.sha256(json.dumps(captured,sort_keys=True,
+            separators=(",",":")).encode()).hexdigest()
+        if digest!=row.get("tick_snapshot_sha256"):
+            raise ValueError("CLMM authenticated tick source content digest mismatch")
         state=captured.get("synchronized_pool_state")
         config=captured.get("amm_config_source")
         if not isinstance(state,dict) or not isinstance(config,dict):
