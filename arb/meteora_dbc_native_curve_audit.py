@@ -7,7 +7,7 @@ No claim about fee scheduler, Token-2022 transfers, signed swaps or registry.
 """
 import argparse,base64,hashlib,json
 from pathlib import Path
-from arb.meteora_dbc_native_segment import quote_one_segment
+from arb.meteora_dbc_native_curve_walk import walk
 
 CONFIG_SIZE=1048
 CFG_DISC=hashlib.sha256(b"account:PoolConfig").digest()[:8]
@@ -52,11 +52,12 @@ def audit(source, sdk):
             liquidity=int.from_bytes(raw[offset+16:offset+32],"little")
             if point==0 or liquidity==0:break
             curve.append((point,liquidity))
-        if not curve or len(curve)!=1:
-            raise ValueError("DBC multi-segment native curve not independently supported")
-        upper,liquidity=curve[0]
+        if not curve:
+            raise ValueError("DBC source curve empty")
+        upper=curve[-1][0]
         price=int(fields["sqrt_price_q64"])
-        if not (0<start<price<upper):
+        migration_price=int.from_bytes(raw[280:296],"little")
+        if not (0<start<price<upper and migration_price>=price):
             raise ValueError("DBC source sqrt price outside authenticated curve")
         trials=sdk_row["trials"]
         if len(trials)!=4:
@@ -74,9 +75,9 @@ def audit(source, sdk):
                 raise ValueError("DBC trial intent/dust/uniqueness invalid")
             seen.add(key)
             base=direction=="base_to_quote"
-            native=quote_one_segment(sqrt_price=price,liquidity=liquidity,
+            native=walk(sqrt_price=price,curve=curve,
                 input_amount=actual,base_for_quote=base,
-                target_price=start if base else upper)
+                sqrt_start_price=start,migration_sqrt_price=migration_price)
             if int(trial["sdk_next_sqrt_price"])!=native["next_sqrt_price"]:
                 raise ValueError("DBC independent curve next price differs from official SDK")
             gross=int(trial["sdk_output"])
@@ -95,7 +96,7 @@ def audit(source, sdk):
             "fee_scheduler_independently_verified":False,
             "native_full_quote_parity_verified":False,
             "signed_swap_verified":False})
-    return {"status":"DBC_INDEPENDENT_SINGLE_SEGMENT_CURVE_MATH_ONLY",
+    return {"status":"DBC_INDEPENDENT_BOUNDED_CURVE_MATH_ONLY",
         "curve_math_verified_pools":len(outputs),"trials_verified":len(outputs)*4,
         "pools":outputs,"fee_scheduler_independently_verified":False,
         "native_full_quote_parity_verified":False,"signed_parity_verified":False,
