@@ -6,6 +6,7 @@ deliberately outside the current six-venue platform scope. This is a RESEARCH
 pipeline, never a live execution engine or a profitability approval.
 """
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -65,53 +66,58 @@ def authenticated_graph(readiness, *, max_cycles=200):
             "routes":routes,**SAFE}
 
 
-def research(rpc, registry, fixture_dir, signed_dir, *, amount_in,
-             observed_unix, maximum=12, max_cycles=200):
-    """Only a local offline fork may run this integrated five-stage pipeline.
 
-    The source quote ranking is indicative; signed results remain separate
-    and a missing cost/conversion proof never becomes a profitable signal.
+def source_research(rpc, registry, fixture_dir, *, amount_in,
+                    observed_unix, maximum=12, max_cycles=200):
+    """Read-only source-backed Surfpool: authenticated pools -> ranked fixtures.
+
+    This phase MUST complete and stop before a separate --offline Surfpool
+    process executes signed simulations. Never sign against a source fork.
     """
     local_rpc_only(rpc)
-    if os.environ.get("SURFPOOL_EXPLICITLY_OFFLINE")!="1":
-        raise ValueError("explicit isolated Surfpool research opt-in required")
     if (type(amount_in)is not int or not 0<amount_in<2**64 or
             type(observed_unix)is not int or observed_unix<0 or
             type(maximum)is not int or not 1<=maximum<=12 or
             not isinstance(registry,dict)):
-        raise ValueError("bounded offline research inputs required")
+        raise ValueError("bounded source research inputs required")
     if not set(VENUES)<=set(PROGRAMS):
         raise ValueError("six venue source adapters unavailable")
-    from arb.m5_distinct_venue_coverage_batch import source_batch,offline_batch
+    from arb.m5_distinct_venue_coverage_batch import source_batch
     from arb.m5_source_triangle_quote_ranking import rank
-    source_root=Path(fixture_dir)
-    signed_root=Path(signed_dir)
-    if source_root.resolve()==signed_root.resolve():
-        raise ValueError("source and signed evidence directories must differ")
+    root=Path(fixture_dir)
     batch=tuple((a,b) for a in VENUES for b in VENUES if a!=b)
     readiness=probe(rpc,registry,batch=batch)
     if set(readiness.get("authenticated_pools",{}))!=set(VENUES):
-        raise ValueError("source adapter returned unexpected venue coverage")
+        raise ValueError("unexpected source venue coverage")
     graph=authenticated_graph(readiness,max_cycles=max_cycles)
-    source=source_batch(rpc,readiness,source_root,maximum=maximum)
-    fixtures=[];indices=[]
+    source=source_batch(rpc,readiness,root,maximum=maximum)
+    fixtures=[];indices=[];digests={}
     for row in source["routes"]:
         if row.get("status")=="AUTHENTICATED_THREE_VENUE_SOURCE_FIXTURE":
-            fixture=json.loads((source_root/row["fixture"]).read_text())
-            if (set(fixture.get("route_venues",[]))-set(VENUES)):
+            path=(root/row["fixture"]).resolve()
+            if path.parent!=root.resolve():
+                raise ValueError("source fixture path escapes evidence directory")
+            raw=path.read_bytes()
+            fixture=json.loads(raw)
+            if (not set(fixture.get("route_venues",[]))<=set(VENUES) or
+                    len(fixture["route_venues"])!=3):
                 raise ValueError("source fixture contains out-of-scope venue")
             fixtures.append(fixture)
             indices.append(row["index"])
+            digests[row["fixture"]]=hashlib.sha256(raw).hexdigest()
     ranking=rank(fixtures,amount_in=amount_in,observed_unix=observed_unix,
                  maximum=maximum)
-    selected=[indices[r["index"]] for r in ranking["ranked"]
-              if r.get("positive_gross") is True]
-    # The existing signed coordinator enforces Ed25519, CPI amount continuity
-    # and negative rollback proof. Never mark a result actionable here.
-    signed=offline_batch(rpc,source_root,signed_root,
-                         observed_unix=observed_unix,route_indices=selected)
-    return {"status":"SIX_VENUE_OFFLINE_DISCOVERY_TO_SIMULATION_RESEARCH",
-            "venue_count":len(VENUES),"venues":list(VENUES),
+    selected=[indices[row["index"]] for row in ranking["ranked"]
+              if row.get("positive_gross") is True]
+    manifest={"status":"SIX_VENUE_SIGNED_HANDOFF_UNEXECUTED",
+              "venues":list(VENUES),"observed_unix":observed_unix,
+              "amount_in":amount_in,"source_fixtures":digests,
+              "selected_source_route_indices":selected,
+              "selection_is_gross_only":True,
+              "cost_conversion_verified":False,**SAFE}
+    root.mkdir(parents=True,exist_ok=True)
+    (root/"six-venue-handoff.json").write_text(json.dumps(manifest,indent=2)+"\n")
+    return {"status":"SIX_VENUE_SOURCE_AND_QUOTE_RESEARCH",
             "discovery":{"authenticated_pools":graph["source_pool_count"],
                          "failed_pool_checks":len(readiness.get("failed_pool_checks",[]))},
             "graph":{"candidate_cycles":graph["candidate_cycles"],
@@ -120,39 +126,92 @@ def research(rpc, registry, fixture_dir, signed_dir, *, amount_in,
                      "fully_quoted":ranking["fully_quoted"],
                      "blocked":ranking["blocked"],
                      "gross_positive":ranking["positive_gross"],
-                     "net_profitable_confirmed":0,
-                     "fee_conversion_verified":False},
-            "simulation":{"selected_positive_gross_routes":len(selected),
-                          "signed_attempted":signed["attempted"],
-                          "independent_signed_accepted":signed["independent_signed_accepted"],
-                          "signed_quote_exact_matches":signed.get(
-                              "observed_venue_quote_exact_matches",0)},
-            "graph_artifact":graph,
-            "ranking_artifact":ranking,
-            "signed_artifact":signed,
-            "reason":"historical or fork simulation is not live executable profit",
-            **SAFE}
+                     "net_profitable_confirmed":0},
+            "signed_simulation_status":"NOT_ATTEMPTED",
+            "manifest":manifest,"graph_artifact":graph,
+            "ranking_artifact":ranking,**SAFE}
+
+
+def offline_research(rpc, fixture_dir, signed_dir):
+    """Independent offline process consumes hash-bound source fixture handoff.
+
+    Both the source-backed process and any RPC datasource must already be
+    stopped. This entry point rejects absence of explicit offline opt-in.
+    """
+    local_rpc_only(rpc)
+    if os.environ.get("SURFPOOL_EXPLICITLY_OFFLINE")!="1":
+        raise ValueError("explicit isolated Surfpool offline opt-in required")
+    src=Path(fixture_dir)
+    dst=Path(signed_dir)
+    if src.resolve()==dst.resolve():
+        raise ValueError("source and signed evidence directories must differ")
+    manifest=json.loads((src/"six-venue-handoff.json").read_text())
+    if (manifest.get("status")!="SIX_VENUE_SIGNED_HANDOFF_UNEXECUTED" or
+            manifest.get("venues")!=list(VENUES) or
+            manifest.get("selection_is_gross_only") is not True or
+            manifest.get("cost_conversion_verified") is not False or
+            any(manifest.get(k) is not False for k in SAFE)):
+        raise ValueError("untrusted six-venue signed handoff")
+    digests=manifest.get("source_fixtures")
+    indices=manifest.get("selected_source_route_indices")
+    if (not isinstance(digests,dict) or len(digests)>12 or
+            not isinstance(indices,list) or len(indices)>12 or
+            len(indices)!=len(set(indices)) or
+            any(type(i)is not int or i<0 for i in indices) or
+            type(manifest.get("observed_unix"))is not int):
+        raise ValueError("invalid signed source selection")
+    listing=json.loads((src/"summary.json").read_text())
+    selected_rows=[r for r in listing["routes"] if r.get("index") in indices]
+    if len(selected_rows)!=len(indices):
+        raise ValueError("selected signed routes missing from source manifest")
+    for row in selected_rows:
+        if row.get("status")!="AUTHENTICATED_THREE_VENUE_SOURCE_FIXTURE":
+            raise ValueError("unverified source route selected for signing")
+    for name,digest in digests.items():
+        if (not isinstance(name,str) or not name.endswith(".json") or
+                (src/name).resolve().parent!=src.resolve() or
+                not isinstance(digest,str) or len(digest)!=64 or
+                hashlib.sha256((src/name).read_bytes()).hexdigest()!=digest):
+            raise ValueError("signed source fixture digest/path mismatch")
+    from arb.m5_distinct_venue_coverage_batch import offline_batch
+    signed=offline_batch(rpc,src,dst,observed_unix=manifest["observed_unix"],
+                         route_indices=indices)
+    return {"status":"SIX_VENUE_SIGNED_OFFLINE_RESEARCH",
+            "selected_positive_gross_routes":len(indices),
+            "signed_attempted":signed["attempted"],
+            "independent_signed_accepted":signed["independent_signed_accepted"],
+            "signed_quote_exact_matches":signed.get(
+                "observed_venue_quote_exact_matches",0),
+            "net_profitable_confirmed":0,
+            "reason":"signed fork success does not establish net live profitability",
+            "signed_artifact":signed,**SAFE}
 
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--phase",choices=("source","offline"),required=True)
     parser.add_argument("--rpc",default="http://127.0.0.1:8899")
     parser.add_argument("--registry",default="arb/pool_registry.json")
     parser.add_argument("--source-dir",required=True)
-    parser.add_argument("--signed-dir",required=True)
-    parser.add_argument("--amount-in",type=int,required=True)
-    parser.add_argument("--observed-unix",type=int,required=True)
+    parser.add_argument("--signed-dir")
+    parser.add_argument("--amount-in",type=int)
+    parser.add_argument("--observed-unix",type=int)
     parser.add_argument("--maximum",type=int,default=12)
     parser.add_argument("--max-cycles",type=int,default=200)
     parser.add_argument("--output",required=True)
     args=parser.parse_args()
-    report=research(args.rpc,json.loads(Path(args.registry).read_text()),
-                    args.source_dir,args.signed_dir,amount_in=args.amount_in,
-                    observed_unix=args.observed_unix,maximum=args.maximum,
-                    max_cycles=args.max_cycles)
+    if args.phase=="source":
+        report=source_research(args.rpc,
+           json.loads(Path(args.registry).read_text()),args.source_dir,
+           amount_in=args.amount_in,observed_unix=args.observed_unix,
+           maximum=args.maximum,max_cycles=args.max_cycles)
+    else:
+        if not args.signed_dir:
+            parser.error("--signed-dir required for offline phase")
+        report=offline_research(args.rpc,args.source_dir,args.signed_dir)
     Path(args.output).write_text(json.dumps(report,indent=2)+"\n")
-    print(json.dumps({key:report[key] for key in (
-        "status","venue_count","discovery","graph","quote","simulation","broadcast")}))
+    print(json.dumps({"status":report["status"],
+                      "actionable":False,"broadcast":False}))
 
 
 if __name__=="__main__":
