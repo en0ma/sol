@@ -23,6 +23,7 @@ concurrency:
   cancel-in-progress: true
 permissions:
   contents: read
+  actions: read
 jobs:
   dbc-source-regression:
     runs-on: ubuntu-latest
@@ -59,7 +60,36 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python3 -m pip install --disable-pip-version-check solders==0.26.0
-      - name: Authenticate untrusted index pool against original DBC source
+      - name: Fetch genuine archived original source evidence for PR regression
+        if: github.event_name == 'pull_request'
+        uses: actions/download-artifact@v4
+        with:
+          name: dbc-six-original-source-only
+          run-id: 40951036061
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/dbc-historical-six
+      - name: Revalidate historical original pool bytes (not current liquidity)
+        if: github.event_name == 'pull_request'
+        run: |
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          from arb.meteora_dbc_seventh_source_audit import independently_audit
+          path=Path(os.environ["RUNNER_TEMP"])
+          snapshot=json.loads((path/"dbc-historical-six/dbc-six-original-source.json").read_text())
+          assert snapshot["status"]=="SIX_DBC_ORIGINAL_SOURCE_POOLS_ONLY"
+          assert snapshot["independent_audit"]["authenticated_source_pools"]==6
+          source=dict(snapshot["source"])
+          assert len(source["source_pools"])==6
+          source["source_pools"]=source["source_pools"][:1]
+          source.update(authenticated=1,source_target=1,source_target_met=True,
+                        source_eligible_not_pricing_verified=1)
+          assert independently_audit(source)["authenticated_source_pools"]==1
+          (path/"dbc-original-contextual-candidates.json").write_text(json.dumps(source)+"\n")
+          print("Reauthenticated archived original mainnet bytes for regression; NOT live pool availability")
+          PY
+      - name: Authenticate fresh current DBC original (manual live research)
+        if: github.event_name == 'workflow_dispatch'
         run: |
           test -n "$SOLANA_RPC_URL"
           python3 -m arb.meteora_dbc_seventh_candidate_capture \
