@@ -49,7 +49,7 @@ def main():
        "native_pricing_verified":False,"signed_swaps_verified":0,
        "signed_parity_verified":False,"registry_admission_approved":False,
        "actionable":False,"broadcast":False}
-    Path(a.output).write_text(json.dumps(result,indent=2)+"\\n")
+    Path(a.output).write_text(json.dumps(result,indent=2)+"\n")
     print(json.dumps({"status":result["status"],
        "authenticated_source_pools":count,"target":6,
        "signed_swaps_verified":0}))
