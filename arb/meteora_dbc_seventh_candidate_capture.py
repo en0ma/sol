@@ -13,10 +13,10 @@ from arb.meteora_dbc_seventh_venue_source import capture
 from arb.meteora_dbc_seventh_state_capture import capture_pool
 
 
-def run(rpc, *, count=1, hint_limit=6):
+def run(rpc, *, count=1, hint_limit=12):
     if type(count) is not int or not 1 <= count <= 6:
         raise ValueError("DBC accepted source count must be 1-6")
-    if type(hint_limit) is not int or not count <= hint_limit <= 6:
+    if type(hint_limit) is not int or not count <= hint_limit <= 12:
         raise ValueError("DBC bounded hint limit required")
     source = "original_dbc_program_recent_transactions"
     try:
@@ -31,7 +31,7 @@ def run(rpc, *, count=1, hint_limit=6):
     if not hinted["hints"]:
         # Still untrusted and independently authenticated in the next stages.
         source="dexpaprika_untrusted_fallback"
-        hinted=public_discover(count=hint_limit)
+        hinted=public_discover(count=min(hint_limit,6))
         print(json.dumps({"stage":"dbc_public_index",
             "hinted":len(hinted["hints"])}))
     if not hinted["hints"]:
@@ -77,7 +77,7 @@ def main():
     ap=argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--rpc",required=True)
     ap.add_argument("--count",type=int,default=1)
-    ap.add_argument("--hint-limit",type=int,default=6)
+    ap.add_argument("--hint-limit",type=int,default=12)
     ap.add_argument("--output",required=True)
     a=ap.parse_args()
     report=run(a.rpc,count=a.count,hint_limit=a.hint_limit)
