@@ -25,7 +25,7 @@ jobs:
           python3 -m unittest discover -s tests -p test_meteora_dbc_seventh_state_capture.py -v
           python3 -m py_compile arb/meteora_dbc_seventh_discovery.py arb/meteora_dbc_seventh_candidate_capture.py
   dbc-real-candidate:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'
     needs: dbc-source-regression
     runs-on: ubuntu-latest
     timeout-minutes: 20
