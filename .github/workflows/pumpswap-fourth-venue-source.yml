@@ -1,6 +1,11 @@
 name: PumpSwap Fourth-Venue Signed Parity Research
 
 on:
+  pull_request:
+    paths:
+      - "arb/pumpswap_*.py"
+      - "tools/pumpswap_sdk_oracle.js"
+      - ".github/workflows/pumpswap-fourth-venue-source.yml"
   workflow_dispatch:
     inputs:
       pool_count:
@@ -17,7 +22,7 @@ jobs:
     timeout-minutes: 35
     env:
       SOLANA_RPC_URL: ${{ secrets.SURFPOOL_DATASOURCE_RPC_URL }}
-      POOL_COUNT: ${{ inputs.pool_count }}
+      POOL_COUNT: ${{ inputs.pool_count || '1' }}
     steps:
       - uses: actions/checkout@v4
       - name: Require read-only upstream RPC
