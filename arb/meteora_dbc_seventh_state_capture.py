@@ -143,7 +143,8 @@ def capture_pool(rpc, original):
     for addr, raw, account in zip(addresses, [pool_raw, cfg_raw, mint_raw, *vaults, clock_raw], rows):
         proof[addr] = {
             "account_base64": account["data"][0], "lamports": account["lamports"],
-            "sha256": hashlib.sha256(raw).hexdigest()
+            "sha256": hashlib.sha256(raw).hexdigest(),
+            "owner": account["owner"], "executable": account["executable"]
         }
     return {"status": "DBC_CONTEXTUAL_POOL_DEPENDENCIES_PARTIALLY_VERIFIED",
             "pool": address, "source_slot": response["context"]["slot"],
