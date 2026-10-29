@@ -10,7 +10,7 @@ import argparse,hashlib,json
 from pathlib import Path
 from arb.raydium_clmm_sixth_venue_source import capture_pool
 from arb.raydium_clmm_tick_source import capture_tick_arrays
-from arb.raydium_clmm_native_single_tick import evaluate
+from arb.raydium_clmm_native_single_tick import evaluate,quote_one_tick
 
 def select(rpc,registry,hints,*,required=6):
     if type(required) is not int or not 1<=required<=6:
@@ -40,6 +40,30 @@ def select(rpc,registry,hints,*,required=6):
                 except ValueError as exc:
                     if "state changed across tick-array read" not in str(exc):raise
             else:raise ValueError("CLMM changing price could not synchronize")
+            # Derive two native-executable *size-aware* trials for each mint
+            # without assuming a nine-decimal token can trade profitably at
+            # 10k raw units. Require bounded single-tick exact-in and output
+            # >100 base units for every directional sample.
+            state_=ticks["synchronized_pool_state"]
+            fee_=ticks["amm_config_source"]
+            selected={}
+            for forward,label in ((True,"zero_for_one"),(False,"one_for_zero")):
+                eligible=[]
+                for size in (10_000,20_000,100_000,200_000,1_000_000,
+                             2_000_000,10_000_000,20_000_000,
+                             100_000_000,200_000_000):
+                    try:
+                        quote=quote_one_tick(state_,fee_,size,
+                                            zero_for_one=forward)
+                        if quote["output"]>=100:
+                            eligible.append(size)
+                    except (ValueError,KeyError,TypeError):
+                        pass
+                    if len(eligible)==2:break
+                if len(eligible)!=2:
+                    raise ValueError("two non-dust bounded single-tick sizes not available "+label)
+                selected[label]=eligible
+            ticks["selected_amounts"]=selected
             row={"pool":address,"authenticated_initial_source_slot":source["source_slot"],
                 "authenticated_initial_source_sha256":source["source_sha256"],
                 "tick_capture":ticks}
@@ -57,7 +81,9 @@ def select(rpc,registry,hints,*,required=6):
             accepted.append(row)
         except (ValueError,KeyError,TypeError,RuntimeError,OSError) as exc:
             rejected.append({"address":address,"reason":str(exc)[:190]})
-        if len(accepted)>=required:break
+        # Retain a broader screened set. Official SDK independent review
+        # may reject native candidates without admitting them as signed.
+        if len(accepted)>=max(required*4,24):break
     result={"venue":"raydium_clmm",
         "status":"AUTHENTICATED_TICK_LIQUIDITY_SOURCE_ONLY",
         "pools":accepted,"rejected":rejected,
