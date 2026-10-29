@@ -1,0 +1,49 @@
+name: Meteora DBC Six-Pool Source Acceptance Research
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/meteora-dbc-six-source.yml"
+      - "arb/meteora_dbc_six_source_qualification.py"
+      - "arb/meteora_dbc_seventh_recent_tx_discovery.py"
+      - "arb/meteora_dbc_seventh_candidate_capture.py"
+      - "tests/test_meteora_dbc_six_source_qualification.py"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  six-source-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Enforce six distinct audited original source identities
+        run: |
+          python3 -m unittest discover -s tests -p 'test_meteora_dbc_six_source_qualification.py' -v
+          python3 -m unittest discover -s tests -p 'test_meteora_dbc_seventh_recent_tx_discovery.py' -v
+          python3 -m py_compile arb/meteora_dbc_six_source_qualification.py
+  six-original-source:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' }}
+    needs: six-source-regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      SOLANA_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
+      SOLANA_RPC_MIN_INTERVAL_SECONDS: "0.5"
+      SOLANA_RPC_ALCHEMY_FREE_TIER: "1"
+      SOLANA_RPC_PACING_FILE: /tmp/dbc-six-source-pacing
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Authenticate six distinct original pools and independently audit source bytes
+        run: |
+          test -n "$SOLANA_RPC_URL"
+          python3 -m arb.meteora_dbc_six_source_qualification \
+            --rpc "$SOLANA_RPC_URL" --pages 4 \
+            --output "$RUNNER_TEMP/dbc-six-original-source.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dbc-six-original-source-only
+          path: ${{ runner.temp }}/dbc-six-original-source.json
+          if-no-files-found: warn
