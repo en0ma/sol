@@ -60,5 +60,9 @@ def simulate_signed(rpc, signed_bytes, input_address, output_address,
     if not 0<spent<=amount_in or gained<min_amount_out:
         raise ValueError("PumpSwap simulation did not satisfy swap deltas and output threshold")
     return {"simulation_verified":True,"spent_base_units":spent,
-            "received_base_units":gained,"min_output_base_units":min_amount_out,"executable_quote":False,
-            "profitable_arbitrage_verified":False}
+            "received_base_units":gained,"min_output_base_units":min_amount_out,
+            "initial_input_base_units":initial_input,
+            "initial_output_base_units":initial_output,
+            "post_spl_account_data_base64":[a["data"][0] for a in accounts],
+            "simulation_logs":logs,
+            "executable_quote":False,"profitable_arbitrage_verified":False}
