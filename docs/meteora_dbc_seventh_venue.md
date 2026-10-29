@@ -97,3 +97,41 @@ References:
 These checks establish account *shape* and ownership, not curve
 activity or pricing parity. Both pool-config and token-vault consistency
 remain separate gates before signed trading acceptance.
+
+## Original on-chain DBC source intake (continuation)
+
+New source-only modules: `arb/meteora_dbc_seventh_discovery.py`
+uses DexPaprika `meteora_dbc` solely for untrusted addresses.
+`arb/meteora_dbc_seventh_candidate_capture.py` reauthenticates
+the source using the original on-chain DBC program/ELF.
+`arb/meteora_dbc_seventh_state_capture.py` re-reads
+the original pool, config, SPL mint and two vaults in a single
+`getMultipleAccounts` response, with `minContextSlot` and
+strict pool-byte identity. It checks original PoolConfig discriminator,
+quote mint and both token vault authorities and mints, retaining
+original bytes and hashes.
+
+New `.github/workflows/meteora-dbc-seventh-candidates.yml`
+runs source regressions on PRs, while genuine read-only candidate
+discovery requires manual dispatch. A failure to identify a real pool
+must fail closed. No original DBC pool is yet claimed as successfully
+live-captured by this continuation, and no SDK/native/signed parity
+or registry admission is claimed.
+
+Manual read-only research:
+```bash
+python3 -m arb.meteora_dbc_seventh_candidate_capture \
+  --rpc "$SOLANA_MAINNET_RPC_URL" --count 1 \
+  --output dbc-original-contextual-candidates.json
+```
+
+Verified upstream layouts:
+`MeteoraAg/dynamic-bonding-curve`
+`programs/dynamic-bonding-curve/src/state/virtual_pool.rs`,
+`state/fee.rs`, and `state/config.rs`.
+Legacy SPL only; Token-2022 and transfer hooks are explicitly
+unsupported by this new source path. Next gates are genuine identity
+snapshot, complete config/fee/curve decoding, official SDK vs
+independent native integer quotes in four directions/size trials,
+genuine signed isolated Surfpool swaps, cryptographic/SPL audit and
+existing registry provenance admission.
