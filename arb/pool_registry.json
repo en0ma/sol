@@ -15,7 +15,19 @@
       "mints": [
         "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
-      ]
+      ],
+      "signed_provenance": {
+        "status": "INDEPENDENT_CLMM_SIGNED_NATIVE_SDK_SPL_PARITY",
+        "source_slot": 462857973,
+        "source_digest": "b8ccfd7880d5ab895ad8778f01c713407d5cc2137a714e420ee03910388a8f03",
+        "signed_transaction_hashes": [
+          "3cc595b06824c2d76e26cb0d42621f1ef07f80d3ab188eda920ed6d36c1584ff",
+          "172b16f0e63c5b24d72d1c9821f9a8bc630eb2ec8a2ce2c3ad080144f596fcb3",
+          "50e91c4d2f4297d216682f6d1d14f9f9eb0b2b2dab67a389c810662692699fc0",
+          "be49f9dd82788bfb413628131d8b68973258e6a90ba2c21ee635d1cf2697d113"
+        ],
+        "independent_receipt_sha256": "ca636d51efbe0e97b175c7808ca74e157aae9271dbbd292f5c70b70451b0cf8d"
+      }
     },
     {
       "venue": "orca",
