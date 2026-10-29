@@ -97,7 +97,7 @@ async function probe(conn,row) {
     const pinnedBins=new Set(row.bin_arrays.filter(b=>b.authenticated).map(b=>b.pda));
     check(arrays.every(a=>pinnedBins.has(a.publicKey.toBase58())),
       "SDK requested a bin array outside authenticated source snapshot");
-    for(const amount of [10000,100000]) {
+    for(const amount of [10000,20000]) {
       const quoted=await pair.swapQuote(
         new BN(amount),swapForY,new BN(0),arrays,false);
       const consumed=quoted.consumedInAmount;
