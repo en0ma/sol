@@ -163,7 +163,15 @@ def run(rpc, sdk_report, manifest):
             proofs.append({"pool":pool,"input_mint":mint,"output_mint":output_mint,
                 "amount_in":size,"signed_spl_output":result["received_base_units"],
                 "official_sdk_output":expected,"native_output":expected,
+                "source_slot":item["source_slot"],"source_digest":item["source_digest"],
+                "input_token_account":input_address,"output_token_account":output_address,
+                "signed_transaction_base64":signed_b64,
                 "signed_sha256":hashlib.sha256(signed_bytes).hexdigest(),
+                "signed_signature":str(transaction.signatures[0]),
+                "initial_input_base_units":result["initial_input_base_units"],
+                "initial_output_base_units":result["initial_output_base_units"],
+                "post_spl_account_data_base64":result["post_spl_account_data_base64"],
+                "simulation_logs":result["simulation_logs"],
                 "status":"PUMPSWAP_SIGNED_SDK_NATIVE_EXACT"})
         if len({x["input_mint"] for x in proofs})!=2 or any(
                 sum(x["input_mint"]==m for x in proofs)!=2
