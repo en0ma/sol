@@ -53,3 +53,44 @@ DBC acceptance remains 0/6 until real signed Ed25519/SPL audits and
 existing registry signed provenance pass.
 
 No mainnet writes are authorized.
+
+## Newest PR CI investigation and fixes (17:18 UTC continuation)
+
+At commit `730244b`, [DBC candidate run
+40915152571](https://github.com/en0ma/sol/actions/runs/40915152571)
+passed source regressions but failed the pinned official SDK quote
+step: the authentic live candidate did not supply two non-dust
+bounded quotes per direction. The oracle formerly started at 10,000
+raw units, increased 10x, then stopped at one-quarter of the source
+reserve. This can exclude perfectly valid small-reserve pools.
+The new bounded source-relative ladder tests sizes from 1 raw unit
+through reserve fractions and accepts only genuine SDK outputs
+with positive actual input/output. It emits counts of SDK rejections,
+but never invents results or removes the two-per-direction gate.
+
+[DBC six-source run
+40915152405](https://github.com/en0ma/sol/actions/runs/40915152405)
+found only **two of six** authenticated original pools from five
+on-chain VirtualPool candidates in 384 bounded program transactions.
+Three were explicitly migrated/unsupported. To broaden the eligible
+search without accepting migrated pools, source discovery now permits
+24 (rather than 12) bounded original-chain account hints, each still
+requiring the original owner, discriminator, program ELF,
+PoolConfig and vault/Clock checks. This is not proof that six
+non-migrated source pools exist in the current sample.
+
+[DBC signed offline research
+40915152365](https://github.com/en0ma/sol/actions/runs/40915152365)
+failed earlier at live source capture (**zero of one**), rather than
+at Ed25519 transaction execution. No new signed acceptance was made.
+
+[CLMM six additional signed run
+40915152670](https://github.com/en0ma/sol/actions/runs/40915152670)
+completed **successfully** after moving the SDK tick-array source
+authentication gate into candidate screening. Previously accepted
+CLMM registry evidence remains intact.
+
+All of these are observed statuses for their respective commit
+runs, not predictions that the latest commits are green.
+DBC remains **0/6 signed-accepted**, **0/24 independently audited
+signed transactions**, with no new mainnet writes.
