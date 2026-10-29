@@ -86,6 +86,18 @@ class DbcStateTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,"mutated"):
                 capture_pool("https://readonly.invalid",original)
 
+    def test_wrong_quote_vault_mint_rejected(self):
+        raw=raw_pool()
+        source={"address":pk(8),"account_base64":base64.b64encode(raw).decode(),
+                "account_sha256":hashlib.sha256(raw).hexdigest(),"source_slot":100}
+        snapshot=context(raw)
+        quote=bytearray(base64.b64decode(snapshot["value"][4]["data"][0]))
+        quote[:32]=bytes([99])*32
+        snapshot["value"][4]["data"][0]=base64.b64encode(quote).decode()
+        with patch("arb.meteora_dbc_seventh_state_capture.call",return_value=snapshot):
+            with self.assertRaisesRegex(ValueError,"mint mismatch"):
+                capture_pool("https://readonly.invalid",source)
+
     def test_migrated_rejected(self):
         raw=bytearray(raw_pool());raw[321]=1
         with self.assertRaisesRegex(ValueError,"migrated"):
