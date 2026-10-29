@@ -23,10 +23,19 @@ function bytes(row) {
 }
 const [,,sourcePath,outputPath]=process.argv;
 requireTrue(sourcePath&&outputPath,"usage: node oracle.js source.json output.json");
-const report=JSON.parse(fs.readFileSync(sourcePath,"utf8"));
+let report=JSON.parse(fs.readFileSync(sourcePath,"utf8"));
+const sixSource=report.status==="SIX_DBC_ORIGINAL_SOURCE_POOLS_ONLY";
+if(sixSource){
+  requireTrue(report.authenticated_source_pools===6 &&
+    report.independent_audit?.authenticated_source_pools===6,
+    "DBC six-pool independent source proof incomplete");
+  report=report.source;
+}
 requireTrue(report.status==="DBC_ORIGINAL_CONTEXTUAL_SOURCE_PARTIAL_NOT_SIGNED" &&
   Array.isArray(report.source_pools) && report.source_pools.length>0,
   "DBC original source proof required");
+if(sixSource) requireTrue(report.source_pools.length===6,
+  "DBC six distinct source pools not available for SDK");
 const client=new DynamicBondingCurveClient(
   new Connection("http://127.0.0.1:8899","confirmed"),"confirmed"
 );
