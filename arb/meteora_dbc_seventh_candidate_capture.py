@@ -82,9 +82,14 @@ def main():
     ap.add_argument("--count",type=int,default=1)
     ap.add_argument("--hint-limit",type=int,default=24)
     ap.add_argument("--pages",type=int,default=4)
+    ap.add_argument("--sdk-screen",action="store_true")
     ap.add_argument("--output",required=True)
     a=ap.parse_args()
-    report=run(a.rpc,count=a.count,hint_limit=a.hint_limit,pages=a.pages)
+    validator=None
+    if a.sdk_screen:
+        from arb.meteora_dbc_six_source_qualification import validate_official_sdk_candidate
+        validator=validate_official_sdk_candidate
+    report=run(a.rpc,count=a.count,hint_limit=a.hint_limit,pages=a.pages,\n               candidate_validator=validator)
     Path(a.output).write_text(json.dumps(report,indent=2)+"\n")
     print(json.dumps({"status":report["status"],
                       "authenticated":report["authenticated"],
