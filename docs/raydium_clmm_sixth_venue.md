@@ -48,7 +48,7 @@ calculations and execute four real signed isolated Surfpool swap_v2
 transactions per pool (two directions, two sizes), with separate signed
 SPL-output audit.
 
-**Current stage: authenticated source only (one pool).**
+**Historical initial stage: authenticated source only (one pool); superseded by the signed acceptance evidence below.**
 Do not mistake the existing swap-v2 instruction builder or a green
 source workflow for signed pricing parity, multi-venue atomic execution,
 or any authorization to broadcast.
@@ -127,3 +127,53 @@ membership is required for each.
 
 Signed acceptance and source/SDK/native/SPL output artifact:
 https://github.com/en0ma/sol/actions/runs/40862666749/artifacts/12892407092
+
+## Six additional CLMM pools: real 24-swap acceptance completed
+
+The independently audited full acceptance for six further **distinct**
+Raydium CLMM pools is green:
+
+https://github.com/en0ma/sol/actions/runs/40866278277
+
+Evidence including the authenticated source/tick-array bytes,
+native Q64.64 integer outputs, official pinned Raydium SDK quotes,
+24 signed wire transactions, raw post-simulation SPL accounts,
+independent cryptographic audit, and the six-pool qualified registry
+is available here:
+
+https://github.com/en0ma/sol/actions/runs/40866278277/artifacts/12893234390
+
+The independent audit reports
+`INDEPENDENT_CLMM_SIGNED_NATIVE_SDK_SPL_PARITY`,
+`verified_pools=6`; the registry promotion reports
+`RAYDIUM_CLMM_SIGNED_REGISTRY_PROVENANCE_ACCEPTED`,
+`signed_verified_pools=6`. All 24 signed trials succeeded on isolated
+Surfpool, with exact official SDK / independent Q64 price and actual
+SPL token delta reconciliation. The existing single shared
+`arb/pool_registry.json` now has **seven** signed-verifiable CLMM
+identities (**28** signed trials including the original RAY/USDC pool).
+
+| Additional verified CLMM pool | Pair | Original verified source slot |
+| --- | --- | ---: |
+| `BCDdHonby65iduz3Ev3c9v5XjNkzyu5e56KRFHpBM4T9` | USD1/USDC | 462865937 |
+| `3ucNos4NbumPLZNWztqGHNFFgkHeRMBQAVemeeomsUxv` | WSOL/USDC | 462865947 |
+| `EWivkwNtcxuPsU6RyD7Pfvs7u9Yv8nQ79tJ7xgGyPrp6` | 6Frr…/USDC | 462866000 |
+| `AQAGYQsdU853WAKhXM79CgNdoyhrRwXvYHX6qrDyC1FS` | WSOL/USD1 | 462866008 |
+| `HnhpJPJgBG2KwniMTNW8cVBHvk1hFog3RC3kjnyc23tD` | CARDS/USDC | 462866029 |
+| `6tgpinsu1Mj5tr6c3HE8BXCGa1jfTtX86jGWYouKwrtV` | CatEv…/USDC | 462866135 |
+
+The discovery layer uses Raydium API or public-index hints **only
+as untrusted locators**. Every final minted identity was read again
+from the original on-chain program-owned PoolState and independently
+authenticated. A 24-pool candidate source preflight is filtered
+through the official SDK to select six with four exact independent
+integer quotes. Each pool uses **two distinct adaptive non-dust
+amounts in both directions**, so this evidence does not imply every
+pool uses the original 10,000/100,000 samples. The complete
+per-trial input sizes and raw observed SPL deltas are in the artifact.
+
+Limitations remain unchanged: accepted samples stay within a single
+concentrated-liquidity tick using supported input-side static fees.
+Tick crossing, limit-order matching, Token-2022 special transfers,
+arbitrary fee modes, and cross-venue atomic multi-hop execution require
+separate acceptance. None of this authorizes live mainnet broadcast.
