@@ -177,6 +177,47 @@ def source_research(rpc, registry, fixture_dir, *, amount_in,
             "ranking_artifact":ranking,**SAFE}
 
 
+
+def assess_signed_batch(batch, selected):
+    """Separate authenticated signed outcome from gross-only quote ranking."""
+    if (not isinstance(batch,dict) or not isinstance(selected,list) or
+            len(selected)!=len(set(selected)) or
+            any(type(i)is not int for i in selected)):
+        raise ValueError("malformed signed batch selection")
+    rows=batch.get("routes")
+    if (not isinstance(rows,list) or len(rows)!=len(selected) or
+            batch.get("attempted")!=len(selected) or
+            any(not isinstance(row,dict) for row in rows) or
+            len({row.get("index") for row in rows})!=len(rows) or
+            {row["index"] for row in rows}!=set(selected) or
+            any(row.get("actionable") is not False or
+                row.get("broadcast") is not False for row in rows)):
+        raise ValueError("signed route report missing or inconsistent with source selection")
+    verified=sum(row.get("independent_signed_accepted") is True for row in rows)
+    if (batch.get("independent_signed_accepted")!=verified or
+            any(row.get("independent_signed_accepted") not in (True,False)
+                for row in rows)):
+        raise ValueError("signed independent acceptance count inconsistent")
+    decisions=[]
+    for row in sorted(rows,key=lambda r:r["index"]):
+        accepted=row["independent_signed_accepted"] is True
+        decisions.append({
+            "index":row["index"],
+            "stage":("SIGNED_FORK_CPI_ROLLBACK_ACCEPTED" if accepted else
+                     "SIGNED_FORK_REJECTED"),
+            "signed_execution_verified":accepted,
+            "source_price_economics_gate":row.get("source_price_economics_gate"),
+            "economics_status":row.get("economics_status"),
+            "network_fee_conversion_verified":False,
+            "net_profitability_verified":False,**SAFE})
+    return {"status":"SIX_VENUE_SIGNED_ROUTE_DECISIONS",
+            "selected":len(selected),"signed_accepted":verified,
+            "signed_rejected":len(selected)-verified,
+            "net_profitable_candidates":0,
+            "decisions":decisions,**SAFE}
+
+
+
 def offline_research(rpc, fixture_dir, signed_dir):
     """Independent offline process consumes hash-bound source fixture handoff.
 
@@ -239,8 +280,10 @@ def offline_research(rpc, fixture_dir, signed_dir):
     from arb.m5_distinct_venue_coverage_batch import offline_batch
     signed=offline_batch(rpc,src,dst,observed_unix=manifest["observed_unix"],
                          route_indices=indices)
+    decisions=assess_signed_batch(signed,indices)
     return {"status":"SIX_VENUE_SIGNED_OFFLINE_RESEARCH",
             "selected_positive_gross_routes":len(indices),
+            "route_decisions":decisions,
             "signed_attempted":signed["attempted"],
             "independent_signed_accepted":signed["independent_signed_accepted"],
             "signed_quote_exact_matches":signed.get(
