@@ -107,7 +107,19 @@
       "mints": [
         "So11111111111111111111111111111111111111112",
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
-      ]
+      ],
+      "signed_provenance": {
+        "status": "INDEPENDENT_DLMM_SIGNED_NATIVE_SDK_SPL_PARITY",
+        "source_slot": 462835102,
+        "source_digest": "0db5c6a3c8a270ec8439ef5c1635fe30c4ff2e81992ecff5eae1b63d429efefe",
+        "signed_transaction_hashes": [
+          "473d8d20dfc6be73879d630d8117978bb46dfd586e94e43ce4925a780eda7047",
+          "4c31c8473df9cd22fe6db97bc958adf1be40aed3f96ccbb5121e3d66912640ea",
+          "f0b7e54ffcf72fdf6b423ef1033d2d628138988114ef596799bd769adbdb7f83",
+          "216829d6348db2f6d3f1387b6b8a0522cdf8926341ec63c48593b3bf4a8ef440"
+        ],
+        "independent_receipt_sha256": "9ad2cf2b5030c2ad888a4ba64413b0480e5ccdad4aaf5cafd5dc71056b569dab"
+      }
     },
     {
       "venue": "meteora_dlmm",
@@ -115,7 +127,19 @@
       "mints": [
         "6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN",
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
-      ]
+      ],
+      "signed_provenance": {
+        "status": "INDEPENDENT_DLMM_SIGNED_NATIVE_SDK_SPL_PARITY",
+        "source_slot": 462835107,
+        "source_digest": "ae952366b5561c91033cab7bc4937bfc096062214e423c2ef7e4de5b85c54fd4",
+        "signed_transaction_hashes": [
+          "211d95ad70ac14d8772b474e8acbb59d27c9ca0d92a6041840a884267ed20353",
+          "2e3b2d2a4b02126bea5e31e0b3bbf8f9b1d341ff49a05fe8a754f0f83dffbb2a",
+          "87c7c24b427c7a100587048e916274f7065e55a6869e513f851defda3d04c8a3",
+          "85e85956db242b13f23964955479a6a622b93eef70395eec18d7db2897853dbc"
+        ],
+        "independent_receipt_sha256": "dd07b2f89633416f7262b79f58948e2419d3ed7ccf2f7a6e3bd4b5f95742356e"
+      }
     },
     {
       "venue": "meteora_dlmm",
@@ -123,7 +147,19 @@
       "mints": [
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
         "So11111111111111111111111111111111111111112"
-      ]
+      ],
+      "signed_provenance": {
+        "status": "INDEPENDENT_DLMM_SIGNED_NATIVE_SDK_SPL_PARITY",
+        "source_slot": 462835112,
+        "source_digest": "416776e564fa4d98f574a1aed2e23cd480aef4c67c1ba729dc8dd79d02d3bc42",
+        "signed_transaction_hashes": [
+          "af45d61830b033c6c4fdb4bd0c755797f46c6ee5a86a6488fb32cb94c4129d56",
+          "8dcb308e44092c96037008a6b2731b89ec441942cb5ca206fe461a25d9950173",
+          "ae6cf4a027e9d86d82e13fbd5dd2c098f5138836676f09be226eee36615b116f",
+          "6c6dec81460825a01228f38c995732222e387e86ac6a7d630e2420bb9cb55d1f"
+        ],
+        "independent_receipt_sha256": "415e3eee7c3a2e54bc3028d9f425f897bfd6d943f13d43cffde82f9f33ebb466"
+      }
     },
     {
       "venue": "meteora_damm_v2",
