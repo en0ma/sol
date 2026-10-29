@@ -11,7 +11,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from arb.rpc import call
+from arb.rpc import call, RPCError
 from arb.meteora_dbc_seventh_venue_source import (
     PROGRAM, DISC, VIRTUAL_POOL_ACCOUNT_SIZE,
 )
@@ -34,10 +34,15 @@ def discover(rpc, *, count=3, max_signatures=48):
             continue
         if entry.get("err") is not None:
             continue
-        tx=call(rpc,"getTransaction",[entry["signature"],{
-            "encoding":"json","commitment":"confirmed",
-            "maxSupportedTransactionVersion":0
-        }])
+        try:
+            tx=call(rpc,"getTransaction",[entry["signature"],{
+                "encoding":"json","commitment":"confirmed",
+                "maxSupportedTransactionVersion":0
+            }])
+        except (RPCError,OSError):
+            # A throttled single historical transaction is NOT pool evidence.
+            # Keep earlier independently authenticated candidates.
+            continue
         if not isinstance(tx,dict) or not isinstance(tx.get("transaction"),dict):
             continue
         message=tx["transaction"].get("message")
@@ -60,9 +65,12 @@ def discover(rpc, *, count=3, max_signatures=48):
             chunk=keys[start:start+50]
             if not chunk:continue
             attempts+=1
-            response=call(rpc,"getMultipleAccounts",[chunk,{
-                "encoding":"base64","commitment":"confirmed"
-            }])
+            try:
+                response=call(rpc,"getMultipleAccounts",[chunk,{
+                    "encoding":"base64","commitment":"confirmed"
+                }])
+            except (RPCError,OSError):
+                continue
             if (not isinstance(response,dict) or
                     not isinstance(response.get("context"),dict) or
                     type(response["context"].get("slot")) is not int or
