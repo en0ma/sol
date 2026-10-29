@@ -49,8 +49,11 @@ def run(rpc, *, count=1, hint_limit=6):
             state=capture_pool(rpc,result["source_pools"][0])
             accepted.append(state)
         except (ValueError, OSError, RuntimeError, KeyError, TypeError) as exc:
-            rejected.append({"address":address,
-                             "reason_type":type(exc).__name__})
+            reason={"address":address,"reason_type":type(exc).__name__}
+            if isinstance(exc, ValueError):
+                reason["validation_reason"]=str(exc)[:160]
+            rejected.append(reason)
+            print(json.dumps({"stage":"dbc_candidate_rejected",**reason}))
         if len(accepted)>=count:
             break
     if len(accepted)!=count:
