@@ -39,26 +39,6 @@ jobs:
         run: |
           python3 -m pip install --disable-pip-version-check solders==0.26.0 meteora-dlmm==0.5.0
           npm install --no-save --package-lock=false @meteora-ag/dlmm@1.9.14
-      - name: Authenticate actual DLMM pool, bin liquidity, oracle and Clock
-        run: |
-          set -euo pipefail
-          [[ "$POOL_COUNT" =~ ^[1-3]$ ]] || exit 1
-          python3 -m arb.meteora_dlmm_fifth_venue_source \
-            --rpc "$SOURCE_RPC" --registry arb/pool_registry.json \
-            --count "$POOL_COUNT" \
-            --unverified-only \
-            --output "$RUNNER_TEMP/dlmm-source.json"
-      - name: Quote real pool in official Meteora SDK
-        run: |
-          node tools/meteora_dlmm_sdk_source_oracle.js \
-            "$RUNNER_TEMP/dlmm-source.json" \
-            "$RUNNER_TEMP/dlmm-sdk.json" "$SOURCE_RPC"
-      - name: Independently certify pure integer bin-walk parity
-        run: |
-          python3 -m arb.meteora_dlmm_native_candidate_audit \
-            --source "$RUNNER_TEMP/dlmm-source.json" \
-            --sdk "$RUNNER_TEMP/dlmm-sdk.json" \
-            --output "$RUNNER_TEMP/dlmm-native-sdk.json"
       - name: Install Surfpool isolated fork
         run: |
           set -euo pipefail
@@ -82,6 +62,35 @@ jobs:
               time.sleep(1)
           else:raise SystemExit("DLMM isolated Surfpool failed to launch")
           PY
+      - name: Freeze isolated fork Clock before capturing mainnet source
+        run: |
+          python3 - <<'PY'
+          from arb.rpc import call
+          from arb.orca_fork_clock import fork_clock
+          url="http://127.0.0.1:8899"
+          call(url,"surfnet_pauseClock",[])
+          print("EARLY_FORK_CLOCK",fork_clock(url)["fork_unix_timestamp"])
+          PY
+      - name: Authenticate actual DLMM pool, bin liquidity, oracle and Clock
+        run: |
+          set -euo pipefail
+          [[ "$POOL_COUNT" =~ ^[1-3]$ ]] || exit 1
+          python3 -m arb.meteora_dlmm_fifth_venue_source \
+            --rpc "$SOURCE_RPC" --registry arb/pool_registry.json \
+            --count "$POOL_COUNT" \
+            --unverified-only \
+            --output "$RUNNER_TEMP/dlmm-source.json"
+      - name: Quote real pool in official Meteora SDK
+        run: |
+          node tools/meteora_dlmm_sdk_source_oracle.js \
+            "$RUNNER_TEMP/dlmm-source.json" \
+            "$RUNNER_TEMP/dlmm-sdk.json" "$SOURCE_RPC"
+      - name: Independently certify pure integer bin-walk parity
+        run: |
+          python3 -m arb.meteora_dlmm_native_candidate_audit \
+            --source "$RUNNER_TEMP/dlmm-source.json" \
+            --sdk "$RUNNER_TEMP/dlmm-sdk.json" \
+            --output "$RUNNER_TEMP/dlmm-native-sdk.json"
       - name: Execute genuine signed DLMM swaps against original program ELF
         run: |
           python3 -m arb.meteora_dlmm_fifth_signed_fork \
