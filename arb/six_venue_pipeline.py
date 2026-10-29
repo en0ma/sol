@@ -235,10 +235,23 @@ def assess_signed_batch(batch, selected):
             "signed_execution_verified":accepted,
             "source_price_economics_gate":row.get("source_price_economics_gate"),
             "economics_status":row.get("economics_status"),
+            "observed_gross_delta_start_mint_base_units":
+                row.get("gross_start_mint_delta") if accepted else None,
+            "observed_compute_units":
+                row.get("observed_compute_units") if accepted else None,
+            "maximum_affordable_total_cost_start_mint_base_units":
+                row.get("break_even_total_cost_budget_start_mint_base_units")
+                if accepted else None,
             "network_fee_conversion_verified":False,
             "net_profitability_verified":False,**SAFE})
+    gross_ranked=sorted(
+        (item for item in decisions if
+            type(item["observed_gross_delta_start_mint_base_units"]) is int),
+        key=lambda item:item["observed_gross_delta_start_mint_base_units"],
+        reverse=True)
     return {"status":"SIX_VENUE_SIGNED_ROUTE_DECISIONS",
             "selected":len(selected),"signed_accepted":verified,
+            "gross_ranked_signed_research":gross_ranked,
             "signed_rejected":len(selected)-verified,
             "net_profitable_candidates":0,
             "decisions":decisions,**SAFE}
