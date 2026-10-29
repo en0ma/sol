@@ -117,9 +117,9 @@ async function probe(conn,row) {
         signed_parity_verified:false
       });
     }
-    await checkPool(conn,row,address);
+    await checkPool(pinned,row,address);
   }
-  await checkPool(conn,row,address);
+  await checkPool(pinned,row,address);
   return {pool:row.address,source_slot:row.source_slot,
     source_sha256:row.source_sha256,trials,
     signed_parity_verified:false,actionable:false};
