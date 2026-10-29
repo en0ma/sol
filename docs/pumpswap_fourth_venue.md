@@ -71,6 +71,28 @@ Also added `arb/pumpswap_native_candidate.py`, a strict, integer-only Python tra
 
 A separate manual-only workflow, `.github/workflows/pumpswap-fourth-venue-source.yml`, runs the bounded source capture using the existing upstream RPC secret. It cannot claim signed parity or admit pools.
 
+## Independent published SDK candidate-price gate
+
+`tools/pumpswap_sdk_oracle.js` imports the pinned published
+`@pump-fun/pump-swap-sdk@2.2.0` and decodes the authenticated source bytes
+using `PUMP_AMM_SDK`. It independently calls the SDK's
+`buyQuoteInput` and `sellBaseInput` with the same reserves, fee
+config, actual quote mint, Mayhem flag, virtual reserve, creator rate
+and outstanding fee buckets. It compares four outputs to Python's
+candidate calculations; `arb/pumpswap_sdk_candidate_audit.py` rejects
+missing trials, mismatched outputs, duplicate sizes/directions, incorrect
+source pool identities and any claim that SDK equivalence establishes
+signed execution.
+
+The **manual** `PumpSwap Fourth-Venue Source Research` workflow now
+runs source authentication, official SDK candidate comparison, then
+independent candidate audit, and uploads all reports. This is a
+*fail-closed experimental gate*, not a green certified fourth venue.
+Running that workflow against fresh upstream state and inspecting its
+receipt is still necessary; routine focused CI only runs the offline
+adversarial tests. GitHub may require the workflow file on its default
+branch before offering manual dispatch.
+
 ## Requirements before claiming the fourth venue works
 
 1. Independently compare every candidate exact-base-unit buy/sell formula
