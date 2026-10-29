@@ -9,6 +9,8 @@ on:
       - "tests/test_meteora_dbc_signed_fork_research.py"
       - "arb/meteora_dbc_signed_audit.py"
       - "tests/test_meteora_dbc_signed_audit.py"
+      - "arb/meteora_dbc_signed_registry_merge.py"
+      - "tests/test_meteora_dbc_signed_registry_merge.py"
       - "arb/meteora_dbc_native_fee.py"
       - "arb/meteora_dbc_native_fee_parity.py"
       - "tests/test_meteora_dbc_native_fee.py"
@@ -33,6 +35,7 @@ jobs:
           python3 -m unittest discover -s tests -p test_meteora_dbc_swap.py -v
           python3 -m unittest discover -s tests -p test_meteora_dbc_signed_fork_research.py -v
           python3 -m unittest discover -s tests -p test_meteora_dbc_signed_audit.py -v
+          python3 -m unittest discover -s tests -p test_meteora_dbc_signed_registry_merge.py -v
           python3 -m unittest discover -s tests -p test_meteora_dbc_native_fee.py -v
           python3 -m py_compile arb/meteora_dbc_signed_fork_research.py
           npm install --no-save --ignore-scripts --prefix "$RUNNER_TEMP/dbc-sdk" @meteora-ag/dynamic-bonding-curve-sdk@2.0.0
@@ -105,6 +108,17 @@ jobs:
             --signed "$RUNNER_TEMP/dbc-signed-diagnostic-unaccepted.json" \
             --required 1 \
             --output "$RUNNER_TEMP/dbc-independent-genuine-signed-audit.json"
+      - name: Gate original independently audited signed DBC pool into existing registry artifact
+        run: |
+          python3 -m arb.meteora_dbc_signed_registry_merge \
+            --registry arb/pool_registry.json \
+            --source "$RUNNER_TEMP/dbc-signed-diagnostic-source.json" \
+            --sdk "$RUNNER_TEMP/dbc-signed-diagnostic-sdk.json" \
+            --native "$RUNNER_TEMP/dbc-signed-diagnostic-native-fee.json" \
+            --signed "$RUNNER_TEMP/dbc-signed-diagnostic-unaccepted.json" \
+            --required 1 \
+            --output "$RUNNER_TEMP/dbc-signed-qualified-registry.json" \
+            --report "$RUNNER_TEMP/dbc-signed-registry-report.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -113,5 +127,7 @@ jobs:
             ${{ runner.temp }}/dbc-signed-diagnostic-*.json
             ${{ runner.temp }}/dbc-independent-source.json
             ${{ runner.temp }}/dbc-independent-genuine-signed-audit.json
+            ${{ runner.temp }}/dbc-signed-qualified-registry.json
+            ${{ runner.temp }}/dbc-signed-registry-report.json
             ${{ runner.temp }}/dbc-surfpool.log
           if-no-files-found: warn
