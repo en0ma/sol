@@ -31,12 +31,30 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("--rpc",required=True)
     p.add_argument("--output",required=True)
-    p.add_argument("--pages",type=int,default=4)
-    args=p.parse_args()
-    result=qualify(args.rpc,pages=args.pages)
-    Path(args.output).write_text(json.dumps(result,indent=2)+"\n")
+    p.add_argument("--pages",type=int,default=6)
+    a=p.parse_args()
+    captured=run(a.rpc,count=6,hint_limit=12,pages=a.pages,strict=False)
+    count=len(captured["source_pools"])
+    audit=(independently_audit(captured) if count else
+           {"authenticated_source_pools":0,"pools":[],
+            "signed_parity_verified":False})
+    if audit["authenticated_source_pools"]!=count:
+        raise SystemExit("DBC original source audit count mismatch")
+    complete=(count==6 and len({p["pool"] for p in captured["source_pools"]})==6)
+    result={"venue":"meteora_dbc",
+       "status":"SIX_DBC_ORIGINAL_SOURCE_POOLS_ONLY" if complete else
+                "PARTIAL_DBC_ORIGINAL_SOURCE_EVIDENCE_NOT_ACCEPTED",
+       "source":captured,"independent_audit":audit,
+       "authenticated_source_pools":count,"target_source_pools":6,
+       "native_pricing_verified":False,"signed_swaps_verified":0,
+       "signed_parity_verified":False,"registry_admission_approved":False,
+       "actionable":False,"broadcast":False}
+    Path(a.output).write_text(json.dumps(result,indent=2)+"\\n")
     print(json.dumps({"status":result["status"],
-      "authenticated_source_pools":6,"signed_swaps_verified":0}))
+       "authenticated_source_pools":count,"target":6,
+       "signed_swaps_verified":0}))
+    if not complete:
+        raise SystemExit("DBC six independently authenticated pools not reached")
 
 
 if __name__=="__main__":main()
