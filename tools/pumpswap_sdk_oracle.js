@@ -68,7 +68,18 @@ function compare(snapshot) {
     isMayhemMode:pool.isMayhemMode,creatorFeeBps:pool.creatorFeeBps,slippage:0,
     feeBucketsTotal:pool.protocolFees.add(pool.creatorFees)};
   const rows=[];
-  for (const input of [poolBase,poolQuote]) for (const amount of [10000,100000]) {
+  const selections=snapshot.native_quote_candidates;
+  check(Array.isArray(selections) && selections.length===4,"four native source candidate quotes required");
+  const identities=new Set();
+  for (const candidate of selections) {
+    const input=candidate.mint_in;
+    const amount=candidate.amount_in;
+    check((input===poolBase || input===poolQuote) &&
+      Number.isSafeInteger(amount) && amount>0,
+      "invalid native source quote mint or size");
+    const identity=input+":"+amount;
+    check(!identities.has(identity),"duplicate native quote candidate");
+    identities.add(identity);
     let result;
     try {
       check(!pool.isCashbackCoin, "cashback V2 unsupported");
