@@ -54,14 +54,14 @@ def parse_pool(raw):
     return fields
 
 
-def decode_account(account, *, owner, size=None):
+def decode_account(account, *, owner, size=None, role="source"):
     if (not isinstance(account, dict) or account.get("owner") != owner
             or account.get("executable") is not False
             or not isinstance(account.get("lamports"), int)
             or account["lamports"] < 0
             or not isinstance(account.get("data"), list)
             or len(account["data"]) != 2 or account["data"][1] != "base64"):
-        raise ValueError("DBC contextual account owner/metadata invalid")
+        raise ValueError("DBC contextual account owner/metadata invalid: "+role)
     raw = base64.b64decode(account["data"][0], validate=True)
     if size is not None and len(raw) != size:
         raise ValueError("DBC contextual account size invalid")
@@ -90,7 +90,7 @@ def capture_pool(rpc, original):
             len(response["value"]) != len(addresses)):
         raise ValueError("DBC synchronized source context invalid")
     rows = response["value"]
-    pool_raw = decode_account(rows[0], owner=PROGRAM, size=VIRTUAL_POOL_ACCOUNT_SIZE)
+    pool_raw = decode_account(rows[0], owner=PROGRAM, size=VIRTUAL_POOL_ACCOUNT_SIZE, role="pool")
     fresh_fields = parse_pool(pool_raw)
     immutable_roles=("config","creator","base_mint","base_vault","quote_vault")
     if any(fresh_fields[k] != fields[k] for k in immutable_roles):
@@ -99,12 +99,12 @@ def capture_pool(rpc, original):
     # the old identity bytes with a later dependency snapshot: use only
     # the *fresh* pool bytes from this single contextual response.
     fields = fresh_fields
-    cfg_raw = decode_account(rows[1], owner=PROGRAM)
+    cfg_raw = decode_account(rows[1], owner=PROGRAM, role="config")
     if len(cfg_raw) < 40 or cfg_raw[:8] != hashlib.sha256(b"account:PoolConfig").digest()[:8]:
         raise ValueError("DBC PoolConfig original discriminator/size invalid")
     quote_mint = key(cfg_raw[8:40])
     base_token_program = TOKEN_2022 if fields["pool_type"] == 1 else TOKEN_PROGRAM
-    mint_raw = decode_account(rows[2], owner=base_token_program)
+    mint_raw = decode_account(rows[2], owner=base_token_program, role="base_mint")
     if len(mint_raw) < 82:
         raise ValueError("DBC base mint original account truncated")
     vaults = []
@@ -112,11 +112,12 @@ def capture_pool(rpc, original):
         expected_owner = base_token_program if n == 0 else row.get("owner")
         if n == 1 and expected_owner not in (TOKEN_PROGRAM, TOKEN_2022):
             raise ValueError("DBC quote vault unsupported token program")
-        raw = decode_account(row, owner=expected_owner)
+        raw = decode_account(row, owner=expected_owner,
+                             role="base_vault" if n==0 else "quote_vault")
         if len(raw) < TOKEN_ACCOUNT_SIZE:
             raise ValueError("DBC SPL or Token-2022 vault truncated")
         vaults.append(raw)
-    clock_raw = decode_account(rows[5], owner=SYSVAR_OWNER, size=40)
+    clock_raw = decode_account(rows[5], owner=SYSVAR_OWNER, size=40, role="Clock")
     clock_slot = int.from_bytes(clock_raw[:8], "little")
     unix_timestamp = int.from_bytes(clock_raw[32:40], "little", signed=True)
     if clock_slot > response["context"]["slot"] or unix_timestamp <= 0:
