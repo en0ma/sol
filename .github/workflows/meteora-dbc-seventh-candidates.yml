@@ -48,9 +48,20 @@ jobs:
           python3 -m arb.meteora_dbc_seventh_candidate_capture \
             --rpc "$SOLANA_RPC_URL" --count 1 \
             --output "$RUNNER_TEMP/dbc-original-contextual-candidates.json"
+      - name: Install pinned original DBC official SDK for source-bound oracle
+        run: npm install --no-save --ignore-scripts --prefix "$RUNNER_TEMP/dbc-sdk" @meteora-ag/dynamic-bonding-curve-sdk@2.0.0
+      - name: Compare official SDK quotes against exact captured original bytes (SDK only)
+        env:
+          NODE_PATH: ${{ runner.temp }}/dbc-sdk/node_modules
+        run: |
+          node tools/meteora_dbc_official_sdk_oracle.js \
+            "$RUNNER_TEMP/dbc-original-contextual-candidates.json" \
+            "$RUNNER_TEMP/dbc-original-official-sdk-quotes.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: dbc-original-contextual-candidates
-          path: ${{ runner.temp }}/dbc-original-contextual-candidates.json
+          path: |
+            ${{ runner.temp }}/dbc-original-contextual-candidates.json
+            ${{ runner.temp }}/dbc-original-official-sdk-quotes.json
           if-no-files-found: warn
