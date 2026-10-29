@@ -38,12 +38,12 @@ def parse_pool(raw):
     o += len(names)*32
     fields["base_reserve"] = int.from_bytes(raw[o:o+8], "little")
     fields["quote_reserve"] = int.from_bytes(raw[o+8:o+16], "little")
-    # Eight-byte quantities follow reserves: protocol/partner fee buckets.
-    fields["sqrt_price_q64"] = int.from_bytes(raw[o+64:o+80], "little")
+    # Four u64 protocol/partner fee buckets follow the two reserves.
+    fields["sqrt_price_q64"] = int.from_bytes(raw[o+48:o+64], "little")
     # Migration flags follow 8-byte activation point.
-    fields["pool_type"] = raw[o+88]
-    fields["is_migrated"] = raw[o+89]
-    fields["migration_progress"] = raw[o+92]
+    fields["pool_type"] = raw[o+72]
+    fields["is_migrated"] = raw[o+73]
+    fields["migration_progress"] = raw[o+76]
     if (fields["sqrt_price_q64"] == 0 or fields["pool_type"] != 0
             or fields["is_migrated"] != 0 or fields["migration_progress"] != 0):
         raise ValueError("DBC unsupported state: pool_type="+str(fields["pool_type"])+
