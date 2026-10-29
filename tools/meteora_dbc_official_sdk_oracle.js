@@ -81,7 +81,7 @@ for(const row of report.source_pools) {
     const cap=BN.max(new BN(1),reserve.divn(2));
     const sizes=new Set();
     for(const divisor of [100000000,10000000,1000000,100000,10000,1000,100,10,2]) {
-      sizes.add(BN.max(new BN(1),reserve.divn(divisor)).toString(10));
+      sizes.add(BN.max(new BN(1),reserve.div(new BN(String(divisor)))).toString(10));
     }
     for(const amount of ["1","10","100","1000","10000","100000","1000000"]) {
       sizes.add(amount);
