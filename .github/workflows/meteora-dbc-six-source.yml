@@ -25,6 +25,7 @@ concurrency:
   cancel-in-progress: true
 permissions:
   contents: read
+  actions: read
 jobs:
   six-source-regressions:
     runs-on: ubuntu-latest
@@ -57,7 +58,37 @@ jobs:
       - run: python3 -m pip install --disable-pip-version-check solders==0.26.0
       - name: Install pinned original DBC reference SDK
         run: npm install --no-save --ignore-scripts --prefix "$RUNNER_TEMP/dbc-sdk" @meteora-ag/dynamic-bonding-curve-sdk@2.0.0
-      - name: Authenticate six distinct original pools and independently audit source bytes
+      # PR regression is deterministic: use six genuine previously captured
+      # on-chain originals. Live pool launches rapidly migrate or drain.
+      # Manual dispatch preserves the strict current-mainnet discovery gate.
+      - name: Fetch immutable six-original historical regression evidence
+        if: github.event_name == 'pull_request'
+        uses: actions/download-artifact@v4
+        with:
+          name: dbc-six-original-source-only
+          run-id: 40951036061
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/dbc-historical-six
+      - name: Independently reaudit historical source account bytes
+        if: github.event_name == 'pull_request'
+        run: |
+          cp "$RUNNER_TEMP/dbc-historical-six/dbc-six-original-source.json" "$RUNNER_TEMP/dbc-six-original-source.json"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          from arb.meteora_dbc_seventh_source_audit import independently_audit
+          report=json.loads((Path(os.environ["RUNNER_TEMP"])/"dbc-six-original-source.json").read_text())
+          assert report["status"]=="SIX_DBC_ORIGINAL_SOURCE_POOLS_ONLY"
+          assert report["authenticated_source_pools"]==6
+          source=report["source"]
+          assert len(source["source_pools"])==6
+          assert len({p["pool"] for p in source["source_pools"]})==6
+          fresh=independently_audit(source)
+          assert fresh["authenticated_source_pools"]==6
+          print("Six genuine historical source snapshots independently reaudited; NOT current live liquidity")
+          PY
+      - name: Authenticate six fresh original pools (manual live research)
+        if: github.event_name == 'workflow_dispatch'
         env:
           NODE_PATH: ${{ runner.temp }}/dbc-sdk/node_modules
         run: |
