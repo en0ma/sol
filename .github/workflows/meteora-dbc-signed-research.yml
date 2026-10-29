@@ -73,15 +73,17 @@ jobs:
           call("http://127.0.0.1:8899","surfnet_pauseClock",[])
           PY
       - name: Capture one authentic original DBC source without broadcast
+        env:
+          NODE_PATH: ${{ runner.temp }}/dbc-sdk/node_modules
         run: |
           test -n "$SOLANA_MAINNET_RPC_URL"
           if [[ "$POOL_COUNT" == "6" ]]; then
             python3 -m arb.meteora_dbc_six_source_qualification \
-              --rpc "$SOLANA_MAINNET_RPC_URL" --pages 6 \
+              --rpc "$SOLANA_MAINNET_RPC_URL" --pages 12 \
               --output "$RUNNER_TEMP/dbc-signed-diagnostic-source.json"
           else
             python3 -m arb.meteora_dbc_seventh_candidate_capture \
-              --rpc "$SOLANA_MAINNET_RPC_URL" --count 1 --pages 2 \
+              --rpc "$SOLANA_MAINNET_RPC_URL" --count 1 --pages 4 --sdk-screen \
               --output "$RUNNER_TEMP/dbc-signed-diagnostic-source.json"
           fi
       - name: Independently audit saved source bytes
