@@ -95,6 +95,41 @@ receipt is still necessary; routine focused CI only runs the offline
 adversarial tests. GitHub may require the workflow file on its default
 branch before offering manual dispatch.
 
+## Real signed Surfpool comparison runner (requires signed inputs)
+
+`arb/pumpswap_signed_parity.py` now runs pre-signed transactions through the
+existing `pumpswap_local_simulation.simulate_signed` verifier against
+**localhost Surfpool only**, with `sigVerify: true` and independently fetched
+initial SPL token balances. It requires four SDK-exact comparisons per pool,
+two input mints and two distinct amounts, the same snapshot slot and digest
+as the signed manifest, valid pre-signed transaction verification, exact
+input-token debit, and exactly equal observed SPL output. It records SHA-256
+of actual signed transaction bytes and rejects extra, duplicate, or missing
+trials. No live broadcasting, registry mutation, or keys are handled here.
+
+Example when a controlled test setup already produced a manifest of four
+*real signed, separately simulatable* transactions for each pool:
+
+```bash
+python3 -m arb.pumpswap_signed_parity \
+  --rpc http://127.0.0.1:8899 \
+  --sdk-report pumpswap-official-sdk-comparison.json \
+  --signed-manifest signed-pumpswap-trials.json \
+  --output pumpswap-signed-parity.json
+```
+
+The manifest must have `venue: "pumpswap"`, `trials: [...]`;
+each trial must supply `pool`, `input_mint`, `output_mint`, `amount_in`,
+`source_slot`, `source_digest`, `input_token_account`,
+`output_token_account`, and `signed_transaction_base64`.
+The runner verifies transaction signatures locally and then calls a
+signature-verifying isolated Surfpool simulation. **No signed manifest has
+yet been generated or tested against real PumpSwap execution**, so this is
+an instrumented runner, not evidence of four completed signed swaps.
+The next acceptance job must prepare payer/user token accounts, source
+program and fee auxiliaries, build and sign official V2 swap instructions,
+then independently audit the resultant receipts before registry admission.
+
 ## Requirements before claiming the fourth venue works
 
 1. Independently compare every candidate exact-base-unit buy/sell formula
