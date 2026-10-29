@@ -46,10 +46,15 @@ def decode_tick_array(raw,pool,start,spacing):
                 raise ValueError("CLMM initialized tick position invalid")
             found.append({"tick":tick,"liquidity_net":str(net),"liquidity_gross":str(gross)})
     initialized=raw[44+60*TICK_STATE_LEN]
-    if initialized!=len(found):
-        raise ValueError("CLMM initialized tick count differs from real liquidity entries: count="+str(initialized)+" gross_positive="+str(len(found))+" start="+str(start))
+    # A tick with an initialized limit order may have zero LP gross.
+    # Do not invent the missing liquidity: explicitly expose the gap and
+    # forbid treating the array as native pricing-verified.
+    if not len(found)<=initialized<=60:
+        raise ValueError("CLMM initialized count smaller than LP ticks or beyond array capacity")
     return {"pool":pool,"start_tick_index":start,
-            "initialized_tick_count":initialized,"initialized_ticks":found}
+            "initialized_tick_count":initialized,"initialized_lp_tick_count":len(found),
+            "additional_initialized_non_lp_ticks":initialized-len(found),
+            "initialized_ticks":found}
 
 def capture_tick_arrays(rpc,pool,state,*,radius=4):
     if type(radius) is not int or not 1<=radius<=8:
