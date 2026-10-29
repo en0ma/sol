@@ -122,7 +122,7 @@ jobs:
             --sdk "$RUNNER_TEMP/dbc-signed-diagnostic-sdk.json" \
             --native "$RUNNER_TEMP/dbc-signed-diagnostic-native-fee.json" \
             --signed "$RUNNER_TEMP/dbc-signed-diagnostic-unaccepted.json" \
-            --required 1 \
+            --required "$POOL_COUNT" \
             --output "$RUNNER_TEMP/dbc-independent-genuine-signed-audit.json"
       - name: Gate original independently audited signed DBC pool into existing registry artifact
         run: |
@@ -132,7 +132,7 @@ jobs:
             --sdk "$RUNNER_TEMP/dbc-signed-diagnostic-sdk.json" \
             --native "$RUNNER_TEMP/dbc-signed-diagnostic-native-fee.json" \
             --signed "$RUNNER_TEMP/dbc-signed-diagnostic-unaccepted.json" \
-            --required 1 \
+            --required "$POOL_COUNT" \
             --output "$RUNNER_TEMP/dbc-signed-qualified-registry.json" \
             --report "$RUNNER_TEMP/dbc-signed-registry-report.json"
       - uses: actions/upload-artifact@v4
