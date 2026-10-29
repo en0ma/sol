@@ -1,4 +1,4 @@
-name: Sixth Venue Raydium CLMM Official SDK Price-Parity Research
+name: Sixth Venue Raydium CLMM Genuine Signed Acceptance
 on:
   pull_request:
     paths:
@@ -91,6 +91,15 @@ jobs:
             --sdk "$RUNNER_TEMP/clmm-official-sdk.json" \
             --signed "$RUNNER_TEMP/clmm-signed.json" \
             --output "$RUNNER_TEMP/clmm-independent-signed-audit.json"
+      - name: Gate signed-verified identity in existing pool registry
+        run: |
+          python3 -m arb.raydium_clmm_signed_registry_merge \
+            --registry arb/pool_registry.json \
+            --tick-source "$RUNNER_TEMP/clmm-ticks.json" \
+            --sdk "$RUNNER_TEMP/clmm-official-sdk.json" \
+            --signed "$RUNNER_TEMP/clmm-signed.json" \
+            --output "$RUNNER_TEMP/clmm-signed-qualified-registry.json" \
+            --report "$RUNNER_TEMP/clmm-signed-registry-audit.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -102,5 +111,7 @@ jobs:
             ${{ runner.temp }}/clmm-official-sdk.json
             ${{ runner.temp }}/clmm-signed.json
             ${{ runner.temp }}/clmm-independent-signed-audit.json
+            ${{ runner.temp }}/clmm-signed-qualified-registry.json
+            ${{ runner.temp }}/clmm-signed-registry-audit.json
             ${{ runner.temp }}/clmm-surfpool.log
           if-no-files-found: warn
