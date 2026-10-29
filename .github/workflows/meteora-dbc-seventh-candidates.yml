@@ -14,6 +14,9 @@ on:
       - "tests/test_meteora_dbc_seventh_recent_tx_discovery.py"
       - "tools/meteora_dbc_official_sdk_oracle.js"
       - "arb/meteora_dbc_native_curve_audit.py"
+      - "arb/meteora_dbc_native_fee.py"
+      - "arb/meteora_dbc_native_fee_parity.py"
+      - "tests/test_meteora_dbc_native_fee.py"
   workflow_dispatch:
 permissions:
   contents: read
@@ -39,6 +42,7 @@ jobs:
           python3 -m unittest discover -s tests -p test_meteora_dbc_seventh_source_audit.py -v
           python3 -m py_compile arb/meteora_dbc_seventh_discovery.py arb/meteora_dbc_seventh_candidate_capture.py
           node --check tools/meteora_dbc_official_sdk_oracle.js
+          python3 -m unittest discover -s tests -p test_meteora_dbc_native_fee.py -v
   dbc-real-candidate:
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'
     needs: dbc-source-regression
@@ -78,6 +82,12 @@ jobs:
             --source "$RUNNER_TEMP/dbc-original-contextual-candidates.json" \
             --sdk "$RUNNER_TEMP/dbc-original-official-sdk-quotes.json" \
             --output "$RUNNER_TEMP/dbc-native-curve-only-audit.json"
+      - name: Independently enforce original fee scheduler plus Q64 SDK parity
+        run: |
+          python3 -m arb.meteora_dbc_native_fee_parity \
+            --source "$RUNNER_TEMP/dbc-original-contextual-candidates.json" \
+            --sdk "$RUNNER_TEMP/dbc-original-official-sdk-quotes.json" \
+            --output "$RUNNER_TEMP/dbc-independent-native-fee-sdk-parity.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -87,4 +97,5 @@ jobs:
             ${{ runner.temp }}/dbc-original-official-sdk-quotes.json
             ${{ runner.temp }}/dbc-independent-original-source-audit.json
             ${{ runner.temp }}/dbc-native-curve-only-audit.json
+            ${{ runner.temp }}/dbc-independent-native-fee-sdk-parity.json
           if-no-files-found: warn
