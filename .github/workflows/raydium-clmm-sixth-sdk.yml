@@ -84,6 +84,13 @@ jobs:
             --native "$RUNNER_TEMP/clmm-native.json" \
             --sdk "$RUNNER_TEMP/clmm-official-sdk.json" \
             --output "$RUNNER_TEMP/clmm-signed.json"
+      - name: Independently audit Ed25519 SwapV2 and raw SPL output
+        run: |
+          python3 -m arb.raydium_clmm_sixth_signed_audit \
+            --tick-source "$RUNNER_TEMP/clmm-ticks.json" \
+            --sdk "$RUNNER_TEMP/clmm-official-sdk.json" \
+            --signed "$RUNNER_TEMP/clmm-signed.json" \
+            --output "$RUNNER_TEMP/clmm-independent-signed-audit.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -94,5 +101,6 @@ jobs:
             ${{ runner.temp }}/clmm-native.json
             ${{ runner.temp }}/clmm-official-sdk.json
             ${{ runner.temp }}/clmm-signed.json
+            ${{ runner.temp }}/clmm-independent-signed-audit.json
             ${{ runner.temp }}/clmm-surfpool.log
           if-no-files-found: warn
