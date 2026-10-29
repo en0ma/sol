@@ -84,9 +84,7 @@ def calculate(source,sdk):
                 raise ValueError("DLMM reference quote partial or zero")
             # Exactly reproduced integer-fee and bin-traversal quote from
             # the same captured bytes and on-chain Clock Unix timestamp.
-            q=quote(pool,amount,forward,timestamp=timestamp,strict=True,
-                    exhaustive=False) if False else quote(
-                    pool,amount,forward,timestamp=timestamp,strict=True)
+            q=quote(pool,amount,forward,timestamp=timestamp,strict=True)
             if not q.complete or q.remaining_in!=0:
                 raise ValueError("DLMM native quote incomplete")
             if q.amount_out!=sdk_out:
