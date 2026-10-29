@@ -10,6 +10,7 @@ import argparse,base64,hashlib,json
 from pathlib import Path
 from solders.pubkey import Pubkey
 from arb.rpc import call
+from arb.orca_whirlpool import b58
 PROGRAM="dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN"
 POOL_AUTHORITY="FhVo3mqL8PW5pH5U2CN4XE33DokiyZnUwuGpH2hmHLuM"
 UPGRADEABLE="BPFLoaderUpgradeab1e11111111111111111111111"
@@ -53,7 +54,7 @@ def capture(rpc,*,count=3):
     # by a capped RPC provider. Never invent new pool identities.
     hints=call(rpc,"getProgramAccounts",[PROGRAM,{
         "encoding":"base64","commitment":"confirmed",
-        "filters":[{"memcmp":{"offset":0,"bytes":str(Pubkey.from_bytes(DISC+b'\x00'*24))}}]}])
+        "filters":[{"memcmp":{"offset":0,"bytes":b58(DISC)}}]}])
     if not isinstance(hints,list):
         raise ValueError("DBC read-only active VirtualPool program account scan denied")
     accepted=[]
