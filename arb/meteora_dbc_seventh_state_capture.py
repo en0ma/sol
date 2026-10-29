@@ -37,11 +37,11 @@ def parse_pool(raw):
     fields["base_reserve"] = int.from_bytes(raw[o:o+8], "little")
     fields["quote_reserve"] = int.from_bytes(raw[o+8:o+16], "little")
     # Eight-byte quantities follow reserves: protocol/partner fee buckets.
-    fields["sqrt_price_q64"] = int.from_bytes(raw[o+48:o+64], "little")
+    fields["sqrt_price_q64"] = int.from_bytes(raw[o+64:o+80], "little")
     # Migration flags follow 8-byte activation point.
-    fields["pool_type"] = raw[o+72]
-    fields["is_migrated"] = raw[o+73]
-    fields["migration_progress"] = raw[o+76]
+    fields["pool_type"] = raw[o+88]
+    fields["is_migrated"] = raw[o+89]
+    fields["migration_progress"] = raw[o+92]
     if (fields["sqrt_price_q64"] == 0 or fields["pool_type"] != 0
             or fields["is_migrated"] != 0 or fields["migration_progress"] != 0):
         raise ValueError("DBC pool nontrading, migrated or unsupported token mode")
@@ -91,12 +91,9 @@ def capture_pool(rpc, original):
     if len(cfg_raw) < 16:
         raise ValueError("DBC PoolConfig too short")
     mint_raw = decode_account(rows[2], owner=TOKEN_PROGRAM, size=82)
-    if mint_raw[0:4] == b"":  # deliberately no mint semantics inferred here
-        raise AssertionError("unreachable")
     vaults = []
     for n, row in enumerate(rows[3:]):
         raw = decode_account(row, owner=TOKEN_PROGRAM, size=TOKEN_ACCOUNT_SIZE)
-        expected_mint = fields["base_mint"] if n == 0 else None
         vaults.append(raw)
     # Source authentication of the mint and token accounts is necessary,
     # but the config's quote mint has not yet been decoded. Do not declare
