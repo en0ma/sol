@@ -36,7 +36,7 @@ def validate_official_sdk_candidate(row):
     mandatory downstream. No public RPC or signing is performed by the oracle.
     """
     source={"status":"DBC_ORIGINAL_CONTEXTUAL_SOURCE_PARTIAL_NOT_SIGNED",
-            "source_pools":[row]}
+            "source_pools":[row],"signed_parity_verified":False}
     with tempfile.TemporaryDirectory(prefix="dbc-sdk-screen-") as directory:
         src=Path(directory)/"source.json"
         out=Path(directory)/"sdk.json"
