@@ -97,6 +97,7 @@ function compare(snapshot) {
     rows.push(result);
   }
   return {address:snapshot.address,source_slot:snapshot.verified_snapshot_slot,
+    source_digest:snapshot.authenticated_source_sha256,
     trials:rows,exact_candidates:rows.filter(x=>x.status==="OFFICIAL_SDK_CANDIDATE_EXACT").length,
     signed_parity_verified:false,actionable:false};
 }
