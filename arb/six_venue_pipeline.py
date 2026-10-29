@@ -205,7 +205,25 @@ def offline_research(rpc, fixture_dir, signed_dir):
             any(type(i)is not int or i<0 for i in indices) or
             type(manifest.get("observed_unix"))is not int):
         raise ValueError("invalid signed source selection")
-    listing=json.loads((src/"summary.json").read_text())
+    summary_raw=(src/"summary.json").read_bytes()
+    ranking_raw=(src/"six-venue-ranking.json").read_bytes()
+    if (hashlib.sha256(summary_raw).hexdigest()!=manifest.get("source_summary_sha256") or
+            hashlib.sha256(ranking_raw).hexdigest()!=manifest.get("source_ranking_sha256")):
+        raise ValueError("signed source inventory or ranking digest mismatch")
+    listing=json.loads(summary_raw)
+    ranking=json.loads(ranking_raw)
+    if (ranking.get("status")!="GROSS_SOURCE_BOUND_RANKING_ONLY" or
+            any(r.get("actionable") is not False for r in ranking.get("ranked",[]))):
+        raise ValueError("signed source ranking status invalid")
+    original=[r for r in listing["routes"]
+              if r.get("status")=="AUTHENTICATED_THREE_VENUE_SOURCE_FIXTURE"]
+    try:
+        derived=[original[r["index"]]["index"] for r in ranking["ranked"]
+                 if r.get("positive_gross") is True]
+    except (TypeError,IndexError,KeyError) as exc:
+        raise ValueError("signed source quote ranking index invalid") from exc
+    if derived!=indices:
+        raise ValueError("signed selection differs from frozen native quote ranking")
     selected_rows=[r for r in listing["routes"] if r.get("index") in indices]
     if len(selected_rows)!=len(indices):
         raise ValueError("selected signed routes missing from source manifest")
