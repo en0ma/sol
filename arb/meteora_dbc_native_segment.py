@@ -6,6 +6,7 @@ not be called signed-price parity without the original SDK comparison.
 """
 U64=(1<<64)-1
 U128=(1<<128)-1
+U256=(1<<256)-1
 Q128=1<<128
 
 
@@ -22,7 +23,7 @@ def divide(n,d,up=False):
 
 def next_sqrt_from_exact_input(sqrt_price,liquidity,amount,base_for_quote):
     bounded(sqrt_price,U128,"sqrt_price")
-    bounded(liquidity,U128,"liquidity")
+    bounded(liquidity,U256,"liquidity")
     bounded(amount,U64,"amount")
     if sqrt_price==0 or liquidity==0:
         raise ValueError("DBC zero price/liquidity")
