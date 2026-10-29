@@ -81,7 +81,16 @@ def audit(source, sdk):
             if int(trial["sdk_next_sqrt_price"])!=native["next_sqrt_price"]:
                 raise ValueError("DBC independent curve next price differs from official SDK")
             gross=int(trial["sdk_output"])
-            if base:
+            # PoolFeesConfig.collectFeeMode=1 collects on *output*
+            # for either direction. Mode 0 collects quote-to-base input
+            # fees, while base-to-quote still pays fees on output.
+            # Earlier curve-only audit omitted quote-to-base output fees
+            # when mode=1, falsely rejecting native/SDK full-fee parity.
+            collection=raw[232]
+            if collection not in (0,1):
+                raise ValueError("DBC unsupported fee collection mode")
+            fees_on_input=(not base and collection==0)
+            if not fees_on_input:
                 gross+=int(trial["sdk_trading_fee"])+int(trial["sdk_protocol_fee"])
             if gross!=native["output_amount"]:
                 raise ValueError("DBC independent zero-fee curve gross output differs from SDK")
