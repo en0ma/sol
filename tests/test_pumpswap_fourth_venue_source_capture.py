@@ -31,6 +31,41 @@ class PumpSwapFourthVenueCaptureTests(unittest.TestCase):
         for name in ("actionable","broadcast","native_pricing_verified",
                      "signed_parity_verified","registry_admission_approved"):
             self.assertIs(report[name],False)
+    def test_transient_live_pool_state_change_retries_same_slot_verifier(self):
+        from arb.pumpswap_native_source_capture import stable_source_snapshot
+        import base64
+        from arb.pumpswap_pool import PROGRAM
+        state={"base_mint":MINT_A,"quote_mint":MINT_B}
+        account={"owner":PROGRAM,"executable":False,
+                 "data":[base64.b64encode(b"snapshot").decode(),"base64"]}
+        response={"value":account,"context":{"slot":11}}
+        verified={"verified":True,"slot":12}
+        with patch("arb.pumpswap_native_source_capture.call",return_value=response),patch(
+            "arb.pumpswap_native_source_capture.decode",return_value=state),patch(
+            "arb.pumpswap_native_source_capture.verify",
+            side_effect=[ValueError("PumpSwap pool owner or state changed"),verified]) as check:
+            slot,pool,authenticated=stable_source_snapshot(
+                "https://readonly.example.com",POOL,[MINT_A,MINT_B])
+        self.assertEqual(slot,11)
+        self.assertEqual(authenticated["slot"],12)
+        self.assertEqual(check.call_count,2)
+
+    def test_persistent_live_pool_state_change_never_admits_source(self):
+        from arb.pumpswap_native_source_capture import stable_source_snapshot
+        import base64
+        from arb.pumpswap_pool import PROGRAM
+        account={"owner":PROGRAM,"executable":False,
+                 "data":[base64.b64encode(b"snapshot").decode(),"base64"]}
+        with patch("arb.pumpswap_native_source_capture.call",
+                   return_value={"value":account,"context":{"slot":11}}),patch(
+            "arb.pumpswap_native_source_capture.decode",
+            return_value={"base_mint":MINT_A,"quote_mint":MINT_B}),patch(
+            "arb.pumpswap_native_source_capture.verify",
+            side_effect=ValueError("PumpSwap pool owner or state changed")) as check:
+            with self.assertRaisesRegex(ValueError,"pool owner or state changed"):
+                stable_source_snapshot("https://readonly.example.com",POOL,[MINT_A,MINT_B])
+        self.assertEqual(check.call_count,4)
+
     def test_rejects_incomplete_proof_of_same_slot_source_accounts(self):
         import base64
         from arb.pumpswap_pool import PROGRAM
