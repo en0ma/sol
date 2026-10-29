@@ -7,6 +7,8 @@ on:
       - "arb/meteora_dbc_swap.py"
       - "tests/test_meteora_dbc_swap.py"
       - "tests/test_meteora_dbc_signed_fork_research.py"
+      - "arb/meteora_dbc_signed_audit.py"
+      - "tests/test_meteora_dbc_signed_audit.py"
       - "arb/meteora_dbc_native_fee.py"
       - "arb/meteora_dbc_native_fee_parity.py"
       - "tests/test_meteora_dbc_native_fee.py"
@@ -30,6 +32,7 @@ jobs:
           python3 -m pip install --disable-pip-version-check solders==0.26.0
           python3 -m unittest discover -s tests -p test_meteora_dbc_swap.py -v
           python3 -m unittest discover -s tests -p test_meteora_dbc_signed_fork_research.py -v
+          python3 -m unittest discover -s tests -p test_meteora_dbc_signed_audit.py -v
           python3 -m unittest discover -s tests -p test_meteora_dbc_native_fee.py -v
           python3 -m py_compile arb/meteora_dbc_signed_fork_research.py
           npm install --no-save --ignore-scripts --prefix "$RUNNER_TEMP/dbc-sdk" @meteora-ag/dynamic-bonding-curve-sdk@2.0.0
@@ -93,6 +96,15 @@ jobs:
             --curve "$RUNNER_TEMP/dbc-signed-diagnostic-native-fee.json" \
             --required 1 \
             --output "$RUNNER_TEMP/dbc-signed-diagnostic-unaccepted.json"
+      - name: Independently reparse Ed25519 intent and raw SPL poststates
+        run: |
+          python3 -m arb.meteora_dbc_signed_audit \
+            --source "$RUNNER_TEMP/dbc-signed-diagnostic-source.json" \
+            --sdk "$RUNNER_TEMP/dbc-signed-diagnostic-sdk.json" \
+            --native "$RUNNER_TEMP/dbc-signed-diagnostic-native-fee.json" \
+            --signed "$RUNNER_TEMP/dbc-signed-diagnostic-unaccepted.json" \
+            --required 1 \
+            --output "$RUNNER_TEMP/dbc-independent-genuine-signed-audit.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -100,5 +112,6 @@ jobs:
           path: |
             ${{ runner.temp }}/dbc-signed-diagnostic-*.json
             ${{ runner.temp }}/dbc-independent-source.json
+            ${{ runner.temp }}/dbc-independent-genuine-signed-audit.json
             ${{ runner.temp }}/dbc-surfpool.log
           if-no-files-found: warn
