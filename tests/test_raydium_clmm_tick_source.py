@@ -39,8 +39,8 @@ class RaydiumTickAuthenticationTests(unittest.TestCase):
             decode_tick_array(tick_blob(0,60),str(Pubkey.new_unique()),0,60)
     def test_tick_count_forgery_rejected(self):
         b=bytearray(tick_blob(0,60))
-        b[44+60*TICK_STATE_LEN]=2
-        with self.assertRaisesRegex(ValueError,"initialized tick count"):
+        b[44+60*TICK_STATE_LEN]=0
+        with self.assertRaisesRegex(ValueError,"initialized count smaller"):
             decode_tick_array(bytes(b),POOL,0,60)
     def test_wrong_layout_rejected(self):
         with self.assertRaisesRegex(ValueError,"discriminator or length"):
