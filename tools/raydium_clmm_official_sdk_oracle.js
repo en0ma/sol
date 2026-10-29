@@ -38,6 +38,7 @@ function quotePool(row,native) {
     const parsed=ray.TickArrayLayout.decode(decode("TickArrayState",entry.account_base64));
     demand(parsed.startTickIndex===entry.start_tick_index,
       "SDK tick array index disagrees with verified source");
+    parsed.address=new PublicKey(entry.address);
     tickArrayCache[entry.start_tick_index]=parsed;
   }
   demand(Object.keys(tickArrayCache).length===source.arrays_present,
@@ -45,33 +46,17 @@ function quotePool(row,native) {
   const info={
     id:new PublicKey(row.pool),
     programId:new PublicKey("CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK"),
-    mintA:{mint:pool.mintA,decimals:pool.mintDecimalsA},
-    mintB:{mint:pool.mintB,decimals:pool.mintDecimalsB},
-    ammConfig:{tradeFeeRate:config.tradeFeeRate,tickSpacing:config.tickSpacing},
-    liquidity:pool.liquidity,
-    sqrtPriceX64:pool.sqrtPriceX64,
-    tickCurrent:pool.tickCurrent,
-    tickSpacing:pool.tickSpacing,
-    tickArrayBitmap:pool.tickArrayBitmap,
-    exBitmapInfo:undefined,
-    feeOn:pool.feeOn
+    mintA:{address:pool.mintA.toBase58()},
+    mintB:{address:pool.mintB.toBase58()},
+    accInfo:pool,
+    ammConfig:config
   };
-  console.log("CLMM_SDK_DEBUG_INPUT",JSON.stringify({
-    sdkPoolId:info.id.toBase58(),programId:info.programId.toBase58(),
-    mintAType:typeof info.mintA.mint.toBase58,
-    mintBType:typeof info.mintB.mint.toBase58,
-    poolMintAType:typeof pool.mintA.toBase58,
-    poolMintBType:typeof pool.mintB.toBase58,
-    tickCacheCount:Object.keys(tickArrayCache).length
-  }));
-  console.log("CLMM_SDK_DEBUG_METHOD",
-    ray.PoolUtils.getOutputAmountAndRemainAccounts.toString().slice(0,4200));
   const out=[];
   for(const nativeQuote of native.quotes) {
     const inputMint=nativeQuote.zero_for_one?pool.mintA:pool.mintB;
     const amount=new BN(String(nativeQuote.amount_in));
     const computed=ray.PoolUtils.getOutputAmountAndRemainAccounts(
-      info,tickArrayCache,inputMint,amount);
+      info,undefined,tickArrayCache,inputMint,amount,0);
     demand(computed.expectedAmountOut&&computed.expectedAmountOut.gt(new BN(0)),
       "official SDK zero output");
     const official=computed.expectedAmountOut.toString();
