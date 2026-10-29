@@ -19,6 +19,7 @@ from arb.meteora_dbc_seventh_venue_source import (
 
 TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
 TOKEN_ACCOUNT_SIZE = 165
+TOKEN_2022 = "TokenzQdBNbLqP5VEhdkAS6EPFTEwJyR9E3weuAF"
 CLOCK = "SysvarC1ock11111111111111111111111111111111"
 SYSVAR_OWNER = "Sysvar1111111111111111111111111111111111111"
 
@@ -44,7 +45,7 @@ def parse_pool(raw):
     fields["pool_type"] = raw[o+72]
     fields["is_migrated"] = raw[o+73]
     fields["migration_progress"] = raw[o+76]
-    if (fields["sqrt_price_q64"] == 0 or fields["pool_type"] != 0
+    if (fields["sqrt_price_q64"] == 0 or fields["pool_type"] not in (0,1)
             or fields["is_migrated"] != 0 or fields["migration_progress"] != 0):
         raise ValueError("DBC unsupported state: pool_type="+str(fields["pool_type"])+
                          ", migrated="+str(fields["is_migrated"])+
@@ -102,10 +103,18 @@ def capture_pool(rpc, original):
     if len(cfg_raw) < 40 or cfg_raw[:8] != hashlib.sha256(b"account:PoolConfig").digest()[:8]:
         raise ValueError("DBC PoolConfig original discriminator/size invalid")
     quote_mint = key(cfg_raw[8:40])
-    mint_raw = decode_account(rows[2], owner=TOKEN_PROGRAM, size=82)
+    base_token_program = TOKEN_2022 if fields["pool_type"] == 1 else TOKEN_PROGRAM
+    mint_raw = decode_account(rows[2], owner=base_token_program)
+    if len(mint_raw) < 82:
+        raise ValueError("DBC base mint original account truncated")
     vaults = []
     for n, row in enumerate(rows[3:5]):
-        raw = decode_account(row, owner=TOKEN_PROGRAM, size=TOKEN_ACCOUNT_SIZE)
+        expected_owner = base_token_program if n == 0 else row.get("owner")
+        if n == 1 and expected_owner not in (TOKEN_PROGRAM, TOKEN_2022):
+            raise ValueError("DBC quote vault unsupported token program")
+        raw = decode_account(row, owner=expected_owner)
+        if len(raw) < TOKEN_ACCOUNT_SIZE:
+            raise ValueError("DBC SPL or Token-2022 vault truncated")
         vaults.append(raw)
     clock_raw = decode_account(rows[5], owner=SYSVAR_OWNER, size=40)
     clock_slot = int.from_bytes(clock_raw[:8], "little")
@@ -121,6 +130,8 @@ def capture_pool(rpc, original):
     if fields["base_mint"] == quote_mint or key(vaults[0][:32]) == key(vaults[1][:32]):
         raise ValueError("DBC both vaults use same mint")
     fields["quote_mint"] = quote_mint
+    fields["base_token_program"] = base_token_program
+    fields["quote_token_program"] = rows[4]["owner"]
     proof = {}
     for addr, raw, account in zip(addresses, [pool_raw, cfg_raw, mint_raw, *vaults, clock_raw], rows):
         proof[addr] = {
@@ -132,6 +143,7 @@ def capture_pool(rpc, original):
             "pool_fields": fields, "accounts": proof,
             "clock_slot": clock_slot, "clock_unix_timestamp": unix_timestamp,
             "config_quote_mint_verified": True, "pricing_eligible": False,
+            "token2022_extensions_not_yet_audited": fields["pool_type"] == 1,
             **SAFE}
 
 
