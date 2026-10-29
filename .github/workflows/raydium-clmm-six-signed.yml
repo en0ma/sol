@@ -41,14 +41,17 @@ jobs:
       - name: Compute all 24 native integer single-tick quote candidates
         run: |
           python3 -m arb.raydium_clmm_native_single_tick \
-            --tick-source "$RUNNER_TEMP/clmm-six-ticks.json" \
+            --tick-source "$RUNNER_TEMP/clmm-six-screened-ticks.json" \
             --output "$RUNNER_TEMP/clmm-six-native.json"
-      - name: Independently prove official SDK quotes and fees against all native outputs
+      - name: Independently select six official-SDK-exact among real source-native candidates
         run: |
-          node tools/raydium_clmm_official_sdk_oracle.js \
+          node tools/raydium_clmm_six_official_sdk_screen.js \
             "$RUNNER_TEMP/clmm-six-ticks.json" \
             "$RUNNER_TEMP/clmm-six-native.json" \
-            "$RUNNER_TEMP/clmm-six-sdk.json"
+            "$RUNNER_TEMP/clmm-six-sdk.json" \
+            "$RUNNER_TEMP/clmm-six-screened-ticks.json" \
+            "$RUNNER_TEMP/clmm-six-screened-native.json" \
+            "$RUNNER_TEMP/clmm-six-screen-rejections.json"
       - name: Install isolated Surfpool
         run: |
           bash ci/install_surfpool.sh
@@ -76,14 +79,14 @@ jobs:
           python3 -m arb.raydium_clmm_sixth_signed_fork \
             --source-rpc "$SOLANA_RPC_URL" \
             --surfpool-rpc http://127.0.0.1:8899 \
-            --tick-source "$RUNNER_TEMP/clmm-six-ticks.json" \
-            --native "$RUNNER_TEMP/clmm-six-native.json" \
+            --tick-source "$RUNNER_TEMP/clmm-six-screened-ticks.json" \
+            --native "$RUNNER_TEMP/clmm-six-screened-native.json" \
             --sdk "$RUNNER_TEMP/clmm-six-sdk.json" \
             --output "$RUNNER_TEMP/clmm-six-signed.json"
       - name: Independently inspect cryptographic signatures and 24 raw SPL post-states
         run: |
           python3 -m arb.raydium_clmm_sixth_signed_audit \
-            --tick-source "$RUNNER_TEMP/clmm-six-ticks.json" \
+            --tick-source "$RUNNER_TEMP/clmm-six-screened-ticks.json" \
             --sdk "$RUNNER_TEMP/clmm-six-sdk.json" \
             --signed "$RUNNER_TEMP/clmm-six-signed.json" \
             --output "$RUNNER_TEMP/clmm-six-independent-audit.json"
@@ -91,7 +94,7 @@ jobs:
         run: |
           python3 -m arb.raydium_clmm_signed_registry_merge \
             --registry arb/pool_registry.json \
-            --tick-source "$RUNNER_TEMP/clmm-six-ticks.json" \
+            --tick-source "$RUNNER_TEMP/clmm-six-screened-ticks.json" \
             --sdk "$RUNNER_TEMP/clmm-six-sdk.json" \
             --signed "$RUNNER_TEMP/clmm-six-signed.json" \
             --output "$RUNNER_TEMP/clmm-seven-pool-registry.json" \
@@ -104,6 +107,9 @@ jobs:
             ${{ runner.temp }}/clmm-six-hints.json
             ${{ runner.temp }}/clmm-six-ticks.json
             ${{ runner.temp }}/clmm-six-native.json
+            ${{ runner.temp }}/clmm-six-screened-ticks.json
+            ${{ runner.temp }}/clmm-six-screened-native.json
+            ${{ runner.temp }}/clmm-six-screen-rejections.json
             ${{ runner.temp }}/clmm-six-sdk.json
             ${{ runner.temp }}/clmm-six-signed.json
             ${{ runner.temp }}/clmm-six-independent-audit.json
