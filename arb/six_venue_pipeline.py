@@ -68,7 +68,8 @@ def authenticated_graph(readiness, *, max_cycles=200):
 
 
 def source_research(rpc, registry, fixture_dir, *, amount_in,
-                    observed_unix, maximum=12, max_cycles=200):
+                    observed_unix, maximum=12, max_cycles=200,
+                    discovery_pairs=None):
     """Read-only source-backed Surfpool: authenticated pools -> ranked fixtures.
 
     This phase MUST complete and stop before a separate --offline Surfpool
@@ -85,6 +86,39 @@ def source_research(rpc, registry, fixture_dir, *, amount_in,
     from arb.m5_distinct_venue_coverage_batch import source_batch
     from arb.m5_source_triangle_quote_ranking import rank
     root=Path(fixture_dir)
+    # Optional venue-owned direct getProgramAccounts search by explicit mint
+    # pair. Every discovered address is reauthenticated by probe; no DEX
+    # HTTP index hint or 'discovered == usable' shortcut is permitted.
+    discovery={"status":"CURATED_REGISTRY_REAUTH_ONLY","verified":0,
+               "rejected":0}
+    if discovery_pairs is not None:
+        from arb.onchain_pool_discovery import discover
+        if (not isinstance(discovery_pairs,list) or
+                not 1<=len(discovery_pairs)<=5 or
+                any(not isinstance(pair,list) or len(pair)!=2 or
+                    any(not isinstance(m,str) or not m for m in pair) or
+                    pair[0]==pair[1] for pair in discovery_pairs)):
+            raise ValueError("bounded explicit discovery mint pairs required")
+        fresh=discover(rpc,discovery_pairs,limit=8,
+                       registry_entries=registry.get("pools",[]),
+                       venues=VENUES)
+        # Never trust returned index metadata as proof. Probe rereads
+        # program-owned pool accounts plus their actual vault balances.
+        known={(p.get("venue"),p.get("address")) for p in registry.get("pools",[])
+               if isinstance(p,dict)}
+        incoming=[]
+        for row in fresh["candidate_graph_pool_identities"]:
+            if row["venue"] not in VENUES:
+                raise ValueError("new candidate venue out of platform scope")
+            key=(row["venue"],row["address"])
+            if key not in known:
+                incoming.append({"venue":row["venue"],"address":row["address"]})
+                known.add(key)
+        registry={**registry,"pools":[*registry.get("pools",[]),*incoming]}
+        discovery={"status":fresh["status"],
+                   "verified":fresh["candidate_graph_verified_count"],
+                   "rejected":len(fresh["errors"]),
+                   "new_identity_hints":len(incoming)}
     batch=tuple((a,b) for a in VENUES for b in VENUES if a!=b)
     readiness=probe(rpc,registry,batch=batch)
     if set(readiness.get("authenticated_pools",{}))!=set(VENUES):
@@ -118,7 +152,8 @@ def source_research(rpc, registry, fixture_dir, *, amount_in,
     root.mkdir(parents=True,exist_ok=True)
     (root/"six-venue-handoff.json").write_text(json.dumps(manifest,indent=2)+"\n")
     return {"status":"SIX_VENUE_SOURCE_AND_QUOTE_RESEARCH",
-            "discovery":{"authenticated_pools":graph["source_pool_count"],
+            "discovery":{"venue_owned_search":discovery,
+                         "authenticated_pools":graph["source_pool_count"],
                          "failed_pool_checks":len(readiness.get("failed_pool_checks",[]))},
             "graph":{"candidate_cycles":graph["candidate_cycles"],
                      "truncated":graph["cycle_inventory_truncated"]},
@@ -192,6 +227,8 @@ def main():
     parser.add_argument("--phase",choices=("source","offline"),required=True)
     parser.add_argument("--rpc",default="http://127.0.0.1:8899")
     parser.add_argument("--registry",default="arb/pool_registry.json")
+    parser.add_argument("--discovery-pairs",
+                        help="Optional JSON list of up to five explicit mint pairs")
     parser.add_argument("--source-dir",required=True)
     parser.add_argument("--signed-dir")
     parser.add_argument("--amount-in",type=int)
@@ -204,7 +241,9 @@ def main():
         report=source_research(args.rpc,
            json.loads(Path(args.registry).read_text()),args.source_dir,
            amount_in=args.amount_in,observed_unix=args.observed_unix,
-           maximum=args.maximum,max_cycles=args.max_cycles)
+           maximum=args.maximum,max_cycles=args.max_cycles,
+           discovery_pairs=(json.loads(Path(args.discovery_pairs).read_text())
+                            if args.discovery_pairs else None))
     else:
         if not args.signed_dir:
             parser.error("--signed-dir required for offline phase")
