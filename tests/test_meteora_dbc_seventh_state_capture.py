@@ -32,7 +32,7 @@ def account(owner,raw):
 
 def context(pool, mutate=False):
     raw=bytearray(pool)
-    if mutate:raw[232]=13
+    if mutate:raw[72:104]=bytes([9])*32
     base_vault=bytearray(165)
     quote_vault=bytearray(165)
     base_vault[:32]=bytes([3])*32
@@ -83,8 +83,22 @@ class DbcStateTests(unittest.TestCase):
         original={"address":pk(8),"account_base64":base64.b64encode(raw).decode(),
           "account_sha256":hashlib.sha256(raw).hexdigest(),"source_slot":100}
         with patch("arb.meteora_dbc_seventh_state_capture.call",return_value=context(raw,True)):
-            with self.assertRaisesRegex(ValueError,"mutated"):
+            with self.assertRaisesRegex(ValueError,"identity changed"):
                 capture_pool("https://readonly.invalid",original)
+
+    def test_same_roles_allow_new_reserves_without_mixing_snapshots(self):
+        raw=raw_pool()
+        original={"address":pk(8),"account_base64":base64.b64encode(raw).decode(),
+            "account_sha256":hashlib.sha256(raw).hexdigest(),"source_slot":100}
+        snapshot=context(raw)
+        newer=bytearray(raw)
+        newer[232:240]=(101).to_bytes(8,"little")
+        snapshot["value"][0]["data"][0]=base64.b64encode(newer).decode()
+        with patch("arb.meteora_dbc_seventh_state_capture.call",return_value=snapshot):
+            result=capture_pool("https://readonly.invalid",original)
+        self.assertEqual(result["pool_fields"]["base_reserve"],101)
+        self.assertEqual(result["accounts"][pk(8)]["sha256"],
+                         hashlib.sha256(newer).hexdigest())
 
     def test_wrong_quote_vault_mint_rejected(self):
         raw=raw_pool()
