@@ -109,9 +109,11 @@ def diagnostic(source_rpc,local_rpc,source,sdk,curve,*,required=1):
             raise ValueError("DBC native curve input not same original config")
         target=row["clock_unix_timestamp"]
         observed=fork_clock(local_rpc)["fork_unix_timestamp"]
-        # Historical authentic snapshots may predate the wall clock.
-        # Move only the isolated paused Surfpool clock, never the mainnet RPC.
-        if observed!=target:
+        # Surfpool can only travel forward, and signed offline replay must
+        # never silently substitute a newer clock for the saved quote point.
+        if observed>target:
+            raise ValueError("DBC paused fork Clock is after source Clock")
+        if observed<target:
             call(local_rpc,"surfnet_timeTravel",[{"absoluteTimestamp":target*1000}])
         if fork_clock(local_rpc)["fork_unix_timestamp"]!=target:
             raise ValueError("DBC fork Clock mismatch")
