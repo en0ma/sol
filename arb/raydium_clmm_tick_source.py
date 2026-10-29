@@ -75,19 +75,34 @@ def capture_tick_arrays(rpc,pool,state,*,radius=4):
     center=array_start(state["tick_current"],state["tick_spacing"])
     starts=[center+i*step for i in range(-radius,radius+1)]
     addresses=[tick_array_pda(pool,start) for start in starts]
+    config=state["amm_config"]
     response=call(rpc,"getMultipleAccounts",[[
-        pool,*addresses],{"encoding":"base64","commitment":"confirmed"}])
+        pool,config,*addresses],{"encoding":"base64","commitment":"confirmed"}])
     slot=response.get("context",{}).get("slot")
     accounts=response.get("value")
     if (type(slot) is not int or slot<0 or not isinstance(accounts,list)
-            or len(accounts)!=len(addresses)+1):
+            or len(accounts)!=len(addresses)+2):
         raise ValueError("CLMM same-slot tick array snapshot incomplete")
     pool_account=accounts[0]
     if (not isinstance(pool_account,dict) or pool_account.get("owner")!=PROGRAM
             or decode_pool(base64.b64decode(pool_account["data"][0],validate=True))!=state):
         raise ValueError("CLMM pool price/fee state changed across tick-array read")
+    config_account=accounts[1]
+    if (not isinstance(config_account,dict) or config_account.get("owner")!=PROGRAM
+            or config_account.get("executable") is not False):
+        raise ValueError("CLMM same-slot trade-fee config owner invalid")
+    config_data=base64.b64decode(config_account["data"][0],validate=True)
+    if (len(config_data)!=117 or
+            config_data[:8]!=hashlib.sha256(b"account:AmmConfig").digest()[:8] or
+            int.from_bytes(config_data[51:53],"little")!=state["tick_spacing"]):
+        raise ValueError("CLMM synchronized AmmConfig layout mismatch")
+    trade_fee=int.from_bytes(config_data[47:51],"little")
+    protocol_fee=int.from_bytes(config_data[43:47],"little")
+    fund_fee=int.from_bytes(config_data[53:57],"little")
+    if not 0<=trade_fee<1_000_000 or protocol_fee+fund_fee>1_000_000:
+        raise ValueError("CLMM source trade fee configuration invalid")
     rows=[]
-    for start,address,account in zip(starts,addresses,accounts[1:]):
+    for start,address,account in zip(starts,addresses,accounts[2:]):
         if account is None:
             rows.append({"address":address,"start_tick_index":start,"present":False})
             continue
@@ -104,6 +119,15 @@ def capture_tick_arrays(rpc,pool,state,*,radius=4):
     if not any(r["present"] for r in rows):
         raise ValueError("CLMM no authenticated initialized tick-array accounts")
     return {"pool":pool,"tick_array_source_slot":slot,
+        "synchronized_pool_state":{"sqrt_price_x64":str(state["sqrt_price_x64"]),
+            "liquidity":str(state["liquidity"]),"tick_current":state["tick_current"],
+            "tick_spacing":state["tick_spacing"],"fee_on":state["fee_on"],
+            "dynamic_fee_info_nonzero":any(base64.b64decode(
+                pool_account["data"][0],validate=True)[1096:1176])},
+        "amm_config_source":{"address":config,"lamports":config_account["lamports"],
+            "owner":PROGRAM,"account_base64":config_account["data"][0],
+            "trade_fee_rate":trade_fee,"protocol_fee_rate":protocol_fee,
+            "fund_fee_rate":fund_fee},
         "tick_array_pool_data_base64":pool_account["data"][0],
         "tick_arrays":rows,"arrays_present":sum(r["present"] for r in rows),
         "native_pricing_verified":False,"signed_parity_verified":False,
