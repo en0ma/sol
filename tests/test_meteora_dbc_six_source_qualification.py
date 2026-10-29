@@ -51,8 +51,8 @@ class SixDbcSources(unittest.TestCase):
         def sdk_screen(row):
             if row["pool"]=="bad":
                 raise ValueError("DBC official SDK bidirectional quote screening failed")
-        with patch("arb.meteora_dbc_seventh_candidate_capture.onchain_discover",return_value=hints), \\
-             patch("arb.meteora_dbc_seventh_candidate_capture.capture",side_effect=identity), \\
+        with patch("arb.meteora_dbc_seventh_candidate_capture.onchain_discover",return_value=hints), \
+             patch("arb.meteora_dbc_seventh_candidate_capture.capture",side_effect=identity), \
              patch("arb.meteora_dbc_seventh_candidate_capture.capture_pool",side_effect=state):
             result=run("https://readonly.invalid",count=1,
                        candidate_validator=sdk_screen)
