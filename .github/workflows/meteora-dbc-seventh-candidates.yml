@@ -10,6 +10,7 @@ on:
       - "tests/test_meteora_dbc_seventh_state_capture.py"
       - "tests/test_meteora_dbc_seventh_discovery.py"
       - "tests/test_meteora_dbc_seventh_recent_tx_discovery.py"
+      - "tools/meteora_dbc_official_sdk_oracle.js"
   workflow_dispatch:
 permissions:
   contents: read
@@ -27,6 +28,7 @@ jobs:
           python3 -m unittest discover -s tests -p test_meteora_dbc_seventh_recent_tx_discovery.py -v
           python3 -m unittest discover -s tests -p test_meteora_dbc_seventh_state_capture.py -v
           python3 -m py_compile arb/meteora_dbc_seventh_discovery.py arb/meteora_dbc_seventh_candidate_capture.py
+          node --check tools/meteora_dbc_official_sdk_oracle.js
   dbc-real-candidate:
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'
     needs: dbc-source-regression
