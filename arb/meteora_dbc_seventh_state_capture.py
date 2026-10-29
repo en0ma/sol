@@ -61,7 +61,8 @@ def decode_account(account, *, owner, size=None, role="source"):
             or account["lamports"] < 0
             or not isinstance(account.get("data"), list)
             or len(account["data"]) != 2 or account["data"][1] != "base64"):
-        raise ValueError("DBC contextual account owner/metadata invalid: "+role)
+        raise ValueError("DBC contextual account owner/metadata invalid: "+role+
+                         " actual_owner="+str(account.get("owner") if isinstance(account,dict) else "missing"))
     raw = base64.b64decode(account["data"][0], validate=True)
     if size is not None and len(raw) != size:
         raise ValueError("DBC contextual account size invalid")
