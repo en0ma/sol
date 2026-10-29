@@ -6,7 +6,7 @@ schedulers, variable fees, Token-2022 and curve crossing. Does not sign.
 """
 import argparse,base64,hashlib,json
 from pathlib import Path
-from arb.meteora_dbc_native_segment import quote_one_segment
+from arb.meteora_dbc_native_curve_walk import walk
 from arb.meteora_dbc_native_fee import price_with_fee
 
 CFG_DISC=hashlib.sha256(b"account:PoolConfig").digest()[:8]
@@ -60,12 +60,13 @@ def parity(source,reference):
             liq=int.from_bytes(config[k+16:k+32],"little")
             if sqrt==0 or liq==0:break
             curve.append((sqrt,liq))
-        if len(curve)!=1:
-            raise ValueError("DBC original native multi-segment pricing requires separate acceptance")
-        upper,liquidity=curve[0]
+        if not curve:
+            raise ValueError("DBC original curve liquidity missing")
+        upper=curve[-1][0]
         start=int.from_bytes(config[392:408],"little")
         price=int(fields["sqrt_price_q64"])
-        if not 0<start<price<upper:
+        migration_price=int.from_bytes(config[280:296],"little")
+        if not 0<start<price<upper or not migration_price>=price:
             raise ValueError("DBC native source price outside original authenticated segment")
         sdk_trials=quoted["trials"]
         if len(sdk_trials)!=4:raise ValueError("DBC four distinct SDK quotes required")
@@ -77,10 +78,10 @@ def parity(source,reference):
             seen.add(key)
             base=direction=="base_to_quote"
             def curve_quote(excluded):
-                return quote_one_segment(
-                    sqrt_price=price,liquidity=liquidity,
-                    input_amount=excluded,base_for_quote=base,
-                    target_price=start if base else upper)
+                return walk(sqrt_price=price,curve=curve,
+                    amount_in=excluded,base_for_quote=base,
+                    sqrt_start_price=start,
+                    migration_sqrt_price=migration_price)
             native=price_with_fee(config,direction=direction,amount_in=amount,
                     price_curve_fn=curve_quote,current_point=current,
                     activation_point=activation)
@@ -107,7 +108,7 @@ def parity(source,reference):
                  "trials":results,"signed_swap_verified":False})
     return {"status":"INDEPENDENT_DBC_ORIGINAL_NATIVE_FEE_CURVE_SDK_PARITY",
       "verified_pools":len(qualified),"verified_trials":len(qualified)*4,
-      "pools":qualified,"supported_scope":"original SPL, single curve segment, static base fee scheduler, no transfer fee",
+      "pools":qualified,"supported_scope":"original SPL, native bounded curve walk, static base fee scheduler, no transfer fee",
       "signed_parity_verified":False,"registry_admission_approved":False,
       "actionable":False,"broadcast":False}
 
