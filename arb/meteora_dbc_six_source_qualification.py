@@ -9,7 +9,7 @@ from arb.meteora_dbc_seventh_candidate_capture import run
 from arb.meteora_dbc_seventh_source_audit import independently_audit
 
 
-def qualify(rpc, *, count=6, hint_limit=12, pages=4):
+def qualify(rpc, *, count=6, hint_limit=24, pages=4):
     if type(count) is not int or count!=6:
         raise ValueError("DBC seventh venue six distinct source pools required")
     captured=run(rpc,count=count,hint_limit=hint_limit,pages=pages,strict=False)
@@ -33,7 +33,7 @@ def main():
     p.add_argument("--output",required=True)
     p.add_argument("--pages",type=int,default=6)
     a=p.parse_args()
-    captured=run(a.rpc,count=6,hint_limit=12,pages=a.pages,strict=False)
+    captured=run(a.rpc,count=6,hint_limit=24,pages=a.pages,strict=False)
     count=len(captured["source_pools"])
     audit=(independently_audit(captured) if count else
            {"authenticated_source_pools":0,"pools":[],
