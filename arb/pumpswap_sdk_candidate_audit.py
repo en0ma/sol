@@ -31,6 +31,12 @@ def audit(source, sdk):
             raise ValueError("SDK receipt for unauthenticated source")
         if receipt.get("signed_parity_verified") is not False or receipt.get("actionable") is not False:
             raise ValueError("SDK receipt improperly promoted to signed proof")
+        if (receipt.get("source_slot")!=source_row.get("verified_snapshot_slot")
+                or type(receipt.get("source_slot")) is not int):
+            raise ValueError("SDK receipt source snapshot slot disagreement")
+        digest=source_row.get("authenticated_source_sha256")
+        if not isinstance(digest,str) or len(digest)!=64:
+            raise ValueError("authenticated source snapshot digest missing")
         source_trials=source_row.get("native_quote_candidates")
         if not isinstance(source_trials,list) or len(source_trials)!=4:
             raise ValueError("authenticated source must contain four quote candidates")
