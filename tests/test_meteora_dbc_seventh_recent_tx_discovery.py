@@ -12,7 +12,7 @@ def key(n):
     return str(Pubkey.from_bytes(bytes([n])*32))
 
 
-def rpc(method,params):
+def rpc(_endpoint,method,params):
     if method=="getSignaturesForAddress":
         return [{"signature":"fake-transaction-hint","err":None}]
     if method=="getTransaction":
@@ -38,8 +38,8 @@ class DbcRecentTransactionTests(unittest.TestCase):
         self.assertEqual(result["signed_verified_pools"],0)
 
     def test_invalid_context_rejected(self):
-        def corrupted(method,params):
-            r=rpc(method,params)
+        def corrupted(endpoint,method,params):
+            r=rpc(endpoint,method,params)
             if method=="getMultipleAccounts":del r["context"]
             return r
         with patch("arb.meteora_dbc_seventh_recent_tx_discovery.call",side_effect=corrupted):
