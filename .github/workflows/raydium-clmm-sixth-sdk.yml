@@ -1,0 +1,64 @@
+name: Sixth Venue Raydium CLMM Official SDK Price-Parity Research
+on:
+  pull_request:
+    paths:
+      - "tools/raydium_clmm_official_sdk_oracle.js"
+      - "arb/raydium_clmm_native_single_tick.py"
+      - "arb/raydium_clmm_tick_source.py"
+      - ".github/workflows/raydium-clmm-sixth-sdk.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: sixth-clmm-sdk-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  clmm-official-sdk-vs-native:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SOLANA_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
+      SOLANA_RPC_MIN_INTERVAL_SECONDS: "0.5"
+      SOLANA_RPC_ALCHEMY_FREE_TIER: "1"
+      SOLANA_RPC_PACING_FILE: /tmp/clmm-sixth-sdk-rpc
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require read-only mainnet source
+        run: test -n "$SOLANA_RPC_URL"
+      - name: Install decoder and pinned official SDK
+        run: |
+          python3 -m pip install --disable-pip-version-check solders==0.26.0
+          npm install --no-save --package-lock=false @raydium-io/raydium-sdk-v2@0.2.75-alpha
+      - name: Authenticate pool vaults and AMM configuration
+        run: |
+          python3 -m arb.raydium_clmm_sixth_venue_source \
+            --rpc "$SOLANA_RPC_URL" --registry arb/pool_registry.json \
+            --count 1 --output "$RUNNER_TEMP/clmm-source.json"
+      - name: Capture synchronized liquidity ticks and config
+        run: |
+          python3 -m arb.raydium_clmm_sixth_tick_capture \
+            --source "$RUNNER_TEMP/clmm-source.json" \
+            --rpc "$SOLANA_RPC_URL" --radius 4 \
+            --output "$RUNNER_TEMP/clmm-ticks.json"
+      - name: Independently quote Q64 integer single tick math
+        run: |
+          python3 -m arb.raydium_clmm_native_single_tick \
+            --tick-source "$RUNNER_TEMP/clmm-ticks.json" \
+            --output "$RUNNER_TEMP/clmm-native.json"
+      - name: Independently compare official Raydium SDK on the exact authenticated state
+        run: |
+          node tools/raydium_clmm_official_sdk_oracle.js \
+            "$RUNNER_TEMP/clmm-ticks.json" \
+            "$RUNNER_TEMP/clmm-native.json" \
+            "$RUNNER_TEMP/clmm-official-sdk.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sixth-clmm-sdk-native-research
+          path: |
+            ${{ runner.temp }}/clmm-source.json
+            ${{ runner.temp }}/clmm-ticks.json
+            ${{ runner.temp }}/clmm-native.json
+            ${{ runner.temp }}/clmm-official-sdk.json
+          if-no-files-found: warn
