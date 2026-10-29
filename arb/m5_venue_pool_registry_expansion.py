@@ -184,7 +184,7 @@ def promote_signed(registry,candidates,orca_receipt,meteora_receipt,*,raydium_ca
     # receipts are never admissible. Existing three-venue API is unchanged.
     if (pumpswap_candidates is None)!=(pumpswap_receipt is None):
         raise ValueError("PumpSwap source and independent signed audit required together")
-    if type(pumpswap_required) is not int or not 1<=pumpswap_required<=3:
+    if type(pumpswap_required) is not int or not 1<=pumpswap_required<=7:
         raise ValueError("invalid PumpSwap signed pool admission threshold")
     pump_source={}
     if pumpswap_candidates is not None:
