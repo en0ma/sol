@@ -121,6 +121,36 @@ def audit(source,sdk,native,signed,*,required=1):
                 amounts.append(spl["amount_base_units"])
             if amounts!=[0,output]:
                 raise ValueError("DBC independent SPL debit/output differs from signed SDK/native")
+            # Reconstruct both vault deltas independently from authenticated
+            # original SPL bytes and simulated raw SPL vault poststates.
+            vault_raw=t.get("post_vault_account_data_base64")
+            if not isinstance(vault_raw,list) or len(vault_raw)!=2:
+                raise ValueError("DBC two raw signed vault poststates required")
+            before_vault=[];after_vault=[]
+            for index,role in enumerate(("base_vault","quote_vault")):
+                vault_address=fields[role]
+                source_account=source_row["accounts"][vault_address]
+                if source_account["owner"]!=TOKEN_PROGRAM:
+                    raise ValueError("DBC original vault token program mismatch")
+                saved=base64.b64decode(source_account["account_base64"],validate=True)
+                if hashlib.sha256(saved).hexdigest()!=source_account["sha256"]:
+                    raise ValueError("DBC original vault digest changed")
+                current=base64.b64decode(vault_raw[index],validate=True)
+                if len(saved)!=165 or len(current)!=165:
+                    raise ValueError("DBC original/signed vault SPL lengths invalid")
+                previous=decode_token_account(saved)
+                latest=decode_token_account(current)
+                mint=fields["base_mint" if index==0 else "quote_mint"]
+                if (previous["mint"]!=mint or latest["mint"]!=mint or
+                        previous["authority"]!=AUTHORITY or latest["authority"]!=AUTHORITY):
+                    raise ValueError("DBC signed vault source mint or authority mismatch")
+                before_vault.append(previous["amount_base_units"])
+                after_vault.append(latest["amount_base_units"])
+            input_index=0 if direction=="base_to_quote" else 1
+            output_index=1-input_index
+            if (after_vault[input_index]-before_vault[input_index]!=amount or
+                    before_vault[output_index]-after_vault[output_index]!=output):
+                raise ValueError("DBC independent vault input credit/output debit mismatch")
             logs=t.get("simulation_logs")
             if (not isinstance(logs,list) or
                 not any("Program "+PROGRAM+" invoke" in x for x in logs) or
