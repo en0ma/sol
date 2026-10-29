@@ -13,6 +13,7 @@ on:
       - "tests/test_meteora_dbc_seventh_discovery.py"
       - "tests/test_meteora_dbc_seventh_recent_tx_discovery.py"
       - "tools/meteora_dbc_official_sdk_oracle.js"
+      - "arb/meteora_dbc_native_curve_audit.py"
   workflow_dispatch:
 permissions:
   contents: read
@@ -71,6 +72,12 @@ jobs:
           node tools/meteora_dbc_official_sdk_oracle.js \
             "$RUNNER_TEMP/dbc-original-contextual-candidates.json" \
             "$RUNNER_TEMP/dbc-original-official-sdk-quotes.json"
+      - name: Independently reconcile original Q64 curve against pinned SDK
+        run: |
+          python3 -m arb.meteora_dbc_native_curve_audit \
+            --source "$RUNNER_TEMP/dbc-original-contextual-candidates.json" \
+            --sdk "$RUNNER_TEMP/dbc-original-official-sdk-quotes.json" \
+            --output "$RUNNER_TEMP/dbc-native-curve-only-audit.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -79,4 +86,5 @@ jobs:
             ${{ runner.temp }}/dbc-original-contextual-candidates.json
             ${{ runner.temp }}/dbc-original-official-sdk-quotes.json
             ${{ runner.temp }}/dbc-independent-original-source-audit.json
+            ${{ runner.temp }}/dbc-native-curve-only-audit.json
           if-no-files-found: warn
