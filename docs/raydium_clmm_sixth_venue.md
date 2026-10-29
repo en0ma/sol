@@ -52,3 +52,29 @@ SPL-output audit.
 Do not mistake the existing swap-v2 instruction builder or a green
 source workflow for signed pricing parity, multi-venue atomic execution,
 or any authorization to broadcast.
+
+## Genuine tick-array liquidity snapshot achieved
+
+The next step beyond the pool/vault snapshot is now implemented as
+`arb/raydium_clmm_tick_source.py` and
+`arb/raydium_clmm_sixth_tick_capture.py`. It derives the official
+`tick_array` PDAs from the tracked pool and signed big-endian start
+indices, captures bounded neighborhoods around the active tick in a
+single `getMultipleAccounts` read, authenticates ownership, original
+packed account bytes, discriminator, parent pool, start index and
+initialized LP liquidity. The source preserves non-LP initialized
+ticks separately rather than silently treating limit-order
+liquidity as ordinary active LP reserves. A bounded retry tolerates
+pool-price movement only when the authenticated pool+tick snapshot
+is internally synchronized. The initial source and subsequent tick
+snapshot retain **separate** slots and hashes: two RPC reads never
+become a falsely claimed same-slot snapshot.
+
+The completed source-plus-tick workflow is:
+https://github.com/en0ma/sol/actions/runs/40857628564
+
+This is an actual authenticated tick-array source milestone; it
+is **not** the official Raydium SDK pricing comparison or signed execution
+acceptance. The latter still requires correct CLMM dynamic fee, limit
+order matching, tick-array bitmap traversal and four fresh signed
+swap_v2 executions with independent SPL and SDK reconciliation.
