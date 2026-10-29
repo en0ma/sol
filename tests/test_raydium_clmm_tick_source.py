@@ -40,8 +40,20 @@ class RaydiumTickAuthenticationTests(unittest.TestCase):
     def test_tick_count_forgery_rejected(self):
         b=bytearray(tick_blob(0,60))
         b[44+60*TICK_STATE_LEN]=0
-        with self.assertRaisesRegex(ValueError,"initialized count smaller"):
+        with self.assertRaisesRegex(ValueError,"LP and limit-order union"):
             decode_tick_array(bytes(b),POOL,0,60)
+    def test_limit_order_only_initialized_tick_is_authenticated(self):
+        b=bytearray(tick_blob(0,60))
+        off=44+7*TICK_STATE_LEN
+        b[off:off+4]=(420).to_bytes(4,"little",signed=True)
+        b[off+124:off+132]=(500).to_bytes(8,"little")
+        b[44+60*TICK_STATE_LEN]=2
+        decoded=decode_tick_array(bytes(b),POOL,0,60)
+        self.assertEqual(decoded["initialized_tick_count"],2)
+        self.assertEqual(decoded["initialized_lp_tick_count"],1)
+        self.assertEqual(decoded["additional_initialized_non_lp_ticks"],1)
+        self.assertEqual(decoded["limit_order_ticks"][0]["orders_amount"],"500")
+
     def test_wrong_layout_rejected(self):
         with self.assertRaisesRegex(ValueError,"discriminator or length"):
             decode_tick_array(b"garbage",POOL,0,60)
