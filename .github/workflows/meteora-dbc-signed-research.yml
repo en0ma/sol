@@ -24,6 +24,9 @@ on:
           - "1"
           - "6"
         default: "1"
+concurrency:
+  group: dbc-signed-offline-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
