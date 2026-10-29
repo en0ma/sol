@@ -28,8 +28,6 @@ def run(rpc, *, count=1, hint_limit=24, pages=4, strict=True, candidate_validato
         print(json.dumps({"stage":"dbc_program_transactions",
             "error_type":type(exc).__name__}))
         hinted={"hints":[]}
-    if not hinted["hints"]:
-        raise ValueError("DBC no candidate identities from original transactions or public index")
     accepted=[]
     rejected=[]
     for entry in hinted["hints"]:
