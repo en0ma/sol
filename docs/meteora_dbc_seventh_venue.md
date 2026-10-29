@@ -135,3 +135,38 @@ snapshot, complete config/fee/curve decoding, official SDK vs
 independent native integer quotes in four directions/size trials,
 genuine signed isolated Surfpool swaps, cryptographic/SPL audit and
 existing registry provenance admission.
+
+## 29 October 2026: first genuine original pool + SDK source milestone
+
+GitHub Actions [run 40900194890](https://github.com/en0ma/sol/actions/runs/40900194890)
+completed successfully in both independent source regression and live original-source
+candidate jobs. The full evidence ZIP is
+[artifact 12907694995](https://github.com/en0ma/sol/actions/runs/40900194890/artifacts/12907694995).
+
+The live job discovered candidate accounts through bounded recent transactions
+of the **original DBC program**, checked exact on-chain ownership and original
+VirtualPool discriminators, then captured one synchronized original pool,
+config, base mint, two token vaults and Clock. A separately implemented
+post-hoc auditor independently re-parsed raw source bytes, account owners,
+SHA-256, vault mint/authority roles and Clock, returning
+`INDEPENDENT_DBC_ORIGINAL_SOURCE_ONLY_NOT_SIGNED` with
+`authenticated_source_pools=1`.
+
+The pinned official `@meteora-ag/dynamic-bonding-curve-sdk@2.0.0` then
+decoded the **same stored bytes** and returned four nonzero adaptive
+exact-in quote candidates (two directions, two source-derived amounts).
+The job reported `sdk_quoted_pools=1`. This is **official SDK output
+only**. Native integer formula equivalence has not yet been proven.
+
+**Do not mark DBC as a signed accepted seventh venue**. There have been
+**zero** genuine DBC Ed25519-signed isolated Surfpool swaps and **zero**
+independent DBC raw post-SPL signed swap audits or signed registry
+promotions. The original source capture/audit, SDK-only candidates and
+green source workflow are legitimate progress but do not substitute for
+those three missing acceptance gates. Token-2022 transfer fee/hook
+semantics and dynamic fee/curve segment traversal also remain to be
+implemented or fail closed. No mainnet transaction was broadcast.
+
+The canonical source-code boundary remains one shared coordinator,
+one shared registry, no separate discovery authority and no fake
+signed receipts.
