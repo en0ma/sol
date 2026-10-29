@@ -4,7 +4,7 @@ Orca and Meteora discovery provide UNTRUSTED addresses. The existing
 on-chain registry validator uses each venue's own decoder and vault checks.
 No source address becomes a registered pool without successful authentication.
 """
-import argparse,json
+import argparse,hashlib,json
 from pathlib import Path
 from arb.pool_registry_batches import refresh_batched
 SAFE={"actionable":False,"broadcast":False,"live_execution_approved":False}
@@ -156,7 +156,7 @@ def expand(rpc,registry,*,count=6,pages=4,venues=("orca","meteora_damm_v2"),coun
         "registered_additional_pools":0,
         "native_pricing_signed_verified":False,**SAFE}
 
-def promote_signed(registry,candidates,orca_receipt,meteora_receipt,*,raydium_candidates=None,raydium_receipt=None,required=6):
+def promote_signed(registry,candidates,orca_receipt,meteora_receipt,*,raydium_candidates=None,raydium_receipt=None,required=6,pumpswap_candidates=None,pumpswap_receipt=None,pumpswap_required=1):
     """Fail-closed discovery -> authenticated identity -> signed parity -> registry.
 
     A summary boolean or exact counter is never sufficient: each trial must
@@ -179,8 +179,42 @@ def promote_signed(registry,candidates,orca_receipt,meteora_receipt,*,raydium_ca
             ("raydium_cpmm",raydium_receipt,"RAYDIUM_CPMM_SIGNED_VERIFIED",
              "RAYDIUM_CPMM_SIGNED_NATIVE_EXACT",("0_to_1","1_to_0"),
              ("signed_output","native_output")))
+    # Fourth venue accepts only authenticated source snapshots AND the separate
+    # cryptographically independent signed-receipt audit. Indicative SDK-only
+    # receipts are never admissible. Existing three-venue API is unchanged.
+    if (pumpswap_candidates is None)!=(pumpswap_receipt is None):
+        raise ValueError("PumpSwap source and independent signed audit required together")
+    if type(pumpswap_required) is not int or not 1<=pumpswap_required<=3:
+        raise ValueError("invalid PumpSwap signed pool admission threshold")
+    pump_source={}
+    if pumpswap_candidates is not None:
+        if (not isinstance(pumpswap_candidates,dict)
+                or pumpswap_candidates.get("venue")!="pumpswap"
+                or not isinstance(pumpswap_candidates.get("pools"),list)):
+            raise ValueError("PumpSwap authenticated source snapshot required")
+        rows=[]
+        for row in pumpswap_candidates["pools"]:
+            if not isinstance(row,dict) or row.get("status")!="AUTHENTICATED_SOURCE_ONLY":
+                raise ValueError("PumpSwap unverified source candidate")
+            address=row.get("address")
+            if not isinstance(address,str) or address in pump_source:
+                raise ValueError("duplicate or malformed PumpSwap source candidate")
+            digest=row.get("authenticated_source_sha256")
+            slot=row.get("verified_snapshot_slot")
+            if (not isinstance(digest,str) or len(digest)!=64 or
+                    any(ch not in "0123456789abcdef" for ch in digest) or
+                    type(slot) is not int or slot<0):
+                raise ValueError("PumpSwap authenticated source identity evidence incomplete")
+            mints=row.get("mints")
+            if not isinstance(mints,list) or len(mints)!=2 or len(set(mints))!=2:
+                raise ValueError("PumpSwap source mint identity invalid")
+            pump_source[address]=row
+            rows.append({"venue":"pumpswap","address":address,"mints":mints})
+        pump_candidate_bundle={"pools":rows}
+    else:
+        pump_candidate_bundle={"pools":[]}
     authenticated={}
-    for bundle in (candidates,raydium_candidates or {"pools":[]}):
+    for bundle in (candidates,raydium_candidates or {"pools":[]},pump_candidate_bundle):
         if not isinstance(bundle,dict) or not isinstance(bundle.get("pools"),list):
             raise ValueError("authenticated candidate manifest missing")
         for entry in bundle["pools"]:
@@ -255,19 +289,72 @@ def promote_signed(registry,candidates,orca_receipt,meteora_receipt,*,raydium_ca
         if len(approved)<required:
             raise ValueError(venue+" fewer than required distinct fully signed pools")
         verified[venue]=approved
+    pump_provenance={}
+    if pumpswap_receipt is not None:
+        receipt=pumpswap_receipt
+        if (not isinstance(receipt,dict) or
+                receipt.get("venue")!="pumpswap" or
+                receipt.get("status")!="INDEPENDENT_SIGNED_NATIVE_SDK_SPL_PARITY" or
+                receipt.get("signed_parity_verified") is not True or
+                receipt.get("independent_signed_audit_verified") is not True or
+                any(receipt.get(k) is not False for k in
+                    ("actionable","broadcast","registry_admission_approved"))):
+            raise ValueError("PumpSwap independent signed audit missing or failed")
+        pool_rows=receipt.get("pools")
+        if (not isinstance(pool_rows,list) or
+                receipt.get("verified_pools")!=len(pool_rows) or
+                len(pool_rows)<pumpswap_required):
+            raise ValueError("PumpSwap fewer than required independently signed pools")
+        for row in pool_rows:
+            if not isinstance(row,dict) or row.get("four_genuine_signed_trials_audited") is not True:
+                raise ValueError("PumpSwap four signed swap audit not verified")
+            address=row.get("pool")
+            if not isinstance(address,str) or address not in pump_source or address in pump_provenance:
+                raise ValueError("PumpSwap signed pool absent or duplicate in authenticated source")
+            source=pump_source[address]
+            if (row.get("source_slot")!=source["verified_snapshot_slot"] or
+                    row.get("source_digest")!=source["authenticated_source_sha256"]):
+                raise ValueError("PumpSwap signed source snapshot provenance disagrees")
+            txs=row.get("signed_transaction_hashes")
+            if (not isinstance(txs,list) or len(txs)!=4 or len(set(txs))!=4 or
+                    any(not isinstance(v,str) or len(v)!=64 or
+                        any(c not in "0123456789abcdef" for c in v) for v in txs)):
+                raise ValueError("PumpSwap unique four signed transaction hashes missing")
+            canonical=json.dumps(row,sort_keys=True,separators=(",",":"))
+            pump_provenance[address]={
+                "status":"INDEPENDENT_SIGNED_NATIVE_SDK_SPL_PARITY",
+                "source_slot":row["source_slot"],
+                "source_digest":row["source_digest"],
+                "signed_transaction_hashes":txs,
+                "independent_receipt_sha256":hashlib.sha256(canonical.encode()).hexdigest()}
+        verified["pumpswap"]=set(pump_provenance)
     fresh=[]
     for (venue,address),row in authenticated.items():
         if address in verified.get(venue,set()):
             old=existing.get((venue,address))
             if old is None:
-                fresh.append({"venue":venue,"address":address,"mints":row["mints"]})
+                item={"venue":venue,"address":address,"mints":row["mints"]}
+                if venue=="pumpswap":
+                    item["signed_provenance"]=pump_provenance[address]
+                fresh.append(item)
             elif "mints" in old and sorted(old["mints"])!=sorted(row["mints"]):
                 raise ValueError(venue+" tracked mint identity disagrees with authenticated state")
     for venue,approved in verified.items():
+        threshold=pumpswap_required if venue=="pumpswap" else required
         if len({p["address"] for p in fresh if p["venue"]==venue}|
-               {address for v,address in existing if v==venue and address in approved})<required:
+               {address for v,address in existing if v==venue and address in approved})<threshold:
             raise ValueError(venue+" incomplete authenticated registry admission")
-    return {**registry,"pools":[*registry["pools"],*fresh]}
+    updated=[]
+    for old in registry["pools"]:
+        if old["venue"]!="pumpswap" or old["address"] not in pump_provenance:
+            updated.append(old)
+            continue
+        evidence=pump_provenance[old["address"]]
+        previous=old.get("signed_provenance")
+        if previous is not None and previous!=evidence:
+            raise ValueError("PumpSwap conflicting durable signed provenance")
+        updated.append({**old,"signed_provenance":evidence})
+    return {**registry,"pools":[*updated,*fresh]}
 
 
 def main():
