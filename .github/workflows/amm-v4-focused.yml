@@ -26,6 +26,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_pumpswap_sdk_candidate_audit.py -v
       - name: Enforce PumpSwap signed four-trial localhost provenance safety
         run: python3 -m unittest discover -s tests -p test_pumpswap_signed_parity.py -v
+      - name: PumpSwap signed V2 instruction intent binding safety
+        run: python3 -m unittest discover -s tests -p test_pumpswap_signed_instruction_binding.py -v
       - name: Fast safety regression batch 1 (16 existing checks)
         run: |
           set -e
