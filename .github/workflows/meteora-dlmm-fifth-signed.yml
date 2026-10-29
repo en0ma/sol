@@ -1,0 +1,103 @@
+name: Fifth Venue Meteora DLMM Genuine Signed Surfpool
+
+on:
+  pull_request:
+    paths:
+      - "arb/meteora_dlmm_fifth_signed_fork.py"
+      - "arb/meteora_dlmm_native_candidate_audit.py"
+      - ".github/workflows/meteora-dlmm-fifth-signed.yml"
+  workflow_dispatch:
+    inputs:
+      pool_count:
+        description: "Registered authenticated DLMM pools with four signed swaps each (1-3)"
+        required: false
+        default: "3"
+
+concurrency:
+  group: dlmm-fifth-signed-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  real-signed-dlmm:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    env:
+      SOURCE_RPC: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
+      POOL_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.pool_count || '1' }}
+      SOLANA_RPC_MIN_INTERVAL_SECONDS: "0.5"
+      SOLANA_RPC_ALCHEMY_FREE_TIER: "1"
+      SOLANA_RPC_PACING_FILE: /tmp/dlmm-fifth-signed-rpc
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require upstream read-only source RPC
+        run: test -n "$SOURCE_RPC"
+      - name: Install signed transaction and independent quote dependencies
+        run: |
+          python3 -m pip install --disable-pip-version-check solders==0.26.0 meteora-dlmm==0.5.0
+          npm install --no-save --package-lock=false @meteora-ag/dlmm@1.9.14
+      - name: Authenticate actual DLMM pool, bin liquidity, oracle and Clock
+        run: |
+          set -euo pipefail
+          [[ "$POOL_COUNT" =~ ^[1-3]$ ]] || exit 1
+          python3 -m arb.meteora_dlmm_fifth_venue_source \
+            --rpc "$SOURCE_RPC" --registry arb/pool_registry.json \
+            --count "$POOL_COUNT" \
+            --output "$RUNNER_TEMP/dlmm-source.json"
+      - name: Quote real pool in official Meteora SDK
+        run: |
+          node tools/meteora_dlmm_sdk_source_oracle.js \
+            "$RUNNER_TEMP/dlmm-source.json" \
+            "$RUNNER_TEMP/dlmm-sdk.json" "$SOURCE_RPC"
+      - name: Independently certify pure integer bin-walk parity
+        run: |
+          python3 -m arb.meteora_dlmm_native_candidate_audit \
+            --source "$RUNNER_TEMP/dlmm-source.json" \
+            --sdk "$RUNNER_TEMP/dlmm-sdk.json" \
+            --output "$RUNNER_TEMP/dlmm-native-sdk.json"
+      - name: Install Surfpool isolated fork
+        run: |
+          set -euo pipefail
+          bash ci/install_surfpool.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - name: Launch fully isolated offline Surfpool
+        run: |
+          set -euo pipefail
+          nohup surfpool start --ci --offline --no-deploy > "$RUNNER_TEMP/dlmm-surfpool.log" 2>&1 < /dev/null &
+          python3 - <<'PY'
+          import json,time,urllib.request
+          for _ in range(90):
+              try:
+                  req=urllib.request.Request("http://127.0.0.1:8899",data=json.dumps({
+                      "jsonrpc":"2.0","id":1,"method":"getHealth","params":[]}).encode(),
+                      headers={"Content-Type":"application/json"})
+                  with urllib.request.urlopen(req,timeout=2) as r:
+                      if json.load(r).get("result")=="ok":break
+              except (OSError,ValueError):pass
+              time.sleep(1)
+          else:raise SystemExit("DLMM isolated Surfpool failed to launch")
+          PY
+      - name: Execute genuine signed DLMM swaps against original program ELF
+        run: |
+          python3 -m arb.meteora_dlmm_fifth_signed_fork \
+            --source-rpc "$SOURCE_RPC" \
+            --surfpool-rpc http://127.0.0.1:8899 \
+            --source "$RUNNER_TEMP/dlmm-source.json" \
+            --sdk "$RUNNER_TEMP/dlmm-sdk.json" \
+            --pool-count "$POOL_COUNT" \
+            --output "$RUNNER_TEMP/dlmm-signed-proof.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dlmm-fifth-genuine-signed-evidence
+          path: |
+            ${{ runner.temp }}/dlmm-source.json
+            ${{ runner.temp }}/dlmm-sdk.json
+            ${{ runner.temp }}/dlmm-native-sdk.json
+            ${{ runner.temp }}/dlmm-signed-proof.json
+            ${{ runner.temp }}/dlmm-surfpool.log
+          if-no-files-found: warn
