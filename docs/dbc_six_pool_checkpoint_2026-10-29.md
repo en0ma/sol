@@ -157,3 +157,49 @@ To inspect current runs:
 
 CI now cancels superseded runs for these three DBC workflows to
 reduce unnecessary queued work. No newer success is assumed.
+
+## Verified later checkpoint: distinct historical signed executions
+
+The earlier 0/24 statement above is obsolete as a *historical user-SPL
+signed-evidence count*. Six separate, successful CI runs have now independently
+audited one unique original DBC pool and four genuine Ed25519-signed offline
+Surfpool swaps per run. These are **six distinct pool identities**, not one
+six-pool synchronized execution:
+
+| Original source pool | Signed CI run | Vault poststates in receipt |
+| --- | --- | --- |
+| `7aBcKp4oB3A4NHqRtDBUciv7X8NB7QJN3xemEdhMmfWY` | [40934682876](https://github.com/en0ma/sol/actions/runs/40934682876) | No |
+| `SWYietXaV2dHysWiRxG9peLPCAmLj3awLdRfn2RMY6y` | [40951035859](https://github.com/en0ma/sol/actions/runs/40951035859) | No |
+| `6ygQ1h9yUFnwNuKdx6KC717y2s3UbDFWAAsfaA4NQ71h` | [40954739110](https://github.com/en0ma/sol/actions/runs/40954739110) | No |
+| `E4k5UbS5gidrL4hb1NJDLrjXKKzFRFDNYkACrn89mDZA` | [40957392652](https://github.com/en0ma/sol/actions/runs/40957392652) | No |
+| `PjKcoXKDPCwjqA8T6sMRwasVNkz6pKNh5hxfs3yKM7U` | [40958792518](https://github.com/en0ma/sol/actions/runs/40958792518) | No |
+| `Hx4wZyYwPLyVyVkui8JBDt8rWPhNXfzo3j9h3Kh6s6Cw` | [40962606945](https://github.com/en0ma/sol/actions/runs/40962606945) | **Yes, independently audited** |
+
+Each run's downloadable `dbc-signed-offline-research-unaccepted`
+artifact contains original source proof, official SDK and native parity,
+signed transaction wire, independent signed audit, and conservative
+non-broadcast flags. All six independent signed reports state
+`signed_trials_verified: 4`; combined there are **24 historical
+user-SPL signed trials across six distinct pools**.
+
+**Do not interpret this as six-pool full vault-backed acceptance.**
+The newer signed runner now includes the original base and quote vault
+poststates returned by the genuine signature-verified simulation.
+`arb/meteora_dbc_signed_audit.py` independently verifies source-vault
+digests, SPL mint/authority, and exact input credit/output debit.
+Only the last run captured those additional vault poststates; older
+receipts cannot be retrospectively upgraded.
+
+The current independent vault-accounting milestone is **1 of 6 pools,
+4 of 24 trials**, while historical signed SPL verification is
+**6 of 6 pools, 24 of 24 trials**. DBC registry admission under the
+stronger Orca-equivalent standard remains **0 of 6**.
+
+The original six-pool SDK/native regression is independently verified
+at **6 sources / 24 quotes**, using immutable authentic October 29
+snapshots. Pull-request CI intentionally reaudits the historical bytes,
+since DBC launchpad curves migrate or drain rapidly. A manual live
+research run must still reauthenticate current source accounts.
+Surfpool `surfnet_timeTravel` cannot rewind to archived source times;
+therefore archived unsigned snapshots cannot be replayed as historical
+signed results without a separate, time-consistent fork runtime.
