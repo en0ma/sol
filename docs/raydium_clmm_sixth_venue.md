@@ -78,3 +78,52 @@ is **not** the official Raydium SDK pricing comparison or signed execution
 acceptance. The latter still requires correct CLMM dynamic fee, limit
 order matching, tick-array bitmap traversal and four fresh signed
 swap_v2 executions with independent SPL and SDK reconciliation.
+
+## Sixth-venue genuine four-swap acceptance achieved
+
+The first real CLMM fourth-trial execution and separate signed audit both
+passed on the tracked RAY/USDC pool:
+
+https://github.com/en0ma/sol/actions/runs/40862666749
+
+This uses **two directions × two raw input sizes (10,000 and 100,000)**
+at one authenticated same-slot PoolState/AmmConfig/vault/observation/mint/
+tick-array snapshot. The independent Python Q64.64 single-tick integer
+engine is compared to the official pinned
+`@raydium-io/raydium-sdk-v2@0.2.75-alpha` output on exact same bytes.
+The original Raydium CLMM upgradeable program ELF is hydrated to an
+isolated offline Surfpool. Four distinct ephemeral Ed25519-signed real
+`swap_v2` instructions invoke the genuine program; sig-verifying
+Surfpool simulation returns exact SPL token account debit/credit and
+success logs. The independent receipt verifier re-parses the signed
+wire bytes, program/role/tick-array/amount/min-output, Ed25519
+signatures, raw SPL poststate and reference quote identities.
+
+**Four signed results in raw token base units:**
+
+| Exact-input direction | Input | Exact SDK/native/observed output |
+| --- | ---: | ---: |
+| RAY → USDC | 10,000 | 16,535 |
+| RAY → USDC | 100,000 | 165,354 |
+| USDC → RAY | 10,000 | 6,017 |
+| USDC → RAY | 100,000 | 60,174 |
+
+Original signed-audit source slot: `462857973`.
+Authenticated tick snapshot SHA-256:
+`b8ccfd7880d5ab895ad8778f01c713407d5cc2137a714e420ee03910388a8f03`.
+The independent audit status is
+`INDEPENDENT_CLMM_SIGNED_NATIVE_SDK_SPL_PARITY` for one pool.
+The existing signed pool registry contains the full original
+four transaction hashes and independent receipt digest.
+
+The scope is **deliberately restricted to single-tick swaps** with
+source-confirmed zero dynamic fee and fee collection on input.
+The integer engine rejects all tick-crossing candidates,
+output-side fee variants and dynamic-fee pools. This is not proof
+of arbitrary Raydium CLMM swaps or limit-order paths, and it
+does not authorize live broadcasting. The official SDK returns a
+tick-account path including prefetch accounts; authenticated source
+membership is required for each.
+
+Signed acceptance and source/SDK/native/SPL output artifact:
+https://github.com/en0ma/sol/actions/runs/40862666749/artifacts/12892407092
