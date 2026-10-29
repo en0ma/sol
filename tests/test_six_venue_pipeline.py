@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from arb.six_venue_pipeline import VENUES,authenticated_graph,source_research,offline_research
+from arb.six_venue_pipeline import VENUES,authenticated_graph,source_research,offline_research,assess_signed_batch
 
 
 def readiness():
@@ -54,7 +54,10 @@ class SixVenuePipelineTests(unittest.TestCase):
                 "ranked":[{"index":0,"positive_gross":True,"actionable":False},
                           {"index":1,"positive_gross":False,"actionable":False}]}
         signed={"attempted":1,"independent_signed_accepted":1,
-                "observed_venue_quote_exact_matches":3}
+                "observed_venue_quote_exact_matches":3,
+                "routes":[{"index":7,"independent_signed_accepted":True,
+                           "economics_status":"COST_EVIDENCE_BLOCKED",
+                           "actionable":False,"broadcast":False}]}
         with tempfile.TemporaryDirectory() as temp:
             src=Path(temp)/"source"
             dst=Path(temp)/"signed"
@@ -82,6 +85,8 @@ class SixVenuePipelineTests(unittest.TestCase):
                 report=offline_research("http://127.0.0.1:8899",src,dst)
             self.assertEqual(offline.call_args.kwargs["route_indices"],[7])
             self.assertEqual(report["independent_signed_accepted"],1)
+            self.assertEqual(report["route_decisions"]["signed_accepted"],1)
+            self.assertEqual(report["route_decisions"]["net_profitable_candidates"],0)
             self.assertFalse(report["actionable"])
             self.assertFalse(report["broadcast"])
             (src/"six-venue-ranking.json").write_text('{"tampered":true}')
@@ -100,6 +105,18 @@ class SixVenuePipelineTests(unittest.TestCase):
             with patch.dict(os.environ,{"SURFPOOL_EXPLICITLY_OFFLINE":"1"}):
                 with self.assertRaisesRegex(ValueError,"digest"):
                     offline_research("http://127.0.0.1:8899",src,dst)
+
+    def test_signed_ledger_rejects_missing_or_false_acceptance(self):
+        row={"index":3,"independent_signed_accepted":True,
+             "actionable":False,"broadcast":False}
+        batch={"attempted":1,"independent_signed_accepted":1,"routes":[row]}
+        self.assertEqual(assess_signed_batch(batch,[3])["signed_accepted"],1)
+        with self.assertRaisesRegex(ValueError,"inconsistent"):
+            assess_signed_batch(batch,[4])
+        with self.assertRaisesRegex(ValueError,"inconsistent"):
+            assess_signed_batch({**batch,"independent_signed_accepted":0},[3])
+        with self.assertRaisesRegex(ValueError,"inconsistent"):
+            assess_signed_batch({**batch,"routes":[{**row,"actionable":True}]},[3])
 
     def test_new_onchain_discovery_hints_must_reauthenticate(self):
         with tempfile.TemporaryDirectory() as temp:
