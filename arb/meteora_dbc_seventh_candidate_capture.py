@@ -20,7 +20,7 @@ def run(rpc, *, count=1, hint_limit=12):
         raise ValueError("DBC bounded hint limit required")
     source = "original_dbc_program_recent_transactions"
     try:
-        hinted=onchain_discover(rpc,count=hint_limit,max_signatures=64)
+        hinted=onchain_discover(rpc,count=hint_limit,max_signatures=32)
         print(json.dumps({"stage":"dbc_program_transactions",
             "hinted":len(hinted["hints"]),
             "transactions":hinted["program_transactions_checked"]}))
