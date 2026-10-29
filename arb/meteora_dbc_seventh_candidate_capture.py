@@ -7,7 +7,8 @@ program ELF, source hash, PoolConfig, vault or migration checks.
 import argparse
 import json
 from pathlib import Path
-from arb.meteora_dbc_seventh_discovery import discover
+from arb.meteora_dbc_seventh_discovery import discover as public_discover
+from arb.meteora_dbc_seventh_recent_tx_discovery import discover as onchain_discover
 from arb.meteora_dbc_seventh_venue_source import capture
 from arb.meteora_dbc_seventh_state_capture import capture_pool
 
@@ -17,9 +18,17 @@ def run(rpc, *, count=1, hint_limit=6):
         raise ValueError("DBC accepted source count must be 1-6")
     if type(hint_limit) is not int or not count <= hint_limit <= 6:
         raise ValueError("DBC bounded hint limit required")
-    hinted=discover(count=hint_limit)
+    source = "original_dbc_program_recent_transactions"
+    try:
+        hinted=onchain_discover(rpc,count=hint_limit,max_signatures=16)
+    except (OSError, RuntimeError, ValueError, KeyError, TypeError):
+        hinted={"hints":[]}
     if not hinted["hints"]:
-        raise ValueError("DBC no untrusted public hints")
+        # Still untrusted and independently authenticated in the next stages.
+        source="dexpaprika_untrusted_fallback"
+        hinted=public_discover(count=hint_limit)
+    if not hinted["hints"]:
+        raise ValueError("DBC no candidate identities from original transactions or public index")
     accepted=[]
     rejected=[]
     for entry in hinted["hints"]:
@@ -43,6 +52,7 @@ def run(rpc, *, count=1, hint_limit=6):
     return {"venue":"meteora_dbc",
        "status":"DBC_ORIGINAL_CONTEXTUAL_SOURCE_PARTIAL_NOT_SIGNED",
        "source_pools":accepted,"authenticated":len(accepted),
+       "discovery_source":source,
        "rejected_candidate_count":len(rejected),
        "rejected_candidates":rejected,
        "source_eligible_not_pricing_verified":len(accepted),
