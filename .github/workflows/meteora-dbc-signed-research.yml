@@ -6,6 +6,7 @@ on:
       - "arb/meteora_dbc_signed_fork_research.py"
       - "arb/meteora_dbc_swap.py"
       - "tests/test_meteora_dbc_swap.py"
+      - "tests/test_meteora_dbc_signed_fork_research.py"
   workflow_dispatch:
 permissions:
   contents: read
@@ -25,6 +26,7 @@ jobs:
       - run: |
           python3 -m pip install --disable-pip-version-check solders==0.26.0
           python3 -m unittest discover -s tests -p test_meteora_dbc_swap.py -v
+          python3 -m unittest discover -s tests -p test_meteora_dbc_signed_fork_research.py -v
           python3 -m py_compile arb/meteora_dbc_signed_fork_research.py
           npm install --no-save --ignore-scripts --prefix "$RUNNER_TEMP/dbc-sdk" @meteora-ag/dynamic-bonding-curve-sdk@2.0.0
       - name: Install isolated Surfpool
