@@ -103,9 +103,8 @@ def capture_pool(rpc, original):
     unix_timestamp = int.from_bytes(clock_raw[32:40], "little", signed=True)
     if clock_slot > response["context"]["slot"] or unix_timestamp <= 0:
         raise ValueError("DBC Clock snapshot inconsistent")
-    # Source authentication of the mint and token accounts is necessary,
-    # but the config's quote mint has not yet been decoded. Do not declare
-    # this sufficient for trade acceptance.
+    # Source-bound vault mint/authority checks are necessary but not
+    # sufficient for complete fee/curve math or signed swap acceptance.
     if key(vaults[0][:32]) != fields["base_mint"] or key(vaults[1][:32]) != quote_mint:
         raise ValueError("DBC base/quote vault mint mismatch")
     if any(key(v[32:64]) != POOL_AUTHORITY for v in vaults):
