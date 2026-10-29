@@ -7,8 +7,6 @@
  * No RPC, signing or broadcasting occurs in this process.
  */
 const fs = require("fs");
-const crypto = require("crypto");
-const {PublicKey} = require("@solana/web3.js");
 const BN = require("bn.js");
 const {
   PUMP_AMM_SDK, buyQuoteInput, sellBaseInput
@@ -27,12 +25,6 @@ function compare(snapshot) {
   check(Array.isArray(accounts) && accounts.length === 6, "source account bundle missing");
   check(Number.isSafeInteger(snapshot.verified_snapshot_slot) && snapshot.verified_snapshot_slot >= 0,
     "invalid source slot");
-  const digest=crypto.createHash("sha256").update(JSON.stringify({
-    // JSON canonicalization is verified separately in Python. Check bytes and
-    // account identities below rather than reserialize across languages.
-    slot:snapshot.verified_snapshot_slot
-  })).digest("hex");
-  void digest;
   const [p,baseVault,quoteVault,globalAccount,feesAccount,mintAccount] = accounts;
   check(p.address === snapshot.address, "pool address mismatch");
   const pool=PUMP_AMM_SDK.decodePool({data:raw(p)});
