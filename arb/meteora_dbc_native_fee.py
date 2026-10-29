@@ -46,8 +46,13 @@ def fee_numerator(config_raw, *, current_point,activation_point):
     # Implements bounded Q64 fixed-point exponent; numberOfPeriods <= u16.
     # Checked max to avoid pathological CI work and unsupported fee timelines.
     if period>64:raise ValueError("DBC long exponential scheduler unsupported")
-    for _ in range(period):
-        value=value*factor//Q64
+    remaining=period
+    base=factor
+    while remaining:
+        if remaining & 1:
+            value=value*base//Q64
+        base=base*base//Q64
+        remaining >>= 1
     return min(MAX_NUMERATOR,cliff*value//Q64)
 
 
