@@ -102,15 +102,28 @@ def capture(rpc, registry, *, limit=3, require_quote_candidates=False):
             from arb.pumpswap_native_candidate import quote_exact_input
             candidates=[]
             for mint_in in (state["base_mint"],state["quote_mint"]):
-                for size in (10_000,100_000):
+                amounts=(10_000,100_000) if not require_quote_candidates else (
+                    10_000,100_000,1_000_000,10_000_000,100_000_000,
+                    1_000_000_000,10_000_000_000,100_000_000_000,
+                    1_000_000_000_000)
+                eligible=[]
+                blocked=[]
+                for size in amounts:
                     try:
-                        candidate=quote_exact_input(verified,mint_in,size)
-                        candidates.append(candidate)
+                        eligible.append(quote_exact_input(verified,mint_in,size))
+                        if len(eligible)==2:
+                            break
                     except (ValueError,KeyError,TypeError) as exc:
-                        candidates.append({"mint_in":mint_in,"amount_in":size,
-                                           "status":"NATIVE_CANDIDATE_BLOCKED",
-                                           "reason":str(exc)[:160],
-                                           "actionable":False,"signed_parity_verified":False})
+                        blocked.append({"mint_in":mint_in,"amount_in":size,
+                                        "status":"NATIVE_CANDIDATE_BLOCKED",
+                                        "reason":str(exc)[:160],
+                                        "actionable":False,"signed_parity_verified":False})
+                candidates.extend(eligible if len(eligible)==2 else
+                                  [*eligible,*blocked[:2]])
+            if require_quote_candidates and (len(candidates)!=4 or any(
+                    c.get("status")!="UNVERIFIED_NATIVE_FORMULA_CANDIDATE"
+                    for c in candidates)):
+                raise ValueError("PumpSwap pool lacks two non-dust executable-size native quotes per direction")
             if require_quote_candidates and any(
                     c.get("status")!="UNVERIFIED_NATIVE_FORMULA_CANDIDATE"
                     for c in candidates):
