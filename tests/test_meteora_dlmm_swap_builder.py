@@ -39,6 +39,20 @@ class DlmmSwapBuilderTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"active neighborhood"):
             build_swap(POOL,s,k(),k(),k(),k(),[bin_array_pda(POOL,11)],1000,1,input_is_x=True)
 
+
+    def test_directional_bin_array_traversal_starts_at_active(self):
+        s=state()
+        bins=[bin_array_pda(POOL,i) for i in (9,10,11)]
+        ix=build_swap(POOL,s,k(),k(),k(),k(),bins,1000,1,input_is_x=True)
+        self.assertEqual([str(meta.pubkey) for meta in ix.accounts[15:]],
+                         [bins[1],bins[0],bins[2]])
+        reverse=dict(s,input_mint=s["token_y_mint"],
+                     output_mint=s["token_x_mint"])
+        ix=build_swap(POOL,reverse,k(),k(),k(),k(),bins,1000,1,
+                      input_is_x=False)
+        self.assertEqual([str(meta.pubkey) for meta in ix.accounts[15:]],
+                         [bins[1],bins[2],bins[0]])
+
     def test_reject_zero_slippage_floor_and_nonclassic(self):
         s=state()
         with self.assertRaisesRegex(ValueError,"nonzero"):
