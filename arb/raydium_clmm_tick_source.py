@@ -35,26 +35,36 @@ def decode_tick_array(raw,pool,start,spacing):
         raise ValueError("CLMM tick-array pool or index disagrees with PDA")
     if array_start(start,spacing)!=start:
         raise ValueError("CLMM tick-array index misaligned")
-    found=[]
+    lp_ticks=[]
+    order_ticks=[]
     for i in range(60):
         off=44+i*TICK_STATE_LEN
         tick=int.from_bytes(raw[off:off+4],"little",signed=True)
         net=int.from_bytes(raw[off+4:off+20],"little",signed=True)
         gross=int.from_bytes(raw[off+20:off+36],"little")
+        order_phase=int.from_bytes(raw[off+116:off+124],"little")
+        orders_amount=int.from_bytes(raw[off+124:off+132],"little")
+        part_filled=int.from_bytes(raw[off+132:off+140],"little")
+        initialized=bool(gross or orders_amount or part_filled)
+        if initialized and tick!=start+i*spacing:
+            raise ValueError("CLMM initialized tick position invalid")
         if gross:
-            if tick!=start+i*spacing:
-                raise ValueError("CLMM initialized tick position invalid")
-            found.append({"tick":tick,"liquidity_net":str(net),"liquidity_gross":str(gross)})
-    initialized=raw[44+60*TICK_STATE_LEN]
-    # A tick with an initialized limit order may have zero LP gross.
-    # Do not invent the missing liquidity: explicitly expose the gap and
-    # forbid treating the array as native pricing-verified.
-    if not len(found)<=initialized<=60:
-        raise ValueError("CLMM initialized count smaller than LP ticks or beyond array capacity")
+            lp_ticks.append({"tick":tick,"liquidity_net":str(net),
+                             "liquidity_gross":str(gross)})
+        if orders_amount or part_filled:
+            order_ticks.append({"tick":tick,"order_phase":str(order_phase),
+                "orders_amount":str(orders_amount),
+                "part_filled_orders_remaining":str(part_filled),
+                "unfilled_ratio_x64":str(int.from_bytes(raw[off+140:off+156],"little"))})
+    initialized_count=raw[44+60*TICK_STATE_LEN]
+    combined={r["tick"] for r in lp_ticks}|{r["tick"] for r in order_ticks}
+    if initialized_count!=len(combined):
+        raise ValueError("CLMM initialized count differs from LP and limit-order union")
     return {"pool":pool,"start_tick_index":start,
-            "initialized_tick_count":initialized,"initialized_lp_tick_count":len(found),
-            "additional_initialized_non_lp_ticks":initialized-len(found),
-            "initialized_ticks":found}
+            "initialized_tick_count":initialized_count,
+            "initialized_lp_tick_count":len(lp_ticks),
+            "additional_initialized_non_lp_ticks":len(combined)-len(lp_ticks),
+            "initialized_ticks":lp_ticks,"limit_order_ticks":order_ticks}
 
 def capture_tick_arrays(rpc,pool,state,*,radius=4):
     if type(radius) is not int or not 1<=radius<=8:
