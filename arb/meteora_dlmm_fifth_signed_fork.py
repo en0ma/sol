@@ -17,6 +17,7 @@ from arb.meteora_dlmm import PROGRAM,decode
 from arb.meteora_dlmm_swap import build_swap
 from arb.meteora_dlmm_native_candidate_audit import calculate as native_audit
 from arb.meteora_dlmm_fifth_venue_source import CLOCK,SYSVAR
+from arb.orca_fork_clock import fork_clock
 from arb.pumpswap_local_simulation import local_rpc_only
 from arb.next_ten_pair_fixture_export import program_data_accounts
 from arb.m5_meteora_damm_v2_dedicated_signed_fork import hydrate,_balances
@@ -80,6 +81,23 @@ def execute(source_rpc,local_rpc,source,sdk,*,pool_count=1):
         native=native_index[address]
         if row["source_sha256"]!=native["source_sha256"]:
             raise ValueError("DLMM source digest changed after native audit")
+        # The official SDK and independent integer engine price the exact
+        # historical, authenticated mainnet Clock. The offline emulator must
+        # execute at that SAME timestamp, not its current wall time. Workflow
+        # launches+pauses Surfpool BEFORE source capture to enable forward-only
+        # Surfpool time travel to each captured source timestamp.
+        target=row.get("fork_clock_unix_timestamp")
+        if type(target) is not int or target<=0:
+            raise ValueError("DLMM synchronized source Clock missing")
+        current=fork_clock(local_rpc)["fork_unix_timestamp"]
+        if current>target:
+            raise ValueError("DLMM source Clock precedes fork Clock: fork must be started and paused BEFORE source capture")
+        if current<target:
+            call(local_rpc,"surfnet_timeTravel",[{
+                "absoluteTimestamp":target*1000}])
+        observed=fork_clock(local_rpc)
+        if observed["fork_unix_timestamp"]!=target:
+            raise ValueError("DLMM local signed fork Clock does not equal authenticated quote Clock")
         account_set=[r for r in row["source_accounts"] if r["address"]!=CLOCK]
         # The core Clock sysvar belongs to the isolated emulator; all DLMM
         # program-owned state is restored from authenticated source accounts.
@@ -126,7 +144,9 @@ def execute(source_rpc,local_rpc,source,sdk,*,pool_count=1):
                                  str(simulated["err"])[:240])
             received=_balances(simulated,(mint_in,mint_out),str(signer.pubkey()))
             if received!=[0,expected]:
-                raise ValueError("signed DLMM SPL debits/credits differ from SDK/native")
+                raise ValueError("signed DLMM SPL debits/credits differ from SDK/native: "
+                                 +address+" "+direction+" "+str(amount)
+                                 +" observed="+str(received)+" expected=[0,"+str(expected)+"]")
             logs=simulated.get("logs")
             if (not isinstance(logs,list) or
                     not any("Program "+PROGRAM+" invoke" in line for line in logs) or
