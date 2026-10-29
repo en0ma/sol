@@ -7,6 +7,8 @@ on:
       - "arb/meteora_dbc_seventh_recent_tx_discovery.py"
       - "arb/meteora_dbc_seventh_candidate_capture.py"
       - "tests/test_meteora_dbc_six_source_qualification.py"
+      - "arb/meteora_dbc_native_segment.py"
+      - "tests/test_meteora_dbc_native_segment.py"
   workflow_dispatch:
 permissions:
   contents: read
@@ -21,6 +23,7 @@ jobs:
         run: |
           python3 -m unittest discover -s tests -p 'test_meteora_dbc_six_source_qualification.py' -v
           python3 -m unittest discover -s tests -p 'test_meteora_dbc_seventh_recent_tx_discovery.py' -v
+          python3 -m unittest discover -s tests -p 'test_meteora_dbc_native_segment.py' -v
           python3 -m py_compile arb/meteora_dbc_six_source_qualification.py
   six-original-source:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' }}
