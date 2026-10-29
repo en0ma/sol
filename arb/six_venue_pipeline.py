@@ -160,8 +160,17 @@ def source_research(rpc, registry, fixture_dir, *, amount_in,
             digests[row["fixture"]]=hashlib.sha256(raw).hexdigest()
     ranking=rank(fixtures,amount_in=amount_in,observed_unix=observed_unix,
                  maximum=maximum)
-    selected=[indices[row["index"]] for row in ranking["ranked"]
+    positive=[indices[row["index"]] for row in ranking["ranked"]
               if row.get("positive_gross") is True]
+    # A gross-loss route can still provide valuable signed CI diagnostics.
+    # Only when there are NO positive-gross candidates, sign one source-
+    # quotable route as an explicitly non-opportunity diagnostic sample.
+    diagnostic=([indices[ranking["ranked"][0]["index"]]]
+                if not positive and ranking["ranked"] else [])
+    selected=positive if positive else diagnostic
+    selection_mode=("POSITIVE_GROSS_RESEARCH" if positive else
+                    "NONPROFITABLE_DIAGNOSTIC_ONLY" if diagnostic else
+                    "NO_QUOTABLE_ROUTE")
     summary_raw=(root/"summary.json").read_bytes()
     ranking_raw=json.dumps(ranking,sort_keys=True,separators=(",",":")).encode()
     (root/"six-venue-ranking.json").write_bytes(ranking_raw)
@@ -171,6 +180,9 @@ def source_research(rpc, registry, fixture_dir, *, amount_in,
               "source_summary_sha256":hashlib.sha256(summary_raw).hexdigest(),
               "source_ranking_sha256":hashlib.sha256(ranking_raw).hexdigest(),
               "selected_source_route_indices":selected,
+              "positive_gross_indices":positive,
+              "diagnostic_only_indices":diagnostic,
+              "selection_mode":selection_mode,
               "selection_is_gross_only":True,
               "cost_conversion_verified":False,**SAFE}
     root.mkdir(parents=True,exist_ok=True)
@@ -278,7 +290,16 @@ def offline_research(rpc, fixture_dir, signed_dir):
                  if r.get("positive_gross") is True]
     except (TypeError,IndexError,KeyError) as exc:
         raise ValueError("signed source quote ranking index invalid") from exc
-    if derived!=indices:
+    diagnostic=([original[ranking["ranked"][0]["index"]]["index"]]
+                if not derived and ranking["ranked"] else [])
+    expected=derived if derived else diagnostic
+    if (expected!=indices or
+            manifest.get("positive_gross_indices")!=derived or
+            manifest.get("diagnostic_only_indices")!=diagnostic or
+            manifest.get("selection_mode")!=(
+                "POSITIVE_GROSS_RESEARCH" if derived else
+                "NONPROFITABLE_DIAGNOSTIC_ONLY" if diagnostic else
+                "NO_QUOTABLE_ROUTE")):
         raise ValueError("signed selection differs from frozen native quote ranking")
     selected_rows=[r for r in listing["routes"] if r.get("index") in indices]
     if len(selected_rows)!=len(indices):
@@ -297,7 +318,9 @@ def offline_research(rpc, fixture_dir, signed_dir):
                          route_indices=indices)
     decisions=assess_signed_batch(signed,indices)
     return {"status":"SIX_VENUE_SIGNED_OFFLINE_RESEARCH",
-            "selected_positive_gross_routes":len(indices),
+            "selected_positive_gross_routes":len(manifest["positive_gross_indices"]),
+            "diagnostic_only_signed_routes":len(manifest["diagnostic_only_indices"]),
+            "selection_mode":manifest["selection_mode"],
             "route_decisions":decisions,
             "signed_attempted":signed["attempted"],
             "independent_signed_accepted":signed["independent_signed_accepted"],
