@@ -35,6 +35,8 @@ def audit(source, sdk):
                 or type(receipt.get("source_slot")) is not int):
             raise ValueError("SDK receipt source snapshot slot disagreement")
         digest=source_row.get("authenticated_source_sha256")
+        if receipt.get("source_digest")!=digest:
+            raise ValueError("SDK receipt source digest disagreement")
         if not isinstance(digest,str) or len(digest)!=64:
             raise ValueError("authenticated source snapshot digest missing")
         source_trials=source_row.get("native_quote_candidates")
