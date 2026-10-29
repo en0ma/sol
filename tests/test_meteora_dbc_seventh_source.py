@@ -4,13 +4,13 @@ import unittest
 from unittest.mock import patch
 from solders.pubkey import Pubkey
 from arb.meteora_dbc_seventh_venue_source import (
-    PROGRAM, DISC, authenticated_pool_hints,
+    PROGRAM, DISC, VIRTUAL_POOL_ACCOUNT_SIZE, authenticated_pool_hints,
 )
 
 ADDRESS = str(Pubkey.from_bytes(bytes([7]) * 32))
 
 
-def reply(owner=PROGRAM, raw=DISC+b"test-payload", slot=123):
+def reply(owner=PROGRAM, raw=DISC+bytes(VIRTUAL_POOL_ACCOUNT_SIZE-8), slot=123):
     return {"context": {"slot": slot}, "value": [{
         "owner": owner, "executable": False, "lamports": 1,
         "data": [base64.b64encode(raw).decode(), "base64"]
@@ -35,6 +35,12 @@ class DbCExplicitSourceTests(unittest.TestCase):
         with patch("arb.meteora_dbc_seventh_venue_source.call",
                    return_value=reply(raw=b"12345678bad")):
             with self.assertRaisesRegex(ValueError, "discriminator"):
+                authenticated_pool_hints("https://readonly.example", [ADDRESS])
+
+    def test_short_discriminator_only_account_rejected(self):
+        with patch("arb.meteora_dbc_seventh_venue_source.call",
+                   return_value=reply(raw=DISC)):
+            with self.assertRaisesRegex(ValueError, "size"):
                 authenticated_pool_hints("https://readonly.example", [ADDRESS])
 
     def test_context_missing_fails_closed(self):
