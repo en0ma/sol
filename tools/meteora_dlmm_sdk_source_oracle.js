@@ -24,6 +24,48 @@ function hash(records,slot) {
 function flatAccount(row,address) {
   return row.source_accounts.find(a=>a.address===address && typeof a.account_base64==="string");
 }
+/** Pin every captured account to the exact authenticated same-slot snapshot.
+ * Active DLMM pools change multiple times per second. Asking the official SDK
+ * to reread live pool bytes would compare different states, not independent
+ * implementations of the SAME state. All pool/bin/Clock bytes returned here
+ * remain identical to the authenticated RPC capture and SHA-256 digest.
+ */
+function snapshotConnection(remote,row) {
+  const snapshot=new Map();
+  for(const account of row.source_accounts) {
+    if(account.present===false) continue;
+    const raw=Buffer.from(account.account_base64,"base64");
+    check(raw.toString("base64")===account.account_base64,
+      "noncanonical authenticated DLMM snapshot account");
+    snapshot.set(account.address,{
+      data:raw,owner:new PublicKey(account.owner),
+      executable:false,lamports:account.lamports,rentEpoch:0
+    });
+  }
+  check(snapshot.has(row.address),"authenticated DLMM pool account missing");
+  const conn=new Connection(remote.rpcEndpoint,{commitment:"confirmed"});
+  const originalGetInfo=conn.getAccountInfo.bind(conn);
+  const originalGetInfoContext=conn.getAccountInfoAndContext.bind(conn);
+  const originalMulti=conn.getMultipleAccountsInfo.bind(conn);
+  conn.getAccountInfo=async(key,...args)=>{
+    const cached=snapshot.get(key.toBase58());
+    return cached || originalGetInfo(key,...args);
+  };
+  conn.getAccountInfoAndContext=async(key,...args)=>{
+    const cached=snapshot.get(key.toBase58());
+    return cached ? {context:{slot:row.source_slot},value:cached} :
+      originalGetInfoContext(key,...args);
+  };
+  conn.getMultipleAccountsInfo=async(keys,...args)=>{
+    // SDK calls this with ordered bin-array paths. Any off-snapshot arrays
+    // must fail below rather than produce mixed-state parity evidence.
+    const cached=keys.map(key=>snapshot.get(key.toBase58()));
+    if(cached.every(Boolean)) return cached;
+    const remoteRows=await originalMulti(keys,...args);
+    return keys.map((key,i)=>cached[i] || remoteRows[i]);
+  };
+  return conn;
+}
 async function checkPool(conn,row,publicKey) {
   const now=await conn.getAccountInfo(publicKey,"confirmed");
   const original=flatAccount(row,row.address);
@@ -41,16 +83,20 @@ async function probe(conn,row) {
   check(hash(row.source_accounts,row.source_slot)===row.source_sha256,
     "DLMM source snapshot SHA-256 integrity mismatch");
   const address=new PublicKey(row.address);
-  await checkPool(conn,row,address);
-  const pair=await DLMM.create(conn,address,{cluster:"mainnet-beta"});
-  await checkPool(conn,row,address);
+  const pinned=snapshotConnection(conn,row);
+  await checkPool(pinned,row,address);
+  const pair=await DLMM.create(pinned,address,{cluster:"mainnet-beta"});
+  await checkPool(pinned,row,address);
   const trials=[];
   for(const swapForY of [true,false]) {
     // Small and larger base-unit amounts, exact-in and nonpartial. These are
     // research source quotes; signability must be proved later on Surfpool.
-    const arrays=await pair.getBinArrayForSwap(swapForY,8);
+    const arrays=await pair.getBinArrayForSwap(swapForY,3);
     check(Array.isArray(arrays)&&arrays.length>0,
       "official SDK did not identify bin array path");
+    const pinnedBins=new Set(row.bin_arrays.filter(b=>b.authenticated).map(b=>b.pda));
+    check(arrays.every(a=>pinnedBins.has(a.publicKey.toBase58())),
+      "SDK requested a bin array outside authenticated source snapshot");
     for(const amount of [10000,100000]) {
       const quoted=await pair.swapQuote(
         new BN(amount),swapForY,new BN(0),arrays,false);
