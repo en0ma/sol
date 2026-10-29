@@ -97,8 +97,12 @@ def evaluate(tick_source,*,amounts=(10000,100000)):
         if not isinstance(state,dict) or not isinstance(config,dict):
             raise ValueError("CLMM same-slot state and fee config missing")
         quotes=[];blocked=[]
+        samples=captured.get("selected_amounts")
         for zero_for_one in (True,False):
-            for amount in amounts:
+            chosen=samples.get("zero_for_one" if zero_for_one else "one_for_zero") if isinstance(samples,dict) else amounts
+            if not isinstance(chosen,(list,tuple)) or len(chosen)!=2 or len(set(chosen))!=2:
+                raise ValueError("CLMM authenticated directional sample size pair missing")
+            for amount in chosen:
                 try:
                     quotes.append(quote_one_tick(state,config,amount,
                                                zero_for_one=zero_for_one))
