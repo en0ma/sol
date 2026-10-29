@@ -52,7 +52,7 @@ def stable_source_snapshot(rpc,address,expected_mints,*,attempts=4):
 
 
 
-def capture(rpc, registry, *, limit=3):
+def capture(rpc, registry, *, limit=3, require_quote_candidates=False):
     if type(limit) is not int or not 1 <= limit <= 10:
         raise ValueError("invalid bounded PumpSwap research sample")
     if not isinstance(registry, dict) or not isinstance(registry.get("pools"), list):
@@ -67,11 +67,12 @@ def capture(rpc, registry, *, limit=3):
             continue
         seen.add(address)
         addresses.append((address, item.get("mints")))
-        if len(addresses) == limit:
+        if len(addresses) == limit and not require_quote_candidates:
             break
     if len(addresses) < limit:
         raise ValueError("insufficient registered PumpSwap identity hints")
     results = []
+    rejected = []
     for address, expected_mints in addresses:
         try:
             slot,state,verified=stable_source_snapshot(rpc,address,expected_mints)
@@ -110,6 +111,12 @@ def capture(rpc, registry, *, limit=3):
                                            "status":"NATIVE_CANDIDATE_BLOCKED",
                                            "reason":str(exc)[:160],
                                            "actionable":False,"signed_parity_verified":False})
+            if require_quote_candidates and any(
+                    c.get("status")!="UNVERIFIED_NATIVE_FORMULA_CANDIDATE"
+                    for c in candidates):
+                raise ValueError("PumpSwap signed quote candidate unsupported: "+
+                                 "; ".join(c.get("reason","blocked") for c in candidates
+                                           if c.get("status")!="UNVERIFIED_NATIVE_FORMULA_CANDIDATE")[:160])
             results.append({"address": address, "status": "AUTHENTICATED_SOURCE_ONLY",
                             "pool_account_slot": slot,
                             "verified_snapshot_slot": verified_slot,
@@ -122,12 +129,17 @@ def capture(rpc, registry, *, limit=3):
                             "effective_fee_verified": False,
                             "signed_parity_verified": False})
         except (ValueError, KeyError, TypeError, RuntimeError, OSError) as exc:
-            results.append({"address": address, "status": "SOURCE_REJECTED",
-                            "reason": str(exc)[:200]})
+            rejected.append({"address": address, "status": "SOURCE_REJECTED",
+                             "reason": str(exc)[:200]})
+            if not require_quote_candidates:
+                results.append(rejected[-1])
+        if require_quote_candidates and len(results)==limit:
+            break
     return {"venue": "pumpswap", "status": "RESEARCH_SOURCE_CAPTURE_ONLY",
             "requested": limit, "authenticated": sum(
                 x["status"] == "AUTHENTICATED_SOURCE_ONLY" for x in results),
-            "pools": results, **SAFE}
+            "pools": results, "rejections": rejected,
+            "examined": len(results)+len(rejected), **SAFE}
 
 
 def main():
@@ -136,8 +148,10 @@ def main():
     parser.add_argument("--registry", default="arb/pool_registry.json")
     parser.add_argument("--limit", type=int, default=3)
     parser.add_argument("--output", required=True)
+    parser.add_argument("--require-quote-candidates", action="store_true")
     args = parser.parse_args()
-    result = capture(args.rpc, json.loads(Path(args.registry).read_text()), limit=args.limit)
+    result = capture(args.rpc, json.loads(Path(args.registry).read_text()), limit=args.limit,
+                     require_quote_candidates=args.require_quote_candidates)
     Path(args.output).write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps({k: result[k] for k in ("venue", "status", "requested", "authenticated")}))
     if result["authenticated"] != args.limit:
