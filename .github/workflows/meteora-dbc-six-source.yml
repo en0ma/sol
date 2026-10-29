@@ -10,6 +10,7 @@ on:
       - "arb/meteora_dbc_native_segment.py"
       - "tests/test_meteora_dbc_native_segment.py"
       - "tools/meteora_dbc_official_sdk_oracle.js"
+      - "arb/meteora_dbc_native_curve_audit.py"
   workflow_dispatch:
 permissions:
   contents: read
@@ -65,6 +66,12 @@ jobs:
               raise SystemExit("Each genuine DBC source requires four SDK quote candidates")
           print("Independent original sources with SDK quotes:",len(pools),"trials:",sum(len(p["trials"]) for p in pools))
           PY
+      - name: Independently reconcile 24 original Q64 curves against pinned SDK
+        run: |
+          python3 -m arb.meteora_dbc_native_curve_audit \
+            --source "$RUNNER_TEMP/dbc-six-original-source.json" \
+            --sdk "$RUNNER_TEMP/dbc-six-official-sdk-quotes.json" \
+            --output "$RUNNER_TEMP/dbc-six-native-curve-only-audit.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -72,4 +79,5 @@ jobs:
           path: |
             ${{ runner.temp }}/dbc-six-original-source.json
             ${{ runner.temp }}/dbc-six-official-sdk-quotes.json
+            ${{ runner.temp }}/dbc-six-native-curve-only-audit.json
           if-no-files-found: warn
