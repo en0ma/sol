@@ -112,4 +112,5 @@ function main() {
     exact_trials:pools.reduce((sum,p)=>sum+p.matched,0)}));
   demand(exact,"official SDK/native tick arithmetic mismatch or incomplete four-trial parity");
 }
-try{main()}catch(error){console.error("CLMM OFFICIAL SDK ORACLE FAILED",error.stack||String(error));process.exitCode=1}
+if(require.main===module){try{main()}catch(error){console.error("CLMM OFFICIAL SDK ORACLE FAILED",error.stack||String(error));process.exitCode=1}}
+module.exports={quotePool};
