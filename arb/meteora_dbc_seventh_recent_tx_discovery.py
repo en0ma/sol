@@ -18,7 +18,7 @@ from arb.meteora_dbc_seventh_venue_source import (
 
 
 def discover(rpc, *, count=3, max_signatures=48):
-    if (type(count) is not int or not 1 <= count <= 6
+    if (type(count) is not int or not 1 <= count <= 12
             or type(max_signatures) is not int or not count <= max_signatures <= 64):
         raise ValueError("DBC bounded onchain discovery arguments required")
     signatures=call(rpc,"getSignaturesForAddress",[
@@ -97,7 +97,7 @@ def discover(rpc, *, count=3, max_signatures=48):
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("--rpc",required=True)
-    p.add_argument("--count",type=int,default=3)
+    p.add_argument("--count",type=int,default=6)
     p.add_argument("--max-signatures",type=int,default=48)
     p.add_argument("--output",required=True)
     a=p.parse_args()
