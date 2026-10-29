@@ -47,7 +47,7 @@ def decode_tick_array(raw,pool,start,spacing):
             found.append({"tick":tick,"liquidity_net":str(net),"liquidity_gross":str(gross)})
     initialized=raw[44+60*TICK_STATE_LEN]
     if initialized!=len(found):
-        raise ValueError("CLMM initialized tick count differs from real liquidity entries")
+        raise ValueError("CLMM initialized tick count differs from real liquidity entries: count="+str(initialized)+" gross_positive="+str(len(found))+" start="+str(start))
     return {"pool":pool,"start_tick_index":start,
             "initialized_tick_count":initialized,"initialized_ticks":found}
 
