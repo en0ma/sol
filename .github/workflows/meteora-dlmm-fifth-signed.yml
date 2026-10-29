@@ -97,6 +97,16 @@ jobs:
             --sdk "$RUNNER_TEMP/dlmm-sdk.json" \
             --signed "$RUNNER_TEMP/dlmm-signed-proof.json" \
             --output "$RUNNER_TEMP/dlmm-independent-signed-audit.json"
+      - name: Gate existing registry against independently audited signed DLMM evidence
+        run: |
+          python3 -m arb.meteora_dlmm_signed_registry_merge \
+            --registry arb/pool_registry.json \
+            --source "$RUNNER_TEMP/dlmm-source.json" \
+            --sdk "$RUNNER_TEMP/dlmm-sdk.json" \
+            --signed "$RUNNER_TEMP/dlmm-signed-proof.json" \
+            --required "$POOL_COUNT" \
+            --output "$RUNNER_TEMP/dlmm-signed-qualified-registry.json" \
+            --report "$RUNNER_TEMP/dlmm-signed-registry-report.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -107,5 +117,7 @@ jobs:
             ${{ runner.temp }}/dlmm-native-sdk.json
             ${{ runner.temp }}/dlmm-signed-proof.json
             ${{ runner.temp }}/dlmm-independent-signed-audit.json
+            ${{ runner.temp }}/dlmm-signed-qualified-registry.json
+            ${{ runner.temp }}/dlmm-signed-registry-report.json
             ${{ runner.temp }}/dlmm-surfpool.log
           if-no-files-found: warn
