@@ -13,7 +13,7 @@ from arb.meteora_dbc_seventh_venue_source import capture
 from arb.meteora_dbc_seventh_state_capture import capture_pool
 
 
-def run(rpc, *, count=1, hint_limit=24, pages=4, strict=True):
+def run(rpc, *, count=1, hint_limit=24, pages=4, strict=True, candidate_validator=None):
     if type(count) is not int or not 1 <= count <= 6:
         raise ValueError("DBC accepted source count must be 1-6")
     if type(hint_limit) is not int or not count <= hint_limit <= 24:
@@ -47,6 +47,8 @@ def run(rpc, *, count=1, hint_limit=24, pages=4, strict=True):
             if result["authenticated"]!=1:
                 raise ValueError("DBC original pool identity not authenticated")
             state=capture_pool(rpc,result["source_pools"][0])
+            if candidate_validator is not None:
+                candidate_validator(state)
             accepted.append(state)
         except (ValueError, OSError, RuntimeError, KeyError, TypeError) as exc:
             reason={"address":address,"reason_type":type(exc).__name__}
