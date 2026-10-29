@@ -77,11 +77,13 @@ def diagnostic(source_rpc,local_rpc,source,sdk,curve,*,required=1):
     if (type(required) is not int or not 1<=required<=6 or
             source.get("status")!="DBC_ORIGINAL_CONTEXTUAL_SOURCE_PARTIAL_NOT_SIGNED" or
             sdk.get("status")!="DBC_ORIGINAL_OFFICIAL_SDK_QUOTES_ONLY_NOT_NATIVE_PARITY" or
-            curve.get("status")!="DBC_INDEPENDENT_SINGLE_SEGMENT_CURVE_MATH_ONLY"):
+            curve.get("status")!="INDEPENDENT_DBC_ORIGINAL_NATIVE_FEE_CURVE_SDK_PARITY"):
         raise ValueError("DBC signed diagnostic requires original unsigned source and Q64 curve evidence")
     pools=source["source_pools"];quoted={q["pool"]:q for q in sdk["pools"]}
     native={q["pool"]:q for q in curve["pools"]}
-    if len(pools)!=required or len(quoted)!=required or len(native)!=required:
+    if (curve.get("verified_pools")!=required or
+            curve.get("verified_trials")!=required*4 or
+            len(pools)!=required or len(quoted)!=required or len(native)!=required):
         raise ValueError("DBC signed diagnostic source/pool count mismatch")
     binaries=program_data_accounts(source_rpc,{PROGRAM})
     header=base64.b64decode(binaries[PROGRAM]["data"][0],validate=True)
