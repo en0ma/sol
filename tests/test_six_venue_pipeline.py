@@ -116,7 +116,9 @@ class SixVenuePipelineTests(unittest.TestCase):
                 return readiness()
             def export(_rpc,_readiness,folder,*,maximum):
                 folder.mkdir()
-                return {"exported":0,"routes":[]}
+                data={"exported":0,"routes":[]}
+                (folder/"summary.json").write_text(json.dumps(data))
+                return data
             rank_empty={"status":"GROSS_SOURCE_BOUND_RANKING_ONLY","fully_quoted":0,"blocked":0,"positive_gross":0,
                         "ranked":[]}
             with patch("arb.onchain_pool_discovery.discover",return_value=discovered) as d, \
