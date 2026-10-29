@@ -8,6 +8,8 @@ No new coordinator, no broadcast.
 import argparse,hashlib,json
 from pathlib import Path
 from arb.raydium_clmm_sixth_signed_audit import audit
+from arb.raydium_clmm import decode
+import base64
 
 SAFE={"actionable":False,"broadcast":False,
       "live_execution_approved":False,"registry_admission_approved":False}
@@ -29,9 +31,19 @@ def merge(registry,tick_source,sdk,signed,*,required=1):
         address=verified["pool"]
         key=("raydium_clmm",address)
         source=sources.get(address)
-        if key not in indexed or source is None:
-            raise ValueError("CLMM signed pool not in pre-tracked authenticated registry")
-        existing=updated[indexed[key]]
+        if source is None:
+            raise ValueError("CLMM signed pool missing independently audited onchain source")
+        original=source["tick_capture"]["synchronized_non_tick_accounts"][0]
+        decoded=decode(base64.b64decode(original["account_base64"],validate=True))
+        mints=[decoded["token_mint_0"],decoded["token_mint_1"]]
+        if key in indexed:
+            existing=updated[indexed[key]]
+            if existing.get("mints")!=mints:
+                raise ValueError("CLMM signed pool mints disagree with original registry")
+        else:
+            existing={"venue":"raydium_clmm","address":address,"mints":mints}
+            updated.append(existing)
+            indexed[key]=len(updated)-1
         if (verified["source_digest"]!=source["tick_snapshot_sha256"]
             or verified["source_slot"]!=source["tick_capture"]["tick_array_source_slot"]):
             raise ValueError("CLMM signed source provenance changed")
