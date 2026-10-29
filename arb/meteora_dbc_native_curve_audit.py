@@ -13,6 +13,21 @@ CONFIG_SIZE=1048
 CFG_DISC=hashlib.sha256(b"account:PoolConfig").digest()[:8]
 
 
+def sdk_gross_curve_output(trial, *, base_for_quote, collection):
+    """Recover gross curve output from a genuine SDK net output and fee mode.
+
+    A reference transformation only; actual gross is separately calculated
+    from source bytes with the independent Q64 walk.
+    """
+    if type(base_for_quote) is not bool or collection not in (0,1):
+        raise ValueError("DBC unsupported fee collection mode")
+    gross=int(trial["sdk_output"])
+    if base_for_quote or collection==1:
+        gross+=int(trial["sdk_trading_fee"])+int(trial["sdk_protocol_fee"])
+    return gross
+
+
+
 def audit(source, sdk):
     if source.get("status")=="SIX_DBC_ORIGINAL_SOURCE_POOLS_ONLY":
         if (source.get("authenticated_source_pools")!=6 or
@@ -80,18 +95,8 @@ def audit(source, sdk):
                 sqrt_start_price=start,migration_sqrt_price=migration_price)
             if int(trial["sdk_next_sqrt_price"])!=native["next_sqrt_price"]:
                 raise ValueError("DBC independent curve next price differs from official SDK")
-            gross=int(trial["sdk_output"])
-            # PoolFeesConfig.collectFeeMode=1 collects on *output*
-            # for either direction. Mode 0 collects quote-to-base input
-            # fees, while base-to-quote still pays fees on output.
-            # Earlier curve-only audit omitted quote-to-base output fees
-            # when mode=1, falsely rejecting native/SDK full-fee parity.
-            collection=raw[232]
-            if collection not in (0,1):
-                raise ValueError("DBC unsupported fee collection mode")
-            fees_on_input=(not base and collection==0)
-            if not fees_on_input:
-                gross+=int(trial["sdk_trading_fee"])+int(trial["sdk_protocol_fee"])
+            gross=sdk_gross_curve_output(trial,base_for_quote=base,
+                                          collection=raw[232])
             if gross!=native["output_amount"]:
                 raise ValueError("DBC independent zero-fee curve gross output differs from SDK")
             verified.append({"direction":direction,"input":amount,
