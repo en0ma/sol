@@ -20,6 +20,9 @@ on:
       - "arb/meteora_dbc_swap.py"
       - "tests/test_meteora_dbc_swap.py"
   workflow_dispatch:
+concurrency:
+  group: dbc-six-source-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
