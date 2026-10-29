@@ -90,6 +90,13 @@ jobs:
             --sdk "$RUNNER_TEMP/dlmm-sdk.json" \
             --pool-count "$POOL_COUNT" \
             --output "$RUNNER_TEMP/dlmm-signed-proof.json"
+      - name: Independently verify Ed25519 signer, instruction, source and raw SPL post-state
+        run: |
+          python3 -m arb.meteora_dlmm_fifth_signed_audit \
+            --source "$RUNNER_TEMP/dlmm-source.json" \
+            --sdk "$RUNNER_TEMP/dlmm-sdk.json" \
+            --signed "$RUNNER_TEMP/dlmm-signed-proof.json" \
+            --output "$RUNNER_TEMP/dlmm-independent-signed-audit.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -99,5 +106,6 @@ jobs:
             ${{ runner.temp }}/dlmm-sdk.json
             ${{ runner.temp }}/dlmm-native-sdk.json
             ${{ runner.temp }}/dlmm-signed-proof.json
+            ${{ runner.temp }}/dlmm-independent-signed-audit.json
             ${{ runner.temp }}/dlmm-surfpool.log
           if-no-files-found: warn
