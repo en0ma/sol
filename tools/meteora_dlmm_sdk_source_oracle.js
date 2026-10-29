@@ -6,7 +6,8 @@
  */
 const fs=require("fs");
 const crypto=require("crypto");
-const DLMM=require("@meteora-ag/dlmm").default;
+const sdkModule=require("@meteora-ag/dlmm");
+const DLMM=sdkModule.default || sdkModule.DLMM || sdkModule;
 const BN=require("bn.js");
 const {Connection,PublicKey}=require("@solana/web3.js");
 
