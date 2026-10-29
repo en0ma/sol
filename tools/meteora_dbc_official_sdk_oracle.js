@@ -74,23 +74,35 @@ for(const row of report.source_pools) {
     const reserve=new BN(String(swapBaseForQuote ?
       roles.base_reserve : roles.quote_reserve));
     requireTrue(reserve.gt(new BN(0)), "DBC source reserve zero");
-    const initial=BN.max(new BN("10000"),reserve.div(new BN("1000000")));
-    const used=new Set();
-    let next=initial;
-    for(let attempt=0;attempt<8 && used.size<2;attempt++) {
-      if(next.gte(reserve.divn(4))) break;
-      const amount=next.toString(10);
-      next=next.muln(10);
-      if(used.has(amount)) continue;
+    // Enumerate from small source-relative sizes upward. The previous 10k
+    // lower bound and 1/4 reserve cap incorrectly excluded small-reserve
+    // launches. A quote remains eligible only if the real SDK succeeds,
+    // outputs nonzero tokens and consumes nonzero input.
+    const cap=BN.max(new BN(1),reserve.divn(2));
+    const sizes=new Set();
+    for(const divisor of [100000000,10000000,1000000,100000,10000,1000,100,10,2]) {
+      sizes.add(BN.max(new BN(1),reserve.divn(divisor)).toString(10));
+    }
+    for(const amount of ["1","10","100","1000","10000","100000","1000000"]) {
+      sizes.add(amount);
+    }
+    const ordered=[...sizes].map(x=>new BN(x)).filter(x=>x.lte(cap))
+      .sort((a,b)=>a.cmp(b));
+    const used=new Set();const failures={};
+    for(const input of ordered) {
+      if(used.size>=2)break;
+      const amount=input.toString(10);
       try {
         const quote=client.pool.swapQuote({
           virtualPool, config, swapBaseForQuote,
-          amountIn:new BN(amount), slippageBps:0, hasReferral:false,
+          amountIn:input, slippageBps:0, hasReferral:false,
           currentPoint, eligibleForFirstSwapWithMinFee:false
         });
-        if(!quote.outputAmount.gt(new BN(0))) continue;
-        requireTrue(quote.actualInputAmount.gte(new BN(0)),
-          "DBC SDK actual input negative");
+        if(!quote.outputAmount.gt(new BN(0)) ||
+           !quote.actualInputAmount.gt(new BN(0))) {
+          failures.nonpositive=(failures.nonpositive||0)+1;
+          continue;
+        }
         used.add(amount);
         trials.push({
           direction:swapBaseForQuote?"base_to_quote":"quote_to_base",
@@ -101,12 +113,16 @@ for(const row of report.source_pools) {
           sdk_trading_fee:quote.tradingFee.toString(10)
         });
       } catch(error) {
-        // This candidate amount is never marked quoted. SDK may reject
-        // migration thresholds or liquidity exhaustion; try a bounded size.
+        // Bounded categorization only, no SDK error strings or RPC secrets.
+        failures.sdk_exception=(failures.sdk_exception||0)+1;
       }
     }
-    requireTrue(used.size===2,
-      "DBC official SDK cannot establish two genuine non-dust quote sizes");
+    if(used.size!==2) {
+      console.error(JSON.stringify({stage:"dbc_sdk_direction_screen",
+        pool:row.pool,direction:swapBaseForQuote?"base_to_quote":"quote_to_base",
+        candidate_sizes:ordered.length,qualified:used.size,failures}));
+      throw Error("DBC official SDK cannot establish two genuine non-dust quote sizes");
+    }
   }
   results.push({
     pool:row.pool,source_slot:row.source_slot,
