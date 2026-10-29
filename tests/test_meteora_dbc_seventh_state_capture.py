@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import patch
 from solders.pubkey import Pubkey
 from arb.meteora_dbc_seventh_state_capture import (
-    parse_pool, capture_pool, PROGRAM, TOKEN_PROGRAM, POOL_AUTHORITY,
+    parse_pool, capture_pool, PROGRAM, TOKEN_PROGRAM, POOL_AUTHORITY, SYSVAR_OWNER,
 )
 from arb.meteora_dbc_seventh_venue_source import DISC
 
@@ -43,11 +43,15 @@ def context(pool, mutate=False):
     config=bytearray(128)
     config[:8]=hashlib.sha256(b"account:PoolConfig").digest()[:8]
     config[8:40]=bytes([6])*32
+    clock=bytearray(40)
+    clock[:8]=(101).to_bytes(8,"little")
+    clock[32:40]=(1760000000).to_bytes(8,"little",signed=True)
     return {"context":{"slot":102},"value":[
        account(PROGRAM,bytes(raw)),account(PROGRAM,bytes(config)),
        account(TOKEN_PROGRAM,bytes(82)),
        account(TOKEN_PROGRAM,bytes(base_vault)),
-       account(TOKEN_PROGRAM,bytes(quote_vault))]}
+       account(TOKEN_PROGRAM,bytes(quote_vault)),
+       account(SYSVAR_OWNER,bytes(clock))]}
 
 
 class DbcStateTests(unittest.TestCase):
@@ -68,6 +72,7 @@ class DbcStateTests(unittest.TestCase):
         with patch("arb.meteora_dbc_seventh_state_capture.call",return_value=context(raw)) as rpc:
             result=capture_pool("https://readonly.invalid",original)
         self.assertEqual(result["source_slot"],102)
+        self.assertEqual(result["clock_slot"],101)
         self.assertFalse(result["pricing_eligible"])
         self.assertFalse(result["signed_parity_verified"])
         self.assertEqual(rpc.call_args.args[1],"getMultipleAccounts")
