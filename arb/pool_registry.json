@@ -151,7 +151,19 @@
       "mints": [
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
         "So11111111111111111111111111111111111111112"
-      ]
+      ],
+      "signed_provenance": {
+        "status": "INDEPENDENT_SIGNED_NATIVE_SDK_SPL_PARITY",
+        "source_slot": 462725881,
+        "source_digest": "dc19402e83a44c361924ac816d9580dfddae6b4bc14922a306f3f20f16eaf268",
+        "signed_transaction_hashes": [
+          "7ec3e2f4ba6f0826033b116c7d6e0516a6fc182a9b196095a4ea3c86d733f1ed",
+          "874dce64b92c75dbb2c41f17cb8233340ea3df04093165cdc1148a9088b4c861",
+          "d960f1de0d07f9d440bf6d9e9735b220130ef18f3c315e2e788ce3034888ea83",
+          "773c3e45b8ec56f64f29f44c34d979260c551d3f1c375b93c0e415468b281d75"
+        ],
+        "independent_receipt_sha256": "d7c92e0901a98b9ae39d27914bb2f3f0077081f66b3299b3398cabd1eac250b2"
+      }
     },
     {
       "venue": "pumpswap",
