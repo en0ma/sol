@@ -95,7 +95,7 @@ def capture_pool(rpc, original):
     quote_mint = key(cfg_raw[8:40])
     mint_raw = decode_account(rows[2], owner=TOKEN_PROGRAM, size=82)
     vaults = []
-    for n, row in enumerate(rows[3:]):
+    for n, row in enumerate(rows[3:5]):
         raw = decode_account(row, owner=TOKEN_PROGRAM, size=TOKEN_ACCOUNT_SIZE)
         vaults.append(raw)
     clock_raw = decode_account(rows[5], owner=SYSVAR_OWNER, size=40)
