@@ -13,7 +13,10 @@ def fixture():
            "status":"OFFICIAL_SDK_CANDIDATE_EXACT","signed_parity_verified":False}
           for mint in (mint_a,mint_b) for size in (10000,100000)]
     source={"venue":"pumpswap","pools":[{"address":address,
-            "status":"AUTHENTICATED_SOURCE_ONLY","mints":[mint_a,mint_b]}]}
+            "status":"AUTHENTICATED_SOURCE_ONLY","mints":[mint_a,mint_b],
+            "native_quote_candidates":[{"mint_in":r["input_mint"],"amount_in":r["amount_in"],
+                "native_formula_candidate_out":100,"status":"UNVERIFIED_NATIVE_FORMULA_CANDIDATE"}
+                for r in rows]}]}
     sdk={"venue":"pumpswap","signed_parity_verified":False,"actionable":False,
          "registry_admission_approved":False,"sdk_candidate_verified_pools":1,
          "pools":[{"address":address,"signed_parity_verified":False,
@@ -38,6 +41,19 @@ class PumpSwapSdkCandidateAuditTest(unittest.TestCase):
     def test_rejects_duplicate_direction_or_amount(self):
         source,sdk=fixture()
         sdk["pools"][0]["trials"][0]["amount_in"]=100000
+        with self.assertRaisesRegex(ValueError,"duplicate"):
+            audit(source,sdk)
+
+    def test_rejects_forged_sdk_receipt_matching_only_its_own_output(self):
+        source,sdk=fixture()
+        sdk["pools"][0]["trials"][0]["official_sdk_output"]="101"
+        sdk["pools"][0]["trials"][0]["python_candidate_output"]="101"
+        with self.assertRaisesRegex(ValueError,"authenticated source candidate"):
+            audit(source,sdk)
+
+    def test_rejects_duplicate_source_trial(self):
+        source,sdk=fixture()
+        source["pools"][0]["native_quote_candidates"][0]["amount_in"]=100000
         with self.assertRaisesRegex(ValueError,"duplicate"):
             audit(source,sdk)
 
