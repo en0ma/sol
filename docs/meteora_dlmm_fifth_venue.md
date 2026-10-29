@@ -18,7 +18,7 @@ and program ownership; the oracle observation bounds; and both reserve
 mints and common authority. It retains exact original account bytes,
 lamports, slot and deterministic SHA-256 provenance. Missing optional
 neighbor arrays are explicitly absent; missing active array is fatal.
-The snapshot is **not** a price quote or a signed receipt.
+The snapshot is **not** a price quote or a signed receipt; the downstream signed acceptance job is the execution proof.
 
 CLI example (read-only RPC):
 ```bash
@@ -45,13 +45,35 @@ References:
 - https://github.com/MeteoraAg/docs/blob/main/developer-guides/dlmm/rust-integration/library.mdx
 - https://github.com/MeteoraAg/dlmm-sdk
 
-The fifth-venue native-verified milestone still requires full directional
-bin-array/bitmap capture, independently computed **on-chain native
-integer quotes** matching the official SDK, and four genuinely signed
-isolated Surfpool swaps **per pool** (both directions, two amounts),
-with independently audited observed SPL debits/credits. New DLMM entries
-must never enter the signed-verified registry until that evidence exists.
-No live broadcasting.
+## First completed three-pool signed acceptance
+
+The **real three-pool** isolated execution at
+https://github.com/en0ma/sol/actions/runs/40819813329 passed source, the
+published `@meteora-ag/dlmm@1.9.14` SDK, a separate integer bin-walk
+(`meteora-dlmm==0.5.0`) at the authenticated Clock timestamp, and
+**12 actual Ed25519-signed legacy DLMM program simulations** (two
+directions × two sizes per pool). Independent post-hoc audit rechecked
+signed wire bytes and program id/role/amount, raw SPL user debit/credit,
+source identities, output parity and distinct signatures.
+
+The three existing registry hints promoted from this evidence are:
+
+- `5rCf1DM8LjKTw4YqhnoLcngyZYeNnQqztScTogYHAS6`
+- `BGm1tav58oGcsQJehL9WXBFXF7D27vZsKefj4xJKD5Y`
+- `6oQ9wVex4mKZti2GsGCfD8FWTMMC9PLQkztRU5cd6MK8`
+
+`arb/meteora_dlmm_signed_registry_merge.py` re-runs the complete audit
+and only annotates existing identities with immutable source digest,
+slot, exact signed-transaction hashes and independent receipt digest.
+No new coordinator or venue registry was introduced. Neither these
+receipts nor unit tests authorize live broadcasting.
+
+**Remaining**: Three more tracked DLMM pools have not yet demonstrated
+signed parity. Pools requiring an extended bitmap path, special
+limit-order liquidity, Token-2022 hooks or multiple additional bin
+arrays need expanded source hydration and refreshed signed evidence.
+Independent exact outputs on the three accepted pools do not prove
+all DLMM modes.
 
 ## PumpSwap handoff before fifth venue
 
