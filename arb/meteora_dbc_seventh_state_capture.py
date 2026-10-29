@@ -88,8 +88,9 @@ def capture_pool(rpc, original):
     if pool_raw != first:
         raise ValueError("DBC pool mutated between identity and dependency capture")
     cfg_raw = decode_account(rows[1], owner=PROGRAM)
-    if len(cfg_raw) < 16:
-        raise ValueError("DBC PoolConfig too short")
+    if len(cfg_raw) < 40 or cfg_raw[:8] != hashlib.sha256(b"account:PoolConfig").digest()[:8]:
+        raise ValueError("DBC PoolConfig original discriminator/size invalid")
+    quote_mint = key(cfg_raw[8:40])
     mint_raw = decode_account(rows[2], owner=TOKEN_PROGRAM, size=82)
     vaults = []
     for n, row in enumerate(rows[3:]):
@@ -98,12 +99,13 @@ def capture_pool(rpc, original):
     # Source authentication of the mint and token accounts is necessary,
     # but the config's quote mint has not yet been decoded. Do not declare
     # this sufficient for trade acceptance.
-    if key(vaults[0][:32]) != fields["base_mint"]:
-        raise ValueError("DBC base vault mint mismatch")
+    if key(vaults[0][:32]) != fields["base_mint"] or key(vaults[1][:32]) != quote_mint:
+        raise ValueError("DBC base/quote vault mint mismatch")
     if any(key(v[32:64]) != POOL_AUTHORITY for v in vaults):
         raise ValueError("DBC token vault authority mismatch")
-    if key(vaults[0][:32]) == key(vaults[1][:32]):
+    if fields["base_mint"] == quote_mint or key(vaults[0][:32]) == key(vaults[1][:32]):
         raise ValueError("DBC both vaults use same mint")
+    fields["quote_mint"] = quote_mint
     proof = {}
     for addr, raw, account in zip(addresses, [pool_raw, cfg_raw, mint_raw, *vaults], rows):
         proof[addr] = {
@@ -113,7 +115,7 @@ def capture_pool(rpc, original):
     return {"status": "DBC_CONTEXTUAL_POOL_DEPENDENCIES_PARTIALLY_VERIFIED",
             "pool": address, "source_slot": response["context"]["slot"],
             "pool_fields": fields, "accounts": proof,
-            "config_quote_mint_verified": False, "pricing_eligible": False,
+            "config_quote_mint_verified": True, "pricing_eligible": False,
             **SAFE}
 
 
