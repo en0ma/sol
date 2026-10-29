@@ -13,7 +13,7 @@ from arb.meteora_dbc_seventh_venue_source import capture
 from arb.meteora_dbc_seventh_state_capture import capture_pool
 
 
-def run(rpc, *, count=1, hint_limit=12, pages=4):
+def run(rpc, *, count=1, hint_limit=12, pages=4, strict=True):
     if type(count) is not int or not 1 <= count <= 6:
         raise ValueError("DBC accepted source count must be 1-6")
     if type(hint_limit) is not int or not count <= hint_limit <= 12:
@@ -56,12 +56,13 @@ def run(rpc, *, count=1, hint_limit=12, pages=4):
             print(json.dumps({"stage":"dbc_candidate_rejected",**reason}))
         if len(accepted)>=count:
             break
-    if len(accepted)!=count:
+    if len(accepted)!=count and strict:
         raise ValueError("DBC original contextual source target incomplete: "+
                          str(len(accepted))+" of "+str(count))
     return {"venue":"meteora_dbc",
        "status":"DBC_ORIGINAL_CONTEXTUAL_SOURCE_PARTIAL_NOT_SIGNED",
        "source_pools":accepted,"authenticated":len(accepted),
+       "source_target":count,"source_target_met":len(accepted)==count,
        "discovery_source":source,
        "rejected_candidate_count":len(rejected),
        "rejected_candidates":rejected,
