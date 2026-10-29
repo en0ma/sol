@@ -70,7 +70,7 @@ def run(rpc, sdk_report, manifest):
                 raise ValueError("invalid or duplicate official SDK trial identity")
             expected_keys.add(key)
     if set(entries)!=expected_keys:
-        raise ValueError("missing or unexpected signed trial for SDK quote")
+        raise ValueError("missing or duplicate signed trial for SDK quote (or unexpected extra trial)")
     results=[]
     for pool, comparison in sdk_pools.items():
         reference=comparison.get("trials")
