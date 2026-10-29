@@ -110,7 +110,7 @@ def _fund_user(rpc,signer,state,input_mint,amount):
 def execute(source_rpc,local_rpc,source,sdk,*,pool_count=1):
     local_rpc_only(local_rpc)
     sdk_audit(source,sdk)
-    if type(pool_count) is not int or not 1<=pool_count<=3:
+    if type(pool_count) is not int or not 1<=pool_count<=7:
         raise ValueError("invalid bounded PumpSwap signed pool count")
     if len(sdk.get("pools",[]))!=pool_count:
         raise ValueError("SDK verified pool count mismatch")
