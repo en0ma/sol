@@ -78,3 +78,22 @@ No actual VirtualPool address is claimed in this section. This is source
 infrastructure only; it does not verify configuration, pricing, SDK parity,
 signed swaps or independent SPL changes. A green ELF-only workflow still
 does not count as source pool acceptance.
+
+## Verified source layout boundary
+
+The official Meteora DBC on-chain `VirtualPool` is a zero-copy Anchor
+account with a 416-byte `PoolState` and an 8-byte discriminator, for
+**exactly 424 serialized bytes**. Both discovery and explicit-source
+authentication now reject shorter/longer accounts even when the
+discriminator matches. The distinct `TransferHookPool` discriminator
+is **not** admitted through this original `VirtualPool` path. Supporting
+transfer hooks requires a separately authenticated account decoder
+and transaction path; do not silently reinterpret it as a regular pool.
+
+References:
+- https://github.com/MeteoraAg/dynamic-bonding-curve/blob/main/programs/dynamic-bonding-curve/src/state/virtual_pool.rs
+- https://github.com/MeteoraAg/docs/blob/main/developer-guides/dbc/program/accounts.mdx
+
+These checks establish account *shape* and ownership, not curve
+activity or pricing parity. Both pool-config and token-vault consistency
+remain separate gates before signed trading acceptance.
