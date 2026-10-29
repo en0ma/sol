@@ -40,6 +40,12 @@ jobs:
           node tools/pumpswap_sdk_oracle.js \
             "$RUNNER_TEMP/pumpswap-native-source.json" \
             "$RUNNER_TEMP/pumpswap-official-sdk-comparison.json"
+      - name: Independently audit four SDK candidate comparisons per pool
+        run: |
+          python3 -m arb.pumpswap_sdk_candidate_audit \
+            "$RUNNER_TEMP/pumpswap-native-source.json" \
+            "$RUNNER_TEMP/pumpswap-official-sdk-comparison.json" \
+            "$RUNNER_TEMP/pumpswap-sdk-candidate-audit.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -47,4 +53,5 @@ jobs:
           path: |
             ${{ runner.temp }}/pumpswap-native-source.json
             ${{ runner.temp }}/pumpswap-official-sdk-comparison.json
+            ${{ runner.temp }}/pumpswap-sdk-candidate-audit.json
           if-no-files-found: warn
