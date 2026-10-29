@@ -89,7 +89,8 @@ def main():
     if a.sdk_screen:
         from arb.meteora_dbc_six_source_qualification import validate_official_sdk_candidate
         validator=validate_official_sdk_candidate
-    report=run(a.rpc,count=a.count,hint_limit=a.hint_limit,pages=a.pages,\n               candidate_validator=validator)
+    report=run(a.rpc,count=a.count,hint_limit=a.hint_limit,pages=a.pages,
+               candidate_validator=validator)
     Path(a.output).write_text(json.dumps(report,indent=2)+"\n")
     print(json.dumps({"status":report["status"],
                       "authenticated":report["authenticated"],
