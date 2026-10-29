@@ -51,8 +51,8 @@ class SixVenuePipelineTests(unittest.TestCase):
                  "state_accounts_observed_slot":123}
         ranked={"status":"GROSS_SOURCE_BOUND_RANKING_ONLY",
                 "fully_quoted":2,"blocked":0,"positive_gross":1,
-                "ranked":[{"index":0,"positive_gross":True},
-                          {"index":1,"positive_gross":False}]}
+                "ranked":[{"index":0,"positive_gross":True,"actionable":False},
+                          {"index":1,"positive_gross":False,"actionable":False}]}
         signed={"attempted":1,"independent_signed_accepted":1,
                 "observed_venue_quote_exact_matches":3}
         with tempfile.TemporaryDirectory() as temp:
@@ -84,6 +84,18 @@ class SixVenuePipelineTests(unittest.TestCase):
             self.assertEqual(report["independent_signed_accepted"],1)
             self.assertFalse(report["actionable"])
             self.assertFalse(report["broadcast"])
+            (src/"six-venue-ranking.json").write_text('{"tampered":true}')
+            with patch.dict(os.environ,{"SURFPOOL_EXPLICITLY_OFFLINE":"1"}):
+                with self.assertRaisesRegex(ValueError,"ranking digest"):
+                    offline_research("http://127.0.0.1:8899",src,dst)
+            (src/"six-venue-ranking.json").write_text(json.dumps(ranked,
+                sort_keys=True,separators=(",",":")))
+            original_summary=(src/"summary.json").read_text()
+            (src/"summary.json").write_text('{"routes":[]}')
+            with patch.dict(os.environ,{"SURFPOOL_EXPLICITLY_OFFLINE":"1"}):
+                with self.assertRaisesRegex(ValueError,"inventory"):
+                    offline_research("http://127.0.0.1:8899",src,dst)
+            (src/"summary.json").write_text(original_summary)
             (src/"triangle-00.json").write_text('{"tampered":true}')
             with patch.dict(os.environ,{"SURFPOOL_EXPLICITLY_OFFLINE":"1"}):
                 with self.assertRaisesRegex(ValueError,"digest"):
@@ -105,7 +117,7 @@ class SixVenuePipelineTests(unittest.TestCase):
             def export(_rpc,_readiness,folder,*,maximum):
                 folder.mkdir()
                 return {"exported":0,"routes":[]}
-            rank_empty={"fully_quoted":0,"blocked":0,"positive_gross":0,
+            rank_empty={"status":"GROSS_SOURCE_BOUND_RANKING_ONLY","fully_quoted":0,"blocked":0,"positive_gross":0,
                         "ranked":[]}
             with patch("arb.onchain_pool_discovery.discover",return_value=discovered) as d, \
                  patch("arb.six_venue_pipeline.probe",side_effect=source_probe), \
