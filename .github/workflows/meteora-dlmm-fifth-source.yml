@@ -1,0 +1,54 @@
+name: Fifth Venue Meteora DLMM Source Authentication
+
+on:
+  pull_request:
+    paths:
+      - "arb/meteora_dlmm_fifth_venue_source.py"
+      - ".github/workflows/meteora-dlmm-fifth-source.yml"
+      - "tests/test_meteora_dlmm_fifth_venue_source.py"
+  workflow_dispatch:
+    inputs:
+      pool_count:
+        description: "Distinct registered DLMM pools to authenticate (1-6)"
+        required: false
+        default: "3"
+
+concurrency:
+  group: dlmm-fifth-source-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  dlmm-authenticated-source:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SOLANA_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
+      POOL_COUNT: ${{ inputs.pool_count || '3' }}
+      SOLANA_RPC_MIN_INTERVAL_SECONDS: "0.5"
+      SOLANA_RPC_ALCHEMY_FREE_TIER: "1"
+      SOLANA_RPC_PACING_FILE: /tmp/dlmm-fifth-source-rpc
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require read-only source RPC
+        run: test -n "$SOLANA_RPC_URL"
+      - name: Install pinned source decoder dependency
+        run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Capture same-slot DLMM bin arrays, oracle, mints and vaults
+        run: |
+          set -euo pipefail
+          [[ "$POOL_COUNT" =~ ^[1-6]$ ]] || { echo "::error::DLMM pool_count must be 1-6"; exit 1; }
+          python3 -m arb.meteora_dlmm_fifth_venue_source \
+            --rpc "$SOLANA_RPC_URL" \
+            --registry arb/pool_registry.json \
+            --count "$POOL_COUNT" \
+            --output "$RUNNER_TEMP/meteora-dlmm-fifth-source.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dlmm-fifth-authenticated-source
+          path: ${{ runner.temp }}/meteora-dlmm-fifth-source.json
+          if-no-files-found: warn
