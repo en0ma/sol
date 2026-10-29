@@ -130,6 +130,46 @@ The next acceptance job must prepare payer/user token accounts, source
 program and fee auxiliaries, build and sign official V2 swap instructions,
 then independently audit the resultant receipts before registry admission.
 
+## Orca-pattern dedicated isolated-fork signed execution
+
+`arb/pumpswap_v2_dedicated_signed_fork.py` now implements the missing
+execution **orchestration** using the established Orca/DAMM fork approach:
+it imports six-account authenticated PumpSwap snapshots (including exact
+lamports), independently reads the quote mint, authenticates the upgradeable
+PumpSwap and pump-fees ELF accounts from the read-only upstream RPC, writes
+both program binaries and pool state to the isolated Surfpool fork,
+provisions fresh ephemeral funded user SPL accounts per quote, builds
+the authentic 17-account `sell_v2` or `buy_exact_quote_in_v2`
+instruction, signs it with an ephemeral keypair, and invokes
+`arb/pumpswap_signed_parity.py` to check four real sig-verified swap
+simulations with exact debit and output parity. The independent parity
+runner additionally decodes the signed instruction and validates its
+program, pool, mints, user token roles, signer, exact-input amount,
+and output threshold. This prevents unrelated signed transactions from
+being substituted for pool receipts.
+
+**Usage with authenticated source and SDK artifacts plus an already-running
+isolated Surfpool instance:**
+
+```bash
+python3 -m arb.pumpswap_v2_dedicated_signed_fork \
+  --source-rpc "$SURFPOOL_DATASOURCE_RPC_URL" \
+  --surfpool-rpc http://127.0.0.1:8899 \
+  --source-report pumpswap-native-source.json \
+  --sdk-report pumpswap-official-sdk-comparison.json \
+  --pool-count 1 \
+  --output pumpswap-dedicated-signed-result.json
+```
+
+This runner will fail closed if the official SDK audit, authenticated
+accounts, binaries, expected program execution, or observed SPL amounts
+disagree. **It has not been run successfully on a real PumpSwap pool yet.**
+Do not treat a green synthetic CI suite, source capture or implemented
+runner as signed fourth-venue acceptance. An isolated Surfpool with the
+source RPC and published SDK artifacts must actually be available; registry
+admission remains blocked until independently verified signed receipts
+exist.
+
 ## Requirements before claiming the fourth venue works
 
 1. Independently compare every candidate exact-base-unit buy/sell formula
