@@ -50,6 +50,14 @@ def build_swap(pool,state,authority,user_input,user_output,oracle,
     allowed={bin_array_pda(pool,active_index+i) for i in (-1,0,1)}
     if bin_array_pda(pool,active_index) not in bin_arrays or any(x not in allowed for x in bin_arrays):
         raise ValueError("bin array path not within authenticated active neighborhood")
-    metas.extend(AccountMeta(Pubkey.from_string(x),False,True) for x in bin_arrays)
+    # Remaining bin arrays must follow directional traversal from active bin.
+    # The source preflight returns ascending neighbors, not swap order.
+    active=bin_array_pda(pool,active_index)
+    forward=bin_array_pda(pool,active_index-1 if input_is_x else active_index+1)
+    reverse=bin_array_pda(pool,active_index+1 if input_is_x else active_index-1)
+    ordered=[active]+[x for x in (forward,reverse) if x in bin_arrays]
+    if len(ordered)!=len(bin_arrays):
+        raise ValueError("DLMM source bin arrays cannot be ordered")
+    metas.extend(AccountMeta(Pubkey.from_string(x),False,True) for x in ordered)
     data=SWAP_DISCRIMINATOR+amount_in.to_bytes(8,"little")+min_amount_out.to_bytes(8,"little")
     return Instruction(p,data,metas)
