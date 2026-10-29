@@ -112,7 +112,7 @@ def execute(source_rpc,local_rpc,source,sdk,*,pool_count=1):
                 local_rpc,signer,mint_in,mint_out,amount)
             state={**base_state,"input_mint":mint_in,
                    "output_mint":mint_out,
-                   "active_bin_array_index":row["bin_arrays"][1]["index"]}
+                   "active_bin_array_index":base_state["active_id"]//70}
             ix=build_swap(address,state,str(signer.pubkey()),
                 user_input,user_output,base_state["oracle"],path,
                 amount,expected,input_is_x=direction=="x_to_y")
