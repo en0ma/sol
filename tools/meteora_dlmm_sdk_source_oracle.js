@@ -78,7 +78,7 @@ async function probe(conn,row) {
   check(row.status==="AUTHENTICATED_BIN_SNAPSHOT_ONLY"&&
     row.signed_parity_verified===false&&row.native_pricing_verified===false,
     "authenticated unsigned DLMM source required");
-  check(Array.isArray(row.source_accounts)&&row.source_accounts.length===10,
+  check(Array.isArray(row.source_accounts)&&row.source_accounts.length===24,
     "complete DLMM pool-vault-oracle-bin-mint snapshot required");
   check(hash(row.source_accounts,row.source_slot)===row.source_sha256,
     "DLMM source snapshot SHA-256 integrity mismatch");
