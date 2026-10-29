@@ -22,17 +22,34 @@ def discover(registry,*,minimum=6,limit=80,fetch=None):
         raise ValueError("bounded Raydium source-discovery arguments invalid")
     existing={r.get("address") for r in registry["pools"]
               if isinstance(r,dict) and r.get("venue")=="raydium_clmm"}
-    get=fetch or (lambda url:json.load(urllib.request.urlopen(url,timeout=20)))
+    def public_get(url):
+        request=urllib.request.Request(url,headers={"User-Agent":"Mozilla/5.0","Accept":"application/json"})
+        with urllib.request.urlopen(request,timeout=20) as response:return json.load(response)
+    get=fetch or public_get
     url=BASE+"?size="+str(limit)+"&poolType=Concentrated&sortField=liquidity&sortType=desc"
-    page=get(url)
-    if not isinstance(page,dict) or page.get("success") is not True:
-        raise ValueError("official Raydium discovery API failed")
-    obj=page.get("data",{})
-    rows=obj.get("data") if isinstance(obj,dict) else None
-    if not isinstance(rows,list):
-        raise ValueError("official Raydium API response lacks pool list")
+    provider="official_raydium_api"
+    try:
+        page=get(url)
+        obj=page.get("data",{}) if page.get("success") is True else {}
+        rows=obj.get("data") if isinstance(obj,dict) else None
+        if not isinstance(rows,list):raise ValueError("Raydium API denied")
+    except (OSError,ValueError):
+        provider="dexpaprika_public_index"
+        page=get("https://api.dexpaprika.com/networks/solana/pools/search?dex_name=raydium_clmm&limit="+str(limit))
+        rows=page.get("results")
+        if not isinstance(rows,list):raise ValueError("public CLMM hint source unavailable")
     results=[];seen=set(existing)
     for item in rows:
+        if not isinstance(item,dict):continue
+        if provider=="dexpaprika_public_index":
+            address=item.get("address") or item.get("pool_address")
+            if not isinstance(address,str) or address in seen:continue
+            try:Pubkey.from_string(address)
+            except ValueError:continue
+            seen.add(address)
+            results.append({"venue":"raydium_clmm","address":address,
+                "candidate_status":"PUBLIC_INDEX_HINT_REQUIRES_ONCHAIN_AUTHENTICATION"})
+            continue
         if not isinstance(item,dict) or item.get("programId")!=PROGRAM:
             continue
         if item.get("type")!="Concentrated" or item.get("hasDynamicFee") is True:
@@ -60,7 +77,7 @@ def discover(registry,*,minimum=6,limit=80,fetch=None):
         seen.add(address)
         results.append({"venue":"raydium_clmm","address":address,
             "mints":[mint_x,mint_y],"candidate_status":"OFFICIAL_API_HINT_NOT_AUTHENTICATED"})
-    return {"venue":"raydium_clmm","status":"OFFICIAL_RAYDIUM_API_HINTS_ONLY",
+    return {"venue":"raydium_clmm","status":"PUBLIC_POOL_HINTS_NOT_AUTHENTICATED","discovery_provider":provider,
         "requested_additional":minimum,"hinted":len(results),"pools":results,**SAFE}
 
 def main():
