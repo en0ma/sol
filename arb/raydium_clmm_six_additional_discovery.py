@@ -56,9 +56,7 @@ def discover(registry,*,minimum=6,limit=80,fetch=None):
             continue
         if not isinstance(item,dict) or item.get("programId")!=PROGRAM:
             continue
-        if item.get("type")!="Concentrated" or item.get("hasDynamicFee") is True:
-            continue
-        if str(item.get("feeOn","0")) not in ("0","input","Input"):
+        if item.get("type")!="Concentrated":
             continue
         address=item.get("id")
         x=item.get("mintA")
