@@ -120,13 +120,14 @@ def capture_pool(rpc,address,expected_mints):
             "signed_sdk_native_parity_verified":False,**SAFE}
 
 
-def capture(rpc,registry,*,count=3):
+def capture(rpc,registry,*,count=3,unverified_only=False):
     if (type(count) is not int or not 1<=count<=6
             or not isinstance(registry,dict)
             or not isinstance(registry.get("pools"),list)):
         raise ValueError("invalid bounded fifth-venue source request")
     candidates=[row for row in registry["pools"] if isinstance(row,dict)
-                and row.get("venue")=="meteora_dlmm"]
+                and row.get("venue")=="meteora_dlmm"
+                and (not unverified_only or not row.get("signed_provenance"))]
     results=[];rejected=[];seen=set()
     for row in candidates:
         address=row.get("address")
@@ -149,9 +150,10 @@ def main():
     p.add_argument("--registry",default="arb/pool_registry.json")
     p.add_argument("--count",type=int,default=3)
     p.add_argument("--output",required=True)
+    p.add_argument("--unverified-only",action="store_true")
     args=p.parse_args()
     result=capture(args.rpc,json.loads(Path(args.registry).read_text()),
-                   count=args.count)
+                   count=args.count,unverified_only=args.unverified_only)
     Path(args.output).write_text(json.dumps(result,indent=2)+"\n")
     print(json.dumps({"venue":result["venue"],"authenticated":result["authenticated"],
                       "requested":result["requested"],"status":result["status"]}))
