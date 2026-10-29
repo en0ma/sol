@@ -21,6 +21,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Install pinned official reference SDK for API availability smoke test
+        run: npm install --no-save --ignore-scripts --prefix "$RUNNER_TEMP/dbc-sdk" @meteora-ag/dynamic-bonding-curve-sdk@2.0.0
+      - name: Smoke-test pinned official reference SDK exports
+        env:
+          NODE_PATH: ${{ runner.temp }}/dbc-sdk/node_modules
+        run: node -e "const d=require(\u0027@meteora-ag/dynamic-bonding-curve-sdk\u0027); if(typeof d.DynamicBondingCurveClient!==\u0027function\u0027) process.exit(1)"
       - name: Validate exact zero-copy account joins, mutation rejection and original source safety
         run: |
           python3 -m unittest discover -s tests -p test_meteora_dbc_seventh_source.py -v
