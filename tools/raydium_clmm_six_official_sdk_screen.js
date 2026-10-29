@@ -24,6 +24,15 @@ function main(){
      check(nativeRow&&nativeRow.quotes.length===4&&!nativeRow.blocked.length,
        "four native single-tick candidates incomplete");
      const result=quotePool(row,nativeRow);
+     const verifiedArrays=new Set(row.tick_capture.tick_arrays
+       .filter(a=>a.present===true).map(a=>a.address));
+     check(result.trials.every(t=>
+       Array.isArray(t.remaining_tick_arrays) &&
+       t.remaining_tick_arrays.length>=1 &&
+       t.remaining_tick_arrays.length<=5 &&
+       new Set(t.remaining_tick_arrays).size===t.remaining_tick_arrays.length &&
+       t.remaining_tick_arrays.every(a=>verifiedArrays.has(a))),
+       "official SDK tick path not in original authenticated tick snapshot");
      check(result.trials.length===4&&result.matched===4,
        "four exact official SDK/native integer prices not achieved");
      check(result.trials.every(r=>r.all_trade===true &&
