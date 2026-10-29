@@ -170,8 +170,10 @@ def audit(source,sdk,native,signed,*,required=1):
                 not any("Program "+PROGRAM+" success" in x for x in logs)):
                 raise ValueError("DBC genuine program success logs absent")
             hashes.append(hashlib.sha256(raw).hexdigest())
-        if len(seen)!=4 or len(hashes)!=4:
-            raise ValueError("DBC original four distinct signed trial coverage incomplete")
+        if (len(seen)!=4 or len(hashes)!=4 or
+                sum(direction=="base_to_quote" for direction,_ in seen)!=2 or
+                sum(direction=="quote_to_base" for direction,_ in seen)!=2):
+            raise ValueError("DBC two signed trials per direction required")
         result.append({"pool":address,"source_slot":source_row["source_slot"],
               "source_sha256":ref["source_pool_sha256"],
               "signed_transaction_hashes":hashes,
