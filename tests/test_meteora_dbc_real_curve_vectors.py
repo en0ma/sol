@@ -5,6 +5,7 @@ The raw config digest and original bytes are retained in Actions artifact
 """
 import unittest
 from arb.meteora_dbc_native_segment import quote_one_segment
+from arb.meteora_dbc_native_curve_audit import sdk_gross_curve_output
 
 PRICE=92098360923781808
 LIQUIDITY=100276303319821972080827062311934
@@ -13,6 +14,20 @@ STOP=318420028436199832
 
 
 class DbcRealSourceCurveVectors(unittest.TestCase):
+
+    def test_sdk_gross_collection_mode_for_both_directions(self):
+        trial={"sdk_output":"49","sdk_trading_fee":"1","sdk_protocol_fee":"0"}
+        self.assertEqual(sdk_gross_curve_output(
+            trial,base_for_quote=False,collection=1),50)
+        self.assertEqual(sdk_gross_curve_output(
+            trial,base_for_quote=False,collection=0),49)
+        self.assertEqual(sdk_gross_curve_output(
+            trial,base_for_quote=True,collection=0),50)
+        self.assertEqual(sdk_gross_curve_output(
+            trial,base_for_quote=True,collection=1),50)
+        with self.assertRaisesRegex(ValueError,"fee collection"):
+            sdk_gross_curve_output(trial,base_for_quote=False,collection=2)
+
     def test_real_original_source_curve_matches_four_reference_prices(self):
         vectors=(
             (True,997886654,92098276515258379,24873),
