@@ -52,9 +52,16 @@ def capture(rpc,*,count=3):
         raise ValueError("Meteora DBC real on-chain ELF missing")
     # getProgramAccounts is source-only discovery and may be disallowed
     # by a capped RPC provider. Never invent new pool identities.
-    hints=call(rpc,"getProgramAccounts",[PROGRAM,{
+    source_scan_status="ONCHAIN_PROGRAM_ACCOUNTS_REQUESTED"
+    try:
+        hints=call(rpc,"getProgramAccounts",[PROGRAM,{
         "encoding":"base64","commitment":"confirmed",
         "filters":[{"memcmp":{"offset":0,"bytes":b58(DISC)}}]}])
+    except OSError:
+        # This datasource rate-limits getProgramAccounts. The verified
+        # original ELF remains useful; never fabricate discovered pools.
+        hints=[]
+        source_scan_status="SCAN_THROTTLED_NO_POOL_AUTHENTICATION"
     if not isinstance(hints,list):
         raise ValueError("DBC read-only active VirtualPool program account scan denied")
     accepted=[]
@@ -78,7 +85,8 @@ def capture(rpc,*,count=3):
         "program":PROGRAM,"pool_authority":POOL_AUTHORITY,
         "onchain_elf_sha256":hashlib.sha256(elf).hexdigest(),
         "programdata_address":program_data,
-        "source_pools":accepted,"authenticated":len(accepted),**SAFE}
+        "source_pools":accepted,"authenticated":len(accepted),
+        "scan_status":source_scan_status,**SAFE}
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
@@ -91,6 +99,6 @@ def main():
     print(json.dumps({"status":report["status"],
                       "authenticated":report["authenticated"],
                       "elf_sha256":report["onchain_elf_sha256"]}))
-    if report["authenticated"]!=args.count:
+    if report["authenticated"]!=args.count and report["scan_status"]!="SCAN_THROTTLED_NO_POOL_AUTHENTICATION":
         raise SystemExit("Meteora DBC bounded real pool source target incomplete")
 if __name__=="__main__":main()
