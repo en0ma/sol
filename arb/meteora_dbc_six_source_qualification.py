@@ -7,6 +7,7 @@ import argparse,json,os,subprocess,tempfile
 from pathlib import Path
 from arb.meteora_dbc_seventh_candidate_capture import run
 from arb.meteora_dbc_seventh_source_audit import independently_audit
+from arb.meteora_dbc_native_fee_parity import parity as native_fee_parity
 
 
 def qualify(rpc, *, count=6, hint_limit=24, pages=4):
@@ -54,6 +55,9 @@ def validate_official_sdk_candidate(row):
                 {t["direction"] for t in pools[0]["trials"]}!=
                 {"base_to_quote","quote_to_base"}):
             raise ValueError("DBC official SDK four bidirectional quotes missing")
+        native=native_fee_parity(source,report)
+        if native.get("verified_pools")!=1 or native.get("verified_trials")!=4:
+            raise ValueError("DBC independent full-fee native/SDK parity missing")
 
 
 def main():
