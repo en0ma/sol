@@ -17,15 +17,33 @@ from arb.meteora_dbc_seventh_venue_source import (
 )
 
 
-def discover(rpc, *, count=3, max_signatures=48):
+def discover(rpc, *, count=6, max_signatures=64, pages=4):
     if (type(count) is not int or not 1 <= count <= 12
-            or type(max_signatures) is not int or not count <= max_signatures <= 64):
+            or type(max_signatures) is not int or not count <= max_signatures <= 64
+            or type(pages) is not int or not 1 <= pages <= 6):
         raise ValueError("DBC bounded onchain discovery arguments required")
-    signatures=call(rpc,"getSignaturesForAddress",[
-        PROGRAM,{"limit":max_signatures,"commitment":"confirmed"}
-    ])
-    if not isinstance(signatures,list) or len(signatures)>max_signatures:
-        raise ValueError("DBC program signatures response malformed")
+    signatures=[]
+    before=None
+    seen_signatures=set()
+    for _ in range(pages):
+        options={"limit":max_signatures,"commitment":"confirmed"}
+        if before is not None:
+            options["before"]=before
+        page=call(rpc,"getSignaturesForAddress",[PROGRAM,options])
+        if not isinstance(page,list) or len(page)>max_signatures:
+            raise ValueError("DBC program signature page malformed")
+        if not page:break
+        for entry in page:
+            if not isinstance(entry,dict) or not isinstance(entry.get("signature"),str):
+                continue
+            signature=entry["signature"]
+            if signature in seen_signatures:
+                raise ValueError("DBC program signatures cursor made no progress")
+            seen_signatures.add(signature)
+            signatures.append(entry)
+        before=page[-1].get("signature")
+        if not isinstance(before,str) or len(page)<max_signatures:
+            break
     found=[]
     seen=set()
     attempts=0
@@ -106,10 +124,11 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("--rpc",required=True)
     p.add_argument("--count",type=int,default=6)
-    p.add_argument("--max-signatures",type=int,default=48)
+    p.add_argument("--max-signatures",type=int,default=64)
+    p.add_argument("--pages",type=int,default=4)
     p.add_argument("--output",required=True)
     a=p.parse_args()
-    r=discover(a.rpc,count=a.count,max_signatures=a.max_signatures)
+    r=discover(a.rpc,count=a.count,max_signatures=a.max_signatures,pages=a.pages)
     Path(a.output).write_text(json.dumps(r,indent=2)+"\n")
     print(json.dumps({"hints":len(r["hints"]),
                       "program_transactions_checked":r["program_transactions_checked"],
