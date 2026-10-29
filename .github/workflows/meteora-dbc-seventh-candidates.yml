@@ -1,0 +1,49 @@
+name: Meteora DBC Seventh Venue Candidate Authentication
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/meteora-dbc-seventh-candidates.yml"
+      - "arb/meteora_dbc_seventh_discovery.py"
+      - "arb/meteora_dbc_seventh_candidate_capture.py"
+      - "arb/meteora_dbc_seventh_state_capture.py"
+      - "tests/test_meteora_dbc_seventh_state_capture.py"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  dbc-source-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Validate exact zero-copy account joins, mutation rejection and original source safety
+        run: |
+          python3 -m unittest discover -s tests -p test_meteora_dbc_seventh_source.py -v
+          python3 -m unittest discover -s tests -p test_meteora_dbc_seventh_state_capture.py -v
+          python3 -m py_compile arb/meteora_dbc_seventh_discovery.py arb/meteora_dbc_seventh_candidate_capture.py
+  dbc-real-candidate:
+    if: github.event_name == 'workflow_dispatch'
+    needs: dbc-source-regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SOLANA_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
+      SOLANA_RPC_MIN_INTERVAL_SECONDS: "0.5"
+      SOLANA_RPC_ALCHEMY_FREE_TIER: "1"
+      SOLANA_RPC_PACING_FILE: /tmp/dbc-seventh-candidate-pacing
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Authenticate untrusted index pool against original DBC source
+        run: |
+          test -n "$SOLANA_RPC_URL"
+          python3 -m arb.meteora_dbc_seventh_candidate_capture \
+            --rpc "$SOLANA_RPC_URL" --count 1 \
+            --output "$RUNNER_TEMP/dbc-original-contextual-candidates.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dbc-original-contextual-candidates
+          path: ${{ runner.temp }}/dbc-original-contextual-candidates.json
+          if-no-files-found: warn
