@@ -118,6 +118,41 @@ class SixVenuePipelineTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"inconsistent"):
             assess_signed_batch({**batch,"routes":[{**row,"actionable":True}]},[3])
 
+    def test_gross_loss_quoted_route_is_diagnostic_only(self):
+        quote={"status":"GROSS_SOURCE_BOUND_RANKING_ONLY",
+               "fully_quoted":1,"blocked":0,"positive_gross":0,
+               "ranked":[{"index":0,"positive_gross":False,
+                          "actionable":False}]}
+        with tempfile.TemporaryDirectory() as temp:
+            src=Path(temp)/"source"
+            dst=Path(temp)/"signed"
+            def export(_rpc,_readiness,folder,*,maximum):
+                folder.mkdir()
+                (folder/"triangle.json").write_text(json.dumps({
+                    "route_venues":["orca","raydium_cpmm","raydium_clmm"]}))
+                summary={"exported":1,"routes":[{
+                    "index":4,"status":"AUTHENTICATED_THREE_VENUE_SOURCE_FIXTURE",
+                    "fixture":"triangle.json"}]}
+                (folder/"summary.json").write_text(json.dumps(summary))
+                return summary
+            with patch("arb.six_venue_pipeline.probe",return_value=readiness()), \
+                 patch("arb.m5_distinct_venue_coverage_batch.source_batch",side_effect=export), \
+                 patch("arb.m5_source_triangle_quote_ranking.rank",return_value=quote):
+                report=source_research("http://127.0.0.1:8899",
+                    {"pools":[]},src,amount_in=100,observed_unix=100)
+            self.assertEqual(report["manifest"]["diagnostic_only_indices"],[4])
+            self.assertEqual(report["manifest"]["positive_gross_indices"],[])
+            signed={"attempted":1,"independent_signed_accepted":0,
+                    "routes":[{"index":4,"independent_signed_accepted":False,
+                              "actionable":False,"broadcast":False}]}
+            with patch.dict(os.environ,{"SURFPOOL_EXPLICITLY_OFFLINE":"1"}), \
+                 patch("arb.m5_distinct_venue_coverage_batch.offline_batch",return_value=signed):
+                offline=offline_research("http://127.0.0.1:8899",src,dst)
+            self.assertEqual(offline["diagnostic_only_signed_routes"],1)
+            self.assertEqual(offline["selected_positive_gross_routes"],0)
+            self.assertEqual(offline["independent_signed_accepted"],0)
+            self.assertEqual(offline["net_profitable_confirmed"],0)
+
     def test_new_onchain_discovery_hints_must_reauthenticate(self):
         with tempfile.TemporaryDirectory() as temp:
             src=Path(temp)/"source"
