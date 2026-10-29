@@ -135,8 +135,11 @@ def execute(source_rpc,local_rpc,tick_source,native,sdk):
                 [ix],signer.pubkey(),[signer],Hash.from_string(blockhash))
             simulated,_=_simulate(local_rpc,tx,[user_in,user_out])
             if simulated.get("err") is not None:
-                raise ValueError("CLMM genuine signed SwapV2 rejected: "+
-                                 str(simulated["err"])[:200])
+                raise ValueError("CLMM genuine signed SwapV2 rejected pool="+
+                                 address+" direction="+str(forward)+
+                                 " amount="+str(size)+" error="+
+                                 str(simulated["err"])[:200]+" logs="+
+                                 str((simulated.get("logs") or [])[-12:])[:1400])
             balances=_balances(simulated,[mint_in,mint_out],str(signer.pubkey()))
             if balances!=[0,output]:
                 raise ValueError("CLMM genuine signed SPL amount differs from native/SDK "+
