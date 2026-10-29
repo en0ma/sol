@@ -15,6 +15,15 @@ on:
       - "arb/meteora_dbc_native_fee_parity.py"
       - "tests/test_meteora_dbc_native_fee.py"
   workflow_dispatch:
+    inputs:
+      pool_count:
+        description: "Independently sourced original SPL DBC pools: 1 or 6"
+        required: false
+        type: choice
+        options:
+          - "1"
+          - "6"
+        default: "1"
 permissions:
   contents: read
 jobs:
@@ -28,6 +37,7 @@ jobs:
       SOLANA_RPC_ALCHEMY_FREE_TIER: "1"
       SOLANA_RPC_PACING_FILE: /tmp/dbc-signed-source-pacing
       SURFPOOL_EXPLICITLY_OFFLINE: "1"
+      POOL_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.pool_count || '1' }}
     steps:
       - uses: actions/checkout@v4
       - run: |
@@ -62,9 +72,15 @@ jobs:
       - name: Capture one authentic original DBC source without broadcast
         run: |
           test -n "$SOLANA_MAINNET_RPC_URL"
-          python3 -m arb.meteora_dbc_seventh_candidate_capture \
-            --rpc "$SOLANA_MAINNET_RPC_URL" --count 1 --pages 2 \
-            --output "$RUNNER_TEMP/dbc-signed-diagnostic-source.json"
+          if [[ "$POOL_COUNT" == "6" ]]; then
+            python3 -m arb.meteora_dbc_six_source_qualification \
+              --rpc "$SOLANA_MAINNET_RPC_URL" --pages 6 \
+              --output "$RUNNER_TEMP/dbc-signed-diagnostic-source.json"
+          else
+            python3 -m arb.meteora_dbc_seventh_candidate_capture \
+              --rpc "$SOLANA_MAINNET_RPC_URL" --count 1 --pages 2 \
+              --output "$RUNNER_TEMP/dbc-signed-diagnostic-source.json"
+          fi
       - name: Independently audit saved source bytes
         run: |
           python3 -m arb.meteora_dbc_seventh_source_audit \
@@ -97,7 +113,7 @@ jobs:
             --source "$RUNNER_TEMP/dbc-signed-diagnostic-source.json" \
             --sdk "$RUNNER_TEMP/dbc-signed-diagnostic-sdk.json" \
             --curve "$RUNNER_TEMP/dbc-signed-diagnostic-native-fee.json" \
-            --required 1 \
+            --required "$POOL_COUNT" \
             --output "$RUNNER_TEMP/dbc-signed-diagnostic-unaccepted.json"
       - name: Independently reparse Ed25519 intent and raw SPL poststates
         run: |
