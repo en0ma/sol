@@ -87,8 +87,14 @@ def capture_pool(rpc, original):
         raise ValueError("DBC synchronized source context invalid")
     rows = response["value"]
     pool_raw = decode_account(rows[0], owner=PROGRAM, size=VIRTUAL_POOL_ACCOUNT_SIZE)
-    if pool_raw != first:
-        raise ValueError("DBC pool mutated between identity and dependency capture")
+    fresh_fields = parse_pool(pool_raw)
+    immutable_roles=("config","creator","base_mint","base_vault","quote_vault")
+    if any(fresh_fields[k] != fields[k] for k in immutable_roles):
+        raise ValueError("DBC source pool identity changed between contextual reads")
+    # On active live DBC pools, reserves/price may change. Never combine
+    # the old identity bytes with a later dependency snapshot: use only
+    # the *fresh* pool bytes from this single contextual response.
+    fields = fresh_fields
     cfg_raw = decode_account(rows[1], owner=PROGRAM)
     if len(cfg_raw) < 40 or cfg_raw[:8] != hashlib.sha256(b"account:PoolConfig").digest()[:8]:
         raise ValueError("DBC PoolConfig original discriminator/size invalid")
