@@ -44,12 +44,14 @@ def discover(registry,*,minimum=6,limit=80,fetch=None):
     for item in rows:
         if not isinstance(item,dict):continue
         if provider=="dexpaprika_public_index":
-            address=item.get("address") or item.get("pool_address")
+            address=item.get("address") or item.get("pool_address") or item.get("id")
             if not isinstance(address,str) or address in seen:continue
             try:Pubkey.from_string(address)
             except ValueError:continue
+            mints=[item.get("mintA",{}).get("address"),item.get("mintB",{}).get("address")]
+            if any(not isinstance(m,str) for m in mints) or len(set(mints))!=2:continue
             seen.add(address)
-            results.append({"venue":"raydium_clmm","address":address,
+            results.append({"venue":"raydium_clmm","address":address,"mints":mints,
                 "candidate_status":"PUBLIC_INDEX_HINT_REQUIRES_ONCHAIN_AUTHENTICATION"})
             continue
         if not isinstance(item,dict) or item.get("programId")!=PROGRAM:
