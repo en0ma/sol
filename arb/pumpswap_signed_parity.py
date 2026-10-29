@@ -31,6 +31,48 @@ def balance(rpc, address, mint):
     return token["amount_base_units"]
 
 
+def verify_transaction_intent(transaction,pool,input_mint,output_mint,
+                              input_address,output_address,size,minimum):
+    """Prevent a different signed transaction from impersonating PumpSwap parity."""
+    from arb.pumpswap_pool import PROGRAM
+    from arb.pumpswap_trade_v2 import ORDER
+    message=transaction.message
+    keys=[str(key) for key in message.account_keys]
+    instructions=list(message.instructions)
+    if len(instructions)!=1:
+        raise ValueError("signed PumpSwap parity must contain exactly one instruction")
+    instruction=instructions[0]
+    if instruction.program_id_index>=len(keys) or keys[instruction.program_id_index]!=PROGRAM:
+        raise ValueError("signed transaction does not invoke PumpSwap")
+    indices=list(instruction.accounts)
+    if len(indices)!=len(ORDER) or any(i>=len(keys) for i in indices):
+        raise ValueError("signed PumpSwap V2 account list invalid")
+    roles={role:keys[index] for role,index in zip(ORDER,indices)}
+    if roles["pool"]!=pool or roles["base_mint"] not in (input_mint,output_mint) or (
+            roles["quote_mint"] not in (input_mint,output_mint)):
+        raise ValueError("signed PumpSwap pool or mint mismatch")
+    direction=("sell" if roles["base_mint"]==input_mint else "buy_exact_quote_in")
+    if roles["base_mint"]==roles["quote_mint"] or (
+            roles["quote_mint"]!=output_mint if direction=="sell"
+            else roles["base_mint"]!=output_mint):
+        raise ValueError("signed V2 swap direction mismatch")
+    if (roles["user_base_token_account"]!=(
+            input_address if direction=="sell" else output_address) or
+            roles["user_quote_token_account"]!=(
+                output_address if direction=="sell" else input_address)):
+        raise ValueError("signed token account roles differ from simulated accounts")
+    import hashlib
+    tag="sell_v2" if direction=="sell" else "buy_exact_quote_in_v2"
+    data=bytes(instruction.data)
+    if (len(data)!=24 or data[:8]!=hashlib.sha256(
+            ("global:"+tag).encode()).digest()[:8] or
+            int.from_bytes(data[8:16],"little")!=size or
+            int.from_bytes(data[16:24],"little")!=minimum):
+        raise ValueError("signed V2 instruction amount or minimum mismatch")
+    if roles["user"] not in keys[:message.header.num_required_signatures]:
+        raise ValueError("signed PumpSwap user authority missing from signers")
+
+
 def run(rpc, sdk_report, manifest):
     local_rpc_only(rpc)
     if (not isinstance(sdk_report,dict) or sdk_report.get("venue")!="pumpswap"
@@ -108,6 +150,8 @@ def run(rpc, sdk_report, manifest):
             from solders.transaction import VersionedTransaction
             transaction=VersionedTransaction.from_bytes(signed_bytes)
             transaction.verify_and_hash_message()
+            verify_transaction_intent(transaction,pool,mint,output_mint,
+                input_address,output_address,size,expected)
             before_in=balance(rpc,input_address,mint)
             before_out=balance(rpc,output_address,output_mint)
             result=simulate_signed(rpc,signed_bytes,input_address,output_address,
