@@ -28,9 +28,17 @@ jobs:
           python3 -m arb.raydium_clmm_sixth_venue_source \
             --rpc "$SOLANA_RPC_URL" --registry arb/pool_registry.json \
             --count 1 --output "$RUNNER_TEMP/clmm-sixth-source.json"
+      - name: Authenticate bounded tick-array liquidity in synchronized source snapshot
+        run: |
+          python3 -m arb.raydium_clmm_sixth_tick_capture \
+            --source "$RUNNER_TEMP/clmm-sixth-source.json" \
+            --rpc "$SOLANA_RPC_URL" --radius 4 \
+            --output "$RUNNER_TEMP/clmm-sixth-tick-source.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: raydium-clmm-sixth-source
-          path: ${{ runner.temp }}/clmm-sixth-source.json
+          path: |
+            ${{ runner.temp }}/clmm-sixth-source.json
+            ${{ runner.temp }}/clmm-sixth-tick-source.json
           if-no-files-found: warn
