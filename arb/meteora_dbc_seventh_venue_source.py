@@ -15,6 +15,8 @@ PROGRAM="dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN"
 POOL_AUTHORITY="FhVo3mqL8PW5pH5U2CN4XE33DokiyZnUwuGpH2hmHLuM"
 UPGRADEABLE="BPFLoaderUpgradeab1e11111111111111111111111"
 DISC=hashlib.sha256(b"account:VirtualPool").digest()[:8]
+# Upstream zero-copy VirtualPool::INIT_SPACE = 416, plus Anchor discriminator.
+VIRTUAL_POOL_ACCOUNT_SIZE=8+416
 SAFE={"actionable":False,"broadcast":False,"native_pricing_verified":False,
       "official_sdk_parity_verified":False,"signed_parity_verified":False,
       "registry_admission_approved":False}
@@ -45,8 +47,8 @@ def authenticated_pool_hints(rpc, addresses):
                 or len(account["data"]) != 2 or account["data"][1] != "base64"):
             raise ValueError("DBC source pool account authentication failed")
         raw = base64.b64decode(account["data"][0], validate=True)
-        if raw[:8] != DISC:
-            raise ValueError("DBC VirtualPool discriminator mismatch")
+        if len(raw) != VIRTUAL_POOL_ACCOUNT_SIZE or raw[:8] != DISC:
+            raise ValueError("DBC VirtualPool size or discriminator mismatch")
         verified.append({
             "address": address, "status": "DBC_PROGRAM_OWNED_VIRTUAL_POOL_SOURCE",
             "account_base64": account["data"][0],
@@ -120,7 +122,7 @@ def capture(rpc,*,count=3,pool_addresses=None):
         if account.get("owner")!=PROGRAM or account.get("executable") is not False:
             continue
         raw=base64.b64decode(account["data"][0],validate=True)
-        if raw[:8]!=DISC:continue
+        if len(raw)!=VIRTUAL_POOL_ACCOUNT_SIZE or raw[:8]!=DISC:continue
         address=entry.get("pubkey")
         if not isinstance(address,str):continue
         Pubkey.from_string(address)
