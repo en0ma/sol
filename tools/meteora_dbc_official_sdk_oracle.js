@@ -60,26 +60,44 @@ for(const row of report.source_pools) {
   requireTrue(currentPoint.gt(new BN(0)),"DBC missing authenticated Clock point");
   const trials=[];
   for(const swapBaseForQuote of [true,false]) {
-    for(const amount of ["10000","100000"]) {
-      const input=new BN(amount);
-      // Original SDK's fee engine and curve walk are deliberately the oracle.
-      const quote=client.pool.swapQuote({
-        virtualPool, config, swapBaseForQuote,
-        amountIn:input, slippageBps:0, hasReferral:false,
-        currentPoint, eligibleForFirstSwapWithMinFee:false
-      });
-      requireTrue(quote.outputAmount.gt(new BN(0)) &&
-        quote.actualInputAmount.gte(new BN(0)),
-        "DBC SDK quote cannot qualify zero or negative output");
-      trials.push({
-        direction:swapBaseForQuote?"base_to_quote":"quote_to_base",
-        amount_in:amount, sdk_output:quote.outputAmount.toString(10),
-        sdk_actual_input:quote.actualInputAmount.toString(10),
-        sdk_next_sqrt_price:quote.nextSqrtPrice.toString(10),
-        sdk_protocol_fee:quote.protocolFee.toString(10),
-        sdk_trading_fee:quote.tradingFee.toString(10)
-      });
+    // Source-bound adaptive raw input sizes prevent a dust-sized false
+    // negative. Short-lived launch curves have wildly different decimals.
+    const reserve=new BN(String(swapBaseForQuote ?
+      roles.base_reserve : roles.quote_reserve));
+    requireTrue(reserve.gt(new BN(0)), "DBC source reserve zero");
+    const initial=BN.max(new BN("10000"),reserve.div(new BN("1000000")));
+    const used=new Set();
+    let next=initial;
+    for(let attempt=0;attempt<8 && used.size<2;attempt++) {
+      if(next.gte(reserve.divn(4))) break;
+      const amount=next.toString(10);
+      next=next.muln(10);
+      if(used.has(amount)) continue;
+      try {
+        const quote=client.pool.swapQuote({
+          virtualPool, config, swapBaseForQuote,
+          amountIn:new BN(amount), slippageBps:0, hasReferral:false,
+          currentPoint, eligibleForFirstSwapWithMinFee:false
+        });
+        if(!quote.outputAmount.gt(new BN(0))) continue;
+        requireTrue(quote.actualInputAmount.gte(new BN(0)),
+          "DBC SDK actual input negative");
+        used.add(amount);
+        trials.push({
+          direction:swapBaseForQuote?"base_to_quote":"quote_to_base",
+          amount_in:amount, sdk_output:quote.outputAmount.toString(10),
+          sdk_actual_input:quote.actualInputAmount.toString(10),
+          sdk_next_sqrt_price:quote.nextSqrtPrice.toString(10),
+          sdk_protocol_fee:quote.protocolFee.toString(10),
+          sdk_trading_fee:quote.tradingFee.toString(10)
+        });
+      } catch(error) {
+        // This candidate amount is never marked quoted. SDK may reject
+        // migration thresholds or liquidity exhaustion; try a bounded size.
+      }
     }
+    requireTrue(used.size===2,
+      "DBC official SDK cannot establish two genuine non-dust quote sizes");
   }
   results.push({
     pool:row.pool,source_slot:row.source_slot,
