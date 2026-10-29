@@ -17,8 +17,9 @@ def merge(registry,source,sdk,native,signed,*,required=1):
             or type(required) is not int or not 1<=required<=6):
         raise ValueError("DBC existing registry and 1-6 independent signed pools required")
     accepted=audit(source,sdk,native,signed,required=required)
-    if accepted["independently_signed_verified_pools"]!=required:
-        raise ValueError("DBC required signed verified pool count unmet")
+    if (accepted["independently_signed_verified_pools"]!=required or
+            accepted.get("all_source_vault_poststates_reconciled") is not True):
+        raise ValueError("DBC signed source vault verification prerequisite unmet")
     if source.get("status")=="SIX_DBC_ORIGINAL_SOURCE_POOLS_ONLY":
         source=source["source"]
     original={p["pool"]:p for p in source["source_pools"]}
@@ -30,6 +31,8 @@ def merge(registry,source,sdk,native,signed,*,required=1):
         addr=item["pool"]
         row=original[addr];f=row["pool_fields"]
         hashes=item["signed_transaction_hashes"]
+        if item.get("source_vault_debit_credit_verified") is not True:
+            raise ValueError("DBC full vault-backed signed pool evidence required")
         if (len(hashes)!=4 or len(set(hashes))!=4 or
             any(not isinstance(h,str) or len(h)!=64 or
                 any(c not in "0123456789abcdef" for c in h) for h in hashes)):
@@ -40,6 +43,8 @@ def merge(registry,source,sdk,native,signed,*,required=1):
         mints=[f["base_mint"],f["quote_mint"]]
         provenance={"status":"INDEPENDENT_DBC_ORIGINAL_SIGNED_NATIVE_SDK_SPL_PARITY",
           "source_slot":item["source_slot"],"source_digest":item["source_sha256"],
+          "vault_debit_credit_verified":True,
+          "two_signed_swaps_each_direction_verified":True,
           "signed_transaction_hashes":hashes,
           "independent_receipt_sha256":hashlib.sha256(
              json.dumps(item,sort_keys=True,separators=(",",":")).encode()).hexdigest()}
@@ -47,7 +52,9 @@ def merge(registry,source,sdk,native,signed,*,required=1):
         if key not in existing:
             existing[key]=len(rows)
             rows.append({"venue":"meteora_dbc","address":addr,
-                         "mints":mints,"signed_provenance":provenance})
+                         "mints":mints,"signed_provenance":provenance,
+                         "usable_for_arbitrage":False,
+                         "requires_live_state_revalidation":True})
         else:
             previous=rows[existing[key]]
             if previous.get("mints")!=mints:
@@ -65,7 +72,9 @@ def merge(registry,source,sdk,native,signed,*,required=1):
     return {**registry,"pools":rows},{"venue":"meteora_dbc",
         "status":"DBC_INDEPENDENT_SIGNED_SHARED_REGISTRY_ARTIFACT_ONLY",
         "signed_verified_pools_in_current_run":required,
-        "target_signed_verified_pools":6,**SAFE}
+        "target_signed_verified_pools":6,
+        "usable_for_arbitrage":False,
+        "requires_live_state_revalidation":True,**SAFE}
 
 
 def main():
