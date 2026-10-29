@@ -7,7 +7,9 @@ on:
       - "arb/meteora_dbc_seventh_recent_tx_discovery.py"
       - "arb/meteora_dbc_seventh_candidate_capture.py"
       - "arb/meteora_dbc_seventh_state_capture.py"
+      - "arb/meteora_dbc_seventh_source_audit.py"
       - "tests/test_meteora_dbc_seventh_state_capture.py"
+      - "tests/test_meteora_dbc_seventh_source_audit.py"
       - "tests/test_meteora_dbc_seventh_discovery.py"
       - "tests/test_meteora_dbc_seventh_recent_tx_discovery.py"
       - "tools/meteora_dbc_official_sdk_oracle.js"
@@ -33,6 +35,7 @@ jobs:
           python3 -m unittest discover -s tests -p test_meteora_dbc_seventh_discovery.py -v
           python3 -m unittest discover -s tests -p test_meteora_dbc_seventh_recent_tx_discovery.py -v
           python3 -m unittest discover -s tests -p test_meteora_dbc_seventh_state_capture.py -v
+          python3 -m unittest discover -s tests -p test_meteora_dbc_seventh_source_audit.py -v
           python3 -m py_compile arb/meteora_dbc_seventh_discovery.py arb/meteora_dbc_seventh_candidate_capture.py
           node --check tools/meteora_dbc_official_sdk_oracle.js
   dbc-real-candidate:
@@ -54,6 +57,11 @@ jobs:
           python3 -m arb.meteora_dbc_seventh_candidate_capture \
             --rpc "$SOLANA_RPC_URL" --count 1 \
             --output "$RUNNER_TEMP/dbc-original-contextual-candidates.json"
+      - name: Independently audit original pool/config/mint/vault/Clock raw bytes
+        run: |
+          python3 -m arb.meteora_dbc_seventh_source_audit \
+            --source "$RUNNER_TEMP/dbc-original-contextual-candidates.json" \
+            --output "$RUNNER_TEMP/dbc-independent-original-source-audit.json"
       - name: Install pinned original DBC official SDK for source-bound oracle
         run: npm install --no-save --ignore-scripts --prefix "$RUNNER_TEMP/dbc-sdk" @meteora-ag/dynamic-bonding-curve-sdk@2.0.0
       - name: Compare official SDK quotes against exact captured original bytes (SDK only)
@@ -70,4 +78,5 @@ jobs:
           path: |
             ${{ runner.temp }}/dbc-original-contextual-candidates.json
             ${{ runner.temp }}/dbc-original-official-sdk-quotes.json
+            ${{ runner.temp }}/dbc-independent-original-source-audit.json
           if-no-files-found: warn
