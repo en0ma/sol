@@ -53,7 +53,9 @@ def capture_pool(rpc,address,expected_mints):
             or state["token_mint_y_program_flag"]!=0):
         raise ValueError("DLMM disabled or unsupported token extensions")
     idx=active_bin_array_index(state["active_id"])
-    array_indexes=[idx-1,idx,idx+1]
+    # Three SDK arrays in each direction may skip uninitialized arrays.
+    # Capture a bounded 17-array neighborhood, all at the same source slot.
+    array_indexes=list(range(idx-8,idx+9))
     arrays=[bin_array_pda(address,i) for i in array_indexes]
     keys=[address,state["reserve_x"],state["reserve_y"],state["oracle"],
           *arrays,*mints,CLOCK]
@@ -80,7 +82,7 @@ def capture_pool(rpc,address,expected_mints):
             or observation_index>=observation_capacity):
         raise ValueError("DLMM oracle observation header invalid")
     verified_bins=[]
-    for index,pda,account in zip(array_indexes,arrays,accounts[4:7]):
+    for index,pda,account in zip(array_indexes,arrays,accounts[4:4+len(arrays)]):
         data=_raw(account,PROGRAM,optional=index!=idx)
         if data is None:
             verified_bins.append({"index":index,"pda":pda,"authenticated":False})
@@ -91,13 +93,14 @@ def capture_pool(rpc,address,expected_mints):
                 str(Pubkey.from_bytes(data[24:56]))!=address):
             raise ValueError("DLMM indexed bin array parent/owner mismatch")
         verified_bins.append({"index":index,"pda":pda,"authenticated":True})
-    if verified_bins[1]["authenticated"] is not True:
+    if not any(b["index"]==idx and b["authenticated"] for b in verified_bins):
         raise ValueError("DLMM active bin liquidity source unavailable")
-    for account in accounts[7:9]:
+    mint_offset=4+len(arrays)
+    for account in accounts[mint_offset:mint_offset+2]:
         mint_bytes=_raw(account,TOKEN_PROGRAM)
         if len(mint_bytes)!=82 or mint_bytes[45]!=1:
             raise ValueError("DLMM classic mint uninitialized")
-    clock=_raw(accounts[9],SYSVAR)
+    clock=_raw(accounts[mint_offset+2],SYSVAR)
     if len(clock)!=40:
         raise ValueError("DLMM synchronized Clock sysvar length invalid")
     clock_slot=int.from_bytes(clock[0:8],"little")
