@@ -126,8 +126,9 @@ def execute(source_rpc,local_rpc,source,sdk,*,pool_count=1):
         hashes[program]=hydrate(local_rpc,{"accounts":{
             program:binaries[program],programdata:binaries[programdata]}},
             program=program)
-    manifest={"venue":"pumpswap","trials":[]}
+    verified_pools=[]
     for sdk_pool in sdk["pools"]:
+        manifest={"venue":"pumpswap","trials":[]}
         address=sdk_pool["address"]
         source_row=source_by_pool[address]
         state,account_set=_source_accounts(source_row)
@@ -185,9 +186,19 @@ def execute(source_rpc,local_rpc,source,sdk,*,pool_count=1):
                 "amount_in":size,"source_slot":sdk_pool["source_slot"],
                 "source_digest":sdk_pool["source_digest"],
                 "signed_transaction_base64":base64.b64encode(bytes(tx)).decode()})
-    # The separate verifier checks real sig-verified SPL deltas and refuses
-    # registry admission. Its success is not substituted with synthetic math.
-    proof=verify_signed(local_rpc,sdk,manifest)
+        # Check this pool's four freshly signed transactions before moving to
+        # another pool. Otherwise the early signed blockhash expires during
+        # minutes of later pool hydration/provisioning (BlockhashNotFound).
+        # No signature retries and no replaceRecentBlockhash shortcuts.
+        pool_sdk={**sdk,"pools":[sdk_pool]}
+        pool_proof=verify_signed(local_rpc,pool_sdk,manifest)
+        if pool_proof.get("signed_parity_verified") is not True or len(pool_proof["pools"])!=1:
+            raise ValueError("PumpSwap signed per-pool parity incomplete")
+        verified_pools.extend(pool_proof["pools"])
+    # The separate verifier checks real sig-verified SPL deltas; all verified
+    # pool receipts are kept together for independent post-hoc cryptographic audit.
+    proof={"venue":"pumpswap","status":"PUMPSWAP_SIGNED_SDK_NATIVE_EXACT",
+           "pools":verified_pools,"signed_parity_verified":True,**SAFE}
     return {"venue":"pumpswap","status":"SIGNED_PUMPSWAP_ISOLATED_PARITY",
             "program_elf_sha256":hashes,"signed_proof":proof,**SAFE}
 
