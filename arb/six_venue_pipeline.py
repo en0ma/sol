@@ -149,7 +149,7 @@ def source_research(rpc, registry, fixture_dir, *, amount_in,
     selected=[indices[row["index"]] for row in ranking["ranked"]
               if row.get("positive_gross") is True]
     summary_raw=(root/"summary.json").read_bytes()
-    ranking_raw=(json.dumps(ranking,sort_keys=True,separators=(",",":"))+"\\n").encode()
+    ranking_raw=json.dumps(ranking,sort_keys=True,separators=(",",":")).encode()
     (root/"six-venue-ranking.json").write_bytes(ranking_raw)
     manifest={"status":"SIX_VENUE_SIGNED_HANDOFF_UNEXECUTED",
               "venues":list(VENUES),"observed_unix":observed_unix,
