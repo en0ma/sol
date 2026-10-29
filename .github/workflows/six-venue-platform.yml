@@ -1,0 +1,31 @@
+name: Six-Venue Arbitrage Pipeline Safety
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/six-venue-platform.yml"
+      - "arb/six_venue_pipeline.py"
+      - "tests/test_six_venue_pipeline.py"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  six-venue-pipeline-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Solana types
+        run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Compile six-venue source/offline entrypoint
+        run: python3 -m py_compile arb/six_venue_pipeline.py tests/test_six_venue_pipeline.py
+      - name: Independently test discovery, quotes, provenance and offline gates
+        run: python3 -m unittest discover -s tests -p test_six_venue_pipeline.py -v
+      - name: Assert all six venues are fixed and no DBC/AMM-v4 sneaks into the platform
+        run: |
+          python3 - <<'PY'
+          from arb.six_venue_pipeline import VENUES
+          expected={"orca","raydium_cpmm","meteora_damm_v2",
+                    "pumpswap","meteora_dlmm","raydium_clmm"}
+          assert len(VENUES)==6 and set(VENUES)==expected
+          print("Six venue research scope only; no trading/broadcast capability enabled")
+          PY
