@@ -33,9 +33,18 @@ jobs:
             --registry arb/pool_registry.json \
             --limit "$POOL_COUNT" \
             --output "$RUNNER_TEMP/pumpswap-native-source.json"
+      - name: Install pinned official PumpSwap SDK for independent candidate comparison
+        run: npm install --no-save --package-lock=false @pump-fun/pump-swap-sdk@2.2.0
+      - name: Independently compare captured native candidates to published SDK
+        run: |
+          node tools/pumpswap_sdk_oracle.js \
+            "$RUNNER_TEMP/pumpswap-native-source.json" \
+            "$RUNNER_TEMP/pumpswap-official-sdk-comparison.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: pumpswap-authenticated-source-research
-          path: ${{ runner.temp }}/pumpswap-native-source.json
+          path: |
+            ${{ runner.temp }}/pumpswap-native-source.json
+            ${{ runner.temp }}/pumpswap-official-sdk-comparison.json
           if-no-files-found: warn
