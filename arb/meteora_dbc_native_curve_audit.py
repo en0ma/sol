@@ -76,7 +76,7 @@ def audit(source, sdk):
             seen.add(key)
             base=direction=="base_to_quote"
             native=walk(sqrt_price=price,curve=curve,
-                input_amount=actual,base_for_quote=base,
+                amount_in=actual,base_for_quote=base,
                 sqrt_start_price=start,migration_sqrt_price=migration_price)
             if int(trial["sdk_next_sqrt_price"])!=native["next_sqrt_price"]:
                 raise ValueError("DBC independent curve next price differs from official SDK")
