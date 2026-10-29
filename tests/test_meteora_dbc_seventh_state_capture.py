@@ -40,8 +40,11 @@ def context(pool, mutate=False):
     authority=bytes(Pubkey.from_string(POOL_AUTHORITY))
     base_vault[32:64]=authority
     quote_vault[32:64]=authority
+    config=bytearray(128)
+    config[:8]=hashlib.sha256(b"account:PoolConfig").digest()[:8]
+    config[8:40]=bytes([6])*32
     return {"context":{"slot":102},"value":[
-       account(PROGRAM,bytes(raw)),account(PROGRAM,bytes(128)),
+       account(PROGRAM,bytes(raw)),account(PROGRAM,bytes(config)),
        account(TOKEN_PROGRAM,bytes(82)),
        account(TOKEN_PROGRAM,bytes(base_vault)),
        account(TOKEN_PROGRAM,bytes(quote_vault))]}
