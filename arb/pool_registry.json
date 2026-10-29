@@ -171,7 +171,19 @@
       "mints": [
         "Ce2gx9KGXJ6C9Mp5b5x1sn9Mg87JwEbrQby4Zqo3pump",
         "So11111111111111111111111111111111111111112"
-      ]
+      ],
+      "signed_provenance": {
+        "status": "INDEPENDENT_SIGNED_NATIVE_SDK_SPL_PARITY",
+        "source_slot": 462733355,
+        "source_digest": "ad7149cd33c12ca10a0e11fb21403d7187b3802f055c5aa576936d3944921e43",
+        "signed_transaction_hashes": [
+          "c4ce75b53ad038c320c0f2262b3acbede36a6a08184151313865c274dd735172",
+          "f9df1714ab103cfa1e5415cef57e510655a013e931e47c4a806cc8da552c1aff",
+          "d4b61f1fdf15234e106c2202b09435e2ae395242bbf01edec8387f504aaabf55",
+          "8fbcabc48e130993807fd5c944f16d76d4e2fbe7ac1238b581aea70580a24bbc"
+        ],
+        "independent_receipt_sha256": "dfcf77b60326c6a89dc01ba2d6fdce9d106284f3041a475524e4dff84e6ab8a1"
+      }
     },
     {
       "venue": "pumpswap",
@@ -179,7 +191,19 @@
       "mints": [
         "So11111111111111111111111111111111111111112",
         "CfRbEWpLB8pWUwrkEGMwMtVBFzAsgJhs4LRNpChUBBDi"
-      ]
+      ],
+      "signed_provenance": {
+        "status": "INDEPENDENT_SIGNED_NATIVE_SDK_SPL_PARITY",
+        "source_slot": 462733359,
+        "source_digest": "4ce06ee0e7977b9744ef42627c382f728dc8ab5ebc96ec846def47c73d3420e3",
+        "signed_transaction_hashes": [
+          "ad9a0d91c35f2a23f46c0a537856b33695306d46d151cf77624c7fbf1a72d7e7",
+          "60b674ea781b232f20da18ebf657b125d8f36b3e4d6fd2855cc03869f1c5c63a",
+          "59cad5ec2e24711fcd07c09a0be555df24cab6431bd8d5e98997835ff92c4862",
+          "6a81b2be8ff1616ca4f3846fa7d35638b77b48989209b1554ffaf63639852bd5"
+        ],
+        "independent_receipt_sha256": "938d7df533c3e5e6439f8e3d4da18b2d34ded84e25dabf308f3c9006efd3837b"
+      }
     },
     {
       "venue": "pumpswap",
@@ -187,7 +211,19 @@
       "mints": [
         "So11111111111111111111111111111111111111112",
         "DneSmn3NenxC8CMm4vTJUpTYfigZZKWWbyymq8MjFkw3"
-      ]
+      ],
+      "signed_provenance": {
+        "status": "INDEPENDENT_SIGNED_NATIVE_SDK_SPL_PARITY",
+        "source_slot": 462733364,
+        "source_digest": "088259f680784816deb8403e5b8b32c88ff23da60d38c7f142a5fd1b9343e1fc",
+        "signed_transaction_hashes": [
+          "a9d73282c902627b31b9c7667bfd2de7f1ae64c818757051a96460898911b2b3",
+          "d470fc24c45183cca64e95e8580a4db74bda4460588746d5b75e981df025d57b",
+          "f25240ea0ede7500a6640f8119e9219b4c0f384f95886603cd24a269321dfdb5",
+          "50dd477e069fae5cde12cd3d5369f8cc0c13f34c2085025244f019753380bb87"
+        ],
+        "independent_receipt_sha256": "aa904ae0cf202e663e57027be4a110707307dfddd5cfe8f2e3b12dbb0ef2b19f"
+      }
     },
     {
       "venue": "pumpswap",
@@ -195,7 +231,19 @@
       "mints": [
         "So11111111111111111111111111111111111111112",
         "3TbrqvTKoVDJNWQe5t4f3KAHVLE8iEsL9vdGJd5ximwh"
-      ]
+      ],
+      "signed_provenance": {
+        "status": "INDEPENDENT_SIGNED_NATIVE_SDK_SPL_PARITY",
+        "source_slot": 462733369,
+        "source_digest": "8d4cf374705c8635e73be195d5ada1b75bc46e26abf7ea8c9952bfdfef780350",
+        "signed_transaction_hashes": [
+          "ff83ad1d5f229d40bc9c2eee8818cfd68f9f263f6ae8af9810bc2f1c1ecd0ed2",
+          "1afabbccf9ffe04f5a4a71dc4e315da15710a19c89ddf98ecc1117f78f688644",
+          "c0a17a0b4b8ec566e67c6318c9d895edabc284d4e9c48b4f10fd045502c6553f",
+          "39aa43d1acb68dabb23f936907a06ba2d1b4cc0c9e25e52fe221537e566e6728"
+        ],
+        "independent_receipt_sha256": "295cd338e39c890f1861538baf8272fefdbdc285129c0bf8e435ca9d545d4ef8"
+      }
     },
     {
       "venue": "pumpswap",
@@ -211,7 +259,19 @@
       "mints": [
         "So11111111111111111111111111111111111111112",
         "EjPr9rQuavUaSMs2HHsbPdAi5KWfvwwF2r1AdW9kRkLR"
-      ]
+      ],
+      "signed_provenance": {
+        "status": "INDEPENDENT_SIGNED_NATIVE_SDK_SPL_PARITY",
+        "source_slot": 462733379,
+        "source_digest": "14c9f1f542735ce3bd6fa1dcd960cc61c42bdf657404fc84dee75aa1c416e674",
+        "signed_transaction_hashes": [
+          "1dff05959aa0f101af82d7e24661f5786bfff26a3b097cf80c2ce90aa37d3e57",
+          "54051ac235089c559fd524ce19856e4d99698f87bbb0e143c550402b778807fe",
+          "5aca3aaae923e541ebb7afbba1d97a4a31368dc7c63778ff8e5990d49cecf66e",
+          "a59aa1132c8730a5241719a5c90d840c99080a911afb3c3178f966db8caf4f8c"
+        ],
+        "independent_receipt_sha256": "5c4e483951d3113cab6d3d9522b8c1a8bb9e460781c0bb69f3f79839030cf1fd"
+      }
     },
     {
       "venue": "pumpswap",
@@ -219,7 +279,19 @@
       "mints": [
         "So11111111111111111111111111111111111111112",
         "BcczGav161jFJmdYTpKLco1TEEkhitsEjr7WqBnvbanW"
-      ]
+      ],
+      "signed_provenance": {
+        "status": "INDEPENDENT_SIGNED_NATIVE_SDK_SPL_PARITY",
+        "source_slot": 462733384,
+        "source_digest": "602f829923c6e06bed7e4cca18180c46c1c4422b8d4a255de3f8dde83bfa7eb4",
+        "signed_transaction_hashes": [
+          "6adede73a3251c9edcedaeaaf99fead1778c7c407b1b87e84b7efe1b16cc2d33",
+          "adcc81e7a9b37a1c2b02b1660e2154857720f10a36cf90fd290e7f561bbcd865",
+          "c2f71ff8ce17a1eee6ea3a8619315ee3d10f0c281616d7d631dd0779525fbfad",
+          "7e8a3215f013fe2d725ae3224ad74a95857d319731ae490369827b377c5be7a5"
+        ],
+        "independent_receipt_sha256": "42e58131ea70bb425348ca98da05d36eb09661cfb4ecb3109de7bb80ddba32e4"
+      }
     },
     {
       "venue": "pumpswap",
