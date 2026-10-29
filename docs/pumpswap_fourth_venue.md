@@ -84,6 +84,8 @@ missing trials, mismatched outputs, duplicate sizes/directions, incorrect
 source pool identities and any claim that SDK equivalence establishes
 signed execution.
 
+The independent Python audit additionally binds each official SDK trial to the corresponding untouched authenticated source-candidate amount, mint direction, and output. Comparing two self-consistent but forged SDK report fields is insufficient; mismatch with the original source candidate fails closed.
+
 The **manual** `PumpSwap Fourth-Venue Source Research` workflow now
 runs source authentication, official SDK candidate comparison, then
 independent candidate audit, and uploads all reports. This is a
