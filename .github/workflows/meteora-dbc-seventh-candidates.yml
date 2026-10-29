@@ -7,6 +7,7 @@ on:
       - "arb/meteora_dbc_seventh_candidate_capture.py"
       - "arb/meteora_dbc_seventh_state_capture.py"
       - "tests/test_meteora_dbc_seventh_state_capture.py"
+      - "tests/test_meteora_dbc_seventh_discovery.py"
   workflow_dispatch:
 permissions:
   contents: read
@@ -20,6 +21,7 @@ jobs:
       - name: Validate exact zero-copy account joins, mutation rejection and original source safety
         run: |
           python3 -m unittest discover -s tests -p test_meteora_dbc_seventh_source.py -v
+          python3 -m unittest discover -s tests -p test_meteora_dbc_seventh_discovery.py -v
           python3 -m unittest discover -s tests -p test_meteora_dbc_seventh_state_capture.py -v
           python3 -m py_compile arb/meteora_dbc_seventh_discovery.py arb/meteora_dbc_seventh_candidate_capture.py
   dbc-real-candidate:
