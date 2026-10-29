@@ -12,6 +12,9 @@ on:
       - "tests/test_meteora_dbc_real_curve_vectors.py"
       - "tools/meteora_dbc_official_sdk_oracle.js"
       - "arb/meteora_dbc_native_curve_audit.py"
+      - "arb/meteora_dbc_native_fee.py"
+      - "arb/meteora_dbc_native_fee_parity.py"
+      - "tests/test_meteora_dbc_native_fee.py"
       - "arb/meteora_dbc_swap.py"
       - "tests/test_meteora_dbc_swap.py"
   workflow_dispatch:
@@ -30,6 +33,7 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_meteora_dbc_seventh_recent_tx_discovery.py' -v
           python3 -m unittest discover -s tests -p 'test_meteora_dbc_native_segment.py' -v
           python3 -m unittest discover -s tests -p 'test_meteora_dbc_real_curve_vectors.py' -v
+          python3 -m unittest discover -s tests -p 'test_meteora_dbc_native_fee.py' -v
           python3 -m unittest discover -s tests -p 'test_meteora_dbc_swap.py' -v
           python3 -m py_compile arb/meteora_dbc_six_source_qualification.py
   six-original-source:
@@ -77,6 +81,12 @@ jobs:
             --source "$RUNNER_TEMP/dbc-six-original-source.json" \
             --sdk "$RUNNER_TEMP/dbc-six-official-sdk-quotes.json" \
             --output "$RUNNER_TEMP/dbc-six-native-curve-only-audit.json"
+      - name: Independently require original Q64 fee/curve SDK parity for 24 quotes
+        run: |
+          python3 -m arb.meteora_dbc_native_fee_parity \
+            --source "$RUNNER_TEMP/dbc-six-original-source.json" \
+            --sdk "$RUNNER_TEMP/dbc-six-official-sdk-quotes.json" \
+            --output "$RUNNER_TEMP/dbc-six-independent-native-fee-parity.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -85,4 +95,5 @@ jobs:
             ${{ runner.temp }}/dbc-six-original-source.json
             ${{ runner.temp }}/dbc-six-official-sdk-quotes.json
             ${{ runner.temp }}/dbc-six-native-curve-only-audit.json
+            ${{ runner.temp }}/dbc-six-independent-native-fee-parity.json
           if-no-files-found: warn
