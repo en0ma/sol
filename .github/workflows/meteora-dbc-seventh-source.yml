@@ -23,7 +23,7 @@ jobs:
       - name: Install pinned BPF account dependency
         run: python3 -m pip install --disable-pip-version-check solders==0.26.0
       - name: Run fail-closed explicit identity regression tests
-        run: python3 -m unittest tests.test_meteora_dbc_seventh_source
+        run: python3 -m unittest discover -s tests -p 'test_meteora_dbc_seventh_source.py'
       - name: Authenticate mainnet DBC program ELF and bounded program-owned VirtualPool accounts
         run: |
           test -n "$SOLANA_RPC_URL"
