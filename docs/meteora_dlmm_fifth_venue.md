@@ -68,12 +68,44 @@ slot, exact signed-transaction hashes and independent receipt digest.
 No new coordinator or venue registry was introduced. Neither these
 receipts nor unit tests authorize live broadcasting.
 
-**Remaining**: Three more tracked DLMM pools have not yet demonstrated
-signed parity. Pools requiring an extended bitmap path, special
+**Remaining**: All six tracked DLMM pools now have demonstrated signed parity. Pools requiring an extended bitmap path, special
 limit-order liquidity, Token-2022 hooks or multiple additional bin
 arrays need expanded source hydration and refreshed signed evidence.
 Independent exact outputs on the three accepted pools do not prove
 all DLMM modes.
+
+## Additional three signed pools: completed
+
+The second three-pool acceptance workflow
+https://github.com/en0ma/sol/actions/runs/40851953257
+passed **three additional, previously unsigned DLMM pool identities**,
+12 genuine signed Surfpool swap simulations, independent raw SPL account
+debit/credit checks, and on-chain/SDK/native integer output parity.
+That brings the existing signed registry to **six distinct DLMM pools
+(24 signed swap trials across both acceptance runs)**. No live broadcasting.
+
+Additional pool identities (source slots retained in the signed registry):
+
+- `HTvjzsfX3yU6BUodCjZ5vZkUrAxMDTrBs3CJaq43ashR` — 462835102
+- `3C5YE97HADPDxZehYq9Cis8AXr9aNyrUsczKzE1nDbW9` — 462835107
+- `HRYEjwdo3bZ1TpXKWKcezqiwSV2Ywuh4LxMa2PzoCnG6` — 462835112
+
+This acceptance run corrected several actual execution obstacles:
+the active LbPair price is taken from the synchronized
+`getMultipleAccounts` snapshot; 17 neighboring bin arrays and the
+source Clock are captured; SDK reads are pinned to authenticated bytes
+rather than mutable live RPC reads; and Surfpool is launched and paused
+before source capture, then time-traveled forward to the source
+Unix timestamp before each signed trial.
+
+**Sample size scope:** these additional volatile pools were verified
+at 10,000 and 20,000 raw input units per direction. The original three
+were verified at 10,000 and 100,000. These are exactly four genuine
+signed tests per pool, not claims of mathematical parity for every
+notional size, bin traversal, extension or liquidity mode.
+
+Evidence artifact:
+https://github.com/en0ma/sol/actions/runs/40851953257/artifacts/12888141229
 
 ## PumpSwap handoff before fifth venue
 
