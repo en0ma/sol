@@ -12,6 +12,8 @@ on:
       - "tests/test_meteora_dbc_real_curve_vectors.py"
       - "tools/meteora_dbc_official_sdk_oracle.js"
       - "arb/meteora_dbc_native_curve_audit.py"
+      - "arb/meteora_dbc_swap.py"
+      - "tests/test_meteora_dbc_swap.py"
   workflow_dispatch:
 permissions:
   contents: read
@@ -28,6 +30,7 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_meteora_dbc_seventh_recent_tx_discovery.py' -v
           python3 -m unittest discover -s tests -p 'test_meteora_dbc_native_segment.py' -v
           python3 -m unittest discover -s tests -p 'test_meteora_dbc_real_curve_vectors.py' -v
+          python3 -m unittest discover -s tests -p 'test_meteora_dbc_swap.py' -v
           python3 -m py_compile arb/meteora_dbc_six_source_qualification.py
   six-original-source:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' }}
