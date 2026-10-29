@@ -27,7 +27,7 @@ jobs:
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     env:
       SOLANA_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
-      POOL_COUNT: ${{ inputs.pool_count || '7' }}
+      POOL_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.pool_count || '1' }}
       SOLANA_RPC_MIN_INTERVAL_SECONDS: "0.5"
       SOLANA_RPC_ALCHEMY_FREE_TIER: "1"
       SOLANA_RPC_PACING_FILE: /tmp/pumpswap-fourth-rpc-pacing
