@@ -104,7 +104,9 @@ def capture_pool(rpc, original):
     if len(cfg_raw) < 40 or cfg_raw[:8] != hashlib.sha256(b"account:PoolConfig").digest()[:8]:
         raise ValueError("DBC PoolConfig original discriminator/size invalid")
     quote_mint = key(cfg_raw[8:40])
-    base_token_program = TOKEN_2022 if fields["pool_type"] == 1 else TOKEN_PROGRAM
+    base_token_program = rows[2].get("owner") if isinstance(rows[2],dict) else None
+    if base_token_program not in (TOKEN_PROGRAM,TOKEN_2022):
+        raise ValueError("DBC base mint is not owned by a supported SPL token program")
     mint_raw = decode_account(rows[2], owner=base_token_program, role="base_mint")
     if len(mint_raw) < 82:
         raise ValueError("DBC base mint original account truncated")
@@ -133,6 +135,9 @@ def capture_pool(rpc, original):
         raise ValueError("DBC both vaults use same mint")
     fields["quote_mint"] = quote_mint
     fields["base_token_program"] = base_token_program
+    fields["pool_type_program_consistent"] = (
+        base_token_program == (TOKEN_2022 if fields["pool_type"] == 1 else TOKEN_PROGRAM)
+    )
     fields["quote_token_program"] = rows[4]["owner"]
     proof = {}
     for addr, raw, account in zip(addresses, [pool_raw, cfg_raw, mint_raw, *vaults, clock_raw], rows):
@@ -145,7 +150,8 @@ def capture_pool(rpc, original):
             "pool_fields": fields, "accounts": proof,
             "clock_slot": clock_slot, "clock_unix_timestamp": unix_timestamp,
             "config_quote_mint_verified": True, "pricing_eligible": False,
-            "token2022_extensions_not_yet_audited": fields["pool_type"] == 1,
+            "token2022_extensions_not_yet_audited": fields["pool_type"] == 1 or
+                base_token_program == TOKEN_2022,
             **SAFE}
 
 
