@@ -17,6 +17,46 @@ AUTHORITY="FhVo3mqL8PW5pH5U2CN4XE33DokiyZnUwuGpH2hmHLuM"
 TOKEN_PROGRAM="TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
 
 
+def verify_vault_deltas(fields, accounts, post_vault, direction, amount, output):
+    """Independent source-hash-bound user/vault conservation for a signed swap.
+
+    Proof is exact raw SPL before/after, never inferred from the SDK quote.
+    No RPC access or assumption that missing poststates imply conservation.
+    """
+    if (direction not in ("base_to_quote","quote_to_base") or
+            type(amount) is not int or type(output) is not int or
+            amount<=0 or output<=0 or
+            not isinstance(post_vault,list) or len(post_vault)!=2):
+        raise ValueError("DBC two signed vault poststates and positive trade required")
+    before=[];after=[]
+    for index,role in enumerate(("base_vault","quote_vault")):
+        saved_account=accounts[fields[role]]
+        if saved_account["owner"]!=TOKEN_PROGRAM:
+            raise ValueError("DBC original vault token program mismatch")
+        saved=base64.b64decode(saved_account["account_base64"],validate=True)
+        if hashlib.sha256(saved).hexdigest()!=saved_account["sha256"]:
+            raise ValueError("DBC original vault digest changed")
+        current=base64.b64decode(post_vault[index],validate=True)
+        if len(saved)!=165 or len(current)!=165:
+            raise ValueError("DBC original/signed vault SPL lengths invalid")
+        previous=decode_token_account(saved)
+        latest=decode_token_account(current)
+        mint=fields["base_mint" if index==0 else "quote_mint"]
+        if (previous["mint"]!=mint or latest["mint"]!=mint or
+                previous["authority"]!=AUTHORITY or
+                latest["authority"]!=AUTHORITY):
+            raise ValueError("DBC signed vault source mint or authority mismatch")
+        before.append(previous["amount_base_units"])
+        after.append(latest["amount_base_units"])
+    input_index=0 if direction=="base_to_quote" else 1
+    output_index=1-input_index
+    if (after[input_index]-before[input_index]!=amount or
+            before[output_index]-after[output_index]!=output):
+        raise ValueError("DBC independent vault input credit/output debit mismatch")
+    return {"before":before,"after":after}
+
+
+
 def audit(source,sdk,native,signed,*,required=1):
     if source.get("status")=="SIX_DBC_ORIGINAL_SOURCE_POOLS_ONLY":
         if source.get("independent_audit",{}).get("authenticated_source_pools")!=6:
@@ -121,36 +161,9 @@ def audit(source,sdk,native,signed,*,required=1):
                 amounts.append(spl["amount_base_units"])
             if amounts!=[0,output]:
                 raise ValueError("DBC independent SPL debit/output differs from signed SDK/native")
-            # Reconstruct both vault deltas independently from authenticated
-            # original SPL bytes and simulated raw SPL vault poststates.
-            vault_raw=t.get("post_vault_account_data_base64")
-            if not isinstance(vault_raw,list) or len(vault_raw)!=2:
-                raise ValueError("DBC two raw signed vault poststates required")
-            before_vault=[];after_vault=[]
-            for index,role in enumerate(("base_vault","quote_vault")):
-                vault_address=fields[role]
-                source_account=source_row["accounts"][vault_address]
-                if source_account["owner"]!=TOKEN_PROGRAM:
-                    raise ValueError("DBC original vault token program mismatch")
-                saved=base64.b64decode(source_account["account_base64"],validate=True)
-                if hashlib.sha256(saved).hexdigest()!=source_account["sha256"]:
-                    raise ValueError("DBC original vault digest changed")
-                current=base64.b64decode(vault_raw[index],validate=True)
-                if len(saved)!=165 or len(current)!=165:
-                    raise ValueError("DBC original/signed vault SPL lengths invalid")
-                previous=decode_token_account(saved)
-                latest=decode_token_account(current)
-                mint=fields["base_mint" if index==0 else "quote_mint"]
-                if (previous["mint"]!=mint or latest["mint"]!=mint or
-                        previous["authority"]!=AUTHORITY or latest["authority"]!=AUTHORITY):
-                    raise ValueError("DBC signed vault source mint or authority mismatch")
-                before_vault.append(previous["amount_base_units"])
-                after_vault.append(latest["amount_base_units"])
-            input_index=0 if direction=="base_to_quote" else 1
-            output_index=1-input_index
-            if (after_vault[input_index]-before_vault[input_index]!=amount or
-                    before_vault[output_index]-after_vault[output_index]!=output):
-                raise ValueError("DBC independent vault input credit/output debit mismatch")
+            verify_vault_deltas(fields,source_row["accounts"],
+                                t.get("post_vault_account_data_base64"),
+                                direction,amount,output)
             logs=t.get("simulation_logs")
             if (not isinstance(logs,list) or
                 not any("Program "+PROGRAM+" invoke" in x for x in logs) or
