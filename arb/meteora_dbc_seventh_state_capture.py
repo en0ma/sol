@@ -46,7 +46,10 @@ def parse_pool(raw):
     fields["migration_progress"] = raw[o+92]
     if (fields["sqrt_price_q64"] == 0 or fields["pool_type"] != 0
             or fields["is_migrated"] != 0 or fields["migration_progress"] != 0):
-        raise ValueError("DBC pool nontrading, migrated or unsupported token mode")
+        raise ValueError("DBC unsupported state: pool_type="+str(fields["pool_type"])+
+                         ", migrated="+str(fields["is_migrated"])+
+                         ", progress="+str(fields["migration_progress"])+
+                         ", nonzero_price="+str(fields["sqrt_price_q64"]>0))
     return fields
 
 
