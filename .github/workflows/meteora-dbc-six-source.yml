@@ -55,14 +55,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Install pinned original DBC reference SDK
+        run: npm install --no-save --ignore-scripts --prefix "$RUNNER_TEMP/dbc-sdk" @meteora-ag/dynamic-bonding-curve-sdk@2.0.0
       - name: Authenticate six distinct original pools and independently audit source bytes
+        env:
+          NODE_PATH: ${{ runner.temp }}/dbc-sdk/node_modules
         run: |
           test -n "$SOLANA_RPC_URL"
           python3 -m arb.meteora_dbc_six_source_qualification \
             --rpc "$SOLANA_RPC_URL" --pages 12 \
             --output "$RUNNER_TEMP/dbc-six-original-source.json"
-      - name: Install pinned original DBC reference SDK
-        run: npm install --no-save --ignore-scripts --prefix "$RUNNER_TEMP/dbc-sdk" @meteora-ag/dynamic-bonding-curve-sdk@2.0.0
       - name: Require four SDK quotes on each of six independently sourced pools
         env:
           NODE_PATH: ${{ runner.temp }}/dbc-sdk/node_modules
