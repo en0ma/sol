@@ -94,3 +94,12 @@ All of these are observed statuses for their respective commit
 runs, not predictions that the latest commits are green.
 DBC remains **0/6 signed-accepted**, **0/24 independently audited
 signed transactions**, with no new mainnet writes.
+
+## 17:26 UTC observed CI failures and concrete corrections
+
+At [DBC candidate run 40920477261](https://github.com/en0ma/sol/actions/runs/40920477261) and [six-pool run 40920477054](https://github.com/en0ma/sol/actions/runs/40920477054), source regression CI failed **before** source research because `test_bounded_requests` expected count=13 to raise a ValueError after the source cap had legitimately increased to 24. Unmocked `count=13` therefore attempted a network call and raised `URLError`. Corrected the regression to assert the true new forbidden bound **25**. In the subsequent commit's six-pool CI, regressions were observed **green**; no six-pool real-source acceptance follows from that.
+
+At [DBC offline signed research run 40920477282](https://github.com/en0ma/sol/actions/runs/40920477282), source authentication succeeded but the pinned SDK oracle failed at `BN.divn(100000000)`: bn.js's small-divisor `divn` API does not support that divisor size. Changed to arbitrary-precision `reserve.div(new BN(String(divisor)))` rather than shrinking the search. No synthetic quotes, signatures or pool evidence substituted.
+
+These fixes are committed; at last inspection newer CI runs were still executing.
+Signed DBC target remains **0/6 accepted**, not a green claim.
