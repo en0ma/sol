@@ -37,6 +37,12 @@ class DbCRegistrySafetyTests(unittest.TestCase):
         self.assertTrue(entry["signed_provenance"]["vault_debit_credit_verified"])
         self.assertFalse(report["registry_admission_approved"])
         self.assertFalse(report["usable_for_arbitrage"])
+        previous={**entry,"usable_for_arbitrage":True,
+                  "requires_live_state_revalidation":False}
+        with patch("arb.meteora_dbc_signed_registry_merge.audit",return_value=accepted):
+            updated,_=merge({"pools":[previous]},source,{},{},{},required=1)
+        self.assertFalse(updated["pools"][0]["usable_for_arbitrage"])
+        self.assertTrue(updated["pools"][0]["requires_live_state_revalidation"])
         accepted["pools"][0]["source_vault_debit_credit_verified"]=False
         with patch("arb.meteora_dbc_signed_registry_merge.audit",return_value=accepted):
             with self.assertRaisesRegex(ValueError,"vault-backed"):
