@@ -46,6 +46,12 @@ class DbcRecentTransactionTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,"context"):
                 discover("https://readonly.invalid",count=1)
 
+    def test_maximum_twenty_four_source_hints_is_bounded(self):
+        with patch("arb.meteora_dbc_seventh_recent_tx_discovery.call",side_effect=rpc):
+            result=discover("https://readonly.invalid",count=24,max_signatures=64,pages=1)
+        self.assertEqual(result["authenticated_pricing_pools"],0)
+        self.assertEqual(result["signed_verified_pools"],0)
+
     def test_bounded_requests(self):
         with self.assertRaisesRegex(ValueError,"bounded"):
             discover("https://readonly.invalid",count=13)
