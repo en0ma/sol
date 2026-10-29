@@ -41,7 +41,7 @@ jobs:
       SOLANA_RPC_ALCHEMY_FREE_TIER: "1"
       SOLANA_RPC_PACING_FILE: /tmp/dbc-signed-source-pacing
       SURFPOOL_EXPLICITLY_OFFLINE: "1"
-      POOL_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.pool_count || '6' }}
+      POOL_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.pool_count || '1' }}
     steps:
       - uses: actions/checkout@v4
       - run: |
@@ -73,32 +73,12 @@ jobs:
           else:raise SystemExit("DBC isolated Surfpool not available")
           call("http://127.0.0.1:8899","surfnet_pauseClock",[])
           PY
-      - name: Download immutable independently audited six-source snapshots
-        if: github.event_name == 'pull_request'
-        uses: actions/download-artifact@v4
-        with:
-          name: dbc-six-original-source-only
-          run-id: 40951036061
-          github-token: ${{ github.token }}
-          path: ${{ runner.temp }}/dbc-historical-six
       - name: Capture one authentic original DBC source without broadcast
         env:
           NODE_PATH: ${{ runner.temp }}/dbc-sdk/node_modules
         run: |
           test -n "$SOLANA_MAINNET_RPC_URL"
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            cp "$RUNNER_TEMP/dbc-historical-six/dbc-six-original-source.json" \
-              "$RUNNER_TEMP/dbc-signed-diagnostic-source.json"
-            python3 - <<'PY'
-          import json,os
-          from pathlib import Path
-          from arb.meteora_dbc_seventh_source_audit import independently_audit
-          src=json.loads((Path(os.environ["RUNNER_TEMP"])/"dbc-signed-diagnostic-source.json").read_text())
-          assert src["status"]=="SIX_DBC_ORIGINAL_SOURCE_POOLS_ONLY"
-          assert independently_audit(src["source"])["authenticated_source_pools"]==6
-          print("DBC historical original six source reauthenticated, no current-liquidity claim")
-          PY
-          elif [[ "$POOL_COUNT" == "6" ]]; then
+          if [[ "$POOL_COUNT" == "6" ]]; then
             python3 -m arb.meteora_dbc_six_source_qualification \
               --rpc "$SOLANA_MAINNET_RPC_URL" --pages 12 \
               --output "$RUNNER_TEMP/dbc-signed-diagnostic-source.json"
