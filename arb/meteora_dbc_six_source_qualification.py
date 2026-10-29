@@ -3,7 +3,7 @@
 Only original account bytes + independent source audits; six successful pool
 identities do NOT imply six SDK/native quote parities or 24 signed swaps.
 """
-import argparse,json
+import argparse,json,os,subprocess,tempfile
 from pathlib import Path
 from arb.meteora_dbc_seventh_candidate_capture import run
 from arb.meteora_dbc_seventh_source_audit import independently_audit
@@ -27,13 +27,42 @@ def qualify(rpc, *, count=6, hint_limit=24, pages=4):
         "actionable":False,"broadcast":False}
 
 
+
+def validate_official_sdk_candidate(row):
+    """Reject an authenticated but unquotable launch before it occupies a slot.
+
+    This is screening only: independent native and signed acceptance remain
+    mandatory downstream. No public RPC or signing is performed by the oracle.
+    """
+    source={"status":"DBC_ORIGINAL_CONTEXTUAL_SOURCE_PARTIAL_NOT_SIGNED",
+            "source_pools":[row]}
+    with tempfile.TemporaryDirectory(prefix="dbc-sdk-screen-") as directory:
+        src=Path(directory)/"source.json"
+        out=Path(directory)/"sdk.json"
+        src.write_text(json.dumps(source)+"\\n")
+        result=subprocess.run(["node","tools/meteora_dbc_official_sdk_oracle.js",
+                               str(src),str(out)],capture_output=True,text=True,
+                              timeout=30,check=False)
+        if result.returncode!=0:
+            # Fail closed; never let a zero-liquidity source count as a
+            # six-pool quote candidate. Avoid leaking source or RPC data.
+            raise ValueError("DBC official SDK bidirectional quote screening failed")
+        report=json.loads(out.read_text())
+        pools=report.get("pools",[])
+        if (len(pools)!=1 or pools[0].get("pool")!=row["pool"] or
+                len(pools[0].get("trials",[]))!=4 or
+                {t["direction"] for t in pools[0]["trials"]}!=
+                {"base_to_quote","quote_to_base"}):
+            raise ValueError("DBC official SDK four bidirectional quotes missing")
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("--rpc",required=True)
     p.add_argument("--output",required=True)
     p.add_argument("--pages",type=int,default=12)
     a=p.parse_args()
-    captured=run(a.rpc,count=6,hint_limit=24,pages=a.pages,strict=False)
+    captured=run(a.rpc,count=6,hint_limit=24,pages=a.pages,strict=False,\n                 candidate_validator=validate_official_sdk_candidate)
     count=len(captured["source_pools"])
     audit=(independently_audit(captured) if count else
            {"authenticated_source_pools":0,"pools":[],
