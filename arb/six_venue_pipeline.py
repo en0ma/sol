@@ -114,7 +114,7 @@ def source_research(rpc, registry, fixture_dir, *, amount_in,
             if key not in known:
                 incoming.append({"venue":row["venue"],"address":row["address"]})
                 known.add(key)
-        registry={**registry,"pools":[*registry.get("pools",[]),*incoming]}
+        registry={**registry,"pools":[*incoming,*registry.get("pools",[])]}
         discovery={"status":fresh["status"],
                    "verified":fresh["candidate_graph_verified_count"],
                    "rejected":len(fresh["errors"]),
