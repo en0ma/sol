@@ -29,3 +29,90 @@ jobs:
           assert len(VENUES)==6 and set(VENUES)==expected
           print("Six venue research scope only; no trading/broadcast capability enabled")
           PY
+  six-venue-source-to-offline-simulation:
+    if: github.event_name == 'workflow_dispatch'
+    needs: six-venue-pipeline-contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      SURFPOOL_DATASOURCE_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
+      SOLANA_RPC_MIN_INTERVAL_SECONDS: "0.5"
+      SOLANA_RPC_ALCHEMY_FREE_TIER: "1"
+      SOLANA_RPC_PACING_FILE: /tmp/six-venue-platform-pacing
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install independent local fork and pinned Solana types
+        run: |
+          test -n "$SURFPOOL_DATASOURCE_RPC_URL"
+          bash ci/install_surfpool.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Launch upstream-backed source fork (read-only)
+        run: |
+          nohup "$HOME/.local/bin/surfpool" start --ci --rpc-url "$SURFPOOL_DATASOURCE_RPC_URL" --no-deploy > "$RUNNER_TEMP/six-source.log" 2>&1 < /dev/null &
+          echo $! > "$RUNNER_TEMP/six-source.pid"
+          python3 - <<'PY'
+          import time
+          from arb.rpc import call
+          for _ in range(80):
+              try:
+                  assert call("http://127.0.0.1:8899","getLatestBlockhash")["value"]["blockhash"]
+                  break
+              except (OSError,ValueError,RuntimeError,KeyError):time.sleep(1)
+          else:raise SystemExit("six-venue source fork failed to start")
+          PY
+      - name: Authenticate six venue pools, build graph, quote and rank source routes
+        run: |
+          python3 -m arb.six_venue_pipeline --phase source \
+            --rpc http://127.0.0.1:8899 \
+            --registry arb/pool_registry.json \
+            --source-dir "$RUNNER_TEMP/six-venue-source" \
+            --amount-in 1000000 --observed-unix "$(date +%s)" \
+            --maximum 8 --output "$RUNNER_TEMP/six-source-report.json"
+      - name: Destroy source-backed fork before any signing
+        run: |
+          kill "$(cat "$RUNNER_TEMP/six-source.pid")"
+          python3 - <<'PY'
+          import socket,time
+          for _ in range(40):
+              s=socket.socket();s.settimeout(.2)
+              connected=s.connect_ex(("127.0.0.1",8899))==0;s.close()
+              if not connected:break
+              time.sleep(1)
+          else:raise SystemExit("source-backed fork still reachable: signing forbidden")
+          PY
+      - name: Start a NEW isolated offline fork without any datasource
+        run: |
+          nohup "$HOME/.local/bin/surfpool" start --ci --offline --no-deploy > "$RUNNER_TEMP/six-offline.log" 2>&1 < /dev/null &
+          python3 - <<'PY'
+          import time
+          from arb.rpc import call
+          for _ in range(80):
+              try:
+                  assert call("http://127.0.0.1:8899","getLatestBlockhash")["value"]["blockhash"]
+                  break
+              except (OSError,ValueError,RuntimeError,KeyError):time.sleep(1)
+          else:raise SystemExit("six-venue offline fork failed to start")
+          PY
+      - name: Validate selected source-ranked routes using signed offline simulation
+        env:
+          SURFPOOL_EXPLICITLY_OFFLINE: "1"
+        run: |
+          python3 -m arb.six_venue_pipeline --phase offline \
+            --rpc http://127.0.0.1:8899 \
+            --source-dir "$RUNNER_TEMP/six-venue-source" \
+            --signed-dir "$RUNNER_TEMP/six-venue-signed" \
+            --output "$RUNNER_TEMP/six-signed-report.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: six-venue-source-quote-signed-offline-research
+          path: |
+            ${{ runner.temp }}/six-source-report.json
+            ${{ runner.temp }}/six-signed-report.json
+            ${{ runner.temp }}/six-venue-source/
+            ${{ runner.temp }}/six-venue-signed/
+            ${{ runner.temp }}/six-source.log
+            ${{ runner.temp }}/six-offline.log
+          if-no-files-found: warn
