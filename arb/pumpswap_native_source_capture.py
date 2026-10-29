@@ -17,6 +17,41 @@ SAFE = {"actionable": False, "broadcast": False,
         "registry_admission_approved": False}
 
 
+def stable_source_snapshot(rpc,address,expected_mints,*,attempts=4):
+    """Bounded retry only for a live pool changing between two RPC snapshots.
+
+    Every accepted pool is still checked by the SAME-SLOT getMultipleAccounts
+    verifier. We never skip mint/owner checks or quote from mixed-slot state.
+    """
+    for attempt in range(attempts):
+        try:
+            response = call(rpc, "getAccountInfo", [address, {
+                "encoding": "base64", "commitment": "confirmed"}])
+            info = response.get("value")
+            slot = response.get("context", {}).get("slot")
+            if (type(slot) is not int or slot < 0 or
+                    not isinstance(info, dict) or info.get("owner") != PROGRAM or
+                    info.get("executable") is not False or
+                    info.get("data", [None, None])[1] != "base64"):
+                raise ValueError("PumpSwap source pool owner/slot/data invalid")
+            raw = base64.b64decode(info["data"][0], validate=True)
+            state = decode(raw)
+            if expected_mints is not None and (
+                    not isinstance(expected_mints, list) or
+                    len(expected_mints) != 2 or
+                    set(expected_mints) != {state["base_mint"], state["quote_mint"]}):
+                raise ValueError("tracked pool mint identity mismatch")
+            verified = verify(rpc, address, state, include_source_bytes=True)
+            if verified.get("verified") is not True:
+                raise ValueError("on-chain pool verifier rejected source")
+            return slot,state,verified
+        except ValueError as exc:
+            if str(exc)!="PumpSwap pool owner or state changed" or attempt+1==attempts:
+                raise
+    raise ValueError("PumpSwap live state failed bounded snapshot retry")
+
+
+
 def capture(rpc, registry, *, limit=3):
     if type(limit) is not int or not 1 <= limit <= 10:
         raise ValueError("invalid bounded PumpSwap research sample")
@@ -39,25 +74,7 @@ def capture(rpc, registry, *, limit=3):
     results = []
     for address, expected_mints in addresses:
         try:
-            response = call(rpc, "getAccountInfo", [address, {
-                "encoding": "base64", "commitment": "confirmed"}])
-            info = response.get("value")
-            slot = response.get("context", {}).get("slot")
-            if (type(slot) is not int or slot < 0 or
-                    not isinstance(info, dict) or info.get("owner") != PROGRAM or
-                    info.get("executable") is not False or
-                    info.get("data", [None, None])[1] != "base64"):
-                raise ValueError("PumpSwap source pool owner/slot/data invalid")
-            raw = base64.b64decode(info["data"][0], validate=True)
-            state = decode(raw)
-            if expected_mints is not None and (
-                    not isinstance(expected_mints, list) or
-                    len(expected_mints) != 2 or
-                    set(expected_mints) != {state["base_mint"], state["quote_mint"]}):
-                raise ValueError("tracked pool mint identity mismatch")
-            verified = verify(rpc, address, state, include_source_bytes=True)
-            if verified.get("verified") is not True:
-                raise ValueError("on-chain pool verifier rejected source")
+            slot,state,verified=stable_source_snapshot(rpc,address,expected_mints)
             source_accounts=verified.get("authenticated_source_accounts")
             if not isinstance(source_accounts,list) or len(source_accounts)!=6:
                 raise ValueError("incomplete authenticated same-slot source account bundle")
