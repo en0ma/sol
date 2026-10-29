@@ -37,7 +37,8 @@ def audit(tick_source,sdk,signed):
     signed_pools=signed.get("pools")
     if (not isinstance(signed_pools,list) or len(signed_pools)!=len(source_by_pool)
             or len(set(x.get("pool") for x in signed_pools))!=len(signed_pools)
-            or set(sdk_by_pool)!=set(native_by_pool)!=set(source_by_pool)):
+            or set(sdk_by_pool)!=set(native_by_pool)
+            or set(sdk_by_pool)!=set(source_by_pool)):
         raise ValueError("CLMM missing or duplicate independent signed pool identities")
     accepted=[]
     for pool in signed_pools:
