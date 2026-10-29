@@ -39,7 +39,7 @@ def validate_official_sdk_candidate(row):
     with tempfile.TemporaryDirectory(prefix="dbc-sdk-screen-") as directory:
         src=Path(directory)/"source.json"
         out=Path(directory)/"sdk.json"
-        src.write_text(json.dumps(source)+"\\n")
+        src.write_text(json.dumps(source)+"\n")
         result=subprocess.run(["node","tools/meteora_dbc_official_sdk_oracle.js",
                                str(src),str(out)],capture_output=True,text=True,
                               timeout=30,check=False)
@@ -62,7 +62,8 @@ def main():
     p.add_argument("--output",required=True)
     p.add_argument("--pages",type=int,default=12)
     a=p.parse_args()
-    captured=run(a.rpc,count=6,hint_limit=24,pages=a.pages,strict=False,\n                 candidate_validator=validate_official_sdk_candidate)
+    captured=run(a.rpc,count=6,hint_limit=24,pages=a.pages,strict=False,
+                 candidate_validator=validate_official_sdk_candidate)
     count=len(captured["source_pools"])
     audit=(independently_audit(captured) if count else
            {"authenticated_source_pools":0,"pools":[],
