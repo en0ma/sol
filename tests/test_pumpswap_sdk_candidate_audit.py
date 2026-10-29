@@ -14,12 +14,13 @@ def fixture():
           for mint in (mint_a,mint_b) for size in (10000,100000)]
     source={"venue":"pumpswap","pools":[{"address":address,
             "status":"AUTHENTICATED_SOURCE_ONLY","mints":[mint_a,mint_b],
+            "verified_snapshot_slot":42,"authenticated_source_sha256":"a"*64,
             "native_quote_candidates":[{"mint_in":r["input_mint"],"amount_in":r["amount_in"],
                 "native_formula_candidate_out":100,"status":"UNVERIFIED_NATIVE_FORMULA_CANDIDATE"}
                 for r in rows]}]}
     sdk={"venue":"pumpswap","signed_parity_verified":False,"actionable":False,
          "registry_admission_approved":False,"sdk_candidate_verified_pools":1,
-         "pools":[{"address":address,"signed_parity_verified":False,
+         "pools":[{"address":address,"source_slot":42,"signed_parity_verified":False,
                    "actionable":False,"trials":rows}]}
     return source,sdk
 
@@ -31,6 +32,18 @@ class PumpSwapSdkCandidateAuditTest(unittest.TestCase):
         self.assertEqual(result["sdk_candidate_matched_pools"],1)
         self.assertFalse(result["signed_parity_verified"])
         self.assertFalse(result["registry_admission_approved"])
+
+    def test_rejects_source_slot_mismatch(self):
+        source,sdk=fixture()
+        sdk["pools"][0]["source_slot"]=43
+        with self.assertRaisesRegex(ValueError,"snapshot slot disagreement"):
+            audit(source,sdk)
+
+    def test_rejects_missing_authenticated_source_digest(self):
+        source,sdk=fixture()
+        source["pools"][0].pop("authenticated_source_sha256")
+        with self.assertRaisesRegex(ValueError,"digest missing"):
+            audit(source,sdk)
 
     def test_rejects_mismatched_integer_price(self):
         source,sdk=fixture()
