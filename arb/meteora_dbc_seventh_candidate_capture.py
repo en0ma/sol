@@ -28,12 +28,24 @@ def run(rpc, *, count=1, hint_limit=24, pages=4, strict=True, candidate_validato
         print(json.dumps({"stage":"dbc_program_transactions",
             "error_type":type(exc).__name__}))
         hinted={"hints":[]}
-    if not hinted["hints"]:
-        # Still untrusted and independently authenticated in the next stages.
-        source="dexpaprika_untrusted_fallback"
-        hinted=public_discover(count=min(hint_limit,6))
-        print(json.dumps({"stage":"dbc_public_index",
-            "hinted":len(hinted["hints"])}))
+    # On-chain lookups often return migrated/illiquid launches. Supplement
+    # with independent untrusted locator addresses, never with index evidence.
+    # Each supplementary pool still passes the same on-chain authentication.
+    if len(hinted["hints"])<hint_limit:
+        try:
+            public=public_discover(count=min(6,hint_limit))
+            existing={entry["address"] for entry in hinted["hints"]}
+            additional=[entry for entry in public["hints"]
+                        if entry["address"] not in existing]
+            remaining=hint_limit-len(hinted["hints"])
+            hinted["hints"].extend(additional[:remaining])
+            print(json.dumps({"stage":"dbc_public_index_supplement",
+                "new_hints":min(len(additional),remaining)}))
+            if not existing:
+                source="dexpaprika_untrusted_fallback"
+        except (OSError,RuntimeError,ValueError,KeyError,TypeError) as exc:
+            print(json.dumps({"stage":"dbc_public_index_unavailable",
+                "error_type":type(exc).__name__}))
     if not hinted["hints"]:
         raise ValueError("DBC no candidate identities from original transactions or public index")
     accepted=[]
