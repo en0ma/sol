@@ -76,18 +76,20 @@ def capture_tick_arrays(rpc,pool,state,*,radius=4):
     starts=[center+i*step for i in range(-radius,radius+1)]
     addresses=[tick_array_pda(pool,start) for start in starts]
     config=state["amm_config"]
+    prefix=[pool,state["token_vault_0"],state["token_vault_1"],
+            config,state["observation_key"],state["token_mint_0"],state["token_mint_1"]]
     response=call(rpc,"getMultipleAccounts",[[
-        pool,config,*addresses],{"encoding":"base64","commitment":"confirmed"}])
+        *prefix,*addresses],{"encoding":"base64","commitment":"confirmed"}])
     slot=response.get("context",{}).get("slot")
     accounts=response.get("value")
     if (type(slot) is not int or slot<0 or not isinstance(accounts,list)
-            or len(accounts)!=len(addresses)+2):
+            or len(accounts)!=len(addresses)+len(prefix)):
         raise ValueError("CLMM same-slot tick array snapshot incomplete")
     pool_account=accounts[0]
     if (not isinstance(pool_account,dict) or pool_account.get("owner")!=PROGRAM
             or decode_pool(base64.b64decode(pool_account["data"][0],validate=True))!=state):
         raise ValueError("CLMM pool price/fee state changed across tick-array read")
-    config_account=accounts[1]
+    config_account=accounts[3]
     if (not isinstance(config_account,dict) or config_account.get("owner")!=PROGRAM
             or config_account.get("executable") is not False):
         raise ValueError("CLMM same-slot trade-fee config owner invalid")
@@ -101,8 +103,33 @@ def capture_tick_arrays(rpc,pool,state,*,radius=4):
     fund_fee=int.from_bytes(config_data[53:57],"little")
     if not 0<=trade_fee<1_000_000 or protocol_fee+fund_fee>1_000_000:
         raise ValueError("CLMM source trade fee configuration invalid")
+    from arb.token_vaults import TOKEN_PROGRAM,decode_token_account
+    vaults=[]
+    for idx,mint in ((1,state["token_mint_0"]),(2,state["token_mint_1"])):
+        v=accounts[idx]
+        if not isinstance(v,dict) or v.get("owner")!=TOKEN_PROGRAM:
+            raise ValueError("CLMM synchronized SPL vault owner invalid")
+        decoded=decode_token_account(base64.b64decode(v["data"][0],validate=True))
+        if decoded["mint"]!=mint or decoded["amount_base_units"]<=0:
+            raise ValueError("CLMM synchronized SPL vault mint/reserve invalid")
+        vaults.append(decoded)
+    if vaults[0]["authority"]!=vaults[1]["authority"]:
+        raise ValueError("CLMM synchronized vault authorities disagree")
+    observed=accounts[4]
+    if not isinstance(observed,dict) or observed.get("owner")!=PROGRAM:
+        raise ValueError("CLMM synchronized observation program owner invalid")
+    for idx in (5,6):
+        mint=accounts[idx]
+        if not isinstance(mint,dict) or mint.get("owner")!=TOKEN_PROGRAM:
+            raise ValueError("CLMM synchronized classic token mint invalid")
+        raw=base64.b64decode(mint["data"][0],validate=True)
+        if len(raw)!=82 or raw[45]!=1:
+            raise ValueError("CLMM synchronized classic token mint not initialized")
+    synchronized_accounts=[{"address":address,"owner":entry["owner"],
+        "lamports":entry["lamports"],"account_base64":entry["data"][0]}
+        for address,entry in zip(prefix,accounts[:len(prefix)])]
     rows=[]
-    for start,address,account in zip(starts,addresses,accounts[2:]):
+    for start,address,account in zip(starts,addresses,accounts[len(prefix):]):
         if account is None:
             rows.append({"address":address,"start_tick_index":start,"present":False})
             continue
@@ -124,6 +151,7 @@ def capture_tick_arrays(rpc,pool,state,*,radius=4):
             "tick_spacing":state["tick_spacing"],"fee_on":state["fee_on"],
             "dynamic_fee_info_nonzero":any(base64.b64decode(
                 pool_account["data"][0],validate=True)[1096:1176])},
+        "synchronized_non_tick_accounts":synchronized_accounts,
         "amm_config_source":{"address":config,"lamports":config_account["lamports"],
             "owner":PROGRAM,"account_base64":config_account["data"][0],
             "trade_fee_rate":trade_fee,"protocol_fee_rate":protocol_fee,
