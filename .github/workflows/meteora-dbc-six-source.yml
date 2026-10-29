@@ -59,7 +59,7 @@ jobs:
         run: |
           test -n "$SOLANA_RPC_URL"
           python3 -m arb.meteora_dbc_six_source_qualification \
-            --rpc "$SOLANA_RPC_URL" --pages 6 \
+            --rpc "$SOLANA_RPC_URL" --pages 12 \
             --output "$RUNNER_TEMP/dbc-six-original-source.json"
       - name: Install pinned original DBC reference SDK
         run: npm install --no-save --ignore-scripts --prefix "$RUNNER_TEMP/dbc-sdk" @meteora-ag/dynamic-bonding-curve-sdk@2.0.0
