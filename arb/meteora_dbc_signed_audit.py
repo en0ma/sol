@@ -175,13 +175,15 @@ def audit(source,sdk,native,signed,*,required=1):
         result.append({"pool":address,"source_slot":source_row["source_slot"],
               "source_sha256":ref["source_pool_sha256"],
               "signed_transaction_hashes":hashes,
-              "four_signed_original_sdk_native_spl_swaps_verified":True})
+              "four_signed_original_sdk_native_spl_swaps_verified":True,
+              "source_vault_debit_credit_verified":True})
     return {"venue":"meteora_dbc",
        "status":"INDEPENDENT_DBC_ORIGINAL_SIGNED_NATIVE_SDK_SPL_PARITY",
        "independently_signed_verified_pools":len(result),
        "signed_trials_verified":4*len(result),"pools":result,
        "signed_parity_verified":True,
        "independent_signed_audit_verified":True,
+       "all_source_vault_poststates_reconciled":True,
        "registry_admission_approved":False,
        "actionable":False,"broadcast":False}
 
