@@ -28,24 +28,6 @@ def run(rpc, *, count=1, hint_limit=24, pages=4, strict=True, candidate_validato
         print(json.dumps({"stage":"dbc_program_transactions",
             "error_type":type(exc).__name__}))
         hinted={"hints":[]}
-    # On-chain lookups often return migrated/illiquid launches. Supplement
-    # with independent untrusted locator addresses, never with index evidence.
-    # Each supplementary pool still passes the same on-chain authentication.
-    if len(hinted["hints"])<hint_limit:
-        try:
-            public=public_discover(count=min(6,hint_limit))
-            existing={entry["address"] for entry in hinted["hints"]}
-            additional=[entry for entry in public["hints"]
-                        if entry["address"] not in existing]
-            remaining=hint_limit-len(hinted["hints"])
-            hinted["hints"].extend(additional[:remaining])
-            print(json.dumps({"stage":"dbc_public_index_supplement",
-                "new_hints":min(len(additional),remaining)}))
-            if not existing:
-                source="dexpaprika_untrusted_fallback"
-        except (OSError,RuntimeError,ValueError,KeyError,TypeError) as exc:
-            print(json.dumps({"stage":"dbc_public_index_unavailable",
-                "error_type":type(exc).__name__}))
     if not hinted["hints"]:
         raise ValueError("DBC no candidate identities from original transactions or public index")
     accepted=[]
@@ -70,6 +52,37 @@ def run(rpc, *, count=1, hint_limit=24, pages=4, strict=True, candidate_validato
             print(json.dumps({"stage":"dbc_candidate_rejected",**reason}))
         if len(accepted)>=count:
             break
+    # Exhaust original transaction hints before consulting an untrusted index.
+    # This prevents network-dependent regression tests and unnecessary HTTP
+    # calls when authentic on-chain hints already satisfy the target.
+    if len(accepted)<count:
+        try:
+            public=public_discover(count=min(6,hint_limit))
+            seen={entry["address"] for entry in hinted["hints"]}
+            for entry in public["hints"]:
+                address=entry["address"]
+                if address in seen:
+                    continue
+                seen.add(address)
+                try:
+                    result=capture(rpc,count=1,pool_addresses=[address])
+                    if result["authenticated"]!=1:
+                        raise ValueError("DBC original pool identity not authenticated")
+                    state=capture_pool(rpc,result["source_pools"][0])
+                    if candidate_validator is not None:
+                        candidate_validator(state)
+                    accepted.append(state)
+                except (ValueError,OSError,RuntimeError,KeyError,TypeError) as exc:
+                    reason={"address":address,"reason_type":type(exc).__name__}
+                    if isinstance(exc,ValueError):
+                        reason["validation_reason"]=str(exc)[:160]
+                    rejected.append(reason)
+                    print(json.dumps({"stage":"dbc_candidate_rejected",**reason}))
+                if len(accepted)>=count:
+                    break
+        except (OSError,RuntimeError,ValueError,KeyError,TypeError) as exc:
+            print(json.dumps({"stage":"dbc_public_index_unavailable",
+                "error_type":type(exc).__name__}))
     if len(accepted)!=count and strict:
         raise ValueError("DBC original contextual source target incomplete: "+
                          str(len(accepted))+" of "+str(count))
