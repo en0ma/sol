@@ -13,10 +13,10 @@ from arb.meteora_dbc_seventh_venue_source import capture
 from arb.meteora_dbc_seventh_state_capture import capture_pool
 
 
-def run(rpc, *, count=1, hint_limit=12, pages=4, strict=True):
+def run(rpc, *, count=1, hint_limit=24, pages=4, strict=True):
     if type(count) is not int or not 1 <= count <= 6:
         raise ValueError("DBC accepted source count must be 1-6")
-    if type(hint_limit) is not int or not count <= hint_limit <= 12:
+    if type(hint_limit) is not int or not count <= hint_limit <= 24:
         raise ValueError("DBC bounded hint limit required")
     source = "original_dbc_program_recent_transactions"
     try:
@@ -78,7 +78,7 @@ def main():
     ap=argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--rpc",required=True)
     ap.add_argument("--count",type=int,default=1)
-    ap.add_argument("--hint-limit",type=int,default=12)
+    ap.add_argument("--hint-limit",type=int,default=24)
     ap.add_argument("--pages",type=int,default=4)
     ap.add_argument("--output",required=True)
     a=ap.parse_args()
