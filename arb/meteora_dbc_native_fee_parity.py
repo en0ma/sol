@@ -102,6 +102,7 @@ def parity(source,reference):
             raise ValueError("DBC exact-in directions not covered with two sizes")
         qualified.append({"pool":addr,"source_slot":row["source_slot"],
                  "source_pool_sha256":row["accounts"][addr]["sha256"],
+                 "source_config_sha256":entry["sha256"],
                  "native_full_fee_sdk_trials_verified":4,
                  "trials":results,"signed_swap_verified":False})
     return {"status":"INDEPENDENT_DBC_ORIGINAL_NATIVE_FEE_CURVE_SDK_PARITY",
