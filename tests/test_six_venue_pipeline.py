@@ -89,6 +89,39 @@ class SixVenuePipelineTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError,"digest"):
                     offline_research("http://127.0.0.1:8899",src,dst)
 
+    def test_new_onchain_discovery_hints_must_reauthenticate(self):
+        with tempfile.TemporaryDirectory() as temp:
+            src=Path(temp)/"source"
+            addr="new-from-original-onchain-lookup"
+            discovered={"status":"PARTIAL","candidate_graph_verified_count":1,
+                        "candidate_graph_pool_identities":[
+                            {"venue":"orca","address":addr,
+                             "mints":["a","b"],"slot":300}],
+                        "errors":[{"reason":"unavailable other venue"}]}
+            observed={}
+            def source_probe(_rpc, registry, *, batch):
+                observed["registry"]=registry
+                return readiness()
+            def export(_rpc,_readiness,folder,*,maximum):
+                folder.mkdir()
+                return {"exported":0,"routes":[]}
+            rank_empty={"fully_quoted":0,"blocked":0,"positive_gross":0,
+                        "ranked":[]}
+            with patch("arb.onchain_pool_discovery.discover",return_value=discovered) as d, \
+                 patch("arb.six_venue_pipeline.probe",side_effect=source_probe), \
+                 patch("arb.m5_distinct_venue_coverage_batch.source_batch",side_effect=export), \
+                 patch("arb.m5_source_triangle_quote_ranking.rank",return_value=rank_empty):
+                report=source_research("http://127.0.0.1:8899",
+                    {"pools":[]},src,amount_in=100,observed_unix=100,
+                    discovery_pairs=[["mintA","mintB"]])
+            self.assertEqual(observed["registry"]["pools"][0]["address"],addr)
+            self.assertEqual(d.call_args.kwargs["venues"],VENUES)
+            self.assertEqual(report["discovery"]["venue_owned_search"]["new_identity_hints"],1)
+            self.assertEqual(report["quote"]["net_profitable_confirmed"],0)
+            with self.assertRaisesRegex(ValueError,"discovery mint pairs"):
+                source_research("http://127.0.0.1:8899",{"pools":[]},src,
+                     amount_in=100,observed_unix=100,discovery_pairs=[["a","a"]])
+
     def test_rejects_out_of_scope_source_fixture(self):
         with tempfile.TemporaryDirectory() as temp:
             src=Path(temp)/"source"
