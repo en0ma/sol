@@ -10,7 +10,7 @@ from arb.raydium_clmm_sixth_venue_source import capture_pool
 from arb.raydium_clmm_six_additional_discovery import SAFE
 
 def capture(rpc,registry,hints,*,required=6):
-    if (not isinstance(hints,dict) or hints.get("status")!="OFFICIAL_RAYDIUM_API_HINTS_ONLY"
+    if (not isinstance(hints,dict) or hints.get("status")!="PUBLIC_POOL_HINTS_NOT_AUTHENTICATED"
             or hints.get("venue")!="raydium_clmm"
             or type(required) is not int or not 1<=required<=6):
         raise ValueError("invalid Raydium untrusted CLMM discovery input")
@@ -19,7 +19,7 @@ def capture(rpc,registry,hints,*,required=6):
     for candidate in hints.get("pools",[]):
         address=candidate.get("address")
         if (not isinstance(address,str) or address in seen
-                or candidate.get("candidate_status")!="OFFICIAL_API_HINT_NOT_AUTHENTICATED"):
+                or candidate.get("candidate_status") not in ("OFFICIAL_API_HINT_NOT_AUTHENTICATED","PUBLIC_INDEX_HINT_REQUIRES_ONCHAIN_AUTHENTICATION")):
             continue
         seen.add(address)
         try:
