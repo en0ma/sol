@@ -48,7 +48,7 @@ class DbcRecentTransactionTests(unittest.TestCase):
 
     def test_bounded_requests(self):
         with self.assertRaisesRegex(ValueError,"bounded"):
-            discover("https://readonly.invalid",count=7)
+            discover("https://readonly.invalid",count=13)
 
 
 if __name__=="__main__":
