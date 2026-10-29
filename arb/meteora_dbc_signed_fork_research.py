@@ -22,6 +22,7 @@ from arb.m5_meteora_damm_v2_dedicated_signed_fork import hydrate,_balances
 from arb.orca_swap_v2_offline_provision import token_account_bytes
 from arb.orca_fork_clock import fork_clock
 from arb.damm_cpmm_atomic_offline import _simulate
+from arb.token_vaults import decode_token_account
 
 SYSTEM="11111111111111111111111111111111"
 
@@ -138,11 +139,18 @@ def diagnostic(source_rpc,local_rpc,source,sdk,curve,*,required=1):
                 {"commitment":"confirmed"}])["value"]["blockhash"]
             signed=Transaction.new_signed_with_payer([
                 ix],signer.pubkey(),[signer],Hash.from_string(blockhash))
-            simulated,_=_simulate(local_rpc,signed,[user_in,user_out])
+            simulated,_=_simulate(local_rpc,signed,[user_in,user_out,
+                fields["base_vault"],fields["quote_vault"]])
             if simulated.get("err") is not None:
                 raise ValueError("DBC isolated original signed swap rejected: "+
                                  str(simulated["err"])[:180])
-            post=_balances(simulated,(mint_in,mint_out),str(signer.pubkey()))
+            accounts=simulated.get("accounts")
+            if not isinstance(accounts,list) or len(accounts)!=4 or any(
+                    not isinstance(a,dict) or a.get("owner")!=TOKEN_PROGRAM or
+                    not isinstance(a.get("data"),list) or len(a["data"])!=2 or
+                    a["data"][1]!="base64" for a in accounts):
+                raise ValueError("DBC signed user/vault poststates missing")
+            post=_balances({"accounts":accounts[:2]},(mint_in,mint_out),str(signer.pubkey()))
             if post!=[0,expected]:
                 raise ValueError("DBC original SPL output differs from official SDK")
             logs=simulated.get("logs")
@@ -150,18 +158,31 @@ def diagnostic(source_rpc,local_rpc,source,sdk,curve,*,required=1):
                 not any("Program "+PROGRAM+" invoke" in line for line in logs) or
                 not any("Program "+PROGRAM+" success" in line for line in logs)):
                 raise ValueError("DBC original signed success logs absent")
-            accounts=simulated.get("accounts")
-            if not isinstance(accounts,list) or len(accounts)!=2 or any(
-                   not isinstance(a,dict) or not isinstance(a.get("data"),list)
-                   for a in accounts):
-                raise ValueError("DBC original SPL raw poststates absent")
+            vault_before=[];vault_after=[]
+            for index,key in enumerate(("base_vault","quote_vault")):
+                original=decode_token_account(base64.b64decode(
+                    row["accounts"][fields[key]]["account_base64"],validate=True))
+                current=decode_token_account(base64.b64decode(
+                    accounts[index+2]["data"][0],validate=True))
+                expected_mint=fields["base_mint" if index==0 else "quote_mint"]
+                if (original["mint"]!=expected_mint or current["mint"]!=expected_mint or
+                        original["authority"]!=current["authority"]):
+                    raise ValueError("DBC original vault versus signed vault identity mismatch")
+                vault_before.append(original["amount_base_units"])
+                vault_after.append(current["amount_base_units"])
+            input_idx=0 if base else 1
+            output_idx=1-input_idx
+            if (vault_after[input_idx]-vault_before[input_idx]!=amount or
+                    vault_before[output_idx]-vault_after[output_idx]!=expected):
+                raise ValueError("DBC signed original vault flow differs from native/SDK")
             receipts.append({"direction":direction,"amount_in":amount,
                  "pool":address,"source_slot":row["source_slot"],
                  "source_pool_sha256":row["accounts"][address]["sha256"],
                  "input_mint":mint_in,"output_mint":mint_out,
                  "input_token_account":user_in,"output_token_account":user_out,
                  "signed_signature":str(signed.signatures[0]),
-                 "post_spl_account_data_base64":[a["data"][0] for a in accounts],
+                 "post_spl_account_data_base64":[a["data"][0] for a in accounts[:2]],
+                 "post_vault_account_data_base64":[a["data"][0] for a in accounts[2:]],
                  "simulation_logs":logs,
                  "sdk_expected_output":expected,
                  "raw_signed_transaction_base64":base64.b64encode(bytes(signed)).decode(),
