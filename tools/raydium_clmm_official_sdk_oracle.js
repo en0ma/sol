@@ -51,12 +51,21 @@ function quotePool(row,native) {
     accInfo:pool,
     ammConfig:config
   };
+  // Valid only for the source's bounded central 1024-array bitmap.
+  // Extension is empty; a requested outside-range array must be rejected
+  // separately instead of interpolating from a different RPC slot.
+  const zeroExtension={
+    negativeTickArrayBitmap:Array.from({length:14},
+      ()=>Array.from({length:8},()=>new BN(0))),
+    positiveTickArrayBitmap:Array.from({length:14},
+      ()=>Array.from({length:8},()=>new BN(0)))
+  };
   const out=[];
   for(const nativeQuote of native.quotes) {
     const inputMint=nativeQuote.zero_for_one?pool.mintA:pool.mintB;
     const amount=new BN(String(nativeQuote.amount_in));
     const computed=ray.PoolUtils.getOutputAmountAndRemainAccounts(
-      info,undefined,tickArrayCache,inputMint,amount,0);
+      info,zeroExtension,tickArrayCache,inputMint,amount,0);
     demand(computed.expectedAmountOut&&computed.expectedAmountOut.gt(new BN(0)),
       "official SDK zero output");
     const official=computed.expectedAmountOut.toString();
