@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import patch
 from solders.pubkey import Pubkey
 from arb.meteora_dbc_seventh_state_capture import (
-    parse_pool, capture_pool, PROGRAM, TOKEN_PROGRAM, POOL_AUTHORITY, SYSVAR_OWNER,
+    parse_pool, capture_pool, PROGRAM, TOKEN_PROGRAM, TOKEN_2022, POOL_AUTHORITY, SYSVAR_OWNER,
 )
 from arb.meteora_dbc_seventh_venue_source import DISC
 
@@ -99,6 +99,23 @@ class DbcStateTests(unittest.TestCase):
         self.assertEqual(result["pool_fields"]["base_reserve"],101)
         self.assertEqual(result["accounts"][pk(8)]["sha256"],
                          hashlib.sha256(newer).hexdigest())
+
+    def test_token2022_source_preserved_but_not_pricing_accepted(self):
+        raw=bytearray(raw_pool());raw[304]=1
+        raw=bytes(raw)
+        original={"address":pk(8),"account_base64":base64.b64encode(raw).decode(),
+          "account_sha256":hashlib.sha256(raw).hexdigest(),"source_slot":100}
+        snapshot=context(raw)
+        snapshot["value"][2]["owner"]=TOKEN_2022
+        snapshot["value"][4-1]["owner"]=TOKEN_2022
+        # Keep legacy vault prefix and an extension payload without treating
+        # those bytes as accepted transfer-fee or transfer-hook semantics.
+        snapshot["value"][4-1]["data"][0]=base64.b64encode(
+            base64.b64decode(snapshot["value"][3]["data"][0])+bytes(32)).decode()
+        with patch("arb.meteora_dbc_seventh_state_capture.call",return_value=snapshot):
+            result=capture_pool("https://readonly.invalid",original)
+        self.assertTrue(result["token2022_extensions_not_yet_audited"])
+        self.assertFalse(result["pricing_eligible"])
 
     def test_wrong_quote_vault_mint_rejected(self):
         raw=raw_pool()
