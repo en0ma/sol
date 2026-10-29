@@ -7,6 +7,9 @@ on:
       - "arb/meteora_dbc_swap.py"
       - "tests/test_meteora_dbc_swap.py"
       - "tests/test_meteora_dbc_signed_fork_research.py"
+      - "arb/meteora_dbc_native_fee.py"
+      - "arb/meteora_dbc_native_fee_parity.py"
+      - "tests/test_meteora_dbc_native_fee.py"
   workflow_dispatch:
 permissions:
   contents: read
@@ -27,6 +30,7 @@ jobs:
           python3 -m pip install --disable-pip-version-check solders==0.26.0
           python3 -m unittest discover -s tests -p test_meteora_dbc_swap.py -v
           python3 -m unittest discover -s tests -p test_meteora_dbc_signed_fork_research.py -v
+          python3 -m unittest discover -s tests -p test_meteora_dbc_native_fee.py -v
           python3 -m py_compile arb/meteora_dbc_signed_fork_research.py
           npm install --no-save --ignore-scripts --prefix "$RUNNER_TEMP/dbc-sdk" @meteora-ag/dynamic-bonding-curve-sdk@2.0.0
       - name: Install isolated Surfpool
@@ -73,6 +77,12 @@ jobs:
             --source "$RUNNER_TEMP/dbc-signed-diagnostic-source.json" \
             --sdk "$RUNNER_TEMP/dbc-signed-diagnostic-sdk.json" \
             --output "$RUNNER_TEMP/dbc-signed-diagnostic-curve.json"
+      - name: Independently require native full-fee original SDK parity before signing
+        run: |
+          python3 -m arb.meteora_dbc_native_fee_parity \
+            --source "$RUNNER_TEMP/dbc-signed-diagnostic-source.json" \
+            --sdk "$RUNNER_TEMP/dbc-signed-diagnostic-sdk.json" \
+            --output "$RUNNER_TEMP/dbc-signed-diagnostic-native-fee.json"
       - name: Diagnostic only real Ed25519-signed isolated four-swap execution
         run: |
           python3 -m arb.meteora_dbc_signed_fork_research \
@@ -80,7 +90,7 @@ jobs:
             --surfpool-rpc http://127.0.0.1:8899 \
             --source "$RUNNER_TEMP/dbc-signed-diagnostic-source.json" \
             --sdk "$RUNNER_TEMP/dbc-signed-diagnostic-sdk.json" \
-            --curve "$RUNNER_TEMP/dbc-signed-diagnostic-curve.json" \
+            --curve "$RUNNER_TEMP/dbc-signed-diagnostic-native-fee.json" \
             --required 1 \
             --output "$RUNNER_TEMP/dbc-signed-diagnostic-unaccepted.json"
       - uses: actions/upload-artifact@v4
