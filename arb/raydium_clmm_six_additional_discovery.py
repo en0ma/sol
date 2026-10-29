@@ -38,6 +38,8 @@ def discover(registry,*,minimum=6,limit=80,fetch=None):
         page=get("https://api.dexpaprika.com/networks/solana/pools/search?dex_name=raydium_clmm&limit="+str(limit))
         rows=page.get("results")
         if not isinstance(rows,list):raise ValueError("public CLMM hint source unavailable")
+    if rows:
+        print("PUBLIC_POOL_INDEX_FIRST_RECORD",json.dumps(rows[0],default=str)[:1400])
     results=[];seen=set(existing)
     for item in rows:
         if not isinstance(item,dict):continue
