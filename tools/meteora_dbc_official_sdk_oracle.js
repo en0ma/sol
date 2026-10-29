@@ -88,7 +88,7 @@ for(const row of report.source_pools) {
     }
     const ordered=[...sizes].map(x=>new BN(x)).filter(x=>x.lte(cap))
       .sort((a,b)=>a.cmp(b));
-    const used=new Set();const failures={};
+    const used=new Set();const failures={};const sdkErrors={};
     for(const input of ordered) {
       if(used.size>=2)break;
       const amount=input.toString(10);
@@ -115,12 +115,14 @@ for(const row of report.source_pools) {
       } catch(error) {
         // Bounded categorization only, no SDK error strings or RPC secrets.
         failures.sdk_exception=(failures.sdk_exception||0)+1;
+        const reason=String(error?.message||error?.name||"unknown").slice(0,180);
+        sdkErrors[reason]=(sdkErrors[reason]||0)+1;
       }
     }
     if(used.size!==2) {
       console.error(JSON.stringify({stage:"dbc_sdk_direction_screen",
         pool:row.pool,direction:swapBaseForQuote?"base_to_quote":"quote_to_base",
-        candidate_sizes:ordered.length,qualified:used.size,failures}));
+        candidate_sizes:ordered.length,qualified:used.size,failures,sdkErrors}));
       throw Error("DBC official SDK cannot establish two genuine non-dust quote sizes");
     }
   }
