@@ -21,7 +21,7 @@ def raw_pool():
         r[off:off+32]=bytes([n])*32
     r[232:240]=(100).to_bytes(8,"little")
     r[240:248]=(200).to_bytes(8,"little")
-    r[296:312]=(1<<64).to_bytes(16,"little")
+    r[280:296]=(1<<64).to_bytes(16,"little")
     return bytes(r)
 
 
@@ -113,7 +113,7 @@ class DbcStateTests(unittest.TestCase):
                 capture_pool("https://readonly.invalid",source)
 
     def test_migrated_rejected(self):
-        raw=bytearray(raw_pool());raw[321]=1
+        raw=bytearray(raw_pool());raw[305]=1
         with self.assertRaisesRegex(ValueError,"migrated"):
             parse_pool(bytes(raw))
 
