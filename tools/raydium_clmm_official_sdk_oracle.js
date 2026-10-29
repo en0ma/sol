@@ -76,6 +76,8 @@ function quotePool(row,native) {
       native_integer_output:candidate,official_sdk_output:official,
       expected_fee_native:nativeQuote.fee,
       official_fee:computed.feeAmount.toString(),
+      remaining_tick_arrays:computed.remainingAccounts.map(k=>k.toBase58()),
+      all_trade:computed.allTrade===true,
       signed_parity_verified:false,
       status:official===candidate?"OFFICIAL_SDK_NATIVE_SINGLE_TICK_EXACT":
         "OFFICIAL_SDK_NATIVE_SINGLE_TICK_MISMATCH"});
