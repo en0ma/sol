@@ -19,7 +19,44 @@ SAFE={"actionable":False,"broadcast":False,"native_pricing_verified":False,
       "official_sdk_parity_verified":False,"signed_parity_verified":False,
       "registry_admission_approved":False}
 
-def capture(rpc,*,count=3):
+def authenticated_pool_hints(rpc, addresses):
+    """Authenticate untrusted addresses in one contextual read, never via an index."""
+    if (not isinstance(addresses, (list, tuple)) or not 1 <= len(addresses) <= 6
+            or any(not isinstance(a, str) for a in addresses)
+            or len(set(addresses)) != len(addresses)):
+        raise ValueError("DBC source addresses must be 1-6 distinct pubkeys")
+    for address in addresses:
+        Pubkey.from_string(address)
+    response = call(rpc, "getMultipleAccounts", [list(addresses), {
+        "encoding": "base64", "commitment": "confirmed"
+    }])
+    if (not isinstance(response, dict) or not isinstance(response.get("context"), dict)
+            or type(response["context"].get("slot")) is not int
+            or not isinstance(response.get("value"), list)
+            or len(response["value"]) != len(addresses)):
+        raise ValueError("DBC source accounts require one contextual RPC snapshot")
+    slot = response["context"]["slot"]
+    verified = []
+    for address, account in zip(addresses, response["value"]):
+        if (not isinstance(account, dict) or account.get("owner") != PROGRAM
+                or account.get("executable") is not False
+                or not isinstance(account.get("lamports"), int)
+                or not isinstance(account.get("data"), list)
+                or len(account["data"]) != 2 or account["data"][1] != "base64"):
+            raise ValueError("DBC source pool account authentication failed")
+        raw = base64.b64decode(account["data"][0], validate=True)
+        if raw[:8] != DISC:
+            raise ValueError("DBC VirtualPool discriminator mismatch")
+        verified.append({
+            "address": address, "status": "DBC_PROGRAM_OWNED_VIRTUAL_POOL_SOURCE",
+            "account_base64": account["data"][0],
+            "account_sha256": hashlib.sha256(raw).hexdigest(),
+            "account_lamports": account["lamports"], "source_slot": slot
+        })
+    return verified
+
+
+def capture(rpc,*,count=3,pool_addresses=None):
     if type(count) is not int or not 1<=count<=6:
         raise ValueError("bounded DBC source identity count required")
     info=call(rpc,"getAccountInfo",[PROGRAM,{
@@ -50,6 +87,17 @@ def capture(rpc,*,count=3):
     elf=binary[45:]
     if elf[:4]!=b"\x7fELF":
         raise ValueError("Meteora DBC real on-chain ELF missing")
+    if pool_addresses is not None:
+        if len(pool_addresses) != count:
+            raise ValueError("DBC explicit source address count must equal requested count")
+        accepted = authenticated_pool_hints(rpc, pool_addresses)
+        return {"venue": "meteora_dbc",
+            "status": "SEVENTH_VENUE_READONLY_SOURCE_ONLY",
+            "program": PROGRAM, "pool_authority": POOL_AUTHORITY,
+            "onchain_elf_sha256": hashlib.sha256(elf).hexdigest(),
+            "programdata_address": program_data,
+            "source_pools": accepted, "authenticated": len(accepted),
+            "scan_status": "EXPLICIT_ADDRESSES_CONTEXTUALLY_AUTHENTICATED", **SAFE}
     # getProgramAccounts is source-only discovery and may be disallowed
     # by a capped RPC provider. Never invent new pool identities.
     source_scan_status="ONCHAIN_PROGRAM_ACCOUNTS_REQUESTED"
@@ -92,9 +140,11 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("--rpc",required=True)
     p.add_argument("--count",type=int,default=3)
+    p.add_argument("--pool-address",action="append",dest="pool_addresses",
+                   help="Untrusted VirtualPool identity; repeat exactly --count times; avoids getProgramAccounts")
     p.add_argument("--output",required=True)
     args=p.parse_args()
-    report=capture(args.rpc,count=args.count)
+    report=capture(args.rpc,count=args.count,pool_addresses=args.pool_addresses)
     Path(args.output).write_text(json.dumps(report,indent=2)+"\n")
     print(json.dumps({"status":report["status"],
                       "authenticated":report["authenticated"],
