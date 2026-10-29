@@ -31,7 +31,7 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("--rpc",required=True)
     p.add_argument("--output",required=True)
-    p.add_argument("--pages",type=int,default=6)
+    p.add_argument("--pages",type=int,default=12)
     a=p.parse_args()
     captured=run(a.rpc,count=6,hint_limit=24,pages=a.pages,strict=False)
     count=len(captured["source_pools"])
