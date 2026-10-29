@@ -92,6 +92,13 @@ jobs:
             --sdk-report "$RUNNER_TEMP/pumpswap-official-sdk-comparison.json" \
             --pool-count "$POOL_COUNT" \
             --output "$RUNNER_TEMP/pumpswap-dedicated-signed-result.json"
+      - name: Independently audit signed instruction signatures and observed raw SPL deltas
+        run: |
+          python3 -m arb.pumpswap_signed_receipt_audit \
+            --source "$RUNNER_TEMP/pumpswap-native-source.json" \
+            --sdk "$RUNNER_TEMP/pumpswap-official-sdk-comparison.json" \
+            --signed "$RUNNER_TEMP/pumpswap-dedicated-signed-result.json" \
+            --output "$RUNNER_TEMP/pumpswap-independent-signed-audit.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -101,5 +108,6 @@ jobs:
             ${{ runner.temp }}/pumpswap-official-sdk-comparison.json
             ${{ runner.temp }}/pumpswap-sdk-candidate-audit.json
             ${{ runner.temp }}/pumpswap-dedicated-signed-result.json
+            ${{ runner.temp }}/pumpswap-independent-signed-audit.json
             ${{ runner.temp }}/pumpswap-surfpool.log
           if-no-files-found: warn
