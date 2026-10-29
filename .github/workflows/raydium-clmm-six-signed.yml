@@ -41,7 +41,7 @@ jobs:
       - name: Compute all 24 native integer single-tick quote candidates
         run: |
           python3 -m arb.raydium_clmm_native_single_tick \
-            --tick-source "$RUNNER_TEMP/clmm-six-screened-ticks.json" \
+            --tick-source "$RUNNER_TEMP/clmm-six-ticks.json" \
             --output "$RUNNER_TEMP/clmm-six-native.json"
       - name: Independently select six official-SDK-exact among real source-native candidates
         run: |
