@@ -34,6 +34,11 @@ jobs:
             --source "$RUNNER_TEMP/clmm-sixth-source.json" \
             --rpc "$SOLANA_RPC_URL" --radius 4 \
             --output "$RUNNER_TEMP/clmm-sixth-tick-source.json"
+      - name: Independently evaluate bounded Q64 integer single-tick swap candidates
+        run: |
+          python3 -m arb.raydium_clmm_native_single_tick \
+            --tick-source "$RUNNER_TEMP/clmm-sixth-tick-source.json" \
+            --output "$RUNNER_TEMP/clmm-sixth-native-candidates.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -41,4 +46,5 @@ jobs:
           path: |
             ${{ runner.temp }}/clmm-sixth-source.json
             ${{ runner.temp }}/clmm-sixth-tick-source.json
+            ${{ runner.temp }}/clmm-sixth-native-candidates.json
           if-no-files-found: warn
