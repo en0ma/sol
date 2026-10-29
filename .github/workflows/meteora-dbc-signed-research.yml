@@ -1,0 +1,92 @@
+name: Meteora DBC Original Signed Offline Research
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/meteora-dbc-signed-research.yml"
+      - "arb/meteora_dbc_signed_fork_research.py"
+      - "arb/meteora_dbc_swap.py"
+      - "tests/test_meteora_dbc_swap.py"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  dbc-genuine-signed-research:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    env:
+      SOLANA_MAINNET_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
+      SOLANA_RPC_MIN_INTERVAL_SECONDS: "0.5"
+      SOLANA_RPC_ALCHEMY_FREE_TIER: "1"
+      SOLANA_RPC_PACING_FILE: /tmp/dbc-signed-source-pacing
+      SURFPOOL_EXPLICITLY_OFFLINE: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          python3 -m pip install --disable-pip-version-check solders==0.26.0
+          python3 -m unittest discover -s tests -p test_meteora_dbc_swap.py -v
+          python3 -m py_compile arb/meteora_dbc_signed_fork_research.py
+          npm install --no-save --ignore-scripts --prefix "$RUNNER_TEMP/dbc-sdk" @meteora-ag/dynamic-bonding-curve-sdk@2.0.0
+      - name: Install isolated Surfpool
+        run: |
+          bash ci/install_surfpool.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - name: Launch and pause offline localhost before source snapshot
+        run: |
+          nohup surfpool start --ci --offline --no-deploy > "$RUNNER_TEMP/dbc-surfpool.log" 2>&1 < /dev/null &
+          python3 - <<'PY'
+          import time
+          from arb.rpc import call
+          for _ in range(90):
+              try:
+                  if call("http://127.0.0.1:8899","getHealth",[],retries=0)=="ok":
+                      break
+              except (OSError,ValueError,RuntimeError): pass
+              time.sleep(1)
+          else:raise SystemExit("DBC isolated Surfpool not available")
+          call("http://127.0.0.1:8899","surfnet_pauseClock",[])
+          PY
+      - name: Capture one authentic original DBC source without broadcast
+        run: |
+          test -n "$SOLANA_MAINNET_RPC_URL"
+          python3 -m arb.meteora_dbc_seventh_candidate_capture \
+            --rpc "$SOLANA_MAINNET_RPC_URL" --count 1 --pages 2 \
+            --output "$RUNNER_TEMP/dbc-signed-diagnostic-source.json"
+      - name: Independently audit saved source bytes
+        run: |
+          python3 -m arb.meteora_dbc_seventh_source_audit \
+            --source "$RUNNER_TEMP/dbc-signed-diagnostic-source.json" \
+            --output "$RUNNER_TEMP/dbc-independent-source.json"
+      - name: Obtain source-bound original official SDK quote candidates
+        env:
+          NODE_PATH: ${{ runner.temp }}/dbc-sdk/node_modules
+        run: |
+          node tools/meteora_dbc_official_sdk_oracle.js \
+            "$RUNNER_TEMP/dbc-signed-diagnostic-source.json" \
+            "$RUNNER_TEMP/dbc-signed-diagnostic-sdk.json"
+      - name: Independently reconcile original zero-fee curve mathematics
+        run: |
+          python3 -m arb.meteora_dbc_native_curve_audit \
+            --source "$RUNNER_TEMP/dbc-signed-diagnostic-source.json" \
+            --sdk "$RUNNER_TEMP/dbc-signed-diagnostic-sdk.json" \
+            --output "$RUNNER_TEMP/dbc-signed-diagnostic-curve.json"
+      - name: Diagnostic only real Ed25519-signed isolated four-swap execution
+        run: |
+          python3 -m arb.meteora_dbc_signed_fork_research \
+            --source-rpc "$SOLANA_MAINNET_RPC_URL" \
+            --surfpool-rpc http://127.0.0.1:8899 \
+            --source "$RUNNER_TEMP/dbc-signed-diagnostic-source.json" \
+            --sdk "$RUNNER_TEMP/dbc-signed-diagnostic-sdk.json" \
+            --curve "$RUNNER_TEMP/dbc-signed-diagnostic-curve.json" \
+            --required 1 \
+            --output "$RUNNER_TEMP/dbc-signed-diagnostic-unaccepted.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dbc-signed-offline-research-unaccepted
+          path: |
+            ${{ runner.temp }}/dbc-signed-diagnostic-*.json
+            ${{ runner.temp }}/dbc-independent-source.json
+            ${{ runner.temp }}/dbc-surfpool.log
+          if-no-files-found: warn
