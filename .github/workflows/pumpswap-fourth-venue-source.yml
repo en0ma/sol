@@ -104,6 +104,17 @@ jobs:
             --sdk "$RUNNER_TEMP/pumpswap-official-sdk-comparison.json" \
             --signed "$RUNNER_TEMP/pumpswap-dedicated-signed-result.json" \
             --output "$RUNNER_TEMP/pumpswap-independent-signed-audit.json"
+      - name: Require six NEW signed PumpSwap pool proofs and export verified registry
+        if: ${{ env.POOL_COUNT == '7' }}
+        run: |
+          python3 -m arb.pumpswap_signed_registry_merge \
+            --registry arb/pool_registry.json \
+            --source "$RUNNER_TEMP/pumpswap-native-source.json" \
+            --sdk "$RUNNER_TEMP/pumpswap-official-sdk-comparison.json" \
+            --signed "$RUNNER_TEMP/pumpswap-dedicated-signed-result.json" \
+            --additional 6 \
+            --output "$RUNNER_TEMP/pumpswap-seven-pool-signed-registry.json" \
+            --report "$RUNNER_TEMP/pumpswap-six-added-proof.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -114,5 +125,7 @@ jobs:
             ${{ runner.temp }}/pumpswap-sdk-candidate-audit.json
             ${{ runner.temp }}/pumpswap-dedicated-signed-result.json
             ${{ runner.temp }}/pumpswap-independent-signed-audit.json
+            ${{ runner.temp }}/pumpswap-seven-pool-signed-registry.json
+            ${{ runner.temp }}/pumpswap-six-added-proof.json
             ${{ runner.temp }}/pumpswap-surfpool.log
           if-no-files-found: warn
