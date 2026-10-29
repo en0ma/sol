@@ -752,6 +752,126 @@
     {
       "venue": "raydium_cpmm",
       "address": "HshXCLduinxu3nhDz4WQxkk8FGWFoZDsi4bnMJExXSRt"
+    },
+    {
+      "venue": "raydium_clmm",
+      "address": "BCDdHonby65iduz3Ev3c9v5XjNkzyu5e56KRFHpBM4T9",
+      "mints": [
+        "USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "signed_provenance": {
+        "status": "INDEPENDENT_CLMM_SIGNED_NATIVE_SDK_SPL_PARITY",
+        "source_slot": 462865937,
+        "source_digest": "3548fc6e795f89ef4f2bbdbcb1f48d01c4d25f7e6cde8ebd7f188adef1125630",
+        "signed_transaction_hashes": [
+          "e774daddc60f30194035ebac25edd6c47c369bcc136b3534c76d6b1595df2a18",
+          "bbe5f7c1f76e415661d18d5713b9d65dfe21f27377d2830fb7732157883088f7",
+          "e2ae8dc52734871bb11447d815b458000f487716a6e8175134a838513b14cf0f",
+          "40b45d257e15cfadc2a844f57003ed7a543c55e7680be9da3c8ac28f30958e4f"
+        ],
+        "independent_receipt_sha256": "dbeaf5a5504bc6bb7a23c810effe718b30ff532a28c0e7adf95d32a2ac3a7a29"
+      }
+    },
+    {
+      "venue": "raydium_clmm",
+      "address": "3ucNos4NbumPLZNWztqGHNFFgkHeRMBQAVemeeomsUxv",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "signed_provenance": {
+        "status": "INDEPENDENT_CLMM_SIGNED_NATIVE_SDK_SPL_PARITY",
+        "source_slot": 462865947,
+        "source_digest": "29b9c557960f38e4874f36900ca1179efbf3fc88b43addb63ca0f9a49fe417c3",
+        "signed_transaction_hashes": [
+          "c73979f1aa361cc5d69f1c5baa901622f3f3ca9ec5fd5ca5354c45fddb4fdde2",
+          "869b3f8ab71ae5c5a0cb96dc9b5adb140df96080111620fc4f37279b0329e7aa",
+          "9c112e70108ba9097bc7551437e8624312f94d2c3c64fda2f083fc039c4ebfb3",
+          "a3c6dedb59a2b56fabf706b188d06b40399eb6ccce6fc7ca956f7c1803ac5903"
+        ],
+        "independent_receipt_sha256": "fd853c216a22b27881c334bd798e8205c2cb33284adc4c7127dde384055cd018"
+      }
+    },
+    {
+      "venue": "raydium_clmm",
+      "address": "EWivkwNtcxuPsU6RyD7Pfvs7u9Yv8nQ79tJ7xgGyPrp6",
+      "mints": [
+        "6FrrzDk5mQARGc1TDYoyVnSyRdds1t4PbtohCD6p3tgG",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "signed_provenance": {
+        "status": "INDEPENDENT_CLMM_SIGNED_NATIVE_SDK_SPL_PARITY",
+        "source_slot": 462866000,
+        "source_digest": "a2eb47a48a754fb344308b1c42c0da1c12107b86b9111d5130a59acbc9a440e2",
+        "signed_transaction_hashes": [
+          "5b966b499714ff926574eff825de49be011dc73a812f0291690cc82300e7516b",
+          "be3ee71d00defea1e73069ddf015703d5e75150705d6c3a67352bee5e6659ef4",
+          "cfb8735380d25fca8776ecbba36527d06574be5a0d70c398ccafb8a43ab6b9fc",
+          "434109b42efe64f27d54993b5d5d3bb499c7c50ec38f335226111526699b9976"
+        ],
+        "independent_receipt_sha256": "f4f173672181b5600588175205e7792c30c9bae66dafb967fd8d8ea69447a1b0"
+      }
+    },
+    {
+      "venue": "raydium_clmm",
+      "address": "AQAGYQsdU853WAKhXM79CgNdoyhrRwXvYHX6qrDyC1FS",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB"
+      ],
+      "signed_provenance": {
+        "status": "INDEPENDENT_CLMM_SIGNED_NATIVE_SDK_SPL_PARITY",
+        "source_slot": 462866008,
+        "source_digest": "9e407f1f55573d7f5db37ea0edc3ef03336afd016d9e2b2db370d26457b6df98",
+        "signed_transaction_hashes": [
+          "e3772527cfaa718a1bb7673673f37b86d44fddeca9c2df860087e2d330468c27",
+          "e2e91a6541b4ce2ce0d2a98a9fe2ef3b512b2d5d31804e114ecb1ddb1beda87f",
+          "331e38d3c692f39129244683b7d2d8886bd851bfb35bbf84f5f7db8594b3ce47",
+          "f7eb87a78e30aa15b09bc75f4c45c55a9e40d2033eebf1cae70910d8a4e5b110"
+        ],
+        "independent_receipt_sha256": "1fde6712345e3d5222fe21dd6e0e57803304acad673161a1cc92315722f699d2"
+      }
+    },
+    {
+      "venue": "raydium_clmm",
+      "address": "HnhpJPJgBG2KwniMTNW8cVBHvk1hFog3RC3kjnyc23tD",
+      "mints": [
+        "CARDSccUMFKoPRZxt5vt3ksUbxEFEcnZ3H2pd3dKxYjp",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "signed_provenance": {
+        "status": "INDEPENDENT_CLMM_SIGNED_NATIVE_SDK_SPL_PARITY",
+        "source_slot": 462866029,
+        "source_digest": "a59a586c2b90337c7dc533e53bcb86dd122b75111874ccf0f90851113843d344",
+        "signed_transaction_hashes": [
+          "7dd2174452be733ca5056f22b9db0ea83ef423aa95d526898f339fe34056a4a1",
+          "7966c061d0724fe5d2dd675c3967e89bf0071a6ab6599bf3099321fe43c1df12",
+          "987164f1b5922d3e79a18c8ff0d8d1c052df3cd0793e02543e717abf6af5e829",
+          "859b1d1b56db46fb754b40ccf6c5a0d30ac0c466c33aeecb2b0a804427fd663d"
+        ],
+        "independent_receipt_sha256": "90cc2526e280b32225eb2de64417dc3bdababe7df6741337caf9b8ded0a823b5"
+      }
+    },
+    {
+      "venue": "raydium_clmm",
+      "address": "6tgpinsu1Mj5tr6c3HE8BXCGa1jfTtX86jGWYouKwrtV",
+      "mints": [
+        "CatEvkKVmK2fsiVJZ3EzEBuCW8bmNoHKxsXvbBggdebp",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "signed_provenance": {
+        "status": "INDEPENDENT_CLMM_SIGNED_NATIVE_SDK_SPL_PARITY",
+        "source_slot": 462866135,
+        "source_digest": "158fe7a0ccadd898adc0e78d59734b3872ccec681bdc0ad79a8f6658649f7df1",
+        "signed_transaction_hashes": [
+          "81764acecfbb2be8e613367befcfb8401812e6a6b28ddf5b2f48fab3ea9ef37e",
+          "a7aa3f6b4d602ded04b283273c298e5932c3671a5e20ac5d58341fcef0859783",
+          "c31d50bbaee55b9e9579a0ea3abceac54c38a530df97c7ca9f10ae978ffc7443",
+          "7821e4bc8e3bec0113cd98fcc61ebaa3b8f260ab43c92fae2d53304958782dd7"
+        ],
+        "independent_receipt_sha256": "00bef24ad5d2aba7ea872244682c061de0980006311766059b6e64caef4bea70"
+      }
     }
   ]
 }
