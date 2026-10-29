@@ -143,6 +143,7 @@ def verify(rpc, address, state, *, include_source_bytes=False):
             "actionable": False, "executable_quote": False,
             **({"authenticated_source_accounts": [
                 {"address": key, "owner": item["owner"],
-                 "account_base64": item["data"][0]}
+                 "account_base64": item["data"][0],
+                 "lamports": item["lamports"], "executable": item["executable"]}
                 for key, item in zip(keys, accounts)
             ]} if include_source_bytes else {})}
