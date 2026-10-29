@@ -72,7 +72,7 @@ def capture_pool(rpc,address,expected_mints):
     # ALL account-role PDAs and the active-array index remain identical.
     if (any(synchronized[k]!=state[k] for k in (
             "reserve_x","reserve_y","token_x_mint","token_y_mint",
-            "oracle","amm_config")) or
+            "oracle","bin_step")) or
             active_bin_array_index(synchronized["active_id"])!=idx):
         raise ValueError("DLMM pool account roles or active array changed during capture")
     if (synchronized["status"]!=0 or
