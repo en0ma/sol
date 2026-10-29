@@ -18,6 +18,9 @@ on:
       - "arb/meteora_dbc_native_fee_parity.py"
       - "tests/test_meteora_dbc_native_fee.py"
   workflow_dispatch:
+concurrency:
+  group: dbc-original-candidates-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
