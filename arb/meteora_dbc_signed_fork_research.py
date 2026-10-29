@@ -74,12 +74,16 @@ def provision(local_rpc, signer, input_mint, output_mint, amount):
 
 def diagnostic(source_rpc,local_rpc,source,sdk,curve,*,required=1):
     local_rpc_only(local_rpc)
+    if source.get("status")=="SIX_DBC_ORIGINAL_SOURCE_POOLS_ONLY":
+        if source.get("independent_audit",{}).get("authenticated_source_pools")!=6:
+            raise ValueError("DBC six-source independently authenticated proof missing")
+        source=source["source"]
     if (type(required) is not int or not 1<=required<=6 or
             source.get("status")!="DBC_ORIGINAL_CONTEXTUAL_SOURCE_PARTIAL_NOT_SIGNED" or
             sdk.get("status")!="DBC_ORIGINAL_OFFICIAL_SDK_QUOTES_ONLY_NOT_NATIVE_PARITY" or
             curve.get("status")!="INDEPENDENT_DBC_ORIGINAL_NATIVE_FEE_CURVE_SDK_PARITY"):
         raise ValueError("DBC signed diagnostic requires original unsigned source and Q64 curve evidence")
-    pools=source["source_pools"];quoted={q["pool"]:q for q in sdk["pools"]}
+    pools=sorted(source["source_pools"],key=lambda r:r["clock_unix_timestamp"]);quoted={q["pool"]:q for q in sdk["pools"]}
     native={q["pool"]:q for q in curve["pools"]}
     if (curve.get("verified_pools")!=required or
             curve.get("verified_trials")!=required*4 or
@@ -141,7 +145,24 @@ def diagnostic(source_rpc,local_rpc,source,sdk,curve,*,required=1):
             post=_balances(simulated,(mint_in,mint_out),str(signer.pubkey()))
             if post!=[0,expected]:
                 raise ValueError("DBC original SPL output differs from official SDK")
+            logs=simulated.get("logs")
+            if (not isinstance(logs,list) or
+                not any("Program "+PROGRAM+" invoke" in line for line in logs) or
+                not any("Program "+PROGRAM+" success" in line for line in logs)):
+                raise ValueError("DBC original signed success logs absent")
+            accounts=simulated.get("accounts")
+            if not isinstance(accounts,list) or len(accounts)!=2 or any(
+                   not isinstance(a,dict) or not isinstance(a.get("data"),list)
+                   for a in accounts):
+                raise ValueError("DBC original SPL raw poststates absent")
             receipts.append({"direction":direction,"amount_in":amount,
+                 "pool":address,"source_slot":row["source_slot"],
+                 "source_pool_sha256":row["accounts"][address]["sha256"],
+                 "input_mint":mint_in,"output_mint":mint_out,
+                 "input_token_account":user_in,"output_token_account":user_out,
+                 "signed_signature":str(signed.signatures[0]),
+                 "post_spl_account_data_base64":[a["data"][0] for a in accounts],
+                 "simulation_logs":logs,
                  "sdk_expected_output":expected,
                  "raw_signed_transaction_base64":base64.b64encode(bytes(signed)).decode(),
                  "raw_signed_transaction_sha256":hashlib.sha256(bytes(signed)).hexdigest(),
