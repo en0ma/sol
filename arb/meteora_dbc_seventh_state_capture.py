@@ -19,6 +19,8 @@ from arb.meteora_dbc_seventh_venue_source import (
 
 TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
 TOKEN_ACCOUNT_SIZE = 165
+CLOCK = "SysvarC1ock11111111111111111111111111111111"
+SYSVAR_OWNER = "Sysvar1111111111111111111111111111111111111"
 
 
 def key(raw):
@@ -69,7 +71,7 @@ def capture_pool(rpc, original):
         raise ValueError("DBC identity source digest mismatch")
     fields = parse_pool(first)
     addresses = [address, fields["config"], fields["base_mint"],
-                 fields["base_vault"], fields["quote_vault"]]
+                 fields["base_vault"], fields["quote_vault"], CLOCK]
     if len(set(addresses)) != len(addresses):
         raise ValueError("DBC duplicated dependent account roles")
     response = call(rpc, "getMultipleAccounts", [addresses, {
@@ -96,6 +98,11 @@ def capture_pool(rpc, original):
     for n, row in enumerate(rows[3:]):
         raw = decode_account(row, owner=TOKEN_PROGRAM, size=TOKEN_ACCOUNT_SIZE)
         vaults.append(raw)
+    clock_raw = decode_account(rows[5], owner=SYSVAR_OWNER, size=40)
+    clock_slot = int.from_bytes(clock_raw[:8], "little")
+    unix_timestamp = int.from_bytes(clock_raw[32:40], "little", signed=True)
+    if clock_slot > response["context"]["slot"] or unix_timestamp <= 0:
+        raise ValueError("DBC Clock snapshot inconsistent")
     # Source authentication of the mint and token accounts is necessary,
     # but the config's quote mint has not yet been decoded. Do not declare
     # this sufficient for trade acceptance.
@@ -107,7 +114,7 @@ def capture_pool(rpc, original):
         raise ValueError("DBC both vaults use same mint")
     fields["quote_mint"] = quote_mint
     proof = {}
-    for addr, raw, account in zip(addresses, [pool_raw, cfg_raw, mint_raw, *vaults], rows):
+    for addr, raw, account in zip(addresses, [pool_raw, cfg_raw, mint_raw, *vaults, clock_raw], rows):
         proof[addr] = {
             "account_base64": account["data"][0], "lamports": account["lamports"],
             "sha256": hashlib.sha256(raw).hexdigest()
@@ -115,6 +122,7 @@ def capture_pool(rpc, original):
     return {"status": "DBC_CONTEXTUAL_POOL_DEPENDENCIES_PARTIALLY_VERIFIED",
             "pool": address, "source_slot": response["context"]["slot"],
             "pool_fields": fields, "accounts": proof,
+            "clock_slot": clock_slot, "clock_unix_timestamp": unix_timestamp,
             "config_quote_mint_verified": True, "pricing_eligible": False,
             **SAFE}
 
