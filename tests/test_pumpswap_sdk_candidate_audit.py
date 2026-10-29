@@ -20,7 +20,7 @@ def fixture():
                 for r in rows]}]}
     sdk={"venue":"pumpswap","signed_parity_verified":False,"actionable":False,
          "registry_admission_approved":False,"sdk_candidate_verified_pools":1,
-         "pools":[{"address":address,"source_slot":42,"signed_parity_verified":False,
+         "pools":[{"address":address,"source_slot":42,"source_digest":"a"*64,"signed_parity_verified":False,
                    "actionable":False,"trials":rows}]}
     return source,sdk
 
@@ -32,6 +32,12 @@ class PumpSwapSdkCandidateAuditTest(unittest.TestCase):
         self.assertEqual(result["sdk_candidate_matched_pools"],1)
         self.assertFalse(result["signed_parity_verified"])
         self.assertFalse(result["registry_admission_approved"])
+
+    def test_rejects_source_digest_mismatch(self):
+        source,sdk=fixture()
+        sdk["pools"][0]["source_digest"]="b"*64
+        with self.assertRaisesRegex(ValueError,"source digest disagreement"):
+            audit(source,sdk)
 
     def test_rejects_source_slot_mismatch(self):
         source,sdk=fixture()
