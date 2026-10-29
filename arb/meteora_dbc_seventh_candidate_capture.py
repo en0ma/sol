@@ -13,14 +13,14 @@ from arb.meteora_dbc_seventh_venue_source import capture
 from arb.meteora_dbc_seventh_state_capture import capture_pool
 
 
-def run(rpc, *, count=1, hint_limit=12):
+def run(rpc, *, count=1, hint_limit=12, pages=4):
     if type(count) is not int or not 1 <= count <= 6:
         raise ValueError("DBC accepted source count must be 1-6")
     if type(hint_limit) is not int or not count <= hint_limit <= 12:
         raise ValueError("DBC bounded hint limit required")
     source = "original_dbc_program_recent_transactions"
     try:
-        hinted=onchain_discover(rpc,count=hint_limit,max_signatures=32)
+        hinted=onchain_discover(rpc,count=hint_limit,max_signatures=64,pages=pages)
         print(json.dumps({"stage":"dbc_program_transactions",
             "hinted":len(hinted["hints"]),
             "transactions":hinted["program_transactions_checked"]}))
@@ -78,9 +78,10 @@ def main():
     ap.add_argument("--rpc",required=True)
     ap.add_argument("--count",type=int,default=1)
     ap.add_argument("--hint-limit",type=int,default=12)
+    ap.add_argument("--pages",type=int,default=4)
     ap.add_argument("--output",required=True)
     a=ap.parse_args()
-    report=run(a.rpc,count=a.count,hint_limit=a.hint_limit)
+    report=run(a.rpc,count=a.count,hint_limit=a.hint_limit,pages=a.pages)
     Path(a.output).write_text(json.dumps(report,indent=2)+"\n")
     print(json.dumps({"status":report["status"],
                       "authenticated":report["authenticated"],
