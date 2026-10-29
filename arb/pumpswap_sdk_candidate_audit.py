@@ -31,6 +31,18 @@ def audit(source, sdk):
             raise ValueError("SDK receipt for unauthenticated source")
         if receipt.get("signed_parity_verified") is not False or receipt.get("actionable") is not False:
             raise ValueError("SDK receipt improperly promoted to signed proof")
+        source_trials=source_row.get("native_quote_candidates")
+        if not isinstance(source_trials,list) or len(source_trials)!=4:
+            raise ValueError("authenticated source must contain four quote candidates")
+        source_by_key={}
+        for candidate in source_trials:
+            if not isinstance(candidate,dict):
+                raise ValueError("malformed authenticated source quote")
+            key=(candidate.get("mint_in"),candidate.get("amount_in"))
+            if (not isinstance(key[0],str) or type(key[1]) is not int or
+                    key[1]<=0 or key in source_by_key):
+                raise ValueError("duplicate or invalid source quote identity")
+            source_by_key[key]=candidate
         trials=receipt.get("trials")
         if not isinstance(trials,list) or len(trials)!=4:
             raise ValueError("four SDK comparisons required")
@@ -54,6 +66,11 @@ def audit(source, sdk):
                 raise ValueError("official SDK integer output missing") from None
             if official<=0 or local!=official:
                 raise ValueError("independent SDK pricing disagreement")
+            source_candidate=source_by_key.get((mint,size))
+            if (not isinstance(source_candidate,dict) or
+                    source_candidate.get("status")!="UNVERIFIED_NATIVE_FORMULA_CANDIDATE" or
+                    source_candidate.get("native_formula_candidate_out")!=local):
+                raise ValueError("SDK receipt disagrees with authenticated source candidate")
         mints=source_row.get("mints")
         if not isinstance(mints,list) or len(mints)!=2 or len(set(mints))!=2:
             raise ValueError("missing authenticated pool mints")
