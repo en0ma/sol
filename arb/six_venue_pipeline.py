@@ -32,6 +32,7 @@ def authenticated_graph(readiness, *, max_cycles=200):
     if not isinstance(by_venue,dict) or set(by_venue)!=set(VENUES):
         raise ValueError("exactly six authenticated venues required")
     pools=[]
+    identities=set()
     for venue in VENUES:
         entries=by_venue[venue]
         if not isinstance(entries,list) or len(entries)>12:
@@ -48,6 +49,10 @@ def authenticated_graph(readiness, *, max_cycles=200):
                     any(not isinstance(m,str) or not m for m in mints) or
                     mints[0]==mints[1]):
                 raise ValueError("untrusted token graph edge")
+            key=(venue,row["pool"])
+            if key in identities:
+                raise ValueError("duplicate authenticated pool identity")
+            identities.add(key)
             pools.append({"venue":venue,"address":row["pool"],
                           "mints":mints,"verified":True,"slot":row["slot"]})
     # A bounded graph is a candidate inventory, never a tradable route.
@@ -143,9 +148,14 @@ def source_research(rpc, registry, fixture_dir, *, amount_in,
                  maximum=maximum)
     selected=[indices[row["index"]] for row in ranking["ranked"]
               if row.get("positive_gross") is True]
+    summary_raw=(root/"summary.json").read_bytes()
+    ranking_raw=(json.dumps(ranking,sort_keys=True,separators=(",",":"))+"\\n").encode()
+    (root/"six-venue-ranking.json").write_bytes(ranking_raw)
     manifest={"status":"SIX_VENUE_SIGNED_HANDOFF_UNEXECUTED",
               "venues":list(VENUES),"observed_unix":observed_unix,
               "amount_in":amount_in,"source_fixtures":digests,
+              "source_summary_sha256":hashlib.sha256(summary_raw).hexdigest(),
+              "source_ranking_sha256":hashlib.sha256(ranking_raw).hexdigest(),
               "selected_source_route_indices":selected,
               "selection_is_gross_only":True,
               "cost_conversion_verified":False,**SAFE}
