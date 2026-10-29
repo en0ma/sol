@@ -1,4 +1,4 @@
-"""DBC independent Q128 segment integer safety checks; not pool parity."""
+"""DBC independent Q64 sqrt and Q128 integer denominator tests; not pool parity."""
 import unittest
 from arb.meteora_dbc_native_segment import (
     Q128, Q64, next_sqrt_from_exact_input, delta_base, delta_quote,
@@ -34,7 +34,7 @@ class DbcNativePrimitiveTests(unittest.TestCase):
                               target_price=Q64-1)
 
     def test_no_signed_acceptance_in_native_curve(self):
-        result=quote_one_segment(sqrt_price=Q128,liquidity=Q128*1_000_000_000,
+        result=quote_one_segment(sqrt_price=Q64,liquidity=1<<96,
                    input_amount=1_000_000,base_for_quote=True,
                    target_price=Q64//2)
         self.assertFalse(result["signed_verified"])
