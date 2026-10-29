@@ -56,6 +56,16 @@ function quotePool(row,native) {
     exBitmapInfo:undefined,
     feeOn:pool.feeOn
   };
+  console.log("CLMM_SDK_DEBUG_INPUT",JSON.stringify({
+    sdkPoolId:info.id.toBase58(),programId:info.programId.toBase58(),
+    mintAType:typeof info.mintA.mint.toBase58,
+    mintBType:typeof info.mintB.mint.toBase58,
+    poolMintAType:typeof pool.mintA.toBase58,
+    poolMintBType:typeof pool.mintB.toBase58,
+    tickCacheCount:Object.keys(tickArrayCache).length
+  }));
+  console.log("CLMM_SDK_DEBUG_METHOD",
+    ray.PoolUtils.getOutputAmountAndRemainAccounts.toString().slice(0,4200));
   const out=[];
   for(const nativeQuote of native.quotes) {
     const inputMint=nativeQuote.zero_for_one?pool.mintA:pool.mintB;
