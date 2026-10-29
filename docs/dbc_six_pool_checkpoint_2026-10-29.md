@@ -112,3 +112,48 @@ source accounts read-only and simulate only against isolated Surfpool.
 
 This is an implementation checkpoint, not a claim that CI has
 completed every new job or that the seventh venue is fully accepted.
+
+## Further implementation in this pass (not a claimed six-pool acceptance)
+
+The following **additional** fail-closed components were committed after
+the original checkpoint text was created:
+
+- `arb/meteora_dbc_native_curve_walk.py`: original Q64 multi-point
+  integer curve traversal in both directions. It replaces the initial
+  single-segment-only approximation in the independent curve and
+  full-fee parity audits. The original source SDK evidence contains
+  two-point curves, so refusing all multi-point pools was too restrictive.
+- `arb/meteora_dbc_native_fee.py`: Q64 exponential-fee exponentiation
+  updated to the source-matched binary rounding algorithm.
+- `arb/meteora_dbc_swap.py`: original Anchor IDL `swap` discriminator,
+  account metas, strict input/mint/source roles and offline-only flags.
+- `arb/meteora_dbc_signed_fork_research.py`: diagnostic signed original
+  ELF in isolated Surfpool, with original raw SPL poststates and signed
+  wire bytes retained. **This file existing is not proof of a passed
+  signed simulation.**
+- `arb/meteora_dbc_signed_audit.py`: independent Ed25519-signed wire,
+  instruction, 4-per-pool identity, token account and SPL poststate
+  verifier. **Only actual accepted receipt artifacts can pass.**
+- `arb/meteora_dbc_signed_registry_merge.py`: produces a candidate
+  update to **the existing** shared registry only after the independent
+  real signed auditor accepts each pool. No changes to the shared
+  coordinator or live execution permissions.
+- `.github/workflows/meteora-dbc-signed-research.yml`: supports a
+  one-pool PR diagnostic or an explicit six-pool manual research path,
+  requiring native/official SDK full-fee parity, signed offline
+  execution, independent signed audit, and existing-registry artifact.
+- Added independent fee, two-point curve, IDL wire, signed audit and
+  registry fail-closed regression tests.
+
+**Exact acceptance at this checkpoint remains DBC 0/6 signed pools,
+0/24 independently audited signed trials.** New CI checks have been
+pushed but their latest runs were still queued when last inspected;
+there is no permission to infer acceptance from their creation.
+
+To inspect current runs:
+- [Six-source and 24 SDK/native quote workflow](https://github.com/en0ma/sol/actions/workflows/meteora-dbc-six-source.yml)
+- [Original DBC signed offline research](https://github.com/en0ma/sol/actions/workflows/meteora-dbc-signed-research.yml)
+- [Original single-source/sdk provenance](https://github.com/en0ma/sol/actions/workflows/meteora-dbc-seventh-candidates.yml)
+
+CI now cancels superseded runs for these three DBC workflows to
+reduce unnecessary queued work. No newer success is assumed.
