@@ -12,7 +12,7 @@ from arb.meteora_dbc_seventh_source_audit import independently_audit
 def qualify(rpc, *, count=6, hint_limit=12, pages=4):
     if type(count) is not int or count!=6:
         raise ValueError("DBC seventh venue six distinct source pools required")
-    captured=run(rpc,count=count,hint_limit=hint_limit,pages=pages)
+    captured=run(rpc,count=count,hint_limit=hint_limit,pages=pages,strict=False)
     addresses=[p["pool"] for p in captured["source_pools"]]
     if len(addresses)!=6 or len(set(addresses))!=6:
         raise ValueError("DBC six unique pool identities not established")
