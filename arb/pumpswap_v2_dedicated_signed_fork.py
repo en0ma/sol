@@ -99,7 +99,6 @@ def _fund_user(rpc,signer,state,input_mint,amount):
     owner=str(signer.pubkey())
     base=str(Keypair().pubkey())
     quote=str(Keypair().pubkey())
-    _set(rpc,owner,SYSTEM,b" ",1000000000) # system account data reset below
     call(rpc,"surfnet_setAccount",[owner,{"lamports":1000000000,"data":"",
         "owner":SYSTEM,"executable":False}])
     for address,mint in ((base,state["base_mint"]),(quote,state["quote_mint"])):
@@ -142,7 +141,7 @@ def execute(source_rpc,local_rpc,source,sdk,*,pool_count=1):
         config_raw=account_set[GLOBAL][1]
         wallet=authenticated_buyback_wallets(config_raw)[0]
         buyback_ata=_pda_ata(wallet,state["quote_mint"])
-        recipient_ata=_pda_ata(wallet,state["quote_mint"])
+        recipient_ata=buyback_ata
         # The V2 buyback account is a quote ATA; account data is
         # zero-initialized only on an isolated Surfpool fork.
         _set(local_rpc,recipient_ata,TOKEN_PROGRAM,
@@ -158,6 +157,8 @@ def execute(source_rpc,local_rpc,source,sdk,*,pool_count=1):
                 or quote.get("status")!="OFFICIAL_SDK_CANDIDATE_EXACT"):
                 raise ValueError("invalid SDK signed candidate")
             _hydrate(local_rpc,account_set)
+            _set(local_rpc,recipient_ata,TOKEN_PROGRAM,
+                 token_account_bytes(state["quote_mint"],wallet,0),2039280)
             signer=Keypair()
             user_base,user_quote=_fund_user(local_rpc,signer,state,mint,size)
             addresses=resolve({"verified":True,
