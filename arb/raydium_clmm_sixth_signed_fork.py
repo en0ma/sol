@@ -71,7 +71,7 @@ def execute(source_rpc,local_rpc,tick_source,native,sdk):
     original={row["pool"]:row for row in tick_source["pools"]}
     candidates={row["pool"]:row for row in local["pools"]}
     if (not isinstance(sdk.get("pools"),list) or
-            len(original)!=len(sdk["pools"]) or not 1<=len(original)<=3):
+            len(original)!=len(sdk["pools"]) or not 1<=len(original)<=7):
         raise ValueError("CLMM signed pool count or source identity invalid")
     binaries=program_data_accounts(source_rpc,{PROGRAM})
     header=base64.b64decode(binaries[PROGRAM]["data"][0],validate=True)
