@@ -18,7 +18,7 @@ from arb.meteora_dbc_seventh_venue_source import (
 
 
 def discover(rpc, *, count=6, max_signatures=64, pages=4):
-    if (type(count) is not int or not 1 <= count <= 12
+    if (type(count) is not int or not 1 <= count <= 24
             or type(max_signatures) is not int or not count <= max_signatures <= 64
             or type(pages) is not int or not 1 <= pages <= 6):
         raise ValueError("DBC bounded onchain discovery arguments required")
