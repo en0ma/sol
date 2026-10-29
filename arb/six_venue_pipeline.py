@@ -74,7 +74,7 @@ def authenticated_graph(readiness, *, max_cycles=200):
 
 def source_research(rpc, registry, fixture_dir, *, amount_in,
                     observed_unix, maximum=12, max_cycles=200,
-                    discovery_pairs=None):
+                    discovery_pairs=None,pool_probe_limit=4):
     """Read-only source-backed Surfpool: authenticated pools -> ranked fixtures.
 
     This phase MUST complete and stop before a separate --offline Surfpool
@@ -84,7 +84,8 @@ def source_research(rpc, registry, fixture_dir, *, amount_in,
     if (type(amount_in)is not int or not 0<amount_in<2**64 or
             type(observed_unix)is not int or observed_unix<0 or
             type(maximum)is not int or not 1<=maximum<=12 or
-            not isinstance(registry,dict)):
+            not isinstance(registry,dict) or
+            type(pool_probe_limit)is not int or not 1<=pool_probe_limit<=12):
         raise ValueError("bounded source research inputs required")
     if not set(VENUES)<=set(PROGRAMS):
         raise ValueError("six venue source adapters unavailable")
@@ -124,8 +125,21 @@ def source_research(rpc, registry, fixture_dir, *, amount_in,
                    "verified":fresh["candidate_graph_verified_count"],
                    "rejected":len(fresh["errors"]),
                    "new_identity_hints":len(incoming)}
+    # Bound the initial onchain probe to avoid long, rate-limited scanning
+    # across large historical registries; select the first N for each venue.
+    # More source rows may be processed in subsequent incremental passes.
+    budgets={venue:0 for venue in VENUES}
+    bounded=[]
+    for item in registry.get("pools",[]):
+        if not isinstance(item,dict):
+            continue
+        venue=item.get("venue")
+        if venue in budgets and budgets[venue]<pool_probe_limit:
+            bounded.append(item)
+            budgets[venue]+=1
+    scoped_registry={**registry,"pools":bounded}
     batch=tuple((a,b) for a in VENUES for b in VENUES if a!=b)
-    readiness=probe(rpc,registry,batch=batch)
+    readiness=probe(rpc,scoped_registry,batch=batch)
     if set(readiness.get("authenticated_pools",{}))!=set(VENUES):
         raise ValueError("unexpected source venue coverage")
     graph=authenticated_graph(readiness,max_cycles=max_cycles)
@@ -164,7 +178,8 @@ def source_research(rpc, registry, fixture_dir, *, amount_in,
     return {"status":"SIX_VENUE_SOURCE_AND_QUOTE_RESEARCH",
             "discovery":{"venue_owned_search":discovery,
                          "authenticated_pools":graph["source_pool_count"],
-                         "failed_pool_checks":len(readiness.get("failed_pool_checks",[]))},
+                         "failed_pool_checks":len(readiness.get("failed_pool_checks",[])),
+                         "registry_pool_probe_limit_per_venue":pool_probe_limit},
             "graph":{"candidate_cycles":graph["candidate_cycles"],
                      "truncated":graph["cycle_inventory_truncated"]},
             "quote":{"source_fixtures_exported":source["exported"],
@@ -305,6 +320,7 @@ def main():
     parser.add_argument("--amount-in",type=int)
     parser.add_argument("--observed-unix",type=int)
     parser.add_argument("--maximum",type=int,default=12)
+    parser.add_argument("--pool-probe-limit",type=int,default=4)
     parser.add_argument("--max-cycles",type=int,default=200)
     parser.add_argument("--output",required=True)
     args=parser.parse_args()
@@ -313,6 +329,7 @@ def main():
            json.loads(Path(args.registry).read_text()),args.source_dir,
            amount_in=args.amount_in,observed_unix=args.observed_unix,
            maximum=args.maximum,max_cycles=args.max_cycles,
+           pool_probe_limit=args.pool_probe_limit,
            discovery_pairs=(json.loads(Path(args.discovery_pairs).read_text())
                             if args.discovery_pairs else None))
     else:
