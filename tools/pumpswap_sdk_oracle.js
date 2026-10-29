@@ -7,6 +7,7 @@
  * No RPC, signing or broadcasting occurs in this process.
  */
 const fs = require("fs");
+const crypto = require("crypto");
 const BN = require("bn.js");
 const {
   PUMP_AMM_SDK, buyQuoteInput, sellBaseInput
@@ -19,12 +20,31 @@ function raw(row) {
   check(b.length > 0 && b.toString("base64") === row.account_base64, "invalid base64");
   return b;
 }
+function canonicalJson(value) {
+  if (Array.isArray(value)) return "["+value.map(canonicalJson).join(",")+"]";
+  if (value && typeof value==="object") {
+    return "{"+Object.keys(value).sort().map(
+      key=>JSON.stringify(key)+":"+canonicalJson(value[key])
+    ).join(",")+"}";
+  }
+  return JSON.stringify(value);
+}
+function verifySourceDigest(snapshot, accounts) {
+  check(typeof snapshot.authenticated_source_sha256==="string" &&
+    /^[a-f0-9]{64}$/.test(snapshot.authenticated_source_sha256),
+    "missing authenticated source digest");
+  const payload={slot:snapshot.verified_snapshot_slot,accounts};
+  const digest=crypto.createHash("sha256").update(canonicalJson(payload),"utf8").digest("hex");
+  check(digest===snapshot.authenticated_source_sha256,
+    "SOURCE_SNAPSHOT_INTEGRITY_MISMATCH");
+}
 function compare(snapshot) {
   check(snapshot.status === "AUTHENTICATED_SOURCE_ONLY", "unauthenticated source");
   const accounts=snapshot.authenticated_source_accounts;
   check(Array.isArray(accounts) && accounts.length === 6, "source account bundle missing");
   check(Number.isSafeInteger(snapshot.verified_snapshot_slot) && snapshot.verified_snapshot_slot >= 0,
     "invalid source slot");
+  verifySourceDigest(snapshot,accounts);
   const [p,baseVault,quoteVault,globalAccount,feesAccount,mintAccount] = accounts;
   check(p.address === snapshot.address, "pool address mismatch");
   const pool=PUMP_AMM_SDK.decodePool({data:raw(p)});
