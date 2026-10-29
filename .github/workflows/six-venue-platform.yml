@@ -6,6 +6,9 @@ on:
       - "arb/six_venue_pipeline.py"
       - "tests/test_six_venue_pipeline.py"
   workflow_dispatch:
+concurrency:
+  group: six-venue-platform-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
