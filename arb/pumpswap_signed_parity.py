@@ -55,6 +55,22 @@ def run(rpc, sdk_report, manifest):
         if key in entries:
             raise ValueError("duplicate signed trial identity")
         entries[key]=item
+    # Enforce complete trial identity coverage before parsing any transaction
+    # or touching Surfpool. A malformed transaction in an otherwise incomplete
+    # manifest must never mask the missing-trial error.
+    expected_keys=set()
+    for pool, comparison in sdk_pools.items():
+        references=comparison.get("trials")
+        if not isinstance(references,list) or len(references)!=4:
+            raise ValueError("four official SDK comparisons required")
+        for quote in references:
+            key=(pool,quote.get("input_mint"),quote.get("amount_in"))
+            if (not isinstance(key[1],str) or type(key[2]) is not int
+                    or key[2]<=0 or key in expected_keys):
+                raise ValueError("invalid or duplicate official SDK trial identity")
+            expected_keys.add(key)
+    if set(entries)!=expected_keys:
+        raise ValueError("missing or unexpected signed trial for SDK quote")
     results=[]
     for pool, comparison in sdk_pools.items():
         reference=comparison.get("trials")
