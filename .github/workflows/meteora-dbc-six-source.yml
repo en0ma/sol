@@ -9,6 +9,7 @@ on:
       - "tests/test_meteora_dbc_six_source_qualification.py"
       - "arb/meteora_dbc_native_segment.py"
       - "tests/test_meteora_dbc_native_segment.py"
+      - "tools/meteora_dbc_official_sdk_oracle.js"
   workflow_dispatch:
 permissions:
   contents: read
@@ -44,9 +45,31 @@ jobs:
           python3 -m arb.meteora_dbc_six_source_qualification \
             --rpc "$SOLANA_RPC_URL" --pages 4 \
             --output "$RUNNER_TEMP/dbc-six-original-source.json"
+      - name: Install pinned original DBC reference SDK
+        run: npm install --no-save --ignore-scripts --prefix "$RUNNER_TEMP/dbc-sdk" @meteora-ag/dynamic-bonding-curve-sdk@2.0.0
+      - name: Require four SDK quotes on each of six independently sourced pools
+        env:
+          NODE_PATH: ${{ runner.temp }}/dbc-sdk/node_modules
+        run: |
+          node tools/meteora_dbc_official_sdk_oracle.js \
+            "$RUNNER_TEMP/dbc-six-original-source.json" \
+            "$RUNNER_TEMP/dbc-six-official-sdk-quotes.json"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          result=json.loads((Path(os.environ["RUNNER_TEMP"])/"dbc-six-official-sdk-quotes.json").read_text())
+          pools=result["pools"]
+          if len(pools)!=6 or len({p["pool"] for p in pools})!=6:
+              raise SystemExit("Six distinct SDK-quoted DBC original pools required")
+          if any(len(p["trials"])!=4 for p in pools):
+              raise SystemExit("Each genuine DBC source requires four SDK quote candidates")
+          print("Independent original sources with SDK quotes:",len(pools),"trials:",sum(len(p["trials"]) for p in pools))
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: dbc-six-original-source-only
-          path: ${{ runner.temp }}/dbc-six-original-source.json
+          path: |
+            ${{ runner.temp }}/dbc-six-original-source.json
+            ${{ runner.temp }}/dbc-six-official-sdk-quotes.json
           if-no-files-found: warn
