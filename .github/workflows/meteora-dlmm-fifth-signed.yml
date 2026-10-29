@@ -27,7 +27,7 @@ jobs:
     timeout-minutes: 50
     env:
       SOURCE_RPC: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
-      POOL_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.pool_count || '3' }}
+      POOL_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.pool_count || '1' }}
       SOLANA_RPC_MIN_INTERVAL_SECONDS: "0.5"
       SOLANA_RPC_ALCHEMY_FREE_TIER: "1"
       SOLANA_RPC_PACING_FILE: /tmp/dlmm-fifth-signed-rpc
