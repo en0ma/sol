@@ -147,6 +147,8 @@ def audit(source,sdk,result):
         if len(directions)!=2 or any(sum(k[0]==m for k in seen)!=2 for m in directions):
             raise ValueError("signed directions or distinct amounts incomplete")
         independently_audited.append({"pool":address,
+            "source_slot":reference["source_slot"],
+            "source_digest":reference["source_digest"],
             "four_genuine_signed_trials_audited":True,
             "signed_transaction_hashes":[r["signed_sha256"] for r in observed]})
     return {"venue":"pumpswap","status":"INDEPENDENT_SIGNED_NATIVE_SDK_SPL_PARITY",
