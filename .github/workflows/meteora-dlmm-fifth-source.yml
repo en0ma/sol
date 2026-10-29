@@ -54,6 +54,16 @@ jobs:
             "$RUNNER_TEMP/meteora-dlmm-fifth-source.json" \
             "$RUNNER_TEMP/meteora-dlmm-fifth-sdk-quotes.json" \
             "$SOLANA_RPC_URL"
+      - name: Install pinned independent integer DLMM quote library
+        run: |
+          python3 -m pip install --disable-pip-version-check meteora-dlmm==0.5.0
+          python3 -m meteora_dlmm.selftest
+      - name: Independently compare official SDK and pure integer bin-walk quotes
+        run: |
+          python3 -m arb.meteora_dlmm_native_candidate_audit \
+            --source "$RUNNER_TEMP/meteora-dlmm-fifth-source.json" \
+            --sdk "$RUNNER_TEMP/meteora-dlmm-fifth-sdk-quotes.json" \
+            --output "$RUNNER_TEMP/meteora-dlmm-native-sdk-parity.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -61,4 +71,5 @@ jobs:
           path: |
             ${{ runner.temp }}/meteora-dlmm-fifth-source.json
             ${{ runner.temp }}/meteora-dlmm-fifth-sdk-quotes.json
+            ${{ runner.temp }}/meteora-dlmm-native-sdk-parity.json
           if-no-files-found: warn
