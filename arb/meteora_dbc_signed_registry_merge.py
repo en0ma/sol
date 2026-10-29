@@ -57,6 +57,13 @@ def merge(registry,source,sdk,native,signed,*,required=1):
                          "requires_live_state_revalidation":True})
         else:
             previous=rows[existing[key]]
+            # Even historically admitted identities lose usable status here:
+            # a new signed artifact never substitutes for fresh pool pricing.
+            if previous.get("usable_for_arbitrage") is True:
+                rows[existing[key]]={**previous,
+                    "usable_for_arbitrage":False,
+                    "requires_live_state_revalidation":True}
+                previous=rows[existing[key]]
             if previous.get("mints")!=mints:
                 raise ValueError("DBC original registered mint identity changed")
             old=previous.get("signed_provenance")
