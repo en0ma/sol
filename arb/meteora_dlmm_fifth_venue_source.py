@@ -17,6 +17,9 @@ from arb.meteora_dlmm_bin_preflight import (
     active_bin_array_index,bin_array_pda,BIN_ARRAY_DISC,ORACLE_DISC)
 from arb.token_vaults import TOKEN_PROGRAM,decode_token_account
 
+CLOCK="SysvarC1ock11111111111111111111111111111111"
+SYSVAR="Sysvar1111111111111111111111111111111111111"
+
 SAFE={"actionable":False,"broadcast":False,"signed_parity_verified":False,
       "native_pricing_verified":False,"registry_admission_approved":False}
 
@@ -53,7 +56,7 @@ def capture_pool(rpc,address,expected_mints):
     array_indexes=[idx-1,idx,idx+1]
     arrays=[bin_array_pda(address,i) for i in array_indexes]
     keys=[address,state["reserve_x"],state["reserve_y"],state["oracle"],
-          *arrays,*mints]
+          *arrays,*mints,CLOCK]
     result=call(rpc,"getMultipleAccounts",[
         keys,{"encoding":"base64","commitment":"confirmed"}])
     slot=result.get("context",{}).get("slot")
@@ -94,6 +97,13 @@ def capture_pool(rpc,address,expected_mints):
         mint_bytes=_raw(account,TOKEN_PROGRAM)
         if len(mint_bytes)!=82 or mint_bytes[45]!=1:
             raise ValueError("DLMM classic mint uninitialized")
+    clock=_raw(accounts[9],SYSVAR)
+    if len(clock)!=40:
+        raise ValueError("DLMM synchronized Clock sysvar length invalid")
+    clock_slot=int.from_bytes(clock[0:8],"little")
+    clock_timestamp=int.from_bytes(clock[32:40],"little",signed=True)
+    if clock_slot<slot-1024 or clock_timestamp<=0:
+        raise ValueError("DLMM Clock not compatible with synchronized snapshot")
     records=[{"address":key,"owner":account["owner"],
               "lamports":account["lamports"],"account_base64":account["data"][0]}
              if account is not None else {"address":key,"present":False}
@@ -105,6 +115,7 @@ def capture_pool(rpc,address,expected_mints):
             "status":"AUTHENTICATED_BIN_SNAPSHOT_ONLY",
             "mints":mints,"source_slot":slot,"active_id":state["active_id"],
             "bin_step":state["bin_step"],"bin_arrays":verified_bins,
+            "fork_clock_slot":clock_slot,"fork_clock_unix_timestamp":clock_timestamp,
             "source_accounts":records,"source_sha256":digest,
             "signed_sdk_native_parity_verified":False,**SAFE}
 
