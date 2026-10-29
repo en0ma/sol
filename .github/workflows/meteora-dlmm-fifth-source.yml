@@ -46,9 +46,19 @@ jobs:
             --registry arb/pool_registry.json \
             --count "$POOL_COUNT" \
             --output "$RUNNER_TEMP/meteora-dlmm-fifth-source.json"
+      - name: Install official Meteora DLMM SDK for independent read-only quotes
+        run: npm install --no-save --package-lock=false @meteora-ag/dlmm@1.9.14
+      - name: Quote both directions and two sizes against authenticated DLMM source
+        run: |
+          node tools/meteora_dlmm_sdk_source_oracle.js \
+            "$RUNNER_TEMP/meteora-dlmm-fifth-source.json" \
+            "$RUNNER_TEMP/meteora-dlmm-fifth-sdk-quotes.json" \
+            "$SOLANA_RPC_URL"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: dlmm-fifth-authenticated-source
-          path: ${{ runner.temp }}/meteora-dlmm-fifth-source.json
+          path: |
+            ${{ runner.temp }}/meteora-dlmm-fifth-source.json
+            ${{ runner.temp }}/meteora-dlmm-fifth-sdk-quotes.json
           if-no-files-found: warn
