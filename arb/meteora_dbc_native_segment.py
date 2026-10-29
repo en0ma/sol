@@ -1,12 +1,13 @@
 """Independent DBC integer curve arithmetic (zero-fee per-segment primitive).
 
-Upstream DBC prices and liquidity use Q128 fixed point, not Q64.
+Upstream DBC sqrt prices use Q64 (u128 container); multiplication\nuses Q128 denominator. Liquidity is a separate unsigned quantity.
 These primitives are NOT full pool fee/scheduler/migration logic and must
 not be called signed-price parity without the original SDK comparison.
 """
 U64=(1<<64)-1
 U128=(1<<128)-1
 U256=(1<<256)-1
+Q64=1<<64
 Q128=1<<128
 
 
@@ -37,7 +38,7 @@ def next_sqrt_from_exact_input(sqrt_price,liquidity,amount,base_for_quote):
 
 def delta_base(lower,upper,liquidity,up=False):
     bounded(lower,U128,"lower");bounded(upper,U128,"upper")
-    bounded(liquidity,U128,"liquidity")
+    bounded(liquidity,U256,"liquidity")
     if not 0<lower<=upper:
         raise ValueError("DBC invalid sqrt price bounds")
     return divide(liquidity*(upper-lower),lower*upper,up)
@@ -48,7 +49,7 @@ def delta_quote(lower,upper,liquidity,up=False):
     bounded(liquidity,U128,"liquidity")
     if lower>upper:
         raise ValueError("DBC inverted sqrt price bounds")
-    return divide(liquidity*(upper-lower),Q128*Q128,up)
+    return divide(liquidity*(upper-lower),Q128,up)
 
 
 def quote_one_segment(*,sqrt_price,liquidity,input_amount,base_for_quote,
