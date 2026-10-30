@@ -37,7 +37,7 @@ def calculate(source,sdk):
         if row is None or row.get("status")!="AUTHENTICATED_BIN_SNAPSHOT_ONLY":
             raise ValueError("unauthenticated DLMM SDK pool")
         accounts=row.get("source_accounts")
-        if (not isinstance(accounts,list) or len(accounts)!=24 or
+        if (not isinstance(accounts,list) or len(accounts)!=25 or
                 row.get("source_sha256")!=hashlib.sha256(_canonical({
                     "slot":row.get("source_slot"),"accounts":accounts})).hexdigest()
                 or sdkpool.get("source_sha256")!=row["source_sha256"]
