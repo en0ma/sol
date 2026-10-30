@@ -580,3 +580,49 @@ def coordinate_registered_cycle_offline(rpc,registry,route,states,evidence,owner
                 receipt.get("signed_atomic_simulation_verified") is True,
             "coordinator_live_eligible":False,
             "actionable":False,"live_execution_approved":False,"broadcast":False}
+
+
+def registered_cycles_for_coordinator(registry, *, max_cycles=200):
+    """Enumerate actual 2-6-hop candidates using already-admitted pool identities.
+
+    This calls the existing opportunity graph, not a replacement discovery,
+    authentication, pricing or registry implementation. Unsupported seventh
+    venues and incomplete legacy mint hints are simply not graph edges.
+    """
+    from arb.opportunity_graph import cycles
+    supported={"orca","raydium_cpmm","meteora_damm_v2",
+               "pumpswap","meteora_dlmm","raydium_clmm"}
+    if (not isinstance(registry,dict) or not isinstance(registry.get("pools"),list)
+        or len(registry["pools"])>200 or
+        type(max_cycles)is not int or not 1<=max_cycles<=500):
+        raise ValueError("bounded already-admitted pool registry required")
+    ready=[]
+    seen=set()
+    for row in registry["pools"]:
+        if not isinstance(row,dict):
+            raise ValueError("malformed coordinator registry row")
+        venue,pool=row.get("venue"),row.get("address")
+        if venue not in supported:
+            continue
+        key=(venue,pool)
+        if key in seen:
+            raise ValueError("duplicate coordinator registry identity")
+        seen.add(key)
+        mints=row.get("mints")
+        if mints is None:
+            continue
+        if (not isinstance(mints,list) or len(mints)!=2 or
+            any(not isinstance(m,str) or not m for m in mints) or
+            mints[0]==mints[1] or not isinstance(pool,str) or not pool):
+            raise ValueError("invalid admitted pool mint pair")
+        ready.append({"venue":venue,"address":pool,
+                      "mints":mints,"verified":True})
+    generated=cycles(ready,max_hops=6,min_hops=2,
+                     max_cycles=max_cycles+1,truncate=True) if ready else []
+    return {"status":"REGISTERED_SIX_VENUE_CYCLE_CANDIDATES",
+            "routes":[{"start_mint":r["start_mint"],"hops":r["hops"],
+                       "legs":r["legs"],"signed_simulation_verified":False}
+                      for r in generated[:max_cycles]],
+            "candidate_count":min(max_cycles,len(generated)),
+            "truncated":len(generated)>max_cycles,
+            "actionable":False,"live_execution_approved":False,"broadcast":False}
