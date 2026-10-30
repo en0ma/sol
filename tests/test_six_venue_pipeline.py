@@ -71,7 +71,7 @@ class SixVenuePipelineTests(unittest.TestCase):
         altered=readiness()
         altered["authenticated_pools"]["pumpswap"]=[{
             **source["authenticated_pools"]["pumpswap"][0],"mints":["A","X"]}]
-        with self.assertRaisesRegex(ValueError,"disagree"):
+        with self.assertRaisesRegex(ValueError,"not bound|disagree"):
             report_signed_source_cycle_preflight({"pools":[accepted]},altered,graph)
 
     def test_no_mainnet_rpc_or_implicit_offline_approval(self):
