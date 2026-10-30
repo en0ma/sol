@@ -228,6 +228,19 @@ def assess_signed_batch(batch, selected):
     decisions=[]
     for row in sorted(rows,key=lambda r:r["index"]):
         accepted=row["independent_signed_accepted"] is True
+        gross=row.get("gross_start_mint_delta") if accepted else None
+        budget=row.get("break_even_total_cost_budget_start_mint_base_units") if accepted else None
+        units=row.get("observed_compute_units") if accepted else None
+        # Signed outcome flags alone do not authorize untrusted numeric fields.
+        # An accepted receipt's optional economic quantities must be exact
+        # integers and the break-even budget must equal positive gross margin.
+        if accepted:
+            if (gross is not None and type(gross) is not int or
+                budget is not None and (type(budget) is not int or budget < 0) or
+                units is not None and (type(units) is not int or
+                                       not 0 < units <= 1_400_000) or
+                budget is not None and (gross is None or budget != max(0,gross))):
+                raise ValueError("signed gross, compute or break-even budget inconsistent")
         decisions.append({
             "index":row["index"],
             "stage":("SIGNED_FORK_CPI_ROLLBACK_ACCEPTED" if accepted else
