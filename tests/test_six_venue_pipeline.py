@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from arb.six_venue_pipeline import VENUES,authenticated_graph,source_research,offline_research,assess_signed_batch
+from arb.six_venue_pipeline import VENUES,authenticated_graph,source_research,offline_research,assess_signed_batch,preflight_candidate_cycles_against_registry
 
 
 def readiness():
@@ -140,6 +140,37 @@ class SixVenuePipelineTests(unittest.TestCase):
             with self.subTest(changes=changes):
                 with self.assertRaisesRegex(ValueError,"signed gross"):
                     assess_signed_batch(batch({**base,**changes}),[1])
+
+    def test_registry_to_two_leg_source_preflight_not_coordinator_admission(self):
+        status="INDEPENDENT_SIGNED_NATIVE_SDK_SPL_PARITY"
+        pools=[]
+        source=[]
+        for i,(venue,mints,proof_status) in enumerate((
+            ("pumpswap",["A","B"],status),
+            ("meteora_dlmm",["B","A"],"INDEPENDENT_DLMM_SIGNED_NATIVE_SDK_SPL_PARITY"))):
+            pools.append({"venue":venue,"address":f"P{i}","mints":mints,
+                          "signed_provenance":{"status":proof_status,
+                              "source_slot":123,"source_digest":"a"*64,
+                              "independent_receipt_sha256":"b"*64,
+                              "signed_transaction_hashes":[str(j)*64 for j in range(4)]}})
+            source.append({"venue":venue,"address":f"P{i}","mints":mints,
+                           "current_source_slot":124,"source_identity_refreshed":True,
+                           "current_complete_fee_and_tick_state_verified":False,
+                           "current_native_sdk_signed_quote_verified":False,
+                           "coordinator_eligible":False})
+        fresh={"status":"FRESH_IDENTITY_ONLY_NOT_USABLE_REGISTRY_ADMISSION",
+               "source_authenticated":source,"coordinator_eligible_count":0,
+               "actionable":False,"live_execution_approved":False,"broadcast":False}
+        legs=[{"venue":p["venue"],"pool":p["address"],
+               "input_mint":p["mints"][0],"output_mint":p["mints"][1]} for p in pools]
+        routes=[{"legs":legs,"tokens":["A","B","A"]},
+                {"legs":[{**legs[0],"pool":"unsigned"},legs[1]],"tokens":["A","B","A"]},
+                {"legs":legs}]
+        report=preflight_candidate_cycles_against_registry({"pools":pools},fresh,routes)
+        self.assertEqual(report["source_identity_routes"],1)
+        self.assertEqual(report["blocked_routes"],2)
+        self.assertEqual(report["coordinator_eligible_routes"],0)
+        self.assertFalse(report["actionable"])
 
     def test_gross_loss_quoted_route_is_diagnostic_only(self):
         quote={"status":"GROSS_SOURCE_BOUND_RANKING_ONLY",
