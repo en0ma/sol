@@ -4,6 +4,10 @@ on:
   pull_request:
     paths:
       - "arb/raydium_clmm_six_signed_source.py"
+      - "arb/raydium_clmm_bitmap_extension_source.py"
+      - "arb/raydium_clmm_sixth_signed_fork.py"
+      - "arb/raydium_clmm_sixth_signed_audit.py"
+      - "tests/test_raydium_clmm_bitmap_extension_source.py"
       - ".github/workflows/raydium-clmm-six-signed.yml"
 permissions:
   contents: read
@@ -27,6 +31,8 @@ jobs:
           test -n "$SOLANA_RPC_URL"
           python3 -m pip install --disable-pip-version-check solders==0.26.0
           npm install --no-save --package-lock=false @raydium-io/raydium-sdk-v2@0.2.75-alpha
+      - name: Fail-closed bitmap extension source and account-order regressions
+        run: python3 -m unittest discover -s tests -p test_raydium_clmm_bitmap_extension_source.py -v
       - name: Discover many real CLMM pool identities, not synthetic pools
         run: |
           python3 -m arb.raydium_clmm_six_additional_discovery \
