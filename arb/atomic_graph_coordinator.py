@@ -500,3 +500,83 @@ def simulation_decision(*,simulation_verified,rollback_verified,net_profit_base_
             "net_profit_base_units":net_profit_base_units,
             "actionable":False,"live_execution_approved":False,"broadcast":False,
             "decision":"SIMULATION_ONLY"}
+
+
+def coordinate_registered_cycle_offline(rpc,registry,route,states,evidence,owner,
+                                        token_accounts,initial_amount,signer,
+                                        *,negative_instructions,observe=None):
+    """Run an admitted registered 2-6-leg cycle through the EXISTING coordinator.
+
+    The registered pool list is authoritative for identity; venue builders
+    still enforce their already-authenticated state/evidence requirements.
+    Price amounts come from signed adaptive prefix observations, not invented
+    coordinator spot quotes. No network broadcasting is exposed.
+    """
+    from arb.next_ten_fork_pool_probe import PROGRAMS
+    local_rpc_only(rpc)
+    supported={"orca","raydium_cpmm","meteora_damm_v2",
+               "pumpswap","meteora_dlmm","raydium_clmm"}
+    if (not isinstance(registry,dict) or not isinstance(registry.get("pools"),list)
+        or not isinstance(route,dict) or not isinstance(route.get("legs"),list)
+        or not 2<=len(route["legs"])<=MAX_ATOMIC_LEGS
+        or type(initial_amount)is not int or not 0<initial_amount<2**64
+        or negative_instructions is None):
+        raise ValueError("registered 2-6 leg coordinator inputs required")
+    registered={}
+    for pool in registry["pools"]:
+        if not isinstance(pool,dict):
+            raise ValueError("malformed admitted registry identity")
+        key=(pool.get("venue"),pool.get("address"))
+        if key in registered:
+            raise ValueError("duplicate admitted registry identity")
+        registered[key]=pool
+    legs=[]
+    tokens=[]
+    used=set()
+    for i,row in enumerate(route["legs"]):
+        if not isinstance(row,dict):
+            raise ValueError("malformed registered route leg")
+        venue,pool=row.get("venue"),row.get("pool")
+        key=(venue,pool)
+        start=row.get("input_mint",row.get("input"))
+        end=row.get("output_mint",row.get("output"))
+        if (venue not in supported or venue not in PROGRAMS or
+            key not in registered or key in used or
+            not isinstance(start,str) or not start or
+            not isinstance(end,str) or not end or start==end):
+            raise ValueError("route contains unsupported, duplicate or unregistered pool")
+        recorded=registered[key].get("mints")
+        if recorded is not None and (not isinstance(recorded,list)
+                                     or len(recorded)!=2 or set(recorded)!={start,end}):
+            raise ValueError("registered pool mint identity mismatch")
+        if key not in states or key not in evidence:
+            raise ValueError("registered pool authenticated builder state unavailable")
+        if i and tokens[-1]!=start:
+            raise ValueError("registered route token path disconnected")
+        if not tokens:
+            tokens.append(start)
+        tokens.append(end)
+        used.add(key)
+        legs.append({"venue":venue,"pool":pool,
+                     "input_mint":start,"output_mint":end})
+    if tokens[0]!=tokens[-1] or (
+        isinstance(route.get("start_mint"),str) and
+        route["start_mint"]!=tokens[0]):
+        raise ValueError("registered arbitrage route must close at start mint")
+    if (not isinstance(token_accounts,(list,tuple)) or
+        len(token_accounts)!=len(tokens) or
+        len(set(token_accounts))!=len(token_accounts) or
+        any(not isinstance(a,str) or not a for a in token_accounts)):
+        raise ValueError("distinct per-hop signed user SPL accounts required")
+    # The existing signer, adaptive prefix simulator, venue instruction
+    # adapter, CPI verifier and rollback verifier remain authoritative.
+    receipt=simulate_adaptive_n_leg_offline(
+        rpc,legs,tokens,states,evidence,owner,list(token_accounts),
+        initial_amount,observe,signer,negative_instructions=negative_instructions)
+    return {"status":"REGISTERED_SIX_VENUE_COORDINATOR_OFFLINE_RESULT",
+            "route_legs":len(legs),"route_venues":[r["venue"] for r in legs],
+            "signed_receipt":receipt,
+            "signed_atomic_simulation_verified":
+                receipt.get("signed_atomic_simulation_verified") is True,
+            "coordinator_live_eligible":False,
+            "actionable":False,"live_execution_approved":False,"broadcast":False}
