@@ -137,7 +137,8 @@ def execute(source_rpc,local_rpc,tick_source,native,sdk):
             user_in,user_out=_provision(local_rpc,signer,mint_in,mint_out,size)
             output=native_trial["output"]
             ix=build(address,state,str(signer.pubkey()),user_in,user_out,
-                size,output,path,input_is_token_0=forward)
+                size,output,([extension["address"]]+path if extension and extension["present"] else path),
+                input_is_token_0=forward)
             blockhash=call(local_rpc,"getLatestBlockhash",[
                 {"commitment":"confirmed"}])["value"]["blockhash"]
             tx=Transaction.new_signed_with_payer(
