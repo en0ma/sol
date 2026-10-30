@@ -205,6 +205,53 @@ def source_research(rpc, registry, fixture_dir, *, amount_in,
 
 
 
+
+def preflight_candidate_cycles_against_registry(registry, fresh_report, routes):
+    """Bridge existing shared registry and authenticated graph to 2-6 hop screens.
+
+    A route must contain explicit token and pool identity. No route is promoted
+    to the coordinator here; current fee/tick pricing and signed full-route
+    acceptance are still separate evidence gates. Keep blocked routes visible.
+    """
+    from arb.six_venue_registry_eligibility import screen_signed_provenance
+    from arb.six_venue_cycle_eligibility import screen_cycle_source_eligibility
+    provenance=screen_signed_provenance(registry)
+    if (not isinstance(routes,list) or len(routes)>MAX_CYCLES or
+        not isinstance(fresh_report,dict) or
+        fresh_report.get("status") not in (
+            "FRESH_IDENTITY_ONLY_NOT_USABLE_REGISTRY_ADMISSION","NO_SCREENED_POOLS") or
+        any(fresh_report.get(k) is not False for k in SAFE)):
+        raise ValueError("bounded fail-closed route preflight required")
+    provenance_keys={(r["venue"],r["address"]) for r in provenance["candidates"]}
+    results=[]
+    for index,route in enumerate(routes):
+        if not isinstance(route,dict):
+            raise ValueError("malformed candidate cycle")
+        legs=route.get("legs")
+        tokens=route.get("tokens")
+        if not isinstance(legs,list) or not isinstance(tokens,list):
+            results.append({"index":index,"status":"BLOCKED_MISSING_EXPLICIT_ROUTE_MINTS_OR_LEGS",
+                            "coordinator_eligible":False,**SAFE})
+            continue
+        try:
+            for leg in legs:
+                if not isinstance(leg,dict) or (leg.get("venue"),leg.get("pool")) not in provenance_keys:
+                    raise ValueError("route pool lacks signed provenance")
+            accepted=screen_cycle_source_eligibility(legs,tokens,fresh_report)
+            results.append({"index":index,"status":accepted["status"],
+                            "legs":accepted["legs"],"coordinator_eligible":False,**SAFE})
+        except (ValueError,TypeError) as exc:
+            results.append({"index":index,"status":"BLOCKED_ROUTE_SOURCE_INELIGIBLE",
+                            "reason":str(exc)[:180],"coordinator_eligible":False,**SAFE})
+    return {"status":"SIX_VENUE_ROUTE_SOURCE_PREFLIGHT_ONLY",
+            "routes_screened":len(results),
+            "source_identity_routes":sum(r["status"]=="SOURCE_IDENTITY_CYCLE_ONLY_PRICING_NOT_VERIFIED"
+                                         for r in results),
+            "blocked_routes":sum(r["status"]!="SOURCE_IDENTITY_CYCLE_ONLY_PRICING_NOT_VERIFIED"
+                                 for r in results),
+            "coordinator_eligible_routes":0,"routes":results,**SAFE}
+
+
 def assess_signed_batch(batch, selected):
     """Separate authenticated signed outcome from gross-only quote ranking."""
     if (not isinstance(batch,dict) or not isinstance(selected,list) or
