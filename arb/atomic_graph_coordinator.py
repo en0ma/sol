@@ -801,7 +801,29 @@ def coordinate_ranked_registered_cycles_offline(rpc,registry,initial_amount,
                              "status":"SIGNED_COORDINATOR_ROUTE_REJECTED",
                              "reason":str(exc)[:200],
                              "signed_atomic_simulation_verified":False})
+    # Only real signed SPL poststates, not source quote margins, are
+    # candidates for observed gross ranking. The result remains nonactionable.
+    signed_gross=[]
+    for attempt in attempts:
+        receipt=attempt.get("signed_receipt")
+        if receipt is None:
+            continue
+        route=next((candidate["route"] for candidate in ranking["ranked"]
+                    if candidate["index"]==attempt["index"]),None)
+        observed=observed_registered_signed_cycle_economics(route,receipt)
+        attempt["observed_signed_economics"]=observed
+        if observed["status"]=="SIGNED_ROUTE_GROSS_ONLY_NETWORK_COST_UNKNOWN":
+            signed_gross.append({"index":attempt["index"],
+                                 "gross_start_mint_base_units":
+                                     observed["gross_start_mint_base_units"],
+                                 "break_even_total_cost_base_units":
+                                     observed["break_even_total_cost_base_units"],
+                                 "net_start_mint_base_units":None})
+    signed_gross.sort(key=lambda row:(-row["gross_start_mint_base_units"],row["index"]))
     return {"status":"REGISTERED_NATIVE_RANKED_SIGNED_COORDINATOR_OFFLINE",
+            "signed_gross_ranked":signed_gross,
+            "signed_gross_positive_routes":sum(
+                row["gross_start_mint_base_units"]>0 for row in signed_gross),
             "candidate_count":ranking["candidate_count"],
             "price_quoted_candidates":len(ranking["ranked"]),
             "price_blocked_candidates":len(ranking["blocked"]),
