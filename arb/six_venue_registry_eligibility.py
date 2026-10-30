@@ -76,3 +76,48 @@ def screen_signed_provenance(registry):
             "candidates":accepted,"blocked":blocked,
             "coordinator_eligible_count":0,
             "actionable":False,"live_execution_approved":False,"broadcast":False}
+
+
+
+def reauthenticate_screened_pool_identities(rpc, registry):
+    """Read-only refresh of screened historical evidence, NOT price admission.
+
+    Existing registry refresh verifies owner/mints/vaults from original accounts.
+    It does not guarantee complete fee or tick state or current signed quote.
+    Preserve this distinction so coordinator cannot consume this as ready.
+    """
+    from arb.pool_registry import refresh
+    from arb.pumpswap_local_simulation import local_rpc_only
+    local_rpc_only(rpc)
+    screened = screen_signed_provenance(registry)
+    candidates = screened["candidates"]
+    if not candidates:
+        return {"status":"NO_SCREENED_POOLS","source_authenticated":[],
+                "rejected":screened["blocked"],"coordinator_eligible_count":0,
+                "actionable":False,"live_execution_approved":False,"broadcast":False}
+    # Pass only known signed candidates, never all the older unqualified hints.
+    refreshed = refresh(rpc,[{"venue":r["venue"],"address":r["address"],
+                              "mints":r["mints"]} for r in candidates])
+    original = {(r["venue"],r["address"]):r for r in candidates}
+    source = []
+    rejected = list(screened["blocked"]) + list(refreshed["rejected"])
+    for observed in refreshed["verified_pools"]:
+        key = (observed["venue"],observed["address"])
+        signed = original.get(key)
+        if (signed is None or observed.get("mints")!=signed["mints"] or
+            type(observed.get("slot")) is not int or observed["slot"]<0):
+            rejected.append({"venue":observed.get("venue"),"address":observed.get("address"),
+                             "reason":"SOURCE_IDENTITY_OR_MINT_DRIFT"})
+            continue
+        source.append({"venue":signed["venue"],"address":signed["address"],
+                       "mints":list(signed["mints"]),
+                       "current_source_slot":observed["slot"],
+                       "historical_signed_receipt_sha256":signed["signed_provenance_receipt_sha256"],
+                       "source_identity_refreshed":True,
+                       "current_complete_fee_and_tick_state_verified":False,
+                       "current_native_sdk_signed_quote_verified":False,
+                       "coordinator_eligible":False})
+    return {"status":"FRESH_IDENTITY_ONLY_NOT_USABLE_REGISTRY_ADMISSION",
+            "source_authenticated":source,"source_authenticated_count":len(source),
+            "rejected":rejected,"coordinator_eligible_count":0,
+            "actionable":False,"live_execution_approved":False,"broadcast":False}
