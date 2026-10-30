@@ -5,6 +5,8 @@ on:
       - ".github/workflows/six-venue-platform.yml"
       - "arb/six_venue_pipeline.py"
       - "tests/test_six_venue_pipeline.py"
+      - "arb/six_venue_registry_eligibility.py"
+      - "tests/test_six_venue_registry_eligibility.py"
   workflow_dispatch:
 concurrency:
   group: six-venue-platform-${{ github.event.pull_request.head.ref || github.ref_name }}
@@ -23,6 +25,8 @@ jobs:
         run: python3 -m py_compile arb/six_venue_pipeline.py tests/test_six_venue_pipeline.py
       - name: Independently test discovery, quotes, provenance and offline gates
         run: python3 -m unittest discover -s tests -p test_six_venue_pipeline.py -v
+      - name: Reject unsigned/legacy provenance as coordinator-ready without fresh validation
+        run: python3 -m unittest discover -s tests -p test_six_venue_registry_eligibility.py -v
       - name: Assert all six venues are fixed and no DBC/AMM-v4 sneaks into the platform
         run: |
           python3 - <<'PY'
