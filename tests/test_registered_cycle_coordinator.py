@@ -1,7 +1,7 @@
 """Coordinator consumes admitted pool registry and existing 2-6-leg executor."""
 import unittest
 from unittest.mock import patch
-from arb.atomic_graph_coordinator import coordinate_registered_cycle_offline, registered_cycles_for_coordinator, run_registered_cycle_batch_offline, rank_registered_cycle_candidates
+from arb.atomic_graph_coordinator import coordinate_registered_cycle_offline, registered_cycles_for_coordinator, run_registered_cycle_batch_offline, rank_registered_cycle_candidates, coordinate_ranked_registered_cycles_offline
 
 VENUES=("orca","raydium_cpmm","meteora_damm_v2","pumpswap","meteora_dlmm","raydium_clmm")
 
@@ -27,6 +27,36 @@ def run(n,**changes):
         observe=lambda *a:{"signed_offline_observed":True,"output_base_units":1234})
 
 class CoordinatorRegistryTests(unittest.TestCase):
+    @patch("arb.atomic_graph_coordinator.coordinate_registered_cycle_offline")
+    def test_ranked_native_quotes_drive_signed_coordinator_in_gross_order(self,run_signed):
+        registry,_,states,evidence,accounts=case(3)
+        route_rows=registered_cycles_for_coordinator(registry,max_cycles=2)["routes"]
+        prepared={}
+        for row in route_rows:
+            key=tuple((leg["venue"],leg["pool"],leg["input"],leg["output"])
+                      for leg in row["legs"])
+            prepared[key]={"states":states,"evidence":evidence,"owner":"owner",
+                           "token_accounts":accounts,"signer":"signer",
+                           "negative_instructions":lambda i,a:i}
+        def priced(venue,pool,mint_in,mint_out,amount):
+            increment=20 if mint_in=="T1" else 1
+            return {"source_verified":True,"source_slot":200,
+                    "output_base_units":amount+increment}
+        run_signed.side_effect=[
+            {"signed_receipt":{"status":"SIGNED_N_LEG_ATOMIC_AND_ROLLBACK_VERIFIED"},
+             "signed_atomic_simulation_verified":True},
+            {"signed_receipt":{"status":"ROLLBACK_UNVERIFIED"},
+             "signed_atomic_simulation_verified":False}]
+        report=coordinate_ranked_registered_cycles_offline(
+            "http://127.0.0.1:8899",registry,1000,priced,prepared,max_cycles=2)
+        self.assertEqual(report["price_quoted_candidates"],2)
+        self.assertEqual(report["signed_atomic_verified_routes"],1)
+        self.assertEqual(report["ranked_attempts"][0]["status"],
+                         "SIGNED_N_LEG_ATOMIC_AND_ROLLBACK_VERIFIED")
+        self.assertFalse(report["net_profitability_verified"])
+        self.assertFalse(report["broadcast"])
+        self.assertEqual(run_signed.call_count,2)
+
     def test_native_quote_callback_propagates_exact_amounts_between_legs(self):
         registry,_,_,_,_=case(3)
         called=[]
