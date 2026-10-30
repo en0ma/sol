@@ -268,17 +268,34 @@ class SixVenuePipelineTests(unittest.TestCase):
         self.assertFalse(report["actionable"])
 
     def test_gross_loss_quoted_route_is_diagnostic_only(self):
+        fixture={"route_venues":["orca","raydium_cpmm","raydium_clmm"],
+                 "route_mints":["a","b","c","a"],
+                 "route_pool_addresses":["p1","p2","p3"],
+                 "state_accounts_observed_slot":123}
         quote={"status":"GROSS_SOURCE_BOUND_RANKING_ONLY",
                "fully_quoted":1,"blocked":0,"positive_gross":0,
-               "ranked":[{"index":0,"positive_gross":False,
-                          "actionable":False}]}
+               "actionable":False,"live_execution_approved":False,"broadcast":False,
+               "ranked":[{"index":0,"status":"GROSS_INDICATIVE_ONLY",
+                          "start_mint":"a","input_base_units":100,
+                          "output_base_units":91,"gross_delta_start_mint_base_units":-9,
+                          "positive_gross":False,"net_profitability_confirmed":False,
+                          "quotes":[{"venue":v,"pool":p,"input_mint":mint,
+                                     "output_mint":next_mint,"amount_out":amount,
+                                     "source_slot":123}
+                                    for v,p,mint,next_mint,amount in zip(
+                                        fixture["route_venues"],
+                                        fixture["route_pool_addresses"],
+                                        fixture["route_mints"][:-1],
+                                        fixture["route_mints"][1:],
+                                        [97,94,91])],
+                          "actionable":False,"live_execution_approved":False,
+                          "broadcast":False}]}
         with tempfile.TemporaryDirectory() as temp:
             src=Path(temp)/"source"
             dst=Path(temp)/"signed"
             def export(_rpc,_readiness,folder,*,maximum):
                 folder.mkdir()
-                (folder/"triangle.json").write_text(json.dumps({
-                    "route_venues":["orca","raydium_cpmm","raydium_clmm"]}))
+                (folder/"triangle.json").write_text(json.dumps(fixture))
                 summary={"exported":1,"routes":[{
                     "index":4,"status":"AUTHENTICATED_THREE_VENUE_SOURCE_FIXTURE",
                     "fixture":"triangle.json"}]}
@@ -321,7 +338,7 @@ class SixVenuePipelineTests(unittest.TestCase):
                 (folder/"summary.json").write_text(json.dumps(data))
                 return data
             rank_empty={"status":"GROSS_SOURCE_BOUND_RANKING_ONLY","fully_quoted":0,"blocked":0,"positive_gross":0,
-                        "ranked":[]}
+                        "ranked":[],"actionable":False,"live_execution_approved":False,"broadcast":False}
             with patch("arb.onchain_pool_discovery.discover",return_value=discovered) as d, \
                  patch("arb.six_venue_pipeline.probe",side_effect=source_probe), \
                  patch("arb.m5_distinct_venue_coverage_batch.source_batch",side_effect=export), \
