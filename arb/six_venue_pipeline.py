@@ -480,6 +480,18 @@ def offline_research(rpc, fixture_dir, signed_dir):
                 not isinstance(digest,str) or len(digest)!=64 or
                 hashlib.sha256((src/name).read_bytes()).hexdigest()!=digest):
             raise ValueError("signed source fixture digest/path mismatch")
+    from arb.six_venue_quote_continuity import audit_ranked_source_quote_continuity
+    frozen_fixtures=[]
+    for row in original:
+        name=row.get("fixture")
+        if (not isinstance(name,str) or name not in digests or
+            (src/name).resolve().parent!=src.resolve()):
+            raise ValueError("ranked source fixture missing from signed digest manifest")
+        frozen_fixtures.append(json.loads((src/name).read_bytes()))
+    independently_recomputed=audit_ranked_source_quote_continuity(
+        ranking,frozen_fixtures,manifest["amount_in"])
+    if independently_recomputed!=continuity:
+        raise ValueError("source quote continuity does not match original signed source ranking")
     from arb.m5_distinct_venue_coverage_batch import offline_batch
     signed=offline_batch(rpc,src,dst,observed_unix=manifest["observed_unix"],
                          route_indices=indices)
