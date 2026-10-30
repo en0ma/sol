@@ -219,6 +219,8 @@ def source_research(rpc, registry, fixture_dir, *, amount_in,
             digests[row["fixture"]]=hashlib.sha256(raw).hexdigest()
     ranking=rank(fixtures,amount_in=amount_in,observed_unix=observed_unix,
                  maximum=maximum)
+    from arb.six_venue_quote_continuity import audit_ranked_source_quote_continuity
+    quote_continuity=audit_ranked_source_quote_continuity(ranking,fixtures,amount_in)
     positive=[indices[row["index"]] for row in ranking["ranked"]
               if row.get("positive_gross") is True]
     # A gross-loss route can still provide valuable signed CI diagnostics.
@@ -235,12 +237,15 @@ def source_research(rpc, registry, fixture_dir, *, amount_in,
     (root/"six-venue-ranking.json").write_bytes(ranking_raw)
     preflight_raw=json.dumps(source_cycle_preflight,sort_keys=True,separators=(",",":")).encode()
     (root/"six-venue-source-cycle-preflight.json").write_bytes(preflight_raw)
+    continuity_raw=json.dumps(quote_continuity,sort_keys=True,separators=(",",":")).encode()
+    (root/"six-venue-quote-continuity.json").write_bytes(continuity_raw)
     manifest={"status":"SIX_VENUE_SIGNED_HANDOFF_UNEXECUTED",
               "venues":list(VENUES),"observed_unix":observed_unix,
               "amount_in":amount_in,"source_fixtures":digests,
               "source_summary_sha256":hashlib.sha256(summary_raw).hexdigest(),
               "source_ranking_sha256":hashlib.sha256(ranking_raw).hexdigest(),
               "source_cycle_preflight_sha256":hashlib.sha256(preflight_raw).hexdigest(),
+              "source_quote_continuity_sha256":hashlib.sha256(continuity_raw).hexdigest(),
               "selected_source_route_indices":selected,
               "positive_gross_indices":positive,
               "diagnostic_only_indices":diagnostic,
@@ -264,6 +269,7 @@ def source_research(rpc, registry, fixture_dir, *, amount_in,
             "signed_simulation_status":"NOT_ATTEMPTED",
             "manifest":manifest,"graph_artifact":graph,
             "source_cycle_preflight":source_cycle_preflight,
+            "source_quote_continuity":quote_continuity,
             "ranking_artifact":ranking,**SAFE}
 
 
@@ -429,6 +435,16 @@ def offline_research(rpc, fixture_dir, signed_dir):
     if (hashlib.sha256(summary_raw).hexdigest()!=manifest.get("source_summary_sha256") or
             hashlib.sha256(ranking_raw).hexdigest()!=manifest.get("source_ranking_sha256")):
         raise ValueError("signed source inventory or ranking digest mismatch")
+    continuity_raw=(src/"six-venue-quote-continuity.json").read_bytes()
+    if hashlib.sha256(continuity_raw).hexdigest()!=manifest.get("source_quote_continuity_sha256"):
+        raise ValueError("source quote continuity digest mismatch")
+    continuity=json.loads(continuity_raw)
+    if (not isinstance(continuity,dict) or
+        continuity.get("status")!="SOURCE_QUOTE_CONTINUITY_ARITHMETIC_ONLY" or
+        continuity.get("current_native_sdk_parity_verified") is not False or
+        continuity.get("coordinator_eligible_routes")!=0 or
+        any(continuity.get(k) is not False for k in SAFE)):
+        raise ValueError("source quote continuity falsely approved pricing")
     listing=json.loads(summary_raw)
     ranking=json.loads(ranking_raw)
     if (ranking.get("status")!="GROSS_SOURCE_BOUND_RANKING_ONLY" or
