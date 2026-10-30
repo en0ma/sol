@@ -689,3 +689,60 @@ def run_registered_cycle_batch_offline(rpc,registry,prepared,*,max_cycles=12):
                 row["signed_atomic_simulation_verified"] for row in rows),
             "routes":rows,"actionable":False,
             "live_execution_approved":False,"broadcast":False}
+
+
+def rank_registered_cycle_candidates(registry,initial_amount,quote_leg,*,max_cycles=200):
+    """Amount-aware route ordering using EXISTING per-venue native price callback.
+
+    quote_leg(venue,pool,input_mint,output_mint,amount_in) must return an
+    authenticated exact-output integer, or a row with output_base_units,
+    source_slot and source_verified=True. It must not return a float.
+    This is prioritization only: signing and CPI/SPL checks remain mandatory.
+    """
+    if (type(initial_amount)is not int or not 0<initial_amount<2**64
+        or not callable(quote_leg)):
+        raise ValueError("exact input and existing venue quote callback required")
+    candidates=registered_cycles_for_coordinator(registry,max_cycles=max_cycles)
+    ranked=[]
+    blocked=[]
+    for index,route in enumerate(candidates["routes"]):
+        current=initial_amount
+        observed=[]
+        try:
+            for leg in route["legs"]:
+                raw=quote_leg(leg["venue"],leg["pool"],
+                              leg["input"],leg["output"],current)
+                if isinstance(raw,dict):
+                    if raw.get("source_verified") is not True or (
+                        type(raw.get("source_slot")) is not int or
+                        raw["source_slot"]<0):
+                        raise ValueError("source-bound native quote evidence missing")
+                    output=raw.get("output_base_units")
+                    slot=raw["source_slot"]
+                else:
+                    # Bare integer quotes cannot prove which pool state was
+                    # used. They remain unusable for coordinator ranking.
+                    raise ValueError("source-bound native quote evidence missing")
+                if type(output)is not int or not 0<output<2**64:
+                    raise ValueError("invalid native quote raw output")
+                observed.append({"venue":leg["venue"],"pool":leg["pool"],
+                                 "input_base_units":current,
+                                 "output_base_units":output,
+                                 "source_slot":slot})
+                current=output
+        except (ValueError,KeyError,TypeError) as exc:
+            blocked.append({"index":index,"reason":str(exc)[:160]})
+            continue
+        ranked.append({"index":index,"route":route,
+                       "start_mint":route["start_mint"],"start_amount_base_units":initial_amount,
+                       "final_amount_base_units":current,
+                       "gross_delta_base_units":current-initial_amount,
+                       "quoted_legs":observed,
+                       "signed_simulation_verified":False})
+    ranked.sort(key=lambda x:(-x["gross_delta_base_units"],x["index"]))
+    return {"status":"REGISTERED_CYCLE_NATIVE_QUOTE_RANKING_ONLY",
+            "ranked":ranked,"blocked":blocked,
+            "candidate_count":candidates["candidate_count"],
+            "gross_positive_candidates":sum(x["gross_delta_base_units"]>0 for x in ranked),
+            "net_profitability_verified":False,
+            "actionable":False,"live_execution_approved":False,"broadcast":False}
