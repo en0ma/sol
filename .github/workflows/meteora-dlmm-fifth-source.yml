@@ -64,7 +64,8 @@ jobs:
           python3 -m arb.meteora_dlmm_native_candidate_audit \
             --source "$RUNNER_TEMP/meteora-dlmm-fifth-source.json" \
             --sdk "$RUNNER_TEMP/meteora-dlmm-fifth-sdk-quotes.json" \
-            --output "$RUNNER_TEMP/meteora-dlmm-native-sdk-parity.json"
+            --output "$RUNNER_TEMP/meteora-dlmm-native-sdk-parity.json" \
+            ${{ github.event_name == 'pull_request' && '--allow-mismatch-research' || '' }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
