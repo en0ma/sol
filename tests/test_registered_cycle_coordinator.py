@@ -1,7 +1,7 @@
 """Coordinator consumes admitted pool registry and existing 2-6-leg executor."""
 import unittest
 from unittest.mock import patch
-from arb.atomic_graph_coordinator import coordinate_registered_cycle_offline, registered_cycles_for_coordinator, run_registered_cycle_batch_offline, rank_registered_cycle_candidates, coordinate_ranked_registered_cycles_offline
+from arb.atomic_graph_coordinator import coordinate_registered_cycle_offline, registered_cycles_for_coordinator, run_registered_cycle_batch_offline, rank_registered_cycle_candidates, coordinate_ranked_registered_cycles_offline, observed_registered_signed_cycle_economics
 
 VENUES=("orca","raydium_cpmm","meteora_damm_v2","pumpswap","meteora_dlmm","raydium_clmm")
 
@@ -56,6 +56,50 @@ class CoordinatorRegistryTests(unittest.TestCase):
         self.assertFalse(report["net_profitability_verified"])
         self.assertFalse(report["broadcast"])
         self.assertEqual(run_signed.call_count,2)
+
+    def test_signed_spl_gross_calculated_from_receipt_not_quote(self):
+        _,route,_,_,_=case(3)
+        positive={"status":"SIGNED_N_LEG_ATOMIC_AND_ROLLBACK_VERIFIED",
+                  "signed_atomic_simulation_verified":True,
+                  "signed_cpi_per_leg_verified":True,
+                  "rollback_failure_case_verified":True,
+                  "signed_packet_crypto_bound":True,
+                  "initial_balances_base_units":[1000,0,0,0],
+                  "positive_post_balances_base_units":[0,0,0,1080],
+                  "planned_inputs":[1000,1100,1050],
+                  "actionable":False,"live_execution_approved":False,"broadcast":False}
+        result=observed_registered_signed_cycle_economics(route,positive)
+        self.assertEqual(result["gross_start_mint_base_units"],80)
+        self.assertEqual(result["break_even_total_cost_base_units"],80)
+        self.assertIsNone(result["net_start_mint_base_units"])
+        self.assertFalse(result["net_profitability_verified"])
+        self.assertFalse(result["actionable"])
+        for change in ({"signed_cpi_per_leg_verified":False},
+                       {"rollback_failure_case_verified":False},
+                       {"signed_packet_crypto_bound":False},
+                       {"positive_post_balances_base_units":[0,1,0,1080]},
+                       {"planned_inputs":[999,1100,1050]},
+                       {"positive_post_balances_base_units":[0,0,0,True]},
+                       {"actionable":True}):
+            with self.subTest(change=change):
+                self.assertIsNone(observed_registered_signed_cycle_economics(
+                    route,{**positive,**change})["gross_start_mint_base_units"])
+
+    def test_signed_route_gross_loss_cannot_be_approved_by_fee_accounting(self):
+        _,route,_,_,_=case(2)
+        receipt={"status":"SIGNED_N_LEG_ATOMIC_AND_ROLLBACK_VERIFIED",
+                 "signed_atomic_simulation_verified":True,
+                 "signed_cpi_per_leg_verified":True,
+                 "rollback_failure_case_verified":True,
+                 "signed_packet_crypto_bound":True,
+                 "initial_balances_base_units":[500,0,0],
+                 "positive_post_balances_base_units":[0,0,470],
+                 "planned_inputs":[500,480],
+                 "actionable":False,"live_execution_approved":False,"broadcast":False}
+        outcome=observed_registered_signed_cycle_economics(route,receipt)
+        self.assertEqual(outcome["gross_start_mint_base_units"],-30)
+        self.assertEqual(outcome["break_even_total_cost_base_units"],0)
+        self.assertIsNone(outcome["net_start_mint_base_units"])
 
     def test_native_quote_callback_propagates_exact_amounts_between_legs(self):
         registry,_,_,_,_=case(3)
