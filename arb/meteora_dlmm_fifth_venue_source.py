@@ -57,8 +57,10 @@ def capture_pool(rpc,address,expected_mints):
     # Capture a bounded 17-array neighborhood, all at the same source slot.
     array_indexes=list(range(idx-8,idx+9))
     arrays=[bin_array_pda(address,i) for i in array_indexes]
+    extension=str(Pubkey.find_program_address(
+        [b"bitmap",bytes(Pubkey.from_string(address))],Pubkey.from_string(PROGRAM))[0])
     keys=[address,state["reserve_x"],state["reserve_y"],state["oracle"],
-          *arrays,*mints,CLOCK]
+          *arrays,*mints,CLOCK,extension]
     result=call(rpc,"getMultipleAccounts",[
         keys,{"encoding":"base64","commitment":"confirmed"}])
     slot=result.get("context",{}).get("slot")
@@ -120,6 +122,13 @@ def capture_pool(rpc,address,expected_mints):
     clock_timestamp=int.from_bytes(clock[32:40],"little",signed=True)
     if clock_slot<slot-1024 or clock_timestamp<=0:
         raise ValueError("DLMM Clock not compatible with synchronized snapshot")
+    extension_account=accounts[mint_offset+3]
+    if extension_account is not None:
+        extension_raw=_raw(extension_account,PROGRAM)
+        if (len(extension_raw)<40 or
+                extension_raw[:8]!=hashlib.sha256(b"account:BinArrayBitmapExtension").digest()[:8] or
+                extension_raw[8:40]!=bytes(Pubkey.from_string(address))):
+            raise ValueError("DLMM authenticated bitmap extension owner, discriminator or pool invalid")
     records=[{"address":key,"owner":account["owner"],
               "lamports":account["lamports"],"account_base64":account["data"][0]}
              if account is not None else {"address":key,"present":False}
