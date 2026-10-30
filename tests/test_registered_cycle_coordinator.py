@@ -57,6 +57,42 @@ class CoordinatorRegistryTests(unittest.TestCase):
         self.assertFalse(report["broadcast"])
         self.assertEqual(run_signed.call_count,2)
 
+    @patch("arb.atomic_graph_coordinator.coordinate_registered_cycle_offline")
+    def test_signed_gross_ranking_uses_poststate_not_native_quote_order(self,run_signed):
+        reg,_,states,evidence,accounts=case(3)
+        routes=registered_cycles_for_coordinator(reg,max_cycles=2)["routes"]
+        prepared={}
+        for route in routes:
+            identity=tuple((leg["venue"],leg["pool"],leg["input"],leg["output"])
+                           for leg in route["legs"])
+            prepared[identity]={"states":states,"evidence":evidence,
+                                "owner":"owner","token_accounts":accounts,
+                                "signer":"signer","negative_instructions":lambda i,a:i}
+        def native(*args):
+            return {"source_verified":True,"source_slot":42,
+                    "output_base_units":args[-1]+10}
+        def signed_output(amount):
+            receipt={"status":"SIGNED_N_LEG_ATOMIC_AND_ROLLBACK_VERIFIED",
+                     "signed_atomic_simulation_verified":True,
+                     "signed_cpi_per_leg_verified":True,
+                     "rollback_failure_case_verified":True,
+                     "signed_packet_crypto_bound":True,
+                     "initial_balances_base_units":[1000,0,0,0],
+                     "positive_post_balances_base_units":[0,0,0,amount],
+                     "planned_inputs":[1000,1010,1020],
+                     "actionable":False,"live_execution_approved":False,"broadcast":False}
+            return {"signed_receipt":receipt,"signed_atomic_simulation_verified":True}
+        run_signed.side_effect=[signed_output(1010),signed_output(1100)]
+        result=coordinate_ranked_registered_cycles_offline(
+            "http://127.0.0.1:8899",reg,1000,native,prepared,max_cycles=2)
+        self.assertEqual([x["gross_start_mint_base_units"] for x in
+                          result["signed_gross_ranked"]],[100,10])
+        self.assertEqual(result["signed_gross_positive_routes"],2)
+        self.assertEqual([x["index"] for x in result["signed_gross_ranked"]],[1,0])
+        self.assertTrue(all(x["net_start_mint_base_units"] is None
+                            for x in result["signed_gross_ranked"]))
+        self.assertFalse(result["net_profitability_verified"])
+
     def test_signed_spl_gross_calculated_from_receipt_not_quote(self):
         _,route,_,_,_=case(3)
         positive={"status":"SIGNED_N_LEG_ATOMIC_AND_ROLLBACK_VERIFIED",
