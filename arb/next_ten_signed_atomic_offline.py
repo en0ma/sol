@@ -508,9 +508,15 @@ def run_three_venue(rpc,fixture,*,amount_in=100_000_000,program_cache=None):
                      keys[-2],keys[-1],mints[-2],mints[-1],
                      amounts[-1],2**64-1)
         return list(instructions[:-1])+[ix]
-    receipt=simulate_adaptive_n_leg_offline(
-        rpc,route,mints,states,evidence,owner,keys,amount_in,None,signer,
-        negative_instructions=negative,require_closed=True)
+    # Consume the actual admitted registry, not a fixture-synthesized pool
+    # collection. Builder states and signed prefix observers remain unchanged.
+    from arb.atomic_graph_coordinator import coordinate_registered_cycle_offline
+    registered=json.loads(Path("arb/pool_registry.json").read_text())
+    wrapped=coordinate_registered_cycle_offline(
+        rpc,registered,{"start_mint":mints[0],"legs":route},
+        states,evidence,owner,keys,amount_in,signer,
+        negative_instructions=negative)
+    receipt=wrapped["signed_receipt"]
     receipt.update(route_venues=venues,route_pool_addresses=pools,route_mints=mints,
         fixture_kind=fixture["fixture_kind"],
         source_snapshot_slot=None,
@@ -614,9 +620,15 @@ def run_four_to_six_venue(rpc,fixture,*,amount_in=100_000,program_cache=None):
             except (ValueError,TypeError,KeyError) as exc:
                 orca_clock_before={"status":"ORCA_FORK_CLOCK_UNAVAILABLE",
                                    "reason":str(exc)[:200],**SAFETY}
-        receipt=simulate_adaptive_n_leg_offline(
-            rpc,route,mints,states,evidence,owner,keys,amount_in,None,signer,
-            negative_instructions=negative,require_closed=True)
+        # The same admitted registry is now the routing authority for genuine
+        # 4-6 hop signed/rollback validation, using the existing hydrator.
+        from arb.atomic_graph_coordinator import coordinate_registered_cycle_offline
+        registered=json.loads(Path("arb/pool_registry.json").read_text())
+        wrapped=coordinate_registered_cycle_offline(
+            rpc,registered,{"start_mint":mints[0],"legs":route},
+            states,evidence,owner,keys,amount_in,signer,
+            negative_instructions=negative)
+        receipt=wrapped["signed_receipt"]
         if "orca" in venues:
             try:
                 orca_clock_after=fork_clock(rpc)
