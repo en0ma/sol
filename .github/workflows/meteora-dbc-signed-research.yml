@@ -74,6 +74,7 @@ jobs:
           call("http://127.0.0.1:8899","surfnet_pauseClock",[])
           PY
       - name: Capture one authentic original DBC source without broadcast
+        id: source_capture
         env:
           NODE_PATH: ${{ runner.temp }}/dbc-sdk/node_modules
         run: |
@@ -83,11 +84,26 @@ jobs:
               --rpc "$SOLANA_MAINNET_RPC_URL" --pages 12 \
               --output "$RUNNER_TEMP/dbc-signed-diagnostic-source.json"
           else
+            args=()
+            if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+              args+=(--allow-incomplete-research)
+            fi
             python3 -m arb.meteora_dbc_seventh_candidate_capture \
               --rpc "$SOLANA_MAINNET_RPC_URL" --count 1 --pages 12 --sdk-screen \
-              --output "$RUNNER_TEMP/dbc-signed-diagnostic-source.json"
+              --output "$RUNNER_TEMP/dbc-signed-diagnostic-source.json" "${args[@]}"
           fi
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          d=json.loads((Path(os.environ["RUNNER_TEMP"])/"dbc-signed-diagnostic-source.json").read_text())
+          ready=(d.get("status")=="SIX_DBC_ORIGINAL_SOURCE_POOLS_ONLY" and
+                 d.get("independent_audit",{}).get("authenticated_source_pools")==6) or d.get("source_target_met") is True
+          with open(os.environ["GITHUB_OUTPUT"],"a") as f:
+              f.write("eligible="+("true" if ready else "false")+"\n")
+          if not ready:print("::warning::No eligible original DBC pool exists in current bounded source window; no signed acceptance or registry promotion")
+          PY
       - name: Independently audit saved source bytes
+        if: steps.source_capture.outputs.eligible == 'true'
         run: |
           python3 - <<'PY'
           import json,os
@@ -107,6 +123,7 @@ jobs:
           print(json.dumps({"authenticated_source_pools":audit["authenticated_source_pools"]}))
           PY
       - name: Obtain source-bound original official SDK quote candidates
+        if: steps.source_capture.outputs.eligible == 'true'
         env:
           NODE_PATH: ${{ runner.temp }}/dbc-sdk/node_modules
         run: |
@@ -114,18 +131,21 @@ jobs:
             "$RUNNER_TEMP/dbc-signed-diagnostic-source.json" \
             "$RUNNER_TEMP/dbc-signed-diagnostic-sdk.json"
       - name: Independently reconcile original zero-fee curve mathematics
+        if: steps.source_capture.outputs.eligible == 'true'
         run: |
           python3 -m arb.meteora_dbc_native_curve_audit \
             --source "$RUNNER_TEMP/dbc-signed-diagnostic-source.json" \
             --sdk "$RUNNER_TEMP/dbc-signed-diagnostic-sdk.json" \
             --output "$RUNNER_TEMP/dbc-signed-diagnostic-curve.json"
       - name: Independently require native full-fee original SDK parity before signing
+        if: steps.source_capture.outputs.eligible == 'true'
         run: |
           python3 -m arb.meteora_dbc_native_fee_parity \
             --source "$RUNNER_TEMP/dbc-signed-diagnostic-source.json" \
             --sdk "$RUNNER_TEMP/dbc-signed-diagnostic-sdk.json" \
             --output "$RUNNER_TEMP/dbc-signed-diagnostic-native-fee.json"
       - name: Diagnostic only real Ed25519-signed isolated four-swap execution
+        if: steps.source_capture.outputs.eligible == 'true'
         run: |
           python3 -m arb.meteora_dbc_signed_fork_research \
             --source-rpc "$SOLANA_MAINNET_RPC_URL" \
@@ -136,6 +156,7 @@ jobs:
             --required "$POOL_COUNT" \
             --output "$RUNNER_TEMP/dbc-signed-diagnostic-unaccepted.json"
       - name: Independently reparse Ed25519 intent and raw SPL poststates
+        if: steps.source_capture.outputs.eligible == 'true'
         run: |
           python3 -m arb.meteora_dbc_signed_audit \
             --source "$RUNNER_TEMP/dbc-signed-diagnostic-source.json" \
@@ -145,6 +166,7 @@ jobs:
             --required "$POOL_COUNT" \
             --output "$RUNNER_TEMP/dbc-independent-genuine-signed-audit.json"
       - name: Gate original independently audited signed DBC pool into existing registry artifact
+        if: steps.source_capture.outputs.eligible == 'true'
         run: |
           python3 -m arb.meteora_dbc_signed_registry_merge \
             --registry arb/pool_registry.json \
