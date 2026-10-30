@@ -49,7 +49,7 @@ function snapshotConnection(remote,row) {
     const address=key.toBase58();
     if(snapshot.has(address)) return snapshot.get(address);
     if(absent.has(address)) return null;
-    throw Error('SDK requested an account outside authenticated DLMM source snapshot');
+    throw Error('SDK requested an account outside authenticated DLMM source snapshot: '+address);
   };
   conn.getAccountInfo=async(key)=>snapshotOnly(key);
   conn.getAccountInfoAndContext=async(key)=>({context:{slot:row.source_slot},value:snapshotOnly(key)});
