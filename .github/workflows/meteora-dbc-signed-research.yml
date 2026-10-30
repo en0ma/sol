@@ -84,7 +84,7 @@ jobs:
               --output "$RUNNER_TEMP/dbc-signed-diagnostic-source.json"
           else
             python3 -m arb.meteora_dbc_seventh_candidate_capture \
-              --rpc "$SOLANA_MAINNET_RPC_URL" --count 1 --pages 4 --sdk-screen \
+              --rpc "$SOLANA_MAINNET_RPC_URL" --count 1 --pages 12 --sdk-screen \
               --output "$RUNNER_TEMP/dbc-signed-diagnostic-source.json"
           fi
       - name: Independently audit saved source bytes
