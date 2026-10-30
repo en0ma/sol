@@ -32,8 +32,9 @@ function flatAccount(row,address) {
  */
 function snapshotConnection(remote,row) {
   const snapshot=new Map();
+  const absent=new Set();
   for(const account of row.source_accounts) {
-    if(account.present===false) continue;
+    if(account.present===false) { absent.add(account.address); continue; }
     const raw=Buffer.from(account.account_base64,"base64");
     check(raw.toString("base64")===account.account_base64,
       "noncanonical authenticated DLMM snapshot account");
@@ -44,26 +45,15 @@ function snapshotConnection(remote,row) {
   }
   check(snapshot.has(row.address),"authenticated DLMM pool account missing");
   const conn=new Connection(remote.rpcEndpoint,{commitment:"confirmed"});
-  const originalGetInfo=conn.getAccountInfo.bind(conn);
-  const originalGetInfoContext=conn.getAccountInfoAndContext.bind(conn);
-  const originalMulti=conn.getMultipleAccountsInfo.bind(conn);
-  conn.getAccountInfo=async(key,...args)=>{
-    const cached=snapshot.get(key.toBase58());
-    return cached || originalGetInfo(key,...args);
+  const snapshotOnly=key=>{
+    const address=key.toBase58();
+    if(snapshot.has(address)) return snapshot.get(address);
+    if(absent.has(address)) return null;
+    throw Error('SDK requested an account outside authenticated DLMM source snapshot');
   };
-  conn.getAccountInfoAndContext=async(key,...args)=>{
-    const cached=snapshot.get(key.toBase58());
-    return cached ? {context:{slot:row.source_slot},value:cached} :
-      originalGetInfoContext(key,...args);
-  };
-  conn.getMultipleAccountsInfo=async(keys,...args)=>{
-    // SDK calls this with ordered bin-array paths. Any off-snapshot arrays
-    // must fail below rather than produce mixed-state parity evidence.
-    const cached=keys.map(key=>snapshot.get(key.toBase58()));
-    if(cached.every(Boolean)) return cached;
-    const remoteRows=await originalMulti(keys,...args);
-    return keys.map((key,i)=>cached[i] || remoteRows[i]);
-  };
+  conn.getAccountInfo=async(key)=>snapshotOnly(key);
+  conn.getAccountInfoAndContext=async(key)=>({context:{slot:row.source_slot},value:snapshotOnly(key)});
+  conn.getMultipleAccountsInfo=async(keys)=>keys.map(snapshotOnly);
   return conn;
 }
 async function checkPool(conn,row,publicKey) {
