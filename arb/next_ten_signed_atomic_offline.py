@@ -512,11 +512,18 @@ def run_three_venue(rpc,fixture,*,amount_in=100_000_000,program_cache=None):
     # collection. Builder states and signed prefix observers remain unchanged.
     from arb.atomic_graph_coordinator import coordinate_registered_cycle_offline
     registered=json.loads(Path("arb/pool_registry.json").read_text())
-    wrapped=coordinate_registered_cycle_offline(
-        rpc,registered,{"start_mint":mints[0],"legs":route},
-        states,evidence,owner,keys,amount_in,signer,
-        negative_instructions=negative)
-    receipt=wrapped["signed_receipt"]
+    if "raydium_amm_v4" in venues:
+        # AMM v4 is experimental and deliberately outside the six admitted
+        # venues; preserve its historical isolated signed research runner.
+        receipt=simulate_adaptive_n_leg_offline(
+            rpc,route,mints,states,evidence,owner,keys,amount_in,None,signer,
+            negative_instructions=negative,require_closed=True)
+    else:
+        wrapped=coordinate_registered_cycle_offline(
+            rpc,registered,{"start_mint":mints[0],"legs":route},
+            states,evidence,owner,keys,amount_in,signer,
+            negative_instructions=negative)
+        receipt=wrapped["signed_receipt"]
     receipt.update(route_venues=venues,route_pool_addresses=pools,route_mints=mints,
         fixture_kind=fixture["fixture_kind"],
         source_snapshot_slot=None,
