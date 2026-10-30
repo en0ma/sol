@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from arb.six_venue_pipeline import VENUES,authenticated_graph,source_research,offline_research,assess_signed_batch,preflight_candidate_cycles_against_registry
+from arb.six_venue_pipeline import VENUES,authenticated_graph,source_research,offline_research,assess_signed_batch,preflight_candidate_cycles_against_registry,report_signed_source_cycle_preflight
 
 
 def readiness():
@@ -35,6 +35,38 @@ class SixVenuePipelineTests(unittest.TestCase):
         wrong["authenticated_pools"]["orca"][0]["authenticated"]=False
         with self.assertRaisesRegex(ValueError,"untrusted"):
             authenticated_graph(wrong)
+
+    def test_existing_source_graph_feeds_provenance_preflight_without_route_approval(self):
+        accepted={"venue":"pumpswap","address":"P1","mints":["A","B"],
+            "signed_provenance":{"status":"INDEPENDENT_SIGNED_NATIVE_SDK_SPL_PARITY",
+                "source_slot":100,"source_digest":"a"*64,
+                "independent_receipt_sha256":"b"*64,
+                "signed_transaction_hashes":[str(i)*64 for i in range(4)]}}
+        other={"venue":"meteora_dlmm","address":"P2","mints":["B","A"],
+            "signed_provenance":{"status":"INDEPENDENT_DLMM_SIGNED_NATIVE_SDK_SPL_PARITY",
+                "source_slot":100,"source_digest":"a"*64,
+                "independent_receipt_sha256":"b"*64,
+                "signed_transaction_hashes":[str(i)*64 for i in range(4)]}}
+        source=readiness()
+        source["authenticated_pools"]["pumpswap"]=[{
+            "venue":"pumpswap","pool":"P1","slot":101,"mints":["A","B"],
+            "authenticated":True,"actionable":False,"broadcast":False,
+            "live_execution_approved":False}]
+        source["authenticated_pools"]["meteora_dlmm"]=[{
+            "venue":"meteora_dlmm","pool":"P2","slot":101,"mints":["B","A"],
+            "authenticated":True,"actionable":False,"broadcast":False,
+            "live_execution_approved":False}]
+        graph=authenticated_graph(source)
+        report=report_signed_source_cycle_preflight(
+            {"pools":[accepted,other]},source,graph)
+        self.assertGreater(report["source_identity_routes"],0)
+        self.assertEqual(report["coordinator_eligible_routes"],0)
+        self.assertFalse(report["actionable"])
+        altered=readiness()
+        altered["authenticated_pools"]["pumpswap"]=[{
+            **source["authenticated_pools"]["pumpswap"][0],"mints":["A","X"]}]
+        with self.assertRaisesRegex(ValueError,"disagree"):
+            report_signed_source_cycle_preflight({"pools":[accepted]},altered,graph)
 
     def test_no_mainnet_rpc_or_implicit_offline_approval(self):
         with self.assertRaises((ValueError,OSError)):
