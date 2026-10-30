@@ -92,7 +92,16 @@ def execute(source_rpc,local_rpc,tick_source,native,sdk):
         if not isinstance(accounts,list) or len(accounts)!=7:
             raise ValueError("CLMM complete same-slot pool/vault/config/obs/mints required")
         tick_accounts=[x for x in tick["tick_arrays"] if x["present"]]
+        extension=tick.get("bitmap_extension")
+        if extension is not None:
+            if (not isinstance(extension,dict) or extension.get("present") not in (True,False)):
+                raise ValueError("CLMM invalid authenticated bitmap extension metadata")
         originals=[*accounts,*tick_accounts]
+        if extension is not None and extension["present"]:
+            from arb.raydium_clmm_bitmap_extension_source import bitmap_pda
+            if extension.get("address")!=bitmap_pda(address):
+                raise ValueError("CLMM bitmap extension PDA mismatch")
+            originals.append(extension)
         state=decode(base64.b64decode(accounts[0]["account_base64"],validate=True))
         verified_arrays={r["address"] for r in tick_accounts}
         native_quotes={(q["zero_for_one"],q["amount_in"]):q
