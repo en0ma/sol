@@ -233,11 +233,14 @@ def source_research(rpc, registry, fixture_dir, *, amount_in,
     summary_raw=(root/"summary.json").read_bytes()
     ranking_raw=json.dumps(ranking,sort_keys=True,separators=(",",":")).encode()
     (root/"six-venue-ranking.json").write_bytes(ranking_raw)
+    preflight_raw=json.dumps(source_cycle_preflight,sort_keys=True,separators=(",",":")).encode()
+    (root/"six-venue-source-cycle-preflight.json").write_bytes(preflight_raw)
     manifest={"status":"SIX_VENUE_SIGNED_HANDOFF_UNEXECUTED",
               "venues":list(VENUES),"observed_unix":observed_unix,
               "amount_in":amount_in,"source_fixtures":digests,
               "source_summary_sha256":hashlib.sha256(summary_raw).hexdigest(),
               "source_ranking_sha256":hashlib.sha256(ranking_raw).hexdigest(),
+              "source_cycle_preflight_sha256":hashlib.sha256(preflight_raw).hexdigest(),
               "selected_source_route_indices":selected,
               "positive_gross_indices":positive,
               "diagnostic_only_indices":diagnostic,
@@ -408,6 +411,21 @@ def offline_research(rpc, fixture_dir, signed_dir):
         raise ValueError("invalid signed source selection")
     summary_raw=(src/"summary.json").read_bytes()
     ranking_raw=(src/"six-venue-ranking.json").read_bytes()
+    preflight_raw=(src/"six-venue-source-cycle-preflight.json").read_bytes()
+    if hashlib.sha256(preflight_raw).hexdigest()!=manifest.get("source_cycle_preflight_sha256"):
+        raise ValueError("source cycle preflight digest mismatch")
+    preflight=json.loads(preflight_raw)
+    if (not isinstance(preflight,dict) or
+        preflight.get("status")!="SIX_VENUE_ROUTE_SOURCE_PREFLIGHT_ONLY" or
+        preflight.get("coordinator_eligible_routes")!=0 or
+        any(preflight.get(k) is not False for k in SAFE) or
+        type(preflight.get("routes_screened")) is not int or
+        not isinstance(preflight.get("routes"),list) or
+        len(preflight["routes"])!=preflight["routes_screened"] or
+        any(not isinstance(route,dict) or route.get("coordinator_eligible") is not False
+            or any(route.get(k) is not False for k in SAFE)
+            for route in preflight["routes"])):
+        raise ValueError("source cycle preflight not fail-closed")
     if (hashlib.sha256(summary_raw).hexdigest()!=manifest.get("source_summary_sha256") or
             hashlib.sha256(ranking_raw).hexdigest()!=manifest.get("source_ranking_sha256")):
         raise ValueError("signed source inventory or ranking digest mismatch")
