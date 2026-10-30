@@ -524,6 +524,7 @@ def run_three_venue(rpc,fixture,*,amount_in=100_000_000,program_cache=None):
             states,evidence,owner,keys,amount_in,signer,
             negative_instructions=negative)
         receipt=wrapped["signed_receipt"]
+        receipt["registered_coordinator_signed_economics"]=wrapped.get("observed_signed_economics")
     receipt.update(route_venues=venues,route_pool_addresses=pools,route_mints=mints,
         fixture_kind=fixture["fixture_kind"],
         source_snapshot_slot=None,
@@ -636,6 +637,7 @@ def run_four_to_six_venue(rpc,fixture,*,amount_in=100_000,program_cache=None):
             states,evidence,owner,keys,amount_in,signer,
             negative_instructions=negative)
         receipt=wrapped["signed_receipt"]
+        receipt["registered_coordinator_signed_economics"]=wrapped.get("observed_signed_economics")
         if "orca" in venues:
             try:
                 orca_clock_after=fork_clock(rpc)
