@@ -72,6 +72,55 @@ def authenticated_graph(readiness, *, max_cycles=200):
 
 
 
+
+def report_signed_source_cycle_preflight(registry, readiness, graph):
+    """Bind preflight to the SAME authenticated original source graph.
+
+    This is evidence inventory only: neither historical signed provenance
+    nor same-source pool authentication proves executable fresh quotes.
+    No additional network reads, separate coordinator, or registry mutation.
+    """
+    from arb.six_venue_registry_eligibility import screen_signed_provenance
+    if (not isinstance(graph,dict) or
+        graph.get("status")!="SIX_VENUE_AUTHENTICATED_GRAPH_ONLY" or
+        any(graph.get(k) is not False for k in SAFE) or
+        not isinstance(readiness,dict) or
+        readiness.get("source")!="READ_ONLY_MAINNET_BACKED_SURFPOOL" or
+        any(readiness.get(k) is not False for k in SAFE)):
+        raise ValueError("same source authenticated graph required")
+    signed=screen_signed_provenance(registry)
+    approved={(p["venue"],p["address"]):p for p in signed["candidates"]}
+    rows=[]
+    for venue in VENUES:
+        for row in readiness.get("authenticated_pools",{}).get(venue,[]):
+            key=(venue,row.get("pool"))
+            previous=approved.get(key)
+            if previous is None:
+                continue
+            if (row.get("authenticated") is not True or
+                row.get("mints")!=previous["mints"] or
+                type(row.get("slot")) is not int or row["slot"]<0 or
+                any(row.get(k) is not False for k in SAFE)):
+                raise ValueError("signed pool and fresh original source identity disagree")
+            rows.append({"venue":venue,"address":key[1],"mints":list(previous["mints"]),
+                         "source_identity_refreshed":True,
+                         "current_source_slot":row["slot"],
+                         "current_complete_fee_and_tick_state_verified":False,
+                         "current_native_sdk_signed_quote_verified":False,
+                         "coordinator_eligible":False})
+    fresh={"status":"FRESH_IDENTITY_ONLY_NOT_USABLE_REGISTRY_ADMISSION",
+           "source_authenticated":rows,"coordinator_eligible_count":0,**SAFE}
+    explicit=[]
+    for route in graph["routes"]:
+        legs=route["legs"]
+        tokens=[legs[0]["input"]]+[leg["output"] for leg in legs]
+        explicit.append({"legs":[{"venue":leg["venue"],"pool":leg["pool"],
+                                  "input_mint":leg["input"],"output_mint":leg["output"]}
+                                 for leg in legs],"tokens":tokens})
+    return preflight_candidate_cycles_against_registry(registry,fresh,explicit)
+
+
+
 def source_research(rpc, registry, fixture_dir, *, amount_in,
                     observed_unix, maximum=12, max_cycles=200,
                     discovery_pairs=None,pool_probe_limit=4):
@@ -143,6 +192,7 @@ def source_research(rpc, registry, fixture_dir, *, amount_in,
     if set(readiness.get("authenticated_pools",{}))!=set(VENUES):
         raise ValueError("unexpected source venue coverage")
     graph=authenticated_graph(readiness,max_cycles=max_cycles)
+    source_cycle_preflight=report_signed_source_cycle_preflight(registry,readiness,graph)
     source=source_batch(rpc,readiness,root,maximum=maximum)
     fixtures=[];indices=[];digests={}
     for row in source["routes"]:
@@ -201,6 +251,7 @@ def source_research(rpc, registry, fixture_dir, *, amount_in,
                      "net_profitable_confirmed":0},
             "signed_simulation_status":"NOT_ATTEMPTED",
             "manifest":manifest,"graph_artifact":graph,
+            "source_cycle_preflight":source_cycle_preflight,
             "ranking_artifact":ranking,**SAFE}
 
 
