@@ -1,7 +1,7 @@
 """Coordinator consumes admitted pool registry and existing 2-6-leg executor."""
 import unittest
 from unittest.mock import patch
-from arb.atomic_graph_coordinator import coordinate_registered_cycle_offline, registered_cycles_for_coordinator
+from arb.atomic_graph_coordinator import coordinate_registered_cycle_offline, registered_cycles_for_coordinator, run_registered_cycle_batch_offline
 
 VENUES=("orca","raydium_cpmm","meteora_damm_v2","pumpswap","meteora_dlmm","raydium_clmm")
 
@@ -27,6 +27,48 @@ def run(n,**changes):
         observe=lambda *a:{"signed_offline_observed":True,"output_base_units":1234})
 
 class CoordinatorRegistryTests(unittest.TestCase):
+    @patch("arb.atomic_graph_coordinator.coordinate_registered_cycle_offline")
+    def test_batch_uses_registered_graph_and_explicit_preparation(self,execute):
+        registry,_,states,evidence,accounts=case(3)
+        candidates=registered_cycles_for_coordinator(registry,max_cycles=2)["routes"]
+        self.assertEqual(len(candidates),2)
+        first=candidates[0]
+        key=tuple((leg["venue"],leg["pool"],leg["input"],leg["output"])
+                  for leg in first["legs"])
+        prepared={key:{"states":states,"evidence":evidence,"owner":"owner",
+                       "token_accounts":accounts,"initial_amount":1000,
+                       "signer":"signer","negative_instructions":lambda i,a:i}}
+        execute.return_value={"signed_receipt":{"status":"SIGNED_N_LEG_ATOMIC_AND_ROLLBACK_VERIFIED"},
+                              "signed_atomic_simulation_verified":True}
+        result=run_registered_cycle_batch_offline(
+            "http://127.0.0.1:8899",registry,prepared,max_cycles=2)
+        self.assertEqual(result["candidate_count"],2)
+        self.assertEqual(result["prepared_routes"],1)
+        self.assertEqual(result["signed_atomic_verified_routes"],1)
+        self.assertEqual(result["routes"][1]["status"],"NOT_PREPARED_FOR_SIGNED_EXECUTION")
+        self.assertFalse(result["actionable"])
+        self.assertEqual(execute.call_count,1)
+
+    @patch("arb.atomic_graph_coordinator.coordinate_registered_cycle_offline")
+    def test_batch_route_failure_does_not_promote_or_stop_other_routes(self,execute):
+        registry,_,states,evidence,accounts=case(3)
+        paths=registered_cycles_for_coordinator(registry,max_cycles=2)["routes"]
+        config={"states":states,"evidence":evidence,"owner":"owner",
+                "token_accounts":accounts,"initial_amount":1000,
+                "signer":"signer","negative_instructions":lambda i,a:i}
+        prepared={tuple((leg["venue"],leg["pool"],leg["input"],leg["output"])
+                        for leg in path["legs"]):dict(config) for path in paths}
+        execute.side_effect=[ValueError("signed CPI failed"),
+            {"signed_receipt":{"status":"ROLLBACK_UNVERIFIED"},
+             "signed_atomic_simulation_verified":False}]
+        result=run_registered_cycle_batch_offline(
+            "http://127.0.0.1:8899",registry,prepared,max_cycles=2)
+        self.assertEqual(result["prepared_routes"],2)
+        self.assertEqual(result["signed_atomic_verified_routes"],0)
+        self.assertEqual(result["routes"][0]["status"],"SIGNED_COORDINATOR_ROUTE_REJECTED")
+        self.assertEqual(result["routes"][1]["status"],"ROLLBACK_UNVERIFIED")
+        self.assertFalse(result["broadcast"])
+
     def test_registered_graph_enumeration_reuses_existing_cycle_finder(self):
         registry,route,states,evidence,accounts=case(3)
         found=registered_cycles_for_coordinator(registry)
