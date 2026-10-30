@@ -139,6 +139,28 @@ class SixVenuePipelineTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError,"inventory"):
                     offline_research("http://127.0.0.1:8899",src,dst)
             (src/"summary.json").write_text(original_summary)
+            preflight_path=src/"six-venue-source-cycle-preflight.json"
+            frozen_preflight=preflight_path.read_bytes()
+            preflight_path.write_text('{"forged":true}')
+            with patch.dict(os.environ,{"SURFPOOL_EXPLICITLY_OFFLINE":"1"}):
+                with self.assertRaisesRegex(ValueError,"source cycle preflight digest"):
+                    offline_research("http://127.0.0.1:8899",src,dst)
+            preflight_path.write_bytes(frozen_preflight)
+            manifest_path=src/"six-venue-handoff.json"
+            original_manifest=manifest_path.read_text()
+            unsafe=json.loads(frozen_preflight)
+            unsafe["coordinator_eligible_routes"]=1
+            preflight_path.write_text(json.dumps(unsafe))
+            manifest=json.loads(original_manifest)
+            import hashlib
+            manifest["source_cycle_preflight_sha256"]=hashlib.sha256(
+                preflight_path.read_bytes()).hexdigest()
+            manifest_path.write_text(json.dumps(manifest))
+            with patch.dict(os.environ,{"SURFPOOL_EXPLICITLY_OFFLINE":"1"}):
+                with self.assertRaisesRegex(ValueError,"not fail-closed"):
+                    offline_research("http://127.0.0.1:8899",src,dst)
+            preflight_path.write_bytes(frozen_preflight)
+            manifest_path.write_text(original_manifest)
             (src/"triangle-00.json").write_text('{"tampered":true}')
             with patch.dict(os.environ,{"SURFPOOL_EXPLICITLY_OFFLINE":"1"}):
                 with self.assertRaisesRegex(ValueError,"digest"):
