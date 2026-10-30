@@ -176,6 +176,26 @@ class SixVenuePipelineTests(unittest.TestCase):
                     offline_research("http://127.0.0.1:8899",src,dst)
             preflight_path.write_bytes(frozen_preflight)
             manifest_path.write_text(original_manifest)
+            continuity_path=src/"six-venue-quote-continuity.json"
+            frozen_continuity=continuity_path.read_bytes()
+            continuity_path.write_text('{"tampered":true}')
+            with patch.dict(os.environ,{"SURFPOOL_EXPLICITLY_OFFLINE":"1"}):
+                with self.assertRaisesRegex(ValueError,"source quote continuity digest"):
+                    offline_research("http://127.0.0.1:8899",src,dst)
+            continuity_path.write_bytes(frozen_continuity)
+            unsafe_continuity=json.loads(frozen_continuity)
+            unsafe_continuity["current_native_sdk_parity_verified"]=True
+            continuity_path.write_text(json.dumps(unsafe_continuity))
+            original_manifest=manifest_path.read_text()
+            manifest=json.loads(original_manifest)
+            manifest["source_quote_continuity_sha256"]=hashlib.sha256(
+                continuity_path.read_bytes()).hexdigest()
+            manifest_path.write_text(json.dumps(manifest))
+            with patch.dict(os.environ,{"SURFPOOL_EXPLICITLY_OFFLINE":"1"}):
+                with self.assertRaisesRegex(ValueError,"falsely approved pricing"):
+                    offline_research("http://127.0.0.1:8899",src,dst)
+            continuity_path.write_bytes(frozen_continuity)
+            manifest_path.write_text(original_manifest)
             (src/"triangle-00.json").write_text('{"tampered":true}')
             with patch.dict(os.environ,{"SURFPOOL_EXPLICITLY_OFFLINE":"1"}):
                 with self.assertRaisesRegex(ValueError,"digest"):
