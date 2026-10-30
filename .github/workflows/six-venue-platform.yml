@@ -9,6 +9,8 @@ on:
       - "tests/test_six_venue_registry_eligibility.py"
       - "arb/six_venue_cycle_eligibility.py"
       - "tests/test_six_venue_cycle_eligibility.py"
+      - "arb/six_venue_route_economics.py"
+      - "tests/test_six_venue_route_economics.py"
   workflow_dispatch:
 concurrency:
   group: six-venue-platform-${{ github.event.pull_request.head.ref || github.ref_name }}
@@ -31,6 +33,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_six_venue_registry_eligibility.py -v
       - name: Reject unsigned 2-6 leg cycles before coordinator compilation
         run: python3 -m unittest discover -s tests -p test_six_venue_cycle_eligibility.py -v
+      - name: Verify exact 2-6 leg cost-accounting boundaries
+        run: python3 -m unittest discover -s tests -p test_six_venue_route_economics.py -v
       - name: Assert all six venues are fixed and no DBC/AMM-v4 sneaks into the platform
         run: |
           python3 - <<'PY'
