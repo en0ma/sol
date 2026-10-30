@@ -746,3 +746,64 @@ def rank_registered_cycle_candidates(registry,initial_amount,quote_leg,*,max_cyc
             "gross_positive_candidates":sum(x["gross_delta_base_units"]>0 for x in ranked),
             "net_profitability_verified":False,
             "actionable":False,"live_execution_approved":False,"broadcast":False}
+
+
+def coordinate_ranked_registered_cycles_offline(rpc,registry,initial_amount,
+                                                quote_leg,prepared,*,max_cycles=12):
+    """Run existing venue quotes -> ranked registered routes -> signed atomics.
+
+    The quote callback uses each venue's ALREADY-IMPLEMENTED native price.
+    Offline preparations must be supplied explicitly for exact user SPL
+    accounts, signer and negative control; no synthetic admission occurs.
+    Signed receipts, not indicative gross quotes, determine verification.
+    """
+    local_rpc_only(rpc)
+    if not isinstance(prepared,dict) or type(max_cycles)is not int or not 1<=max_cycles<=50:
+        raise ValueError("bounded signed ranked coordinator preparation required")
+    ranking=rank_registered_cycle_candidates(
+        registry,initial_amount,quote_leg,max_cycles=max_cycles)
+    attempts=[]
+    for item in ranking["ranked"]:
+        route=item["route"]
+        identity=tuple((leg["venue"],leg["pool"],leg["input"],leg["output"])
+                       for leg in route["legs"])
+        config=prepared.get(identity)
+        if not isinstance(config,dict):
+            attempts.append({"index":item["index"],
+                             "status":"NOT_PREPARED_FOR_SIGNED_EXECUTION",
+                             "signed_atomic_simulation_verified":False})
+            continue
+        required=("states","evidence","owner","token_accounts",
+                  "signer","negative_instructions")
+        if any(k not in config for k in required):
+            attempts.append({"index":item["index"],
+                             "status":"MISSING_SIGNED_ROUTE_PREPARATION",
+                             "signed_atomic_simulation_verified":False})
+            continue
+        try:
+            result=coordinate_registered_cycle_offline(
+                rpc,registry,route,config["states"],config["evidence"],
+                config["owner"],config["token_accounts"],initial_amount,
+                config["signer"],
+                negative_instructions=config["negative_instructions"],
+                observe=config.get("observe"))
+            receipt=result["signed_receipt"]
+            attempts.append({"index":item["index"],
+                             "status":receipt.get("status","UNVERIFIED"),
+                             "signed_atomic_simulation_verified":
+                                 result["signed_atomic_simulation_verified"],
+                             "signed_receipt":receipt})
+        except (ValueError,KeyError,TypeError) as exc:
+            attempts.append({"index":item["index"],
+                             "status":"SIGNED_COORDINATOR_ROUTE_REJECTED",
+                             "reason":str(exc)[:200],
+                             "signed_atomic_simulation_verified":False})
+    return {"status":"REGISTERED_NATIVE_RANKED_SIGNED_COORDINATOR_OFFLINE",
+            "candidate_count":ranking["candidate_count"],
+            "price_quoted_candidates":len(ranking["ranked"]),
+            "price_blocked_candidates":len(ranking["blocked"]),
+            "ranked_attempts":attempts,
+            "signed_atomic_verified_routes":sum(
+                x["signed_atomic_simulation_verified"] for x in attempts),
+            "net_profitability_verified":False,
+            "actionable":False,"live_execution_approved":False,"broadcast":False}
