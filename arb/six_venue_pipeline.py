@@ -88,6 +88,15 @@ def report_signed_source_cycle_preflight(registry, readiness, graph):
         readiness.get("source")!="READ_ONLY_MAINNET_BACKED_SURFPOOL" or
         any(readiness.get(k) is not False for k in SAFE)):
         raise ValueError("same source authenticated graph required")
+    # A caller cannot pair a legitimate source inventory with a forged or
+    # stale graph. Regenerate the bounded topology from these exact source
+    # identities and compare its complete route inventory.
+    expected=authenticated_graph(readiness,max_cycles=len(graph.get("routes",[])) or 1)
+    if (graph.get("source_pool_count")!=expected["source_pool_count"] or
+        graph.get("venue_pool_counts")!=expected["venue_pool_counts"] or
+        graph.get("routes")!=expected["routes"] or
+        graph.get("cycle_inventory_truncated")!=expected["cycle_inventory_truncated"]):
+        raise ValueError("source graph is not bound to authenticated source inventory")
     signed=screen_signed_provenance(registry)
     approved={(p["venue"],p["address"]):p for p in signed["candidates"]}
     rows=[]
