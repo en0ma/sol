@@ -111,9 +111,22 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     for name in ("source","sdk","output"):
         p.add_argument("--"+name,required=True)
+    p.add_argument("--allow-mismatch-research",action="store_true")
     args=p.parse_args()
-    result=calculate(json.loads(Path(args.source).read_text()),
-                     json.loads(Path(args.sdk).read_text()))
+    try:
+        result=calculate(json.loads(Path(args.source).read_text()),
+                         json.loads(Path(args.sdk).read_text()))
+    except ValueError as exc:
+        if not args.allow_mismatch_research or not str(exc).startswith(
+                "DLMM NATIVE_INTEGER_SDK_MISMATCH "):
+            raise
+        # No source/SDK/native parity claim or signed admission. This option
+        # exists solely for exploratory PR jobs when current variable-fee
+        # state differs from the independently implemented integer model.
+        result={"venue":"meteora_dlmm",
+                "status":"DLMM_SOURCE_NATIVE_SDK_MISMATCH_BLOCKED",
+                "verified_pools":0,"native_pricing_verified":False,
+                "reason":str(exc)[:250],**SAFE}
     Path(args.output).write_text(json.dumps(result,indent=2)+"\n")
     print(json.dumps({"status":result["status"],"verified_pools":result["verified_pools"]}))
 
