@@ -1,7 +1,7 @@
 """Coordinator consumes admitted pool registry and existing 2-6-leg executor."""
 import unittest
 from unittest.mock import patch
-from arb.atomic_graph_coordinator import coordinate_registered_cycle_offline, registered_cycles_for_coordinator, run_registered_cycle_batch_offline
+from arb.atomic_graph_coordinator import coordinate_registered_cycle_offline, registered_cycles_for_coordinator, run_registered_cycle_batch_offline, rank_registered_cycle_candidates
 
 VENUES=("orca","raydium_cpmm","meteora_damm_v2","pumpswap","meteora_dlmm","raydium_clmm")
 
@@ -27,6 +27,38 @@ def run(n,**changes):
         observe=lambda *a:{"signed_offline_observed":True,"output_base_units":1234})
 
 class CoordinatorRegistryTests(unittest.TestCase):
+    def test_native_quote_callback_propagates_exact_amounts_between_legs(self):
+        registry,_,_,_,_=case(3)
+        called=[]
+        def native(venue,pool,a,b,amount):
+            called.append((venue,pool,a,b,amount))
+            return {"source_verified":True,"source_slot":225,
+                    "output_base_units":amount+7}
+        ranking=rank_registered_cycle_candidates(
+            registry,1000,native,max_cycles=2)
+        self.assertEqual(len(ranking["ranked"]),2)
+        self.assertEqual(len(called),6)
+        for row in ranking["ranked"]:
+            self.assertEqual(row["final_amount_base_units"],1021)
+            self.assertEqual(row["gross_delta_base_units"],21)
+            self.assertEqual([x["input_base_units"] for x in row["quoted_legs"]],
+                             [1000,1007,1014])
+            self.assertFalse(row["signed_simulation_verified"])
+        self.assertFalse(ranking["net_profitability_verified"])
+        self.assertFalse(ranking["broadcast"])
+
+    def test_native_quote_unverified_or_float_result_is_blocked(self):
+        registry,_,_,_,_=case(2)
+        for result in ({"output_base_units":1010,"source_slot":1},
+                       {"output_base_units":1010.5,"source_slot":1,"source_verified":True},
+                       1010):
+            with self.subTest(result=result):
+                report=rank_registered_cycle_candidates(
+                    registry,1000,lambda *args:result,max_cycles=1)
+                self.assertEqual(len(report["ranked"]),0)
+                self.assertEqual(len(report["blocked"]),1)
+                self.assertFalse(report["actionable"])
+
     @patch("arb.atomic_graph_coordinator.coordinate_registered_cycle_offline")
     def test_batch_uses_registered_graph_and_explicit_preparation(self,execute):
         registry,_,states,evidence,accounts=case(3)
