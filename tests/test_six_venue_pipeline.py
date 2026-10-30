@@ -59,6 +59,12 @@ class SixVenuePipelineTests(unittest.TestCase):
         graph=authenticated_graph(source)
         report=report_signed_source_cycle_preflight(
             {"pools":[accepted,other]},source,graph)
+        tampered={**graph,"routes":[{**graph["routes"][0],
+            "legs":[{**graph["routes"][0]["legs"][0],"pool":"FORGED"},
+                    *graph["routes"][0]["legs"][1:]]},*graph["routes"][1:]]}
+        with self.assertRaisesRegex(ValueError,"not bound"):
+            report_signed_source_cycle_preflight(
+                {"pools":[accepted,other]},source,tampered)
         self.assertGreater(report["source_identity_routes"],0)
         self.assertEqual(report["coordinator_eligible_routes"],0)
         self.assertFalse(report["actionable"])
