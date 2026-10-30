@@ -1,7 +1,7 @@
 """Coordinator consumes admitted pool registry and existing 2-6-leg executor."""
 import unittest
 from unittest.mock import patch
-from arb.atomic_graph_coordinator import coordinate_registered_cycle_offline
+from arb.atomic_graph_coordinator import coordinate_registered_cycle_offline, registered_cycles_for_coordinator
 
 VENUES=("orca","raydium_cpmm","meteora_damm_v2","pumpswap","meteora_dlmm","raydium_clmm")
 
@@ -27,6 +27,26 @@ def run(n,**changes):
         observe=lambda *a:{"signed_offline_observed":True,"output_base_units":1234})
 
 class CoordinatorRegistryTests(unittest.TestCase):
+    def test_registered_graph_enumeration_reuses_existing_cycle_finder(self):
+        registry,route,states,evidence,accounts=case(3)
+        found=registered_cycles_for_coordinator(registry)
+        self.assertGreater(found["candidate_count"],0)
+        self.assertTrue(any(r["hops"]==3 for r in found["routes"]))
+        self.assertFalse(found["actionable"])
+        for path in found["routes"]:
+            self.assertLessEqual(path["hops"],6)
+            self.assertGreaterEqual(path["hops"],2)
+            self.assertFalse(path["signed_simulation_verified"])
+        scoped={"pools":registry["pools"]+[
+            {"venue":"meteora_dbc","address":"exploratory","mints":["T0","T1"]}]}
+        self.assertEqual(registered_cycles_for_coordinator(scoped)["routes"],found["routes"])
+
+    def test_registered_graph_rejects_duplicate_admitted_pool(self):
+        registry,_,_,_,_=case(3)
+        registry["pools"].append(dict(registry["pools"][0]))
+        with self.assertRaisesRegex(ValueError,"duplicate"):
+            registered_cycles_for_coordinator(registry)
+
     @patch("arb.atomic_graph_coordinator.simulate_adaptive_n_leg_offline")
     def test_all_two_to_six_lengths_dispatch_existing_signed_coordinator(self,sim):
         sim.return_value={"signed_atomic_simulation_verified":True,
