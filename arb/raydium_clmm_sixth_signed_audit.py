@@ -117,7 +117,9 @@ def audit(tick_source,sdk,signed):
                 or roles[8]!=TOKEN_PROGRAM or
                 roles[11]!=entry.get("input_mint")
                 or roles[12]!=entry.get("output_mint")
-                or roles[13:]!=ref.get("remaining_tick_arrays")):
+                or roles[13:]!=([captured["tick_capture"]["bitmap_extension"]["address"]] + ref.get("remaining_tick_arrays")
+                    if captured["tick_capture"].get("bitmap_extension",{}).get("present") is True
+                    else ref.get("remaining_tick_arrays"))):
                 raise ValueError("CLMM signed pool, mint, authority or tick path mismatch")
             data=bytes(ix.data)
             if (len(data)!=41 or data[:8]!=DISC
