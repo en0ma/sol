@@ -196,6 +196,20 @@ class SixVenuePipelineTests(unittest.TestCase):
                     offline_research("http://127.0.0.1:8899",src,dst)
             continuity_path.write_bytes(frozen_continuity)
             manifest_path.write_text(original_manifest)
+            # Even coordinated rewriting of the continuity JSON and its
+            # manifest SHA cannot change the original source-ranked arithmetic.
+            altered_continuity=json.loads(frozen_continuity)
+            altered_continuity["routes"][0]["gross_start_mint_base_units"]+=1
+            continuity_path.write_text(json.dumps(altered_continuity))
+            manifest=json.loads(original_manifest)
+            manifest["source_quote_continuity_sha256"]=hashlib.sha256(
+                continuity_path.read_bytes()).hexdigest()
+            manifest_path.write_text(json.dumps(manifest))
+            with patch.dict(os.environ,{"SURFPOOL_EXPLICITLY_OFFLINE":"1"}):
+                with self.assertRaisesRegex(ValueError,"does not match original"):
+                    offline_research("http://127.0.0.1:8899",src,dst)
+            continuity_path.write_bytes(frozen_continuity)
+            manifest_path.write_text(original_manifest)
             (src/"triangle-00.json").write_text('{"tampered":true}')
             with patch.dict(os.environ,{"SURFPOOL_EXPLICITLY_OFFLINE":"1"}):
                 with self.assertRaisesRegex(ValueError,"digest"):
