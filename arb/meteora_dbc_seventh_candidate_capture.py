@@ -106,6 +106,7 @@ def main():
     ap.add_argument("--hint-limit",type=int,default=24)
     ap.add_argument("--pages",type=int,default=4)
     ap.add_argument("--sdk-screen",action="store_true")
+    ap.add_argument("--allow-incomplete-research",action="store_true")
     ap.add_argument("--output",required=True)
     a=ap.parse_args()
     validator=None
@@ -113,7 +114,7 @@ def main():
         from arb.meteora_dbc_six_source_qualification import validate_official_sdk_candidate
         validator=validate_official_sdk_candidate
     report=run(a.rpc,count=a.count,hint_limit=a.hint_limit,pages=a.pages,
-               candidate_validator=validator)
+               strict=not a.allow_incomplete_research,candidate_validator=validator)
     Path(a.output).write_text(json.dumps(report,indent=2)+"\n")
     print(json.dumps({"status":report["status"],
                       "authenticated":report["authenticated"],
