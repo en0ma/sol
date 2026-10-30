@@ -40,6 +40,8 @@ def select(rpc,registry,hints,*,required=6):
                 except ValueError as exc:
                     if "state changed across tick-array read" not in str(exc):raise
             else:raise ValueError("CLMM changing price could not synchronize")
+            from arb.raydium_clmm_bitmap_extension_source import attach_authenticated_bitmap
+            ticks=attach_authenticated_bitmap(rpc,address,ticks)
             # Derive two native-executable *size-aware* trials for each mint
             # without assuming a nine-decimal token can trade profitably at
             # 10k raw units. Require bounded single-tick exact-in and output
