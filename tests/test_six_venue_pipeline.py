@@ -87,10 +87,25 @@ class SixVenuePipelineTests(unittest.TestCase):
                  "route_mints":["a","b","c","a"],
                  "route_pool_addresses":["p1","p2","p3"],
                  "state_accounts_observed_slot":123}
+        def quoted(index,outputs):
+            gross=outputs[-1]-1000
+            return {"index":index,"status":"GROSS_INDICATIVE_ONLY",
+                    "start_mint":"a","input_base_units":1000,
+                    "output_base_units":outputs[-1],
+                    "gross_delta_start_mint_base_units":gross,
+                    "positive_gross":gross>0,
+                    "net_profitability_confirmed":False,
+                    "quotes":[{"venue":venue,"pool":pool,
+                               "input_mint":mint_in,"output_mint":mint_out,
+                               "amount_out":out,"source_slot":123}
+                              for venue,pool,mint_in,mint_out,out in zip(
+                                  fixture["route_venues"],fixture["route_pool_addresses"],
+                                  fixture["route_mints"][:-1],fixture["route_mints"][1:],outputs)],
+                    "actionable":False,"live_execution_approved":False,"broadcast":False}
         ranked={"status":"GROSS_SOURCE_BOUND_RANKING_ONLY",
                 "fully_quoted":2,"blocked":0,"positive_gross":1,
-                "ranked":[{"index":0,"positive_gross":True,"actionable":False},
-                          {"index":1,"positive_gross":False,"actionable":False}]}
+                "ranked":[quoted(0,[1100,1200,1300]),quoted(1,[950,900,850])],
+                "actionable":False,"live_execution_approved":False,"broadcast":False}
         signed={"attempted":1,"independent_signed_accepted":1,
                 "observed_venue_quote_exact_matches":3,
                 "routes":[{"index":7,"independent_signed_accepted":True,
