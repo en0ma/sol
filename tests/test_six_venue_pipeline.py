@@ -118,6 +118,29 @@ class SixVenuePipelineTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"inconsistent"):
             assess_signed_batch({**batch,"routes":[{**row,"actionable":True}]},[3])
 
+    def test_signed_economics_rejects_inconsistent_integer_evidence(self):
+        base={"index":1,"independent_signed_accepted":True,
+              "actionable":False,"broadcast":False,
+              "gross_start_mint_delta":1200,
+              "break_even_total_cost_budget_start_mint_base_units":1200,
+              "observed_compute_units":100000}
+        def batch(row):
+            return {"attempted":1,"independent_signed_accepted":1,"routes":[row]}
+        valid=assess_signed_batch(batch(base),[1])
+        self.assertEqual(valid["gross_ranked_signed_research"][0][
+            "maximum_affordable_total_cost_start_mint_base_units"],1200)
+        for changes in (
+            {"gross_start_mint_delta":1200.5},
+            {"gross_start_mint_delta":True},
+            {"break_even_total_cost_budget_start_mint_base_units":1201},
+            {"break_even_total_cost_budget_start_mint_base_units":-1},
+            {"observed_compute_units":0},
+            {"observed_compute_units":1400001},
+            {"observed_compute_units":True}):
+            with self.subTest(changes=changes):
+                with self.assertRaisesRegex(ValueError,"signed gross"):
+                    assess_signed_batch(batch({**base,**changes}),[1])
+
     def test_gross_loss_quoted_route_is_diagnostic_only(self):
         quote={"status":"GROSS_SOURCE_BOUND_RANKING_ONLY",
                "fully_quoted":1,"blocked":0,"positive_gross":0,
