@@ -85,6 +85,29 @@ class CoordinatorRegistryTests(unittest.TestCase):
                 self.assertIsNone(observed_registered_signed_cycle_economics(
                     route,{**positive,**change})["gross_start_mint_base_units"])
 
+    @patch("arb.atomic_graph_coordinator.simulate_adaptive_n_leg_offline")
+    def test_registered_coordinator_exposes_only_real_signed_spl_gross(self,sim):
+        reg,route,states,evidence,accounts=case(3)
+        sim.return_value={
+            "status":"SIGNED_N_LEG_ATOMIC_AND_ROLLBACK_VERIFIED",
+            "signed_atomic_simulation_verified":True,
+            "signed_cpi_per_leg_verified":True,
+            "rollback_failure_case_verified":True,
+            "signed_packet_crypto_bound":True,
+            "initial_balances_base_units":[1000,0,0,0],
+            "positive_post_balances_base_units":[0,0,0,1125],
+            "planned_inputs":[1000,1050,1100],
+            "actionable":False,"live_execution_approved":False,"broadcast":False}
+        outcome=coordinate_registered_cycle_offline(
+            "http://127.0.0.1:8899",reg,route,states,evidence,
+            "owner",accounts,1000,"signer",
+            negative_instructions=lambda instructions,amounts:instructions)
+        economics=outcome["observed_signed_economics"]
+        self.assertEqual(economics["gross_start_mint_base_units"],125)
+        self.assertIsNone(economics["net_start_mint_base_units"])
+        self.assertFalse(outcome["coordinator_live_eligible"])
+        self.assertFalse(outcome["broadcast"])
+
     def test_signed_route_gross_loss_cannot_be_approved_by_fee_accounting(self):
         _,route,_,_,_=case(2)
         receipt={"status":"SIGNED_N_LEG_ATOMIC_AND_ROLLBACK_VERIFIED",
