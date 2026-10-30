@@ -626,3 +626,66 @@ def registered_cycles_for_coordinator(registry, *, max_cycles=200):
             "candidate_count":min(max_cycles,len(generated)),
             "truncated":len(generated)>max_cycles,
             "actionable":False,"live_execution_approved":False,"broadcast":False}
+
+
+def run_registered_cycle_batch_offline(rpc,registry,prepared,*,max_cycles=12):
+    """Bounded registry -> existing graph -> signed coordinator dispatch.
+
+    prepared is indexed by the exact canonical (venue,pool,input,output)
+    sequence. Each entry supplies signer, local initial SPL accounts, signed
+    negative-control builder and already authenticated builder states.
+    No fabricated instruction inputs, implicit signer, price refresh or send.
+    Different candidate failures remain individually visible.
+    """
+    local_rpc_only(rpc)
+    if (not isinstance(prepared,dict) or type(max_cycles)is not int
+        or not 1<=max_cycles<=50):
+        raise ValueError("bounded explicit coordinator preparation required")
+    inventory=registered_cycles_for_coordinator(registry,max_cycles=max_cycles)
+    rows=[]
+    for index,candidate in enumerate(inventory["routes"]):
+        legs=candidate["legs"]
+        identity=tuple((leg["venue"],leg["pool"],leg["input"],leg["output"])
+                       for leg in legs)
+        config=prepared.get(identity)
+        if config is None:
+            rows.append({"index":index,"status":"NOT_PREPARED_FOR_SIGNED_EXECUTION",
+                         "legs":len(legs),"signed_atomic_simulation_verified":False})
+            continue
+        if not isinstance(config,dict):
+            rows.append({"index":index,"status":"MALFORMED_SIGNED_ROUTE_PREPARATION",
+                         "legs":len(legs),"signed_atomic_simulation_verified":False})
+            continue
+        required=("states","evidence","owner","token_accounts",
+                  "initial_amount","signer","negative_instructions")
+        if any(key not in config for key in required):
+            rows.append({"index":index,"status":"MISSING_SIGNED_ROUTE_PREPARATION",
+                         "legs":len(legs),"signed_atomic_simulation_verified":False})
+            continue
+        try:
+            receipt=coordinate_registered_cycle_offline(
+                rpc,registry,candidate,config["states"],config["evidence"],
+                config["owner"],config["token_accounts"],
+                config["initial_amount"],config["signer"],
+                negative_instructions=config["negative_instructions"],
+                observe=config.get("observe"))
+        except (ValueError,KeyError,TypeError) as exc:
+            rows.append({"index":index,"status":"SIGNED_COORDINATOR_ROUTE_REJECTED",
+                         "legs":len(legs),"reason":str(exc)[:200],
+                         "signed_atomic_simulation_verified":False})
+            continue
+        rows.append({"index":index,"status":receipt["signed_receipt"].get("status","UNVERIFIED"),
+                     "legs":len(legs),
+                     "signed_atomic_simulation_verified":
+                         receipt["signed_atomic_simulation_verified"],
+                     "signed_receipt":receipt["signed_receipt"]})
+    return {"status":"REGISTERED_SIX_VENUE_SIGNED_BATCH_OFFLINE_ONLY",
+            "candidate_count":inventory["candidate_count"],
+            "inventory_truncated":inventory["truncated"],
+            "prepared_routes":sum(row["status"] not in
+                ("NOT_PREPARED_FOR_SIGNED_EXECUTION","MALFORMED_SIGNED_ROUTE_PREPARATION",
+                 "MISSING_SIGNED_ROUTE_PREPARATION") for row in rows),
+            "signed_atomic_verified_routes":sum(
+                row["signed_atomic_simulation_verified"] for row in rows),
+            "routes":rows,"actionable":False,
+            "live_execution_approved":False,"broadcast":False}
