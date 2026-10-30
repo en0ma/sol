@@ -573,8 +573,11 @@ def coordinate_registered_cycle_offline(rpc,registry,route,states,evidence,owner
     receipt=simulate_adaptive_n_leg_offline(
         rpc,legs,tokens,states,evidence,owner,list(token_accounts),
         initial_amount,observe,signer,negative_instructions=negative_instructions)
+    observed=observed_registered_signed_cycle_economics(
+        {"start_mint":tokens[0],"legs":legs},receipt)
     return {"status":"REGISTERED_SIX_VENUE_COORDINATOR_OFFLINE_RESULT",
             "route_legs":len(legs),"route_venues":[r["venue"] for r in legs],
+            "observed_signed_economics":observed,
             "signed_receipt":receipt,
             "signed_atomic_simulation_verified":
                 receipt.get("signed_atomic_simulation_verified") is True,
@@ -807,3 +810,52 @@ def coordinate_ranked_registered_cycles_offline(rpc,registry,initial_amount,
                 x["signed_atomic_simulation_verified"] for x in attempts),
             "net_profitability_verified":False,
             "actionable":False,"live_execution_approved":False,"broadcast":False}
+
+
+def observed_registered_signed_cycle_economics(route, receipt):
+    """Derive gross start-mint result from the existing signed SPL receipt.
+
+    Full multi-leg CPI, positive SPL and negative rollback are checked by the
+    existing signed simulator. This arithmetic view does not accept quoted
+    output as executed output and never invents SOL-to-start-mint fees.
+    """
+    base={"status":"SIGNED_ROUTE_ECONOMICS_NOT_VERIFIED",
+          "gross_start_mint_base_units":None,"break_even_total_cost_base_units":None,
+          "net_start_mint_base_units":None,"net_profitability_verified":False,
+          "actionable":False,"live_execution_approved":False,"broadcast":False}
+    if not isinstance(route,dict) or not isinstance(receipt,dict):
+        return base
+    legs=route.get("legs")
+    if not isinstance(legs,list) or not 2<=len(legs)<=6:
+        return base
+    n=len(legs)
+    before=receipt.get("initial_balances_base_units")
+    after=receipt.get("positive_post_balances_base_units")
+    amounts=receipt.get("planned_inputs")
+    if (receipt.get("status")!="SIGNED_N_LEG_ATOMIC_AND_ROLLBACK_VERIFIED"
+        or receipt.get("signed_atomic_simulation_verified") is not True
+        or receipt.get("signed_cpi_per_leg_verified") is not True
+        or receipt.get("rollback_failure_case_verified") is not True
+        or receipt.get("signed_packet_crypto_bound") is not True
+        or not isinstance(before,list) or len(before)!=n+1
+        or not isinstance(after,list) or len(after)!=n+1
+        or not isinstance(amounts,list) or len(amounts)!=n
+        or any(type(v)is not int or v<0 or v>=2**64
+               for v in before+after)
+        or any(type(v)is not int or not 0<v<2**64 for v in amounts)
+        or before[0]-after[0]!=amounts[0]
+        or any(after[i]!=before[i] for i in range(1,n))
+        or after[-1]<=before[-1]
+        or any(receipt.get(k) is not False for k in
+               ("actionable","live_execution_approved","broadcast"))):
+        return base
+    # Initial and terminal user SPL accounts are distinct, but their mint is
+    # identical on a closed route, hence raw base units are comparable.
+    gross=(after[-1]-before[-1])-amounts[0]
+    return {**base,"status":"SIGNED_ROUTE_GROSS_ONLY_NETWORK_COST_UNKNOWN",
+            "gross_start_mint_base_units":gross,
+            "break_even_total_cost_base_units":max(0,gross),
+            "signed_spl_poststate_verified":True,
+            "signed_cpi_per_leg_verified":True,
+            "rollback_control_verified":True,
+            "net_start_mint_base_units":None}
