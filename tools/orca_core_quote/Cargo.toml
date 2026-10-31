@@ -1,0 +1,9 @@
+[package]
+name = "sol-orca-native-reference"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+orca_whirlpools_core = "=2.1.1"
+serde_json = "1.0"

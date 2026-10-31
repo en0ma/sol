@@ -1,0 +1,91 @@
+name: Seven-Venue Connected Registry Evidence
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/connected-registry-evidence.yml"
+      - "arb/connected_pool_discovery.py"
+      - "arb/registry_pair_reconciliation.py"
+      - "arb/chain_token_pair_labels.py"
+      - "arb/onchain_pool_discovery.py"
+      - "arb/pool_registry.json"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: connected-registry-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  authenticated-shared-pairs:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      SURFPOOL_DATASOURCE_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
+      SOLANA_RPC_MIN_INTERVAL_SECONDS: "0.5"
+      SOLANA_RPC_ALCHEMY_FREE_TIER: "1"
+      SOLANA_RPC_PACING_FILE: /tmp/connected-registry-pacing
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the read-only Surfpool source fork and Solana client types
+        run: |
+          test -n "$SURFPOOL_DATASOURCE_RPC_URL"
+          bash ci/install_surfpool.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Launch upstream-backed fork for authentic owner/vault/metadata reads
+        run: |
+          nohup "$HOME/.local/bin/surfpool" start --ci --rpc-url "$SURFPOOL_DATASOURCE_RPC_URL" --no-deploy > "$RUNNER_TEMP/registry-source.log" 2>&1 < /dev/null &
+          echo $! > "$RUNNER_TEMP/registry-source.pid"
+          python3 - <<'PY'
+          import time
+          from arb.rpc import call
+          for _ in range(80):
+              try:
+                  assert call("http://127.0.0.1:8899","getLatestBlockhash")["value"]["blockhash"]
+                  break
+              except (OSError,ValueError,RuntimeError,KeyError):
+                  time.sleep(1)
+          else:
+              raise SystemExit("source fork unavailable; refusing unverified pool admission")
+          PY
+      - name: Reauthenticate registered mints and expand connected real-pair pool candidates
+        run: |
+          set +e
+          python3 -m arb.connected_pool_discovery \
+            --rpc http://127.0.0.1:8899 \
+            --registry arb/pool_registry.json \
+            --max-pairs 18 --min-per-venue 20 \
+            --output "$RUNNER_TEMP/connected-registry-evidence.json" \
+            --clean-registry "$RUNNER_TEMP/source-verified-connected-registry.json"
+          result=$?
+          set -e
+          if [ "$result" -eq 2 ]; then
+            echo "Seven-venue 20-connected-pools-each requirement **NOT YET MET**. See exact evidence and deficits in artifact." >> "$GITHUB_STEP_SUMMARY"
+          elif [ "$result" -ne 0 ]; then
+            exit "$result"
+          else
+            echo "Seven venues have at least 20 independently authenticated, connected pools each." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          test -s "$RUNNER_TEMP/connected-registry-evidence.json"
+          test -s "$RUNNER_TEMP/source-verified-connected-registry.json"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          data=json.loads((Path(os.environ["RUNNER_TEMP"])/"connected-registry-evidence.json").read_text())
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a") as fp:
+              fp.write("| Venue | Verified pools | Both mints linked | Closed 2-6 hop pools | Still needed |\n")
+              fp.write("|---|---:|---:|---:|---:|\n")
+              for venue,counts in sorted(data["venue_coverage"].items()):
+                  fp.write(f"| {venue} | {counts['authenticated']} | {counts['cross_venue_mint_connected']} | {counts['closed_cross_venue_cycle_pools']} | {counts['missing_to_target']} |\n")
+              fp.write("\nPool/account attestation is read-only and does not verify executable pricing or net profit.\n")
+          PY
+      - name: Upload actual verified pools and unresolved source evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: seven-venue-connected-real-pool-coverage
+          path: |
+            ${{ runner.temp }}/connected-registry-evidence.json
+            ${{ runner.temp }}/source-verified-connected-registry.json
+            ${{ runner.temp }}/registry-source.log
+          if-no-files-found: warn

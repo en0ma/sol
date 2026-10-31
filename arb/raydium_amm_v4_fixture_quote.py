@@ -1,0 +1,65 @@
+"""Manifest-backed AMM v4 indicative exact-input quote path.
+
+Reuses pool-native fee, SPL vault balances, and OpenOrders/PnL net reserve
+derivation. Inputs are read from a single captured contextual inventory.
+Outputs are *indicative* until compared against signed isolated simulations.
+"""
+from arb.raydium_amm_v4_fee_state import derive_v4,quote_native_fraction
+from arb.authenticated_quote_provider import from_snapshot
+SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
+def quote_from_fixture(fixture,*,pool,input_mint,amount_in,observed_unix):
+    if type(observed_unix)is not int or observed_unix<0:
+        raise ValueError("observation timestamp required")
+    report=derive_v4(fixture)
+    matching=[r for r in report["pricing"] if r["address"]==pool]
+    if len(matching)!=1:
+        raise ValueError("AMM v4 pool not in authenticated captured fixture")
+    row=matching[0]
+    a,b=row["mints"]
+    if input_mint not in (a,b):
+        raise ValueError("quote input mint mismatch")
+    if type(amount_in)is not int or not 0<amount_in<2**64:
+        raise ValueError("valid exact input amount required")
+    # The quote adapter checks both directions, effective reserves, fee,
+    # and market account authentication before computing any output.
+    if not (row.get("market_accounts_authenticated") is True
+            and row.get("effective_reserves_authenticated") is True
+            and row.get("native_fraction_fee_authenticated") is True):
+        raise ValueError("AMM v4 native fee and adjusted reserves not authenticated")
+    native=quote_native_fraction(row["effective_reserves_base_units"],row["mints"],
+        input_mint,amount_in,row["native_fee_numerator"],row["native_fee_denominator"])
+    leg={"venue":"raydium_amm_v4","pool":pool,
+        "input_mint":input_mint,"output_mint":b if input_mint==a else a}
+    quoted={"venue":"raydium_amm_v4","pool":pool,
+        "input_mint":input_mint,"output_mint":leg["output_mint"],
+        "amount_in":amount_in,"amount_out":native["amount_out"],
+        "snapshot_slot":row["slot"],"observed_unix":observed_unix,
+        "quote_model":"AMM_V4_NATIVE_FRACTION_ADJUSTED_RESERVE_INDICATIVE",
+        "protocol_exact_quote_verified":False}
+    # Retain an independently computed ppm-model cross-check whenever
+    # the chain fraction is exactly representable in the existing provider.
+    if row["trade_fee_authenticated"] is True:
+        record={"venue":"raydium_amm_v4","address":pool,"mints":row["mints"],
+            "slot":row["slot"],"observed_unix":observed_unix,
+            "source_authenticated":True,"verified":True,
+            "account_owner_verified":True,
+            "snapshot_origin":"READ_ONLY_MAINNET_BACKED_SURFPOOL",
+            "base_mint":a,"quote_mint":b,
+            "trade_fee_ppm":row["trade_fee_ppm"],
+            "trade_fee_authenticated":row["trade_fee_authenticated"],
+            "market_accounts_authenticated":row["market_accounts_authenticated"],
+            "effective_reserves_authenticated":row["effective_reserves_authenticated"],
+            "effective_reserves_base_units":row["effective_reserves_base_units"]}
+        provider,registry=from_snapshot([record],now=observed_unix)
+        if registry["pool_count"]!=1:
+            raise ValueError("AMM v4 source snapshot rejected")
+        previous=provider(leg,amount_in)
+        quoted["legacy_ppm_model_amount_out"]=previous["amount_out"]
+        quoted["legacy_ppm_model_difference_base_units"]=native["amount_out"]-previous["amount_out"]
+    return {"status":"AMM_V4_ACCOUNT_DERIVED_INDICATIVE_QUOTE",
+        "quote":quoted,"snapshot_slot":row["slot"],
+        "native_fee_fraction_reference":native,
+        "integer_fee_rounding_quote_interval_base_units":
+            native["fee_rounding_output_interval_base_units"],
+        "signed_swap_accuracy_verified":False,
+        "source_rpc_provenance_independently_attested":False,**SAFE}

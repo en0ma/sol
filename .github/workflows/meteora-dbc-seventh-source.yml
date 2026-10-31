@@ -1,0 +1,38 @@
+name: Seventh Venue Meteora DBC Source Authentication
+on:
+  pull_request:
+    paths:
+      - "arb/meteora_dbc_seventh_venue_source.py"
+      - "tests/test_meteora_dbc_seventh_source.py"
+      - ".github/workflows/meteora-dbc-seventh-source.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  dbc-source:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SOLANA_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
+      SOLANA_RPC_MIN_INTERVAL_SECONDS: "0.5"
+      SOLANA_RPC_ALCHEMY_FREE_TIER: "1"
+      SOLANA_RPC_PACING_FILE: /tmp/dbc-seventh-source-pacing
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned BPF account dependency
+        run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Run fail-closed explicit identity regression tests
+        run: python3 -m unittest discover -s tests -p 'test_meteora_dbc_seventh_source.py'
+      - name: Authenticate mainnet DBC program ELF and bounded program-owned VirtualPool accounts
+        run: |
+          test -n "$SOLANA_RPC_URL"
+          python3 -m arb.meteora_dbc_seventh_venue_source \
+            --rpc "$SOLANA_RPC_URL" --count 3 \
+            --output "$RUNNER_TEMP/dbc-seventh-source.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: meteora-dbc-seventh-authenticated-source
+          path: ${{ runner.temp }}/dbc-seventh-source.json
+          if-no-files-found: warn

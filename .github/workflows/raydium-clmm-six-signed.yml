@@ -1,0 +1,125 @@
+name: Raydium CLMM Six Additional Genuine Signed Pools
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "arb/raydium_clmm_six_signed_source.py"
+      - "arb/raydium_clmm_bitmap_extension_source.py"
+      - "arb/raydium_clmm_sixth_signed_fork.py"
+      - "arb/raydium_clmm_sixth_signed_audit.py"
+      - "tests/test_raydium_clmm_bitmap_extension_source.py"
+      - ".github/workflows/raydium-clmm-six-signed.yml"
+permissions:
+  contents: read
+concurrency:
+  group: clmm-six-signed-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  six-genuine-signed-clmm:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 105
+    env:
+      SOLANA_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
+      SOLANA_RPC_MIN_INTERVAL_SECONDS: "0.5"
+      SOLANA_RPC_ALCHEMY_FREE_TIER: "1"
+      SOLANA_RPC_PACING_FILE: /tmp/clmm-six-signed-rpc
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned official SDK and on-chain decoder
+        run: |
+          test -n "$SOLANA_RPC_URL"
+          python3 -m pip install --disable-pip-version-check solders==0.26.0
+          npm install --no-save --package-lock=false @raydium-io/raydium-sdk-v2@0.2.75-alpha
+      - name: Fail-closed bitmap extension source and account-order regressions
+        run: python3 -m unittest discover -s tests -p test_raydium_clmm_bitmap_extension_source.py -v
+      - name: Discover many real CLMM pool identities, not synthetic pools
+        run: |
+          python3 -m arb.raydium_clmm_six_additional_discovery \
+            --registry arb/pool_registry.json --minimum 6 --limit 100 \
+            --output "$RUNNER_TEMP/clmm-six-hints.json"
+      - name: Require six unique onchain synchronized quote-eligible CLMM pools
+        run: |
+          python3 -m arb.raydium_clmm_six_signed_source \
+            --rpc "$SOLANA_RPC_URL" --registry arb/pool_registry.json \
+            --hints "$RUNNER_TEMP/clmm-six-hints.json" --required 6 \
+            --output "$RUNNER_TEMP/clmm-six-ticks.json"
+      - name: Compute all 24 native integer single-tick quote candidates
+        run: |
+          python3 -m arb.raydium_clmm_native_single_tick \
+            --tick-source "$RUNNER_TEMP/clmm-six-ticks.json" \
+            --output "$RUNNER_TEMP/clmm-six-native.json"
+      - name: Independently select six official-SDK-exact among real source-native candidates
+        run: |
+          node tools/raydium_clmm_six_official_sdk_screen.js \
+            "$RUNNER_TEMP/clmm-six-ticks.json" \
+            "$RUNNER_TEMP/clmm-six-native.json" \
+            "$RUNNER_TEMP/clmm-six-sdk.json" \
+            "$RUNNER_TEMP/clmm-six-screened-ticks.json" \
+            "$RUNNER_TEMP/clmm-six-screened-native.json" \
+            "$RUNNER_TEMP/clmm-six-screen-rejections.json"
+      - name: Install isolated Surfpool
+        run: |
+          bash ci/install_surfpool.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - name: Start offline fork for 24 genuine signed swap_v2 simulations
+        run: |
+          nohup surfpool start --ci --offline --no-deploy > "$RUNNER_TEMP/clmm-six-surfpool.log" 2>&1 < /dev/null &
+          python3 - <<'PY'
+          import time,json,urllib.request
+          for _ in range(90):
+              try:
+                  req=urllib.request.Request("http://127.0.0.1:8899",
+                      data=json.dumps({"jsonrpc":"2.0","id":1,
+                        "method":"getHealth","params":[]}).encode(),
+                      headers={"Content-Type":"application/json"})
+                  with urllib.request.urlopen(req,timeout=2) as r:
+                      if json.load(r).get("result")=="ok":break
+              except (OSError,ValueError):pass
+              time.sleep(1)
+          else:raise SystemExit("six-CLMM offline Surfpool failed startup")
+          PY
+      - name: Require genuine distinct signed 4 x 6 CLMM SDK/native/SPL results
+        run: |
+          python3 -m arb.raydium_clmm_sixth_signed_fork \
+            --source-rpc "$SOLANA_RPC_URL" \
+            --surfpool-rpc http://127.0.0.1:8899 \
+            --tick-source "$RUNNER_TEMP/clmm-six-screened-ticks.json" \
+            --native "$RUNNER_TEMP/clmm-six-screened-native.json" \
+            --sdk "$RUNNER_TEMP/clmm-six-sdk.json" \
+            --output "$RUNNER_TEMP/clmm-six-signed.json"
+      - name: Independently inspect cryptographic signatures and 24 raw SPL post-states
+        run: |
+          python3 -m arb.raydium_clmm_sixth_signed_audit \
+            --tick-source "$RUNNER_TEMP/clmm-six-screened-ticks.json" \
+            --sdk "$RUNNER_TEMP/clmm-six-sdk.json" \
+            --signed "$RUNNER_TEMP/clmm-six-signed.json" \
+            --output "$RUNNER_TEMP/clmm-six-independent-audit.json"
+      - name: Create signed-qualified existing registry artifact, not auto-broadcast
+        run: |
+          python3 -m arb.raydium_clmm_signed_registry_merge \
+            --registry arb/pool_registry.json \
+            --tick-source "$RUNNER_TEMP/clmm-six-screened-ticks.json" \
+            --sdk "$RUNNER_TEMP/clmm-six-sdk.json" \
+            --signed "$RUNNER_TEMP/clmm-six-signed.json" \
+            --output "$RUNNER_TEMP/clmm-seven-pool-registry.json" \
+            --report "$RUNNER_TEMP/clmm-six-promotion-report.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: raydium-clmm-six-additional-genuine-signed
+          path: |
+            ${{ runner.temp }}/clmm-six-hints.json
+            ${{ runner.temp }}/clmm-six-ticks.json
+            ${{ runner.temp }}/clmm-six-native.json
+            ${{ runner.temp }}/clmm-six-screened-ticks.json
+            ${{ runner.temp }}/clmm-six-screened-native.json
+            ${{ runner.temp }}/clmm-six-screen-rejections.json
+            ${{ runner.temp }}/clmm-six-sdk.json
+            ${{ runner.temp }}/clmm-six-signed.json
+            ${{ runner.temp }}/clmm-six-independent-audit.json
+            ${{ runner.temp }}/clmm-seven-pool-registry.json
+            ${{ runner.temp }}/clmm-six-promotion-report.json
+            ${{ runner.temp }}/clmm-six-surfpool.log
+          if-no-files-found: warn

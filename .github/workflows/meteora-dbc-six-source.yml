@@ -1,0 +1,138 @@
+name: Meteora DBC Six-Pool Source Acceptance Research
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/meteora-dbc-six-source.yml"
+      - "arb/meteora_dbc_six_source_qualification.py"
+      - "arb/meteora_dbc_seventh_recent_tx_discovery.py"
+      - "arb/meteora_dbc_seventh_candidate_capture.py"
+      - "tests/test_meteora_dbc_six_source_qualification.py"
+      - "arb/meteora_dbc_native_segment.py"
+      - "tests/test_meteora_dbc_native_segment.py"
+      - "tests/test_meteora_dbc_real_curve_vectors.py"
+      - "tools/meteora_dbc_official_sdk_oracle.js"
+      - "arb/meteora_dbc_native_curve_audit.py"
+      - "arb/meteora_dbc_native_curve_walk.py"
+      - "tests/test_meteora_dbc_two_point_real_vectors.py"
+      - "arb/meteora_dbc_native_fee.py"
+      - "arb/meteora_dbc_native_fee_parity.py"
+      - "tests/test_meteora_dbc_native_fee.py"
+      - "arb/meteora_dbc_swap.py"
+      - "tests/test_meteora_dbc_swap.py"
+  workflow_dispatch:
+concurrency:
+  group: dbc-six-source-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+  actions: read
+jobs:
+  six-source-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Enforce six distinct audited original source identities
+        run: |
+          python3 -m unittest discover -s tests -p 'test_meteora_dbc_six_source_qualification.py' -v
+          python3 -m unittest discover -s tests -p 'test_meteora_dbc_seventh_recent_tx_discovery.py' -v
+          python3 -m unittest discover -s tests -p 'test_meteora_dbc_native_segment.py' -v
+          python3 -m unittest discover -s tests -p 'test_meteora_dbc_real_curve_vectors.py' -v
+          python3 -m unittest discover -s tests -p 'test_meteora_dbc_two_point_real_vectors.py' -v
+          python3 -m unittest discover -s tests -p 'test_meteora_dbc_native_fee.py' -v
+          python3 -m unittest discover -s tests -p 'test_meteora_dbc_swap.py' -v
+          python3 -m py_compile arb/meteora_dbc_six_source_qualification.py
+  six-original-source:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' }}
+    needs: six-source-regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      SOLANA_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
+      SOLANA_RPC_MIN_INTERVAL_SECONDS: "0.5"
+      SOLANA_RPC_ALCHEMY_FREE_TIER: "1"
+      SOLANA_RPC_PACING_FILE: /tmp/dbc-six-source-pacing
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Install pinned original DBC reference SDK
+        run: npm install --no-save --ignore-scripts --prefix "$RUNNER_TEMP/dbc-sdk" @meteora-ag/dynamic-bonding-curve-sdk@2.0.0
+      # PR regression is deterministic: use six genuine previously captured
+      # on-chain originals. Live pool launches rapidly migrate or drain.
+      # Manual dispatch preserves the strict current-mainnet discovery gate.
+      - name: Fetch immutable six-original historical regression evidence
+        if: github.event_name == 'pull_request'
+        uses: actions/download-artifact@v4
+        with:
+          name: dbc-six-original-source-only
+          run-id: 40951036061
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/dbc-historical-six
+      - name: Independently reaudit historical source account bytes
+        if: github.event_name == 'pull_request'
+        run: |
+          cp "$RUNNER_TEMP/dbc-historical-six/dbc-six-original-source.json" "$RUNNER_TEMP/dbc-six-original-source.json"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          from arb.meteora_dbc_seventh_source_audit import independently_audit
+          report=json.loads((Path(os.environ["RUNNER_TEMP"])/"dbc-six-original-source.json").read_text())
+          assert report["status"]=="SIX_DBC_ORIGINAL_SOURCE_POOLS_ONLY"
+          assert report["authenticated_source_pools"]==6
+          source=report["source"]
+          assert len(source["source_pools"])==6
+          assert len({p["pool"] for p in source["source_pools"]})==6
+          fresh=independently_audit(source)
+          assert fresh["authenticated_source_pools"]==6
+          print("Six genuine historical source snapshots independently reaudited; NOT current live liquidity")
+          PY
+      - name: Authenticate six fresh original pools (manual live research)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          NODE_PATH: ${{ runner.temp }}/dbc-sdk/node_modules
+        run: |
+          test -n "$SOLANA_RPC_URL"
+          python3 -m arb.meteora_dbc_six_source_qualification \
+            --rpc "$SOLANA_RPC_URL" --pages 12 \
+            --output "$RUNNER_TEMP/dbc-six-original-source.json"
+      - name: Require four SDK quotes on each of six independently sourced pools
+        env:
+          NODE_PATH: ${{ runner.temp }}/dbc-sdk/node_modules
+        run: |
+          node tools/meteora_dbc_official_sdk_oracle.js \
+            "$RUNNER_TEMP/dbc-six-original-source.json" \
+            "$RUNNER_TEMP/dbc-six-official-sdk-quotes.json"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          result=json.loads((Path(os.environ["RUNNER_TEMP"])/"dbc-six-official-sdk-quotes.json").read_text())
+          pools=result["pools"]
+          if len(pools)!=6 or len({p["pool"] for p in pools})!=6:
+              raise SystemExit("Six distinct SDK-quoted DBC original pools required")
+          if any(len(p["trials"])!=4 for p in pools):
+              raise SystemExit("Each genuine DBC source requires four SDK quote candidates")
+          print("Independent original sources with SDK quotes:",len(pools),"trials:",sum(len(p["trials"]) for p in pools))
+          PY
+      - name: Independently reconcile 24 original Q64 curves against pinned SDK
+        run: |
+          python3 -m arb.meteora_dbc_native_curve_audit \
+            --source "$RUNNER_TEMP/dbc-six-original-source.json" \
+            --sdk "$RUNNER_TEMP/dbc-six-official-sdk-quotes.json" \
+            --output "$RUNNER_TEMP/dbc-six-native-curve-only-audit.json"
+      - name: Independently require original Q64 fee/curve SDK parity for 24 quotes
+        run: |
+          python3 -m arb.meteora_dbc_native_fee_parity \
+            --source "$RUNNER_TEMP/dbc-six-original-source.json" \
+            --sdk "$RUNNER_TEMP/dbc-six-official-sdk-quotes.json" \
+            --output "$RUNNER_TEMP/dbc-six-independent-native-fee-parity.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dbc-six-original-source-only
+          path: |
+            ${{ runner.temp }}/dbc-six-original-source.json
+            ${{ runner.temp }}/dbc-six-official-sdk-quotes.json
+            ${{ runner.temp }}/dbc-six-native-curve-only-audit.json
+            ${{ runner.temp }}/dbc-six-independent-native-fee-parity.json
+          if-no-files-found: warn

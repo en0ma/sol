@@ -1,0 +1,131 @@
+name: PumpSwap Fourth-Venue Signed Parity Research
+
+on:
+  pull_request:
+    paths:
+      - "arb/pumpswap_*.py"
+      - "tools/pumpswap_sdk_oracle.js"
+      - ".github/workflows/pumpswap-fourth-venue-source.yml"
+  workflow_dispatch:
+    inputs:
+      pool_count:
+        description: "Distinct PumpSwap pools to fully authenticate, quote, sign and audit (1–7)"
+        required: false
+        default: "7"
+
+concurrency:
+  group: pumpswap-real-signed-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  signed-isolated-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 100
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    env:
+      SOLANA_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
+      POOL_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.pool_count || '1' }}
+      SOLANA_RPC_MIN_INTERVAL_SECONDS: "0.5"
+      SOLANA_RPC_ALCHEMY_FREE_TIER: "1"
+      SOLANA_RPC_PACING_FILE: /tmp/pumpswap-fourth-rpc-pacing
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require read-only upstream RPC
+        run: test -n "$SOLANA_RPC_URL"
+      - name: Install account decoder dependency
+        run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Authenticate and capture existing PumpSwap source pools
+        run: |
+          set -euo pipefail
+          [[ "$POOL_COUNT" =~ ^[1-7]$ ]] || { echo "::error::pool_count must be 1 to 7"; exit 1; }
+          python3 -m arb.pumpswap_native_source_capture \
+            --rpc "$SOLANA_RPC_URL" \
+            --registry arb/pool_registry.json \
+            --limit "$POOL_COUNT" \
+            --require-quote-candidates \
+            --output "$RUNNER_TEMP/pumpswap-native-source.json"
+      - name: Install pinned official PumpSwap SDK for independent candidate comparison
+        run: npm install --no-save --package-lock=false @pump-fun/pump-swap-sdk@2.2.0
+      - name: Independently compare captured native candidates to published SDK
+        run: |
+          node tools/pumpswap_sdk_oracle.js \
+            "$RUNNER_TEMP/pumpswap-native-source.json" \
+            "$RUNNER_TEMP/pumpswap-official-sdk-comparison.json"
+      - name: Independently audit four SDK candidate comparisons per pool
+        run: |
+          python3 -m arb.pumpswap_sdk_candidate_audit \
+            "$RUNNER_TEMP/pumpswap-native-source.json" \
+            "$RUNNER_TEMP/pumpswap-official-sdk-comparison.json" \
+            "$RUNNER_TEMP/pumpswap-sdk-candidate-audit.json"
+      - name: Install Surfpool for isolated signed V2 execution
+        run: |
+          set -euo pipefail
+          bash ci/install_surfpool.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - name: Launch fully offline Surfpool
+        run: |
+          set -euo pipefail
+          nohup surfpool start --ci --offline --no-deploy > "$RUNNER_TEMP/pumpswap-surfpool.log" 2>&1 < /dev/null &
+          echo $! > "$RUNNER_TEMP/pumpswap-surfpool.pid"
+          python3 - <<'PY'
+          import json,time,urllib.request
+          url="http://127.0.0.1:8899"
+          for _ in range(90):
+              try:
+                  req=urllib.request.Request(url,data=json.dumps({
+                      "jsonrpc":"2.0","id":1,"method":"getHealth","params":[]}).encode(),
+                      headers={"Content-Type":"application/json"})
+                  with urllib.request.urlopen(req,timeout=2) as r:
+                      result=json.load(r)
+                  if result.get("result")=="ok":break
+              except (OSError,ValueError): pass
+              time.sleep(1)
+          else:
+              raise SystemExit("offline PumpSwap Surfpool failed to start")
+          PY
+      - name: Generate and execute four signed V2 swaps for each captured pool
+        run: |
+          set -euo pipefail
+          python3 -m arb.pumpswap_v2_dedicated_signed_fork \
+            --source-rpc "$SOLANA_RPC_URL" \
+            --surfpool-rpc "http://127.0.0.1:8899" \
+            --source-report "$RUNNER_TEMP/pumpswap-native-source.json" \
+            --sdk-report "$RUNNER_TEMP/pumpswap-official-sdk-comparison.json" \
+            --pool-count "$POOL_COUNT" \
+            --output "$RUNNER_TEMP/pumpswap-dedicated-signed-result.json"
+      - name: Independently audit signed instruction signatures and observed raw SPL deltas
+        run: |
+          python3 -m arb.pumpswap_signed_receipt_audit \
+            --source "$RUNNER_TEMP/pumpswap-native-source.json" \
+            --sdk "$RUNNER_TEMP/pumpswap-official-sdk-comparison.json" \
+            --signed "$RUNNER_TEMP/pumpswap-dedicated-signed-result.json" \
+            --output "$RUNNER_TEMP/pumpswap-independent-signed-audit.json"
+      - name: Require six NEW signed PumpSwap pool proofs and export verified registry
+        if: ${{ env.POOL_COUNT == '7' }}
+        run: |
+          python3 -m arb.pumpswap_signed_registry_merge \
+            --registry arb/pool_registry.json \
+            --source "$RUNNER_TEMP/pumpswap-native-source.json" \
+            --sdk "$RUNNER_TEMP/pumpswap-official-sdk-comparison.json" \
+            --signed "$RUNNER_TEMP/pumpswap-dedicated-signed-result.json" \
+            --additional 6 \
+            --output "$RUNNER_TEMP/pumpswap-seven-pool-signed-registry.json" \
+            --report "$RUNNER_TEMP/pumpswap-six-added-proof.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pumpswap-authenticated-source-research
+          path: |
+            ${{ runner.temp }}/pumpswap-native-source.json
+            ${{ runner.temp }}/pumpswap-official-sdk-comparison.json
+            ${{ runner.temp }}/pumpswap-sdk-candidate-audit.json
+            ${{ runner.temp }}/pumpswap-dedicated-signed-result.json
+            ${{ runner.temp }}/pumpswap-independent-signed-audit.json
+            ${{ runner.temp }}/pumpswap-seven-pool-signed-registry.json
+            ${{ runner.temp }}/pumpswap-six-added-proof.json
+            ${{ runner.temp }}/pumpswap-surfpool.log
+          if-no-files-found: warn

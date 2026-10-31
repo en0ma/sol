@@ -1,0 +1,94 @@
+# Sol — Agent operating instructions
+
+## PRIMARY DIRECTIVE — INTEGRATED ENGINEERING EXECUTION (user directive, 2026-10-27)
+
+**On every "Proceed", read this entire AGENTS.md, the active milestone ledger and roadmap, inspect current branch HEAD and CI, then implement the broadest coherent production batch across the COMPLETE seven-venue M5 milestone.** This policy applies to every future engineering prompt, not only requests explicitly mentioning the agent file. Do not treat a single decoder, standalone test, or improved blocker report as completion of an engineering batch.
+
+### Mandatory simultaneous workstreams
+
+1. **Native pricing across all incomplete venues:** advance Meteora DLMM bin traversal and effective dynamic fees; Meteora DAMM v2 native fee scheduler, fee collection and curve calculations; PumpSwap market-cap tier, effective fee mode, accrued liabilities and reserves; Orca Whirlpool and Raydium CLMM cross-tick handling; and Raydium CPMM/AMM v4 source-fee and reserve reconciliation. Identify and work on multiple actionable gaps in the same batch rather than selecting the easiest venue and deferring the others.
+2. **Authenticated end-to-end 2–6-hop economics:** integrate those exact venue-owned quote adapters with existing authenticated graph routes and single-slot source fixtures, propagate exact-input integer amounts, account for transaction/priority costs in the starting mint when verifiable, and rank only genuinely evidenced candidates.
+3. **Independently verified offline Surfpool execution:** reuse the existing generic 2–6-leg route compiler and signed simulator; build genuine source-bound signed atomic attempts with intermediate SPL/CPI accounting, negative controls, rollback validation and durable receipts. Do not equate a quote or a signed fixture with independent atomic acceptance.
+
+**Develop all three workstreams within one coherent batch** to the extent real evidence and dependencies permit. Inspect signatures, production callers, existing tests and source artifacts before writing new code. Reuse established engines; avoid separate duplicate quote coordinators or report-only alternatives.
+
+### Implementation-first acceptance
+
+**Commit implementations rather than documenting blockers.** When a missing decoder, algorithm, source-account integration, fee calculation, routing link or signed execution path is known, implement that production functionality and wire it into the existing pipeline before describing remaining limitations. A new TODO, blocker ledger, diagnostic wrapper, test alone, document, or green CI run does NOT count as substantive milestone delivery.
+
+Implement authoritative protocol behavior where supported; validate real on-chain layouts, rounding, dynamic fees, vault identity and simulation evidence. If an exact protocol behavior cannot be independently established, fail closed, make substantive progress on independently implementable workstreams, and report the precise remaining verification dependency. **Do not guess protocols, synthesize source accounts, inflate success claims, or mark indicative outputs executable.**
+
+### Mandatory scope and push discipline
+
+Target **three meaningful milestone-scoped implementation commits, at least 1,000 newly written or substantively rewritten production source-code lines per milestone commit**, and one coherent push after integration/tests when feasible. Exclude tests, documentation, generated material, comments, whitespace, copied code, filler and diagnostics-only changes from qualifying lines. Do not pad code to reach numerical targets. Report actual eligible line deltas, rather than claiming this target without measuring. A batch below the threshold must be marked incomplete; urgency/safety or explicitly requested policy-only commits may be exceptions, clearly disclosed.
+
+**Do not stop and push after the first workstream.** Complete the available native-pricing, multihop, and signed-verification implementations together, add adversarial and real-source regressions, and inspect both current-HEAD GitHub Actions jobs and actual evidence artifacts. One green workflow, three commits, or one fixed decoder does not satisfy the objective.
+
+### Non-negotiable safety and delivery evidence
+
+This is strictly research and isolated signing/simulation only. Never broadcast swaps or enable live trading; always keep `actionable=false`, `broadcast=false`, and `live_execution_approved=false`. No invented pools, fees, profits, protocol-exact quotes, signed success or rollback receipts.
+
+At each completed engineering response report: (1) user-facing production behavior actually implemented for **each** of the three workstreams; (2) measured qualifying production source-code lines per commit; (3) integration and caller wiring; (4) genuine slot/pool/source and independent signed CPI/SPL/rollback evidence, or explicitly unverified; (5) pushed SHA and exact-SHA CI results; (6) remaining technical gaps. Separate implemented, mocked, source authenticated, quoted, signed simulated and independently accepted statuses.
+
+**Definition of success:** an operational source-authenticated seven-venue native-pricing, amount-aware multihop opportunity research, and independently audited signed offline Surfpool pipeline—not the creation of small commits, helper modules, or longer lists of blockers.
+
+Read this file, [docs/MILESTONE_EXECUTION_LEDGER.md](docs/MILESTONE_EXECUTION_LEDGER.md), and [docs/ROADMAP_AND_ARCHITECTURE.md](docs/ROADMAP_AND_ARCHITECTURE.md) before making changes. The roadmap is the durable record of user-agreed design directions and acceptance criteria. Update it whenever a design decision, target, or milestone changes.
+
+## PRIMARY DELIVERY MANDATE — M5 Working Seven-Venue Arbitrage Opportunity Discovery and Offline Verification (user priority, 2026-10-26)
+
+**Ship an operational end-to-end research pipeline before further isolated pricing perfection.** The outcome is current seven-venue pool discovery -> authenticated source-state registry -> connected multi-venue graph/closed candidate cycles -> venue-owned amount-aware quotes -> gross spread and separately accounted estimated costs -> ranked candidate opportunities -> isolated signed Surfpool simulation with CPI/SPL and rollback -> machine-readable evidence. Show detected candidates AND rejection/blocker counts; if no genuine candidates are found, report zero and why. No fabricated opportunities, returns, or exactness claims. Simulation only; execution remains disabled.
+
+**Mandatory audit BEFORE choosing work or writing code (every engineering batch):**
+1. Fetch current branch head, focused/non-v4 CI *jobs and failed steps*, AGENTS.md, ledger and roadmap. Inspect actual artifacts when available. Record what passed and failed at the current SHA.
+2. Map the existing implementation end-to-end: pool discovery (`arb/raydium_public_pool_discovery.py`, `arb/onchain_pool_discovery.py` and venue feeds); registry (`arb/market_state_registry.py`); routing (`arb/opportunity_graph.py`, `arb/atomic_graph_coordinator.py`); quote contracts/adapters (`arb/venue_quote_contract.py`, `arb/venue_quote_adapter.py` and venue code); candidate research (`arb/opportunity_research.py`, `arb/research_engine_pipeline.py`); signed runner/independent acceptance; and current CI. Read signatures, callers, tests, and existing wiring. Check capability claims against real code, not file existence.
+3. Produce a concise audit in the working record: **already wired / present but disconnected / missing / failing / unverified**, plus the single widest end-to-end acceptance gap. Select work by impact on real candidate discovery and verified simulation, not by ease of a standalone unit test.
+4. Reuse and connect existing engines; no duplicated quote coordinator, discovery loop, route compiler, pricing engine or report-only replacement. Preserve working behavior, agreed architecture and user decisions; request approval for redesign.
+
+**No narrow engineering pushes:** Do not push a lone small test fix, isolated fee formula, decoder tweak, cosmetic change, documentation-only progress note, or narrow CI patch and then declare meaningful engineering progress. Batch such repairs with a coherent vertical slice that advances the end-to-end M5 outcome. The standard engineering push contains **at least three substantive, logically distinct commits**, each covering meaningful implementation, integration and/or empirical acceptance—not artificial splitting—followed by relevant regression tests and CI inspection. Prefer one batched push to avoid repeated costly Surfpool runs. An explicitly requested operating-policy/documentation change may be committed by itself and must be described as policy only, never as delivered M5 functionality. Critical safety fixes may be shipped separately if necessary, with the exception called out.
+
+**Acceptance of M5 is evidence-based, not a count of commits:** a repeatable run using current discovered seven-venue inventory (report source slots and venue coverage), authentic pool/state binding, genuine graph candidates, comparable token-unit quotes with missing fees marked, ranked theoretical opportunities or explicit zero-result blockers, actual signed isolated Surfpool simulation attempts for eligible candidates, independent CPI/SPL/rollback outcomes, and persisted evidence/report with safe flags. Coverage gaps, absent RPC, and unsupported quote configurations must be visible rather than hidden by synthetic pass-throughs. Historical 42/42 signed pair and three-venue acceptance stays historical until fresh artifacts support new claims. Do not wait to perfect all seven quote models before wiring discovery; fail closed per unsupported route and continue with supported ones.
+
+**Reporting contract:** After each batch state (a) what functioning user-facing end-to-end capability advanced, (b) current actual discovered pools/candidates/validated attempts from artifacts—or explicitly not measured, (c) regression and current-head CI evidence, (d) largest remaining blocker. If a batch only repairs CI, say it is maintenance, not delivery of an arbitrage opportunity system. Never equate indicative spread with executable profit.
+
+## Mandatory three-milestone engineering batch (user directive, 2026-10-27)
+
+**Three commits are not three milestones.** For each ordinary "Proceed" batch, advance **three distinct M5 delivery milestones in parallel** in one coherent branch push: (1) genuine seven-venue source-native fee/bin/price decoding and amount-aware quote evidence; (2) authenticated 4–6-hop fixture capture, route chaining and starting-mint economic evaluation; (3) actual isolated signed Surfpool execution plus independent CPI/SPL/rollback evidence and strict CI. Each milestone needs implementation/integration, relevant regression tests and concrete artifacts or an explicit independently observed blocker; a single milestone split into three commits does not meet the directive. Prefer commits organized by milestone, but count outcomes, not commits. Inspect dependencies, batch fixes with these integrations, and push once after three meaningful slices where feasible.
+
+**User-required minimum implementation size (2026-10-27):** Plan three milestone-scoped implementation commits per ordinary engineering batch, **each with at least 1,000 newly written or substantively rewritten nonblank source-code lines** (excluding tests, generated files, documentation, fixture dumps, whitespace, duplicated code, and boilerplate). Report actual eligible source-line deltas per commit alongside functionality and tests. Do **not** pad, duplicate, or invent implementations to hit a numeric target; source-derived protocol correctness and signed evidence remain mandatory. If the available work cannot honestly satisfy this size threshold without padding, say explicitly that the batch is incomplete and do not claim three milestones were delivered. Small urgent bug/security fixes or explicitly requested policy-only commits may remain exceptions, identified as such. **A 1,000-line patch is never sufficient evidence of native quote correctness by itself.**
+
+**No false milestone completion:** if real RPC, native effective fees, eligible four-hop signatures or execution evidence is absent, land the substantive available integrations and label that milestone **advanced / blocked**, never **complete**. Track all three milestones separately in the roadmap/ledger and the user report; distinguish actual source-backed evidence from mocks, diagnostics and unit-only improvements. Do not bypass the original strict audit gate to satisfy the three-milestone target. Critical safety exceptions are permitted and must be identified.
+
+## Implementation-first mandate — user directive, 2026-10-27
+
+**Commit implementations rather than documenting blockers.** When a missing protocol decoder, dynamic-fee calculation, multihop pricing link, signed Surfpool runner, or independent rollback auditor is identified, prioritize writing and integrating the actual missing source implementation in the same engineering batch. Treat a diagnosis as the beginning of engineering work, not the deliverable. A blocker-only report, TODO, checklist, logging enhancement, test-only change, or extra diagnostic wrapper does **not** satisfy milestone advancement, even if CI is green.
+
+**Required execution:** inspect official protocol layouts/algorithms and existing repository code; implement source-derived behavior in the existing venue adapter and end-to-end pipeline; add adversarial and real-source regression tests; run relevant CI and inspect actual source/account/signed simulation evidence. Reuse existing modules rather than multiplying stand-alone reports. When the missing implementation is legitimately impossible with available data or access, identify the precise unverifiable dependency, land any substantive independent implementation progress possible, and disclose the remaining blocker without falsely claiming completion. Never invent protocol details, liquidity, effective fees, profit, signing acceptance, or broadcast authority to make a milestone appear delivered.
+
+**Priority over output volume:** The 1,000-substantive-lines-per-milestone-commit target is an engineering scope requirement, **not** permission to pad source code or replace implementations with documentation. If a batch cannot meet the requested volume and meaningful functional criteria, say it is incomplete. Report newly functioning behavior, genuine source receipts, and independently verified execution before commit counts, diagnostics, or line counts.
+
+## Non-negotiable safety boundary
+This project is **simulation and verification only**. Do not send, sign-and-broadcast, or submit live/mainnet swaps, connect funded execution wallets, enable automated trading, or claim trading approval. Local-fork transaction signing solely for `simulateTransaction` is permitted. Keep `actionable=false`, `live_execution_approved=false`, and `broadcast=false` in execution/evidence outputs. Any eventual live execution is a separate future project phase requiring explicit user authorization and controls.
+
+## Anti-circular-work mandate\n- Before implementing anything, check the milestone ledger: existing decoders, venue adapters, 42/42 historical two-leg atomic/rollback infrastructure and generic 2–6 compiler are already built. Do not recreate them.\n- Only work on an unchecked acceptance item. Update its checkbox when independently supported; link CI artifacts and do not confuse workflow-green with route-level evidence.\n- Reuse one adaptive route coordinator for 2–6 hops rather than adding separate hop-count or per-venue-pair engines.\n\n## Required working style
+- Make actual code/test/CI changes when asked to proceed; commit to the working branch and report SHA and evidence. Do not report intentions as accomplishments.
+- Distinguish **implemented**, **unit tested**, **on-chain authenticated**, **signed standalone simulated**, and **atomic execution verified**. A builder module or a green CI workflow does not prove successful execution.
+- Preserve and cite evidence artifacts, fork slot, pool/program IDs, ordered instructions, token balance deltas, failure/rollback checks, and CI run ID. Never fabricate a passing result or upgrade verification flags without proof.
+- Fail closed on missing accounts, stale API responses, mismatched program owners, unsupported layouts, RPC 429s, and unverified token/vault authority. Do not equate missing RPC evidence with venue absence.
+- Prefer **venue-wide public API/index pool enumeration**, no hardcoded token pair or static pool-only universe. Apply configurable liquidity screening, classify by venue program, and authenticate candidates independently on-chain in Surfpool. APIs are discovery hints, never security or execution evidence. Add RPC-native exhaustive discovery later when the user upgrades RPC.
+- Do not require a closed X→Y→X arbitrage cycle for the two-venue atomic acceptance test: X→Y on venue A then Y→Z on venue B is sufficient when token continuity and atomic execution are proved.
+- Test **both execution directions** for each active venue pair (7 venues = 21 unordered, 42 ordered). Begin testing ready pairs without waiting for all seven venues. Orca Token Swap v1 is deprecated and archived as optional legacy code; do not make it an execution acceptance gate or run its legacy discovery in active CI.
+
+## CI efficiency
+- Deliver coherent multi-file batches, test locally first, and push once per batch to avoid repeated expensive Surfpool CI and cancellation.
+- Keep deprecated Orca Token Swap v1 discovery out of mandatory CI while preserving its code and isolated tests.
+- Prioritize actual local-fork signed execution and atomic rollback artifacts over narrow harness-only changes.
+
+## Source of truth
+- Roadmap: `docs/ROADMAP_AND_ARCHITECTURE.md`
+- Active seven-venue target matrix: `arb/execution_target_matrix.py`
+- Fork evidence: `arb/eight_venue_onchain_probe.py` and GitHub Actions artifacts
+- Discovery: `arb/raydium_public_pool_discovery.py`, `arb/onchain_pool_discovery.py`
+- Capability registries may lag actual builder modules; reconcile before claiming coverage.
+
+## Before claiming a milestone
+Inspect the **actual CI step and JSON artifact**, not only the overall workflow conclusion. Check negative controls, explicit signed swap simulation success, pre/post token balances, intermediate token flow, instruction order and atomic rollback. Document what remains unverified.

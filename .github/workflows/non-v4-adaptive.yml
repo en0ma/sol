@@ -1,0 +1,116 @@
+name: Non-v4 Adaptive Signed Research
+on:
+  pull_request:
+  workflow_dispatch:
+concurrency:
+  group: adaptive-non-v4-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+  actions: read
+jobs:
+  authenticate-30:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      SOLANA_RPC_URL: http://127.0.0.1:8899
+      SURFPOOL_DATASOURCE_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
+      SOLANA_RPC_MIN_INTERVAL_SECONDS: "0.5"
+      SOLANA_RPC_ALCHEMY_FREE_TIER: "1"
+      SOLANA_RPC_PACING_FILE: /tmp/solana-rpc-non-v4
+    steps:
+      - uses: actions/checkout@v4
+      - run: test -n "$SURFPOOL_DATASOURCE_RPC_URL"
+      - run: |
+          bash ci/install_surfpool.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - run: |
+          nohup surfpool start --ci --rpc-url "$SURFPOOL_DATASOURCE_RPC_URL" --no-deploy > "$RUNNER_TEMP/source.log" 2>&1 < /dev/null &
+          python3 - <<'PY'
+          import time
+          from arb.rpc import call
+          for _ in range(60):
+              try:
+                  assert call("http://127.0.0.1:8899","getLatestBlockhash")["value"]["blockhash"]
+                  break
+              except Exception:time.sleep(2)
+          else:raise SystemExit("source RPC unavailable")
+          PY
+      - run: python3 -m arb.atomic_missing_venue_candidates --registry arb/pool_registry.json --output "$RUNNER_TEMP/venues.json"
+      - run: python3 -m arb.next_ten_fork_pool_probe --batch non-v4 --registry "$RUNNER_TEMP/venues.json" --output "$RUNNER_TEMP/readiness.json"
+      - run: python3 -m arb.next_ten_pair_fixture_export --batch non-v4 --readiness "$RUNNER_TEMP/readiness.json" --output-dir "$RUNNER_TEMP/non-v4-fixtures"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: non-v4-adaptive-source
+          path: |
+            ${{ runner.temp }}/non-v4-fixtures/
+            ${{ runner.temp }}/readiness.json
+          if-no-files-found: error
+  adaptive-signed-30:
+    needs: authenticate-30
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2]
+    env:
+      SOLANA_RPC_URL: http://127.0.0.1:8899
+      SURFPOOL_EXPLICITLY_OFFLINE: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          bash ci/install_surfpool.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - uses: actions/download-artifact@v4
+        with:
+          name: non-v4-adaptive-source
+          path: ${{ runner.temp }}
+      - run: |
+          nohup surfpool start --ci --offline > "$RUNNER_TEMP/offline.log" 2>&1 < /dev/null &
+          python3 - <<'PY'
+          import time
+          from arb.rpc import call
+          for _ in range(60):
+              try:
+                  assert call("http://127.0.0.1:8899","getLatestBlockhash")["value"]["blockhash"]
+                  break
+              except Exception:time.sleep(2)
+          else:raise SystemExit("offline RPC unavailable")
+          PY
+      - name: Execute adaptive signed and rollback trials across non-v4 pairs
+        run: |
+          python3 -m arb.next_ten_signed_atomic_offline --batch non-v4 --adaptive-all-venues --shard-count 3 --shard-index ${{ matrix.shard }} --fixture-dir "$RUNNER_TEMP/non-v4-fixtures" --output-dir "$RUNNER_TEMP/adaptive"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: non-v4-adaptive-signed-${{ matrix.shard }}
+          path: ${{ runner.temp }}/adaptive/
+          if-no-files-found: warn
+  audit-adaptive-30:
+    needs: [authenticate-30,adaptive-signed-30]
+    if: always() && needs.authenticate-30.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: non-v4-adaptive-signed-*
+          path: ${{ runner.temp }}/shards
+      - run: |
+          mkdir -p "$RUNNER_TEMP/merged"
+          for shard in 0 1 2; do cp -a "$RUNNER_TEMP/shards/non-v4-adaptive-signed-$shard/." "$RUNNER_TEMP/merged/"; done
+      - name: Independently assess all 30 adaptive signed routes (fail closed)
+        run: |
+          python3 -m arb.m5_all_venue_adaptive_acceptance --batch non-v4 --receipts "$RUNNER_TEMP/merged" --output "$RUNNER_TEMP/acceptance.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: non-v4-thirty-adaptive-acceptance
+          path: ${{ runner.temp }}/acceptance.json
+          if-no-files-found: warn

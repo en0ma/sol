@@ -1,0 +1,49 @@
+name: Raydium CLMM Six Additional Pool Discovery And Authentication
+on:
+  pull_request:
+    paths:
+      - "arb/raydium_clmm_six_additional_discovery.py"
+      - "arb/raydium_clmm_six_additional_capture.py"
+      - ".github/workflows/raydium-clmm-six-additional.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: clmm-additional-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  discover-authenticate:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SOLANA_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
+      SOLANA_RPC_MIN_INTERVAL_SECONDS: "0.5"
+      SOLANA_RPC_ALCHEMY_FREE_TIER: "1"
+      SOLANA_RPC_PACING_FILE: /tmp/clmm-six-pacing
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Solana decoder
+        run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Gather official Raydium API hints
+        run: |
+          python3 -m arb.raydium_clmm_six_additional_discovery \
+            --registry arb/pool_registry.json --minimum 6 --limit 100 \
+            --output "$RUNNER_TEMP/clmm-extra-hints.json"
+      - name: Authenticate pool accounts and mint identities independently on chain
+        run: |
+          test -n "$SOLANA_RPC_URL"
+          python3 -m arb.raydium_clmm_six_additional_capture \
+            --rpc "$SOLANA_RPC_URL" \
+            --registry arb/pool_registry.json \
+            --hints "$RUNNER_TEMP/clmm-extra-hints.json" \
+            --required 6 \
+            --output "$RUNNER_TEMP/clmm-extra-onchain.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: clmm-six-extra-authenticated-pool-research
+          path: |
+            ${{ runner.temp }}/clmm-extra-hints.json
+            ${{ runner.temp }}/clmm-extra-onchain.json
+          if-no-files-found: warn

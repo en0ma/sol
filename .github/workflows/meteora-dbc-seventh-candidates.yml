@@ -1,0 +1,134 @@
+name: Meteora DBC Seventh Venue Candidate Authentication
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/meteora-dbc-seventh-candidates.yml"
+      - "arb/meteora_dbc_seventh_discovery.py"
+      - "arb/meteora_dbc_seventh_recent_tx_discovery.py"
+      - "arb/meteora_dbc_seventh_candidate_capture.py"
+      - "arb/meteora_dbc_seventh_state_capture.py"
+      - "arb/meteora_dbc_seventh_source_audit.py"
+      - "tests/test_meteora_dbc_seventh_state_capture.py"
+      - "tests/test_meteora_dbc_seventh_source_audit.py"
+      - "tests/test_meteora_dbc_seventh_discovery.py"
+      - "tests/test_meteora_dbc_seventh_recent_tx_discovery.py"
+      - "tools/meteora_dbc_official_sdk_oracle.js"
+      - "arb/meteora_dbc_native_curve_audit.py"
+      - "arb/meteora_dbc_native_fee.py"
+      - "arb/meteora_dbc_native_fee_parity.py"
+      - "tests/test_meteora_dbc_native_fee.py"
+  workflow_dispatch:
+concurrency:
+  group: dbc-original-candidates-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+  actions: read
+jobs:
+  dbc-source-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Install pinned official reference SDK for API availability smoke test
+        run: npm install --no-save --ignore-scripts --prefix "$RUNNER_TEMP/dbc-sdk" @meteora-ag/dynamic-bonding-curve-sdk@2.0.0
+      - name: Smoke-test pinned official reference SDK exports
+        env:
+          NODE_PATH: ${{ runner.temp }}/dbc-sdk/node_modules
+        run: node -e 'const d=require("@meteora-ag/dynamic-bonding-curve-sdk"); if(typeof d.DynamicBondingCurveClient!=="function") process.exit(1)'
+      - name: Validate exact zero-copy account joins, mutation rejection and original source safety
+        run: |
+          python3 -m unittest discover -s tests -p test_meteora_dbc_seventh_source.py -v
+          python3 -m unittest discover -s tests -p test_meteora_dbc_seventh_discovery.py -v
+          python3 -m unittest discover -s tests -p test_meteora_dbc_seventh_recent_tx_discovery.py -v
+          python3 -m unittest discover -s tests -p test_meteora_dbc_seventh_state_capture.py -v
+          python3 -m unittest discover -s tests -p test_meteora_dbc_seventh_source_audit.py -v
+          python3 -m py_compile arb/meteora_dbc_seventh_discovery.py arb/meteora_dbc_seventh_candidate_capture.py
+          node --check tools/meteora_dbc_official_sdk_oracle.js
+          python3 -m unittest discover -s tests -p test_meteora_dbc_native_fee.py -v
+  dbc-real-candidate:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'
+    needs: dbc-source-regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SOLANA_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
+      SOLANA_RPC_MIN_INTERVAL_SECONDS: "0.5"
+      SOLANA_RPC_ALCHEMY_FREE_TIER: "1"
+      SOLANA_RPC_PACING_FILE: /tmp/dbc-seventh-candidate-pacing
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Fetch genuine archived original source evidence for PR regression
+        if: github.event_name == 'pull_request'
+        uses: actions/download-artifact@v4
+        with:
+          name: dbc-six-original-source-only
+          run-id: 40951036061
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/dbc-historical-six
+      - name: Revalidate historical original pool bytes (not current liquidity)
+        if: github.event_name == 'pull_request'
+        run: |
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          from arb.meteora_dbc_seventh_source_audit import independently_audit
+          path=Path(os.environ["RUNNER_TEMP"])
+          snapshot=json.loads((path/"dbc-historical-six/dbc-six-original-source.json").read_text())
+          assert snapshot["status"]=="SIX_DBC_ORIGINAL_SOURCE_POOLS_ONLY"
+          assert snapshot["independent_audit"]["authenticated_source_pools"]==6
+          source=dict(snapshot["source"])
+          assert len(source["source_pools"])==6
+          source["source_pools"]=source["source_pools"][:1]
+          source.update(authenticated=1,source_target=1,source_target_met=True,
+                        source_eligible_not_pricing_verified=1)
+          assert independently_audit(source)["authenticated_source_pools"]==1
+          (path/"dbc-original-contextual-candidates.json").write_text(json.dumps(source)+"\n")
+          print("Reauthenticated archived original mainnet bytes for regression; NOT live pool availability")
+          PY
+      - name: Authenticate fresh current DBC original (manual live research)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          test -n "$SOLANA_RPC_URL"
+          python3 -m arb.meteora_dbc_seventh_candidate_capture \
+            --rpc "$SOLANA_RPC_URL" --count 1 \
+            --output "$RUNNER_TEMP/dbc-original-contextual-candidates.json"
+      - name: Independently audit original pool/config/mint/vault/Clock raw bytes
+        run: |
+          python3 -m arb.meteora_dbc_seventh_source_audit \
+            --source "$RUNNER_TEMP/dbc-original-contextual-candidates.json" \
+            --output "$RUNNER_TEMP/dbc-independent-original-source-audit.json"
+      - name: Install pinned original DBC official SDK for source-bound oracle
+        run: npm install --no-save --ignore-scripts --prefix "$RUNNER_TEMP/dbc-sdk" @meteora-ag/dynamic-bonding-curve-sdk@2.0.0
+      - name: Compare official SDK quotes against exact captured original bytes (SDK only)
+        env:
+          NODE_PATH: ${{ runner.temp }}/dbc-sdk/node_modules
+        run: |
+          node tools/meteora_dbc_official_sdk_oracle.js \
+            "$RUNNER_TEMP/dbc-original-contextual-candidates.json" \
+            "$RUNNER_TEMP/dbc-original-official-sdk-quotes.json"
+      - name: Independently reconcile original Q64 curve against pinned SDK
+        run: |
+          python3 -m arb.meteora_dbc_native_curve_audit \
+            --source "$RUNNER_TEMP/dbc-original-contextual-candidates.json" \
+            --sdk "$RUNNER_TEMP/dbc-original-official-sdk-quotes.json" \
+            --output "$RUNNER_TEMP/dbc-native-curve-only-audit.json"
+      - name: Independently enforce original fee scheduler plus Q64 SDK parity
+        run: |
+          python3 -m arb.meteora_dbc_native_fee_parity \
+            --source "$RUNNER_TEMP/dbc-original-contextual-candidates.json" \
+            --sdk "$RUNNER_TEMP/dbc-original-official-sdk-quotes.json" \
+            --output "$RUNNER_TEMP/dbc-independent-native-fee-sdk-parity.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dbc-original-contextual-candidates
+          path: |
+            ${{ runner.temp }}/dbc-original-contextual-candidates.json
+            ${{ runner.temp }}/dbc-original-official-sdk-quotes.json
+            ${{ runner.temp }}/dbc-independent-original-source-audit.json
+            ${{ runner.temp }}/dbc-native-curve-only-audit.json
+            ${{ runner.temp }}/dbc-independent-native-fee-sdk-parity.json
+          if-no-files-found: warn

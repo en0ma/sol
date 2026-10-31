@@ -1,0 +1,12 @@
+[package]
+name = "sol-meteora-damm-v2-official-reference"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+serde_json = "1.0"
+base64 = "0.22"
+bytemuck = "1.16"
+cp-amm = { git = "https://github.com/MeteoraAg/damm-v2", rev = "5398b5c7c534de014091132da37c6478cce671a8", features = ["no-entrypoint", "no-custom-entrypoint"] }
+rust-sdk = { git = "https://github.com/MeteoraAg/damm-v2", rev = "5398b5c7c534de014091132da37c6478cce671a8" }

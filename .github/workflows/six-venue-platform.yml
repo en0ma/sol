@@ -1,0 +1,187 @@
+name: Six-Venue Arbitrage Pipeline Safety
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/six-venue-platform.yml"
+      - "arb/six_venue_pipeline.py"
+      - "tests/test_six_venue_pipeline.py"
+      - "arb/six_venue_registry_eligibility.py"
+      - "tests/test_six_venue_registry_eligibility.py"
+      - "arb/six_venue_cycle_eligibility.py"
+      - "tests/test_six_venue_cycle_eligibility.py"
+      - "arb/six_venue_route_economics.py"
+      - "tests/test_six_venue_route_economics.py"
+      - "arb/registered_cycle_acceptance.py"
+      - "tests/test_registered_cycle_acceptance.py"
+      - "arb/signed_route_resource_audit.py"
+      - "tests/test_signed_route_resource_audit.py"
+      - "arb/six_venue_quote_continuity.py"
+      - "tests/test_six_venue_quote_continuity.py"
+      - "arb/atomic_graph_coordinator.py"
+      - "arb/registry_pair_reconciliation.py"
+      - "arb/pool_registry.py"
+      - "tests/test_pool_registry.py"
+      - "arb/connected_pool_discovery.py"
+      - "arb/chain_token_pair_labels.py"
+      - "tests/test_chain_token_pair_labels.py"
+      - "arb/onchain_pool_discovery.py"
+      - "tests/test_amm_v4_connected_pool_discovery.py"
+      - "tests/test_connected_pool_discovery.py"
+      - "arb/registry_multihop_cycles.py"
+      - "tests/test_registry_pair_reconciliation.py"
+      - "arb/signed_transaction_inventory.py"
+      - "tests/test_signed_transaction_inventory.py"
+      - "tests/test_registered_cycle_coordinator.py"
+  workflow_dispatch:
+concurrency:
+  group: six-venue-platform-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  six-venue-pipeline-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Solana types
+        run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Compile six-venue source/offline entrypoint
+        run: python3 -m py_compile arb/six_venue_pipeline.py tests/test_six_venue_pipeline.py
+      - name: Independently test discovery, quotes, provenance and offline gates
+        run: python3 -m unittest discover -s tests -p test_six_venue_pipeline.py -v
+      - name: Reject unsigned/legacy provenance as coordinator-ready without fresh validation
+        run: python3 -m unittest discover -s tests -p test_six_venue_registry_eligibility.py -v
+      - name: Reject unsigned 2-6 leg cycles before coordinator compilation
+        run: python3 -m unittest discover -s tests -p test_six_venue_cycle_eligibility.py -v
+      - name: Verify exact 2-6 leg cost-accounting boundaries
+        run: python3 -m unittest discover -s tests -p test_six_venue_route_economics.py -v
+      - name: Independently reject forged signed wire or missing compute evidence
+        run: python3 -m unittest discover -s tests -p test_signed_route_resource_audit.py -v
+      - name: Require independently authenticated four-gate cycle acceptance
+        run: python3 -m unittest discover -s tests -p test_registered_cycle_acceptance.py -v
+      - name: Verify source-bound exact quote continuity never promotes live routes
+        run: python3 -m unittest discover -s tests -p test_six_venue_quote_continuity.py -v
+      - name: Validate registered 2-6 leg coordinator dispatch and no-broadcast gates
+        run: python3 -m unittest discover -s tests -p test_registered_cycle_coordinator.py -v
+      - name: Test authenticated pool-pair reconciliation and shared-mint graph connectivity
+        run: python3 -m unittest discover -s tests -p test_registry_pair_reconciliation.py -v
+      - name: Validate source-authenticated shared-pair pool discovery
+        run: python3 -m unittest discover -s tests -p test_connected_pool_discovery.py -v
+      - name: Verify AMM v4 seventh venue source-owned mints and reserves
+        run: python3 -m unittest discover -s tests -p test_amm_v4_connected_pool_discovery.py -v
+      - name: Validate mint-bound onchain token symbols and immutable graph pubkeys
+        run: python3 -m unittest discover -s tests -p test_chain_token_pair_labels.py -v
+      - name: Ensure source rate limits cannot silently promote pool identities
+        run: python3 -m unittest discover -s tests -p test_pool_registry.py -v
+      - name: Test signed transaction inventory and fail-closed economics
+        run: python3 -m unittest discover -s tests -p test_signed_transaction_inventory.py -v
+      - name: Assert all six venues are fixed and no DBC/AMM-v4 sneaks into the platform
+        run: |
+          python3 - <<'PY'
+          from arb.six_venue_pipeline import VENUES
+          expected={"orca","raydium_cpmm","meteora_damm_v2",
+                    "pumpswap","meteora_dlmm","raydium_clmm"}
+          assert len(VENUES)==6 and set(VENUES)==expected
+          print("Six venue research scope only; no trading/broadcast capability enabled")
+          PY
+  six-venue-source-to-offline-simulation:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+    needs: six-venue-pipeline-contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      SURFPOOL_DATASOURCE_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
+      SOLANA_RPC_MIN_INTERVAL_SECONDS: "0.5"
+      SOLANA_RPC_ALCHEMY_FREE_TIER: "1"
+      SOLANA_RPC_PACING_FILE: /tmp/six-venue-platform-pacing
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install independent local fork and pinned Solana types
+        run: |
+          test -n "$SURFPOOL_DATASOURCE_RPC_URL"
+          bash ci/install_surfpool.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Launch upstream-backed source fork (read-only)
+        run: |
+          nohup "$HOME/.local/bin/surfpool" start --ci --rpc-url "$SURFPOOL_DATASOURCE_RPC_URL" --no-deploy > "$RUNNER_TEMP/six-source.log" 2>&1 < /dev/null &
+          echo $! > "$RUNNER_TEMP/six-source.pid"
+          python3 - <<'PY'
+          import time
+          from arb.rpc import call
+          for _ in range(80):
+              try:
+                  assert call("http://127.0.0.1:8899","getLatestBlockhash")["value"]["blockhash"]
+                  break
+              except (OSError,ValueError,RuntimeError,KeyError):time.sleep(1)
+          else:raise SystemExit("six-venue source fork failed to start")
+          PY
+      - name: Authenticate six venue pools, build graph, quote and rank source routes
+        run: |
+          python3 -m arb.six_venue_pipeline --phase source \
+            --rpc http://127.0.0.1:8899 \
+            --registry arb/pool_registry.json \
+            --source-dir "$RUNNER_TEMP/six-venue-source" \
+            --amount-in 1000000 --observed-unix "$(date +%s)" \
+            --maximum 4 --sign-all-authenticated --output "$RUNNER_TEMP/six-source-report.json"
+      - name: Destroy source-backed fork before any signing
+        run: |
+          kill "$(cat "$RUNNER_TEMP/six-source.pid")"
+          python3 - <<'PY'
+          import socket,time
+          for _ in range(40):
+              s=socket.socket();s.settimeout(.2)
+              connected=s.connect_ex(("127.0.0.1",8899))==0;s.close()
+              if not connected:break
+              time.sleep(1)
+          else:raise SystemExit("source-backed fork still reachable: signing forbidden")
+          PY
+      - name: Start a NEW isolated offline fork without any datasource
+        run: |
+          nohup "$HOME/.local/bin/surfpool" start --ci --offline --no-deploy > "$RUNNER_TEMP/six-offline.log" 2>&1 < /dev/null &
+          python3 - <<'PY'
+          import time
+          from arb.rpc import call
+          for _ in range(80):
+              try:
+                  assert call("http://127.0.0.1:8899","getLatestBlockhash")["value"]["blockhash"]
+                  break
+              except (OSError,ValueError,RuntimeError,KeyError):time.sleep(1)
+          else:raise SystemExit("six-venue offline fork failed to start")
+          PY
+      - name: Validate selected source-ranked routes using signed offline simulation
+        env:
+          SURFPOOL_EXPLICITLY_OFFLINE: "1"
+        run: |
+          python3 -m arb.six_venue_pipeline --phase offline \
+            --rpc http://127.0.0.1:8899 \
+            --source-dir "$RUNNER_TEMP/six-venue-source" \
+            --signed-dir "$RUNNER_TEMP/six-venue-signed" \
+            --output "$RUNNER_TEMP/six-signed-report.json"
+      - name: Export per-route transaction JSON, CSV and CI summary
+        if: always()
+        run: |
+          if test -f "$RUNNER_TEMP/six-venue-source/summary.json" && test -f "$RUNNER_TEMP/six-signed-report.json"; then
+            python3 -m arb.signed_transaction_inventory \
+              --source "$RUNNER_TEMP/six-venue-source/summary.json" \
+              --offline "$RUNNER_TEMP/six-signed-report.json" \
+              --output-dir "$RUNNER_TEMP/transaction-inventory"
+            cat "$RUNNER_TEMP/transaction-inventory/summary.md" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Signed transaction inventory unavailable: source or offline report missing." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: six-venue-source-quote-signed-offline-research
+          path: |
+            ${{ runner.temp }}/six-source-report.json
+            ${{ runner.temp }}/six-signed-report.json
+            ${{ runner.temp }}/six-venue-source/
+            ${{ runner.temp }}/six-venue-signed/
+            ${{ runner.temp }}/six-source.log
+            ${{ runner.temp }}/six-offline.log
+            ${{ runner.temp }}/transaction-inventory/
+          if-no-files-found: warn

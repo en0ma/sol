@@ -1,0 +1,50 @@
+name: Sixth Venue Raydium CLMM Source Authentication
+on:
+  pull_request:
+    paths:
+      - "arb/raydium_clmm_sixth_venue_source.py"
+      - ".github/workflows/raydium-clmm-sixth-source.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  authenticate-raydium-clmm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    env:
+      SOLANA_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
+      SOLANA_RPC_MIN_INTERVAL_SECONDS: "0.5"
+      SOLANA_RPC_ALCHEMY_FREE_TIER: "1"
+      SOLANA_RPC_PACING_FILE: /tmp/raydium-clmm-sixth-pacing
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require source RPC
+        run: test -n "$SOLANA_RPC_URL"
+      - name: Install native decoder dependencies
+        run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Authenticate first tracked Raydium CLMM source
+        run: |
+          python3 -m arb.raydium_clmm_sixth_venue_source \
+            --rpc "$SOLANA_RPC_URL" --registry arb/pool_registry.json \
+            --count 1 --output "$RUNNER_TEMP/clmm-sixth-source.json"
+      - name: Authenticate bounded tick-array liquidity in synchronized source snapshot
+        run: |
+          python3 -m arb.raydium_clmm_sixth_tick_capture \
+            --source "$RUNNER_TEMP/clmm-sixth-source.json" \
+            --rpc "$SOLANA_RPC_URL" --radius 4 \
+            --output "$RUNNER_TEMP/clmm-sixth-tick-source.json"
+      - name: Independently evaluate bounded Q64 integer single-tick swap candidates
+        run: |
+          python3 -m arb.raydium_clmm_native_single_tick \
+            --tick-source "$RUNNER_TEMP/clmm-sixth-tick-source.json" \
+            --output "$RUNNER_TEMP/clmm-sixth-native-candidates.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: raydium-clmm-sixth-source
+          path: |
+            ${{ runner.temp }}/clmm-sixth-source.json
+            ${{ runner.temp }}/clmm-sixth-tick-source.json
+            ${{ runner.temp }}/clmm-sixth-native-candidates.json
+          if-no-files-found: warn

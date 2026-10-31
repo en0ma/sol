@@ -1,0 +1,70 @@
+name: Seven Venue Acceptance Checkpoint
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/seven-venue-checkpoint.yml"
+      - "tests/test_meteora_dbc_seventh_source.py"
+      - "arb/meteora_dbc_seventh_venue_source.py"
+      - "arb/pool_registry.json"
+      - "docs/seven_venue_ci_checkpoint_2026-10-29.md"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  seven-venue-checkpoint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned dependencies for source and signed-evidence regressions
+        run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Verify Orca source, adaptive integer quote and signed receipt safety
+        run: |
+          python3 -m unittest discover -s tests -p test_m5_orca_fork_parity.py -v
+          python3 -m unittest discover -s tests -p test_orca_native_tick_range_guard.py -v
+      - name: Verify Meteora DAMM v2 integer and collection-mode pricing
+        run: |
+          python3 -m unittest discover -s tests -p test_meteora_damm_v2_fee_quote.py -v
+          python3 -m unittest discover -s tests -p test_damm_v2_native_fee_modes.py -v
+      - name: Verify Raydium CPMM fee-state and native quote safeguards
+        run: |
+          python3 -m unittest discover -s tests -p test_cpmm_native_fee_candidates.py -v
+          python3 -m unittest discover -s tests -p test_cpmm_fee_rounding_interval.py -v
+      - name: Verify PumpSwap signed source and independently audited registry safeguards
+        run: |
+          python3 -m unittest discover -s tests -p test_pumpswap_signed_receipt_audit.py -v
+          python3 -m unittest discover -s tests -p test_pumpswap_signed_registry_admission.py -v
+      - name: Verify Meteora DLMM independent signed audit
+        run: python3 -m unittest discover -s tests -p test_meteora_dlmm_fifth_signed_audit.py -v
+      - name: Verify Raydium CLMM integer and authenticated tick safeguards
+        run: |
+          python3 -m unittest discover -s tests -p test_raydium_clmm_native_single_tick.py -v
+          python3 -m unittest discover -s tests -p test_raydium_clmm_tick_source.py -v
+      - name: Verify Meteora DBC source identity safeguards (not signed acceptance)
+        run: python3 -m unittest discover -s tests -p test_meteora_dbc_seventh_source.py -v
+      - name: Inventory current registry evidence without assigning false signed acceptance
+        run: |
+          python3 - <<'PY'
+          import json
+          from collections import defaultdict
+          from pathlib import Path
+          rows=json.loads(Path("arb/pool_registry.json").read_text())["pools"]
+          inventory=defaultdict(lambda:{"registered":0,"signed_provenance":0,"signed_hashes":0})
+          for p in rows:
+              d=inventory[p["venue"]];d["registered"]+=1
+              proof=p.get("signed_provenance")
+              if proof:
+                  hashes=proof.get("signed_transaction_hashes",[])
+                  if len(hashes)!=4 or len(set(hashes))!=4:
+                      raise SystemExit("Malformed four-trial signed proof in "+p["venue"])
+                  d["signed_provenance"]+=1
+                  d["signed_hashes"]+=len(hashes)
+          Path("seven-venue-registry-inventory.json").write_text(json.dumps(dict(inventory),indent=2,sort_keys=True)+"\n")
+          print(json.dumps(dict(inventory),sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: seven-venue-registry-inventory
+          path: seven-venue-registry-inventory.json
+          if-no-files-found: warn
