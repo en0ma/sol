@@ -76,7 +76,7 @@ def candidate_pairs(hints, *, max_pairs=30):
     return [list(pair) for pair in selected[:max_pairs]]
 
 
-def expand(rpc, hints, *, max_pairs=12, per_order_limit=8, target=20):
+def expand(rpc, hints, *, max_pairs=12, per_order_limit=32, target=20):
     if not isinstance(hints,list) or len(hints)>200:
         raise ValueError("bounded registry required")
     base=refresh(rpc,hints)
@@ -84,7 +84,7 @@ def expand(rpc, hints, *, max_pairs=12, per_order_limit=8, target=20):
     # A bad/unverified hint must never inject arbitrary search seeds.
     seeds=candidate_pairs(base["verified_pools"],max_pairs=max_pairs)
     discovered=discover(rpc,seeds,limit=per_order_limit,
-                        registry_entries=hints,venues=list(VENUES)) if seeds else {
+                        registry_entries=None,venues=list(VENUES)) if seeds else {
                             "pools":[],"errors":[],"status":"NO_VERIFIED_SEEDS",
                             "venue_attempts":{}}
     joined={}
@@ -116,13 +116,15 @@ def main():
     parser.add_argument("--output",required=True)
     parser.add_argument("--clean-registry",required=True)
     parser.add_argument("--max-pairs",type=int,default=12)
+    parser.add_argument("--per-order-limit",type=int,default=32)
     parser.add_argument("--min-per-venue",type=int,default=20)
     parser.add_argument("--skip-token-labels",action="store_true")
     args=parser.parse_args()
     from arb.six_venue_pipeline import local_rpc_only
     local_rpc_only(args.rpc)
     registry=json.loads(Path(args.registry).read_text())["pools"]
-    report=expand(args.rpc,registry,max_pairs=args.max_pairs,target=args.min_per_venue)
+    report=expand(args.rpc,registry,max_pairs=args.max_pairs,
+                  per_order_limit=args.per_order_limit,target=args.min_per_venue)
     if not args.skip_token_labels:
         from arb.chain_token_pair_labels import fetch_labels, annotate_report
         mints=sorted({m for row in report["graph_pools"] for m in row["mints"]})
