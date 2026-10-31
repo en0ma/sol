@@ -20,6 +20,17 @@ class UntrustedPoolIndexTests(unittest.TestCase):
         self.assertEqual(picks[0],SOL)
         self.assertEqual(picks[1],rare)
         self.assertNotIn(common,picks)
+    def test_mint_budget_reserves_slots_for_peer_venue_connectors(self):
+        rare=["r"*43+str(i) for i in range(4)]
+        peer="x"*44
+        hints=([{"venue":"orca","mints":[SOL,peer]} for _ in range(25)]
+               +[{"venue":"raydium_clmm","mints":[USDC,peer]}]
+               +[{"venue":"pumpswap","mints":[SOL,m]} for m in rare])
+        selected=pick_seeds(hints,max_mints=6)
+        self.assertEqual(selected[:2],[SOL,USDC])
+        self.assertTrue(any(m in selected for m in rare))
+        self.assertIn(peer,selected)
+        self.assertEqual(len(set(selected)),6)
     def test_index_only_finds_untrusted_addresses_and_ignores_claimed_symbols(self):
         address=SOL
         def feed(mint):
