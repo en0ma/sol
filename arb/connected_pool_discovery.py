@@ -145,7 +145,7 @@ def expand(rpc, hints, *, max_pairs=12, per_order_limit=32, target=20, candidate
     if not isinstance(hints,list) or len(hints)>256:
         raise ValueError("bounded registry required")
     candidates=[] if candidate_hints is None else candidate_hints
-    if not isinstance(candidates,list) or len(hints)+len(candidates)>200:
+    if not isinstance(candidates,list) or len(hints)+len(candidates)>256:
         raise ValueError("candidate batch exceeds registry bound")
     known={(x.get("venue"),x.get("address")) for x in hints if isinstance(x,dict)}
     clean_candidates=[]
