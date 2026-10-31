@@ -11,7 +11,7 @@ from arb.onchain_pool_discovery import VENUES,verify
 
 def refresh(rpc,entries):
     valid=[];rejected=[];upstream_rate_limited=False
-    if not isinstance(entries,list) or len(entries)>200:
+    if not isinstance(entries,list) or len(entries)>256:
         raise ValueError("registry entries must be a bounded list")
     seen=set()
     for position,entry in enumerate(entries):
