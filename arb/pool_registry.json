@@ -1,7 +1,7 @@
 {
-  "note": "173 distinct source-authenticated pool identity hints from read-only Surfpool CI run 41242538834 (artifact 13057314432). Each pair display <=9 characters and no duplicate pair per venue. Full mint identity remains the graph key. Reauthenticate all source accounts before every use; no broadcasting.",
-  "latest_source_verified_workflow_run": 41242538834,
-  "unique_pair_policy": "ONE_PER_VENUE_UNORDERED_MINT_PAIR_AND_DISPLAY_PAIR",
+  "note": "223 unique source-authenticated pool identity hints from read-only Surfpool workflow run 41244571050, artifact 13059625140. Display pairs <=9 characters and no duplicate display/canonical pair per venue. State must be refreshed before use; not evidence of exact quotes, profitability, or broadcasts.",
+  "latest_source_verified_workflow_run": 41244571050,
+  "unique_pair_policy": "ONE_PER_VENUE_UNORDERED_CANONICAL_MINT_PAIR_AND_SHORT_LABEL",
   "pools": [
     {
       "venue": "meteora_damm_v2",
@@ -1251,6 +1251,16 @@
     },
     {
       "venue": "raydium_amm_v4",
+      "address": "Cne2WysEXzSLWbdABTG3vYkRNyJyMJ1zLhn26QPrBRZg",
+      "mints": [
+        "AujTJJ7aMS8LDo3bFzoyXDwT3jBALUbu4VZhzZdTZLmG",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "$BEE/SOL",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "raydium_amm_v4",
       "address": "FQed3Ay883zUcGcLaubkV56JJbweiYjxPSTC84yUxqNd",
       "mints": [
         "4G86CMxGsMdLETrYnavMFKPhQzKTvDBYGMRAdVtr72nu",
@@ -1271,12 +1281,72 @@
     },
     {
       "venue": "raydium_amm_v4",
+      "address": "GhfVrsA2a8ZjHfCS5AdPUYT2faQeHnEm96rXeqFaMgUr",
+      "mints": [
+        "Gq4TXhDhaC2i3sHLQ9rg16wGUzPFF1AvgZticrjFWJZz",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "AHHH/SOL",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "raydium_amm_v4",
       "address": "DSUvc5qf5LJHHV5e2tD184ixotSnCnwj7i4jJa4Xsrmt",
       "mints": [
         "ukHH6c7mMyiWCf1b9pnWe25TSpkDDt3H5pQZgZ74J82",
         "So11111111111111111111111111111111111111112"
       ],
       "pair": "BOME/SOL",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "raydium_amm_v4",
+      "address": "DVkAryLFZnWh2HtEZcdmt6r6Jn1JY64bMLJewcvaX4Sb",
+      "mints": [
+        "CrvdFVNXk17q6iSpm1j3in7ZGHgtpkABu9P5P1kZPxun",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "CIA/SOL",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "raydium_amm_v4",
+      "address": "DhHVd5s4hqBGnTkFztsK98WGPtYUJjpUCqNnWaNLWb4F",
+      "mints": [
+        "y1AZt42vceCmStjW4zetK3VoNarC1VxJ5iDjpiupump",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "FART/SOL",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "raydium_amm_v4",
+      "address": "FnBRxTzSNSqb3QCPfJEaMjMKAVFAwP2oRkwXNK4dKtdL",
+      "mints": [
+        "6NspJqVFceCiU5D1YgVq7waYoC394Vhqxwg7cSJdFtVE",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "FROG/SOL",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "raydium_amm_v4",
+      "address": "4xxM4cdb6MEsCxM52xvYqkNbzvdeWWsPDZrBcTqVGUar",
+      "mints": [
+        "63LfDmNb3MQ8mw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "GIGA/SOL",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "raydium_amm_v4",
+      "address": "9tz6vYKiBDLYx2RnGWC5tESu4pyVE4jD6Tm56352UGte",
+      "mints": [
+        "8wXtPeU6557ETkp9WHFY1n1EcU6NxDvbAggHGsMYiHsB",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "GME/SOL",
       "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
@@ -1341,6 +1411,26 @@
     },
     {
       "venue": "raydium_amm_v4",
+      "address": "ESAXeEwatpFg19WgGDyRfTWrjpjWqEhYfCM3RfQm7biP",
+      "mints": [
+        "2miHpQbYLPvXxC2V234jrrrtnJdejd5xW883a5ToNW3g",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "POGA/SOL",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "raydium_amm_v4",
+      "address": "5uTwG3y3F5cx4YkodgTjWEHDrX5HDKZ5bZZ72x8eQ6zE",
+      "mints": [
+        "5z3EqYQo9HiCEs3R84RCDMu2n7anpDMxRhdK8PSWmrRC",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "PONK/SOL",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "raydium_amm_v4",
       "address": "FRhB8L7Y9Qq41qZXYLtC2nw8An1RJfLLxRF2x9RwLLMo",
       "mints": [
         "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr",
@@ -1391,12 +1481,42 @@
     },
     {
       "venue": "raydium_amm_v4",
+      "address": "3Zm5BnJvK5xpJ2CKdqajq1HbQSLwz6F3jzSMn5YZeK1C",
+      "mints": [
+        "9jZgvgS2bWtQiYzv48GcWzY4tnkeRSANbTm8Kp1LmSyS",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "SHAR/SOL",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "raydium_amm_v4",
+      "address": "6LfqGQFoYP8qxnfk7xV6T9mksvQx3sDkCLYADKGUeMjV",
+      "mints": [
+        "9QJ8Qkxz4kBCa5tTYswBWM3vairThAzDRuB8Mh8FE7qn",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "SHER/SOL",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "raydium_amm_v4",
       "address": "5EgCcjkuE42YyTZY4QG8qTioUwNh6agTvJuNRyEqcqV1",
       "mints": [
         "9Ttyez3xiruyj6cqaR495hbBkJU6SUWdV6AmQ9MvbyyS",
         "So11111111111111111111111111111111111111112"
       ],
       "pair": "SMOL/SOL",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "raydium_amm_v4",
+      "address": "B4PHSkL6CeZbxVqm1aUPQuVpc5ERFcaZj7u9dhtphmVX",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "GJAFwWjJ3vnTsrQVabjBVK2TYB1YtRCQXRDfDgUnpump"
+      ],
+      "pair": "SOL/ACT",
       "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
@@ -1421,6 +1541,26 @@
     },
     {
       "venue": "raydium_amm_v4",
+      "address": "9ViX1VductEoC2wERTSp2TuDxXPwAf69aeET8ENPJpsN",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "DtR4D9FtVoTX2569gaL837ZgrB6wNjj6tkmnX9Rdk9B2"
+      ],
+      "pair": "SOL/AURA",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "raydium_amm_v4",
+      "address": "GjvW8JQSpKG5ogjyD3zozfaeJSShTajS5ZFrexT8L12k",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "DKu9kykSfbN5LBfFXtNNDPaX35o4Fv6vJ9FKk7pZpump"
+      ],
+      "pair": "SOL/AVA",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "raydium_amm_v4",
       "address": "DmAsjXoceoL5vTKZbYpTpXPo7MKm16FMfNMm3PJFiUha",
       "mints": [
         "So11111111111111111111111111111111111111112",
@@ -1431,12 +1571,62 @@
     },
     {
       "venue": "raydium_amm_v4",
+      "address": "BmsZE6TkZYskyS1PatPKRyyazGdxWFxdia4BuvLg9AgY",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "HgBRWfYxEfvPhtqkaeymCQtHCrKE46qQ43pKe8HCpump"
+      ],
+      "pair": "SOL/BERT",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "raydium_amm_v4",
+      "address": "93tjgwff5Ac5ThyMi8C4WejVVQq4tuMeMuYW1LEYZ7bu",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "Df6yfrKC8kZE3KNkrHERKzAetSxbrWeniQfyJY4Jpump"
+      ],
+      "pair": "SOL/CHILL",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "raydium_amm_v4",
+      "address": "zcdAw3jpcqEY8JYVxNVMqs2cU35cyDdy4ot7V8edNhz",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "4Cnk9EPnW5ixfLZatCPJjDB1PUtcRpVVgTQukm9epump"
+      ],
+      "pair": "SOL/DADDY",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "raydium_amm_v4",
       "address": "Bzc9NZfMqkXR6fz1DBph7BDf9BroyEf6pnzESP7v5iiw",
       "mints": [
         "So11111111111111111111111111111111111111112",
         "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump"
       ],
       "pair": "SOL/FARTC",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "raydium_amm_v4",
+      "address": "AB1eu2L1Jr3nfEft85AuD2zGksUbam1Kr8MR3uM2sjwt",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "A8C3xuqscfmyLrte3VmTqrAq8kgMASius9AFNANwpump"
+      ],
+      "pair": "SOL/FWOG",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "raydium_amm_v4",
+      "address": "9Tb2ohu5P16BpBarqd3N27WnkF51Ukfs8Z1GzzLDxVZW",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "CzLSujWBLFsSjncfkh59rUFqvafWcY5tzedWJSuypump"
+      ],
+      "pair": "SOL/GOAT",
       "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
@@ -1471,6 +1661,16 @@
     },
     {
       "venue": "raydium_amm_v4",
+      "address": "95512Hcjd8ZkjyYninGBBuhwsLrA5sF3Xto8ehtEwyXb",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "21Dt6Ne2tQ8wQ5j6G2zahtF1tskJqRmtSaaSwXjyBJVz"
+      ],
+      "pair": "SOL/PEPE",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "raydium_amm_v4",
       "address": "8WwcNqdZjCY5Pt7AkhupAFknV2txca9sq6YBkGzLbvdt",
       "mints": [
         "So11111111111111111111111111111111111111112",
@@ -1487,6 +1687,46 @@
         "2qEHjDLDLbuBgRYvsxhc5D6uDWAivNFZGan56P1tpump"
       ],
       "pair": "SOL/PNUT",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "raydium_amm_v4",
+      "address": "9fmdkQipJK2teeUv53BMDXi52uRLbrEvV38K8GBNkiM7",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "CniPCE4b3s8gSUPhUiyMjXnytrEqUrMfSsnbBjLCpump"
+      ],
+      "pair": "SOL/PWEAS",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "raydium_amm_v4",
+      "address": "5C8vTkYttBq6NonFw7R4U8Sr1MqYqAEAHahqEiyjYr33",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "6CTPpJgxX5M6Lygok4kXuxReFE4HFmA7t33AbuXiaP88"
+      ],
+      "pair": "SOL/SORRY",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "raydium_amm_v4",
+      "address": "HL4KFTfhZZMm7NGefszQxzJ3M6CaDWE7TesyuRuQYmMJ",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "74SBV4zDXxTRgv1pEMoECskKBkZHc2yGPnc7GYVepump"
+      ],
+      "pair": "SOL/SWARM",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "raydium_amm_v4",
+      "address": "78sBWyimVhLumzZg1bdMD6ogGig8QpmgYZqCXNyMxx4z",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "eL5fUxj2J4CiQsmW85k5FG9DvuQjjUoBHoQBi2Kpump"
+      ],
+      "pair": "SOL/UFD",
       "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
@@ -1511,12 +1751,32 @@
     },
     {
       "venue": "raydium_amm_v4",
+      "address": "58fzJMbX5PatnfJPqWWsqkVFPRKptkbb5r2vCw4Qq3z9",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "6AJcP7wuLwmRYLBNbi825wgguaPsWzPBEHcHndpRpump"
+      ],
+      "pair": "SOL/VINE",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "raydium_amm_v4",
       "address": "3sjNoCnkkhWPVXYGDtem8rCciHSGc9jSFZuUAzKbvRVp",
       "mints": [
         "So11111111111111111111111111111111111111112",
         "8x5VqbHA8D7NkD52uNuS5nnt3PwA8pLD34ymskeSo2Wn"
       ],
       "pair": "SOL/ZEREB",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "raydium_amm_v4",
+      "address": "EZgUVCbvWMdpAGtbJhLY6nnjfLtE8JCPCGx7NsNF2y1b",
+      "mints": [
+        "5t4EVfkb5QU8NZXmTzcSK2bQsNWUr2HL64rRb8i6wpat",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "SPHY/SOL",
       "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
