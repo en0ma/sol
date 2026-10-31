@@ -1,11 +1,12 @@
 """Bounded directed closed-cycle search over verified on-chain pool registry.
 
-Each pool is traversable in either direction. Cycles start and finish at WSOL
-or USDC, never reuse an intermediate token or pool, and never imply profit or
+Each pool is traversable in either direction. Cycles start and finish at WSOL,
+USDC or USDT, never reuse an intermediate token or pool, and never imply profit or
 live execution readiness. Pure algorithm: no RPC calls, transactions or writes.
 """
 from collections import defaultdict
 from arb.orca_whirlpool import SOL, USDC
+from arb.onchain_pool_discovery import USDT
 
 MAX_HOPS=8
 MAX_CYCLES=5000
@@ -19,8 +20,8 @@ def discover_cycles(pools, *, min_hops=2, max_hops=5,
         raise ValueError("bounded cycle count required")
     if not isinstance(pools,list) or len(pools)>MAX_EDGES:
         raise ValueError("bounded list of registry pools required")
-    if not isinstance(starts,(tuple,list)) or not starts or any(s not in (SOL,USDC) for s in starts):
-        raise ValueError("only WSOL/USDC start assets supported")
+    if not isinstance(starts,(tuple,list)) or not starts or any(s not in (SOL,USDC,USDT) for s in starts):
+        raise ValueError("only WSOL/USDC/USDT start assets supported")
     adjacency=defaultdict(list)
     for pool in pools:
         if not isinstance(pool,dict) or pool.get("all_pools_onchain_verified") is not True:
