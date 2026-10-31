@@ -106,3 +106,56 @@ def screen_signed_cycle_net_acceptance(route, signed_receipt, local_fee,
             "accepted_net_profit_base_units":None,
             "net_profitability_verified":False,
             "gates":gates,**SAFE}
+
+
+def inspect_upstream_original_account(rpc, *, address, expected_owner,
+                                      min_context_slot=0):
+    """Read original upstream account bytes with slot and owner checks.
+
+    Caller must configure its independently trusted *read-only* upstream RPC.
+    A single endpoint cannot prove independence, pool vaults, or fresh parity.
+    """
+    import base64
+    from urllib.parse import urlsplit
+    from arb.rpc import call
+    parsed=urlsplit(rpc)
+    if (parsed.scheme!="https" or not parsed.hostname or
+        parsed.username or parsed.password or parsed.fragment or
+        parsed.hostname in ("localhost","127.0.0.1","::1") or
+        not isinstance(address,str) or not address or
+        not isinstance(expected_owner,str) or not expected_owner or
+        type(min_context_slot)is not int or min_context_slot<0):
+        raise ValueError("independent upstream HTTPS read-only account source required")
+    result=call(rpc,"getAccountInfo",[address,{
+        "encoding":"base64","commitment":"confirmed",
+        "minContextSlot":min_context_slot}])
+    if (not isinstance(result,dict) or not isinstance(result.get("context"),dict) or
+        type(result["context"].get("slot"))is not int or
+        result["context"]["slot"]<min_context_slot or
+        not isinstance(result.get("value"),dict)):
+        raise ValueError("missing original upstream account and context")
+    row=result["value"]
+    data=row.get("data")
+    if (not isinstance(data,list) or len(data)!=2 or data[1]!="base64"
+        or not isinstance(data[0],str) or
+        row.get("owner")!=expected_owner or row.get("executable") is not False or
+        type(row.get("lamports"))is not int or not 0<=row["lamports"]<UINT64):
+        raise ValueError("original account owner or encoding rejected")
+    try:
+        original=base64.b64decode(data[0],validate=True)
+    except (ValueError,base64.binascii.Error) as exc:
+        raise ValueError("invalid upstream account base64") from exc
+    if not 0<len(original)<=4_194_304:
+        raise ValueError("empty or oversized upstream account")
+    digest=hashlib.sha256(original).hexdigest()
+    account={"address":address,"owner":row["owner"],
+             "slot":result["context"]["slot"],
+             "lamports":row["lamports"],"executable":False}
+    checked=verify_original_account_snapshot(
+        account,original,expected_owner=expected_owner,
+        expected_address=address,expected_slot=account["slot"],
+        expected_sha256=digest)
+    return {**checked,"status":"UPSTREAM_ACCOUNT_RPC_OBSERVED_ORIGIN_UNATTESTED",
+            "origin_rpc_hostname":parsed.hostname,
+            "original_data_length":len(original),
+            "upstream_origin_independently_authenticated":False}
