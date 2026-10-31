@@ -9,7 +9,7 @@ from arb.orca_whirlpool import SOL, USDC
 from arb.onchain_pool_discovery import USDT
 
 MAX_HOPS=8
-MAX_CYCLES=25000
+MAX_CYCLES=200000
 MAX_EDGES=50000
 
 def discover_cycles(pools, *, min_hops=2, max_hops=5,
