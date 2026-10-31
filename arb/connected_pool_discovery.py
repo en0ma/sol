@@ -188,7 +188,16 @@ def expand(rpc, hints, *, max_pairs=12, per_order_limit=32, target=20, candidate
                         registry_entries=None,venues=venue_order) if seeds else {
                             "pools":[],"errors":[],"status":"NO_VERIFIED_SEEDS",
                             "venue_attempts":{}}
-    base=refresh(rpc,hints+clean_candidates)
+    # Direct-account source reads can hit the upstream RPC rate budget.
+    # Authenticate NEW owner-classified pool candidates FIRST, prioritizing
+    # venues below the twenty-distinct-pair target. Old canonical hints are
+    # then revalidated. Never add the candidates on owner checks alone:
+    # refresh() still independently decodes pool mints and SPL vaults.
+    current_count=Counter(x["venue"] for x in hints if isinstance(x,dict)
+                          and x.get("venue") in VENUES)
+    clean_candidates.sort(key=lambda x:(
+        -max(0,target-current_count[x["venue"]]),x["venue"],x["address"]))
+    base=refresh(rpc,clean_candidates+hints)
     joined={}
     for pool in base["verified_pools"]:
         joined[(pool["venue"],pool["address"])]=pool
