@@ -18,9 +18,12 @@ class RegistryTests(unittest.TestCase):
             self.assertTrue(32 <= len(entry["address"]) <= 44)
             self.assertNotIn("actionable",entry)
             self.assertNotIn("verified",entry)
-            if entry["venue"] == "pumpswap":
-                self.assertEqual(len(entry["mints"]),2)
-                self.assertEqual(len(set(entry["mints"])),2)
+            self.assertEqual(len(entry["mints"]),2)
+            self.assertEqual(len(set(entry["mints"])),2)
+            self.assertTrue(all(isinstance(m,str) and len(m)>=32 for m in entry["mints"]))
+            self.assertIsInstance(entry["pair"],str)
+            self.assertIn("/",entry["pair"])
+            self.assertEqual(len(entry["pair"].split("/")),2)
 
     def test_unbounded_rejected(self):
         with self.assertRaises(ValueError):refresh("rpc",[{}]*201)
