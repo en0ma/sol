@@ -260,6 +260,7 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache
         direction=("sell" if mints[pump_idx]==base else "buy_exact_quote_in")
         required=account_metas(direction,addresses)["metas"]
         from arb.rpc import call as rpc_call
+        missing_user_volume=[]
         for meta in required:
             if meta["name"] in ("user","user_base_token_account",
                                 "user_quote_token_account",
@@ -270,10 +271,25 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache
                                 "protocol_fee_recipient"):
                 continue
             address=meta["address"]
-            if address not in fixture["accounts"]:
-                raise ValueError("PumpSwap source account not authenticated: "+meta["name"])
+            if address in fixture["accounts"]:
+                continue
+            if meta["name"]=="user_volume_accumulator":
+                # The ephemeral offline signer has a fresh per-user PDA;
+                # this account cannot be captured from a source fork before
+                # the user is generated. Require an actual fork RPC proof
+                # that it is absent; the signed runtime MUST initialize it
+                # or the independent atomic auditor will reject the route.
+                account=rpc_call(rpc,"getAccountInfo",[
+                    address,{"encoding":"base64","commitment":"confirmed"}])
+                if not isinstance(account,dict) or "value" not in account or account["value"] is not None:
+                    raise ValueError("PumpSwap user volume PDA lacks fork absence proof")
+                missing_user_volume.append(address)
+                continue
+            raise ValueError("PumpSwap source account not authenticated: "+meta["name"])
         proof["account_addresses"]=addresses
         proof["account_addresses_authenticated"]=True
+        proof["uninitialized_user_volume_pda_fork_absence_verified"]=missing_user_volume
+        proof["uninitialized_user_volume_pda_runtime_initialized_verified"]=False
         buyback=proof.get("buyback_fee_recipient")
         if not isinstance(buyback,str) or buyback not in fixture["accounts"]:
             raise ValueError("PumpSwap V2 authenticated buyback ATA missing")
