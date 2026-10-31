@@ -55,9 +55,11 @@ def collect(source, offline):
             raise ValueError("independent net acceptance not implemented in this exporter")
         output.append({
             "index": i,
-            "venues": ">".join(str(l.get("venue", "?")) for l in r.get("legs", [])
-                               if isinstance(l, dict)),
-            "legs": len(r.get("legs", [])) if isinstance(r.get("legs"), list) else None,
+            "venues": ">".join(r.get("venues", [])) if isinstance(r.get("venues"), list)
+                      else ">".join(str(l.get("venue", "?")) for l in r.get("legs", [])
+                                    if isinstance(l, dict)),
+            "legs": len(r["venues"]) if isinstance(r.get("venues"), list)
+                    else len(r["legs"]) if isinstance(r.get("legs"), list) else None,
             "source_status": r.get("status"),
             "simulation_status": "SIGNED_ACCEPTED" if accepted else "SIGNED_REJECTED",
             "profitability": "UNKNOWN_COSTS" if accepted else "NOT_ESTABLISHED",
@@ -69,10 +71,33 @@ def collect(source, offline):
             "source_fixture": r.get("fixture"),
             "broadcast": False,
         })
+    for i, r in sorted(source_index.items()):
+        if i in seen:
+            continue
+        venues = r.get("venues")
+        legs = r.get("legs")
+        output.append({
+            "index": i,
+            "venues": ">".join(venues) if isinstance(venues, list) else
+                      ">".join(str(l.get("venue", "?")) for l in legs if isinstance(l, dict))
+                      if isinstance(legs, list) else "",
+            "legs": len(venues) if isinstance(venues, list) else
+                    len(legs) if isinstance(legs, list) else None,
+            "source_status": r.get("status"),
+            "simulation_status": "NOT_ATTEMPTED",
+            "profitability": "NOT_ESTABLISHED",
+            "gross_delta_base_units": None,
+            "net_delta_base_units": None,
+            "compute_units": None,
+            "reason": "source candidate not selected for signed offline simulation",
+            "source_fixture": r.get("fixture"),
+            "broadcast": False,
+        })
+    output.sort(key=lambda row: row["index"])
     return {
         "status": "SIGNED_SIMULATION_TRANSACTION_INVENTORY",
         "source_routes": len(routes),
-        "signed_attempted": len(output),
+        "signed_attempted": len(decisions),
         "signed_accepted": sum(r["simulation_status"] == "SIGNED_ACCEPTED" for r in output),
         "confirmed_profitable": 0,
         "confirmed_unprofitable": 0,
