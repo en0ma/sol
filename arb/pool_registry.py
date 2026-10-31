@@ -10,11 +10,11 @@ from arb.rpc import call
 from arb.onchain_pool_discovery import VENUES,verify
 
 def refresh(rpc,entries):
-    valid=[];rejected=[]
+    valid=[];rejected=[];upstream_rate_limited=False
     if not isinstance(entries,list) or len(entries)>200:
         raise ValueError("registry entries must be a bounded list")
     seen=set()
-    for entry in entries:
+    for position,entry in enumerate(entries):
         venue=entry.get("venue"); address=entry.get("address")
         if venue not in VENUES or not isinstance(address,str) or len(address)>64 or len(address)<32:
             rejected.append({"entry":entry,"reason":"INVALID_REGISTRY_ENTRY"});continue
@@ -37,8 +37,15 @@ def refresh(rpc,entries):
                 raise ValueError("missing verification slot")
             valid.append({**verified,"verified":True})
         except Exception as exc:
-            rejected.append({"venue":venue,"address":address,
-                             "reason":type(exc).__name__+": "+str(exc)[:200]})
+            reason=type(exc).__name__+": "+str(exc)[:200]
+            rejected.append({"venue":venue,"address":address,"reason":reason})
+            if "429" in reason or "too many requests" in reason.lower():
+                upstream_rate_limited=True
+                for later in entries[position+1:]:
+                    rejected.append({"venue":later.get("venue") if isinstance(later,dict) else None,
+                                     "address":later.get("address") if isinstance(later,dict) else None,
+                                     "reason":"SKIPPED_UPSTREAM_RATE_LIMIT"})
+                break
     graph={}
     for pool in valid:
         key=tuple(sorted(pool["mints"]))
@@ -48,7 +55,8 @@ def refresh(rpc,entries):
     coverage={name:{"validated_pools":sum(p["venue"]==name for p in valid),
                     "rejected_pools":sum(p.get("venue")==name for p in rejected)}
               for name in VENUES}
-    return {"status":"COMPLETE" if not rejected else "PARTIAL",
+    return {"status":"UPSTREAM_RATE_LIMITED" if upstream_rate_limited else
+                     "COMPLETE" if not rejected else "PARTIAL",
             "venue_validation_coverage":coverage,
             "verified_count":len(valid),"rejected_count":len(rejected),
             "verified_pools":valid,"rejected":rejected,"shared_pairs":shared,
