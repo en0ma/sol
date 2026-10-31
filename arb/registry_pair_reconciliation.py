@@ -111,6 +111,8 @@ def main():
     parser.add_argument("--output", required=True)
     parser.add_argument("--rpc", default=os.getenv("SOLANA_RPC_URL", "http://127.0.0.1:8899"))
     parser.add_argument("--min-per-venue", type=int, default=20)
+    parser.add_argument("--clean-registry", default="",
+                        help="Write only independently verified, mint-complete pool identities")
     args = parser.parse_args()
     # Explicit actual RPC authentication, never copy hint-only mint labels
     # into a supposedly trusted graph.
