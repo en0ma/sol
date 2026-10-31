@@ -27,7 +27,7 @@ def screen_signed_provenance(registry):
     if not isinstance(registry, dict) or not isinstance(registry.get("pools"), list):
         raise ValueError("malformed shared registry")
     entries = registry["pools"]
-    if len(entries) > 200:
+    if len(entries) > 256:
         raise ValueError("unbounded registry")
     accepted, blocked = [], []
     seen = set()
