@@ -149,10 +149,25 @@ class ConnectedPoolDiscoveryTests(unittest.TestCase):
         discovery.assert_not_called()
         self.assertEqual(report["admitted"],0)
         self.assertEqual(report["external_candidate_addresses_checked"],1)
-        self.assertEqual(refresh.call_args.args[1][-1],
+        self.assertEqual(refresh.call_args.args[1][0],
                          {"venue":"raydium_amm_v4","address":"b"*44})
         with self.assertRaises(ValueError):
             expand("rpc",original,candidate_hints=[{"venue":"forged","address":"b"*44}])
+    def test_new_pumpswap_owner_candidates_precede_rate_limited_old_hints(self):
+        hints=[{"venue":"orca","address":str(i).zfill(44)}
+               for i in range(21)]
+        indexed=[{"venue":"raydium_cpmm","address":"r"*44},
+                 {"venue":"pumpswap","address":"p"*44}]
+        with patch("arb.connected_pool_discovery.refresh",
+                   return_value={"verified_pools":[],"rejected":[]}) as refresh,\
+             patch("arb.connected_pool_discovery.discover") as discovery:
+            report=expand("rpc",hints,candidate_hints=indexed)
+        discovery.assert_not_called()
+        queried=refresh.call_args.args[1]
+        self.assertEqual(queried[0],{"venue":"pumpswap","address":"p"*44})
+        self.assertEqual(queried[1],{"venue":"raydium_cpmm","address":"r"*44})
+        self.assertEqual(len(queried),23)
+        self.assertEqual(report["admitted"],0)
     def test_no_verified_seeds_no_fabricated_discovery(self):
         initial=[{"venue":"orca","address":"a"*44}]
         with patch("arb.connected_pool_discovery.refresh",
