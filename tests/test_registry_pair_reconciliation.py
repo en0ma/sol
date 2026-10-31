@@ -37,6 +37,15 @@ class RegistryPairReconciliationTests(unittest.TestCase):
         ):
             with self.assertRaises(ValueError):
                 reconcile(hints,[forged])
+    def test_isolated_liquidity_cannot_satisfy_twenty_connected_pool_target(self):
+        hints=[{"venue":"orca","address":str(i).zfill(44)} for i in range(20)]
+        evidence=[{"venue":"orca","address":h["address"],"mints":[SOL,USDC],
+                   "verified":True,"slot":123,"vault_base_units":[1,1]} for h in hints]
+        result=reconcile(hints,evidence,target=20)
+        self.assertEqual(result["venue_coverage"]["orca"]["authenticated"],20)
+        self.assertEqual(result["venue_coverage"]["orca"]["cross_venue_mint_connected"],0)
+        self.assertEqual(result["venue_coverage"]["orca"]["missing_to_target"],20)
+        self.assertFalse(result["venue_coverage"]["orca"]["target_met"])
     def test_unknown_symbols_do_not_affect_graph_identity(self):
         hints=[{"venue":"orca","address":"a"*40},
                {"venue":"raydium_cpmm","address":"b"*40}]
