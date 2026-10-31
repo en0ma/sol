@@ -185,6 +185,32 @@ def balance_candidates(candidates, known, *, limit=80):
         counts[venue]+=1
     return selected
 
+def pick_amm_v4_leads(leads, known, *, limit=24):
+    """Untrusted Raydium API *addresses* only; source verifies actual owners.
+
+    Prefer mint pairs already present on another venue. A claimed program
+    label or mint pair from the API is never accepted as chain evidence.
+    """
+    if (not isinstance(leads,list) or not isinstance(known,list) or
+            type(limit) is not int or not 1<=limit<=32):
+        raise ValueError("invalid bounded AMM v4 lead selection")
+    known_addresses={x.get("address") for x in known if isinstance(x,dict)}
+    selected=[];seen=set()
+    for item in sorted(leads,key=lambda x:not x.get("matching_peer_mints",False)
+                       if isinstance(x,dict) else True):
+        if not isinstance(item,dict):
+            continue
+        address=item.get("address")
+        if (not isinstance(address,str) or not 32<=len(address)<=44 or
+                address in seen or address in known_addresses):
+            continue
+        seen.add(address)
+        selected.append(address)
+        if len(selected)>=limit:
+            break
+    return selected
+
+
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument("--registry",default="arb/pool_registry.json")
@@ -193,6 +219,7 @@ def main():
     parser.add_argument("--max-mints",type=int,default=12)
     parser.add_argument("--max-addresses",type=int,default=115)
     parser.add_argument("--max-candidates",type=int,default=80)
+    parser.add_argument("--amm-v4-candidates",type=int,default=24)
     args=parser.parse_args()
     from arb.six_venue_pipeline import local_rpc_only
     local_rpc_only(args.rpc)
@@ -200,6 +227,25 @@ def main():
     seeds=pick_seeds(hints,args.max_mints)
     inventory=index_addresses(seeds,max_addresses=args.max_addresses)
     owners=authenticate_owners(args.rpc,inventory["addresses"])
+    # Target scarce AMM v4 source identities with a SECOND independently
+    # owner-authenticated path. Never trust Raydium API pool identities.
+    supplemental_error=None
+    extra=[]
+    try:
+        from arb.atomic_missing_venue_candidates import discover_amm_v4_candidates
+        leads=discover_amm_v4_candidates({"pools":hints},max_pages=2)
+        selected=pick_amm_v4_leads(
+            leads,hints,limit=args.amm_v4_candidates)
+        selected=[a for a in selected if a not in inventory["addresses"]]
+        if selected:
+            authenticated=authenticate_owners(args.rpc,selected)
+            extra=[p for p in authenticated["pools"]
+                   if p["venue"]=="raydium_amm_v4"]
+    except (ValueError,TypeError,KeyError,OSError,RuntimeError,HTTPError,URLError) as exc:
+        supplemental_error=type(exc).__name__+": "+str(exc)[:160]
+    owners["pools"].extend(extra)
+    owners["amm_v4_source_owner_candidate_count"]=len(extra)
+    owners["amm_v4_public_lead_error"]=supplemental_error
     owners["source_owner_classified_pool_count"]=len(owners["pools"])
     # refresh() accepts at most 200 total historical + discovered hints.
     remaining=max(0,200-len(hints))
