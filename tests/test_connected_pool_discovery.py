@@ -13,6 +13,15 @@ class ConnectedPoolDiscoveryTests(unittest.TestCase):
                {"venue":"pumpswap","mints":[SOL,USDC]}]
         self.assertEqual(set(candidate_pairs(hints,max_pairs=1)[0]),{SOL,mint})
 
+    def test_cross_hub_sol_usdc_usdt_pair_queries_not_invented_pools(self):
+        from arb.onchain_pool_discovery import USDT
+        mint="x"*44
+        hints=[{"venue":"orca","mints":[SOL,mint]},
+               {"venue":"raydium_clmm","mints":[SOL,USDC]}]
+        pairs=candidate_pairs(hints,max_pairs=9)
+        self.assertIn(sorted([mint,USDT]),[sorted(x) for x in pairs])
+        self.assertEqual(len(pairs),len(set(tuple(x) for x in pairs)))
+        self.assertTrue(all(len(pair)==2 and pair[0]!=pair[1] for pair in pairs))
     def test_only_new_independently_verified_pools_are_admitted(self):
         initial=[{"venue":"orca","address":"a"*44,"mints":[SOL,USDC]}]
         base={"venue":"orca","address":"a"*44,"mints":[SOL,USDC],
