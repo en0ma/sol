@@ -24,12 +24,12 @@ class RegistryPairReconciliationTests(unittest.TestCase):
         self.assertTrue(all(x["broadcast"] is False for x in cycles["cycles"]))
     def test_expanded_cycle_limit(self):
         from arb.registry_multihop_cycles import MAX_CYCLES
-        self.assertEqual(MAX_CYCLES, 25000)
+        self.assertEqual(MAX_CYCLES, 200000)
         with self.assertRaises(ValueError):
-            reconcile([], [], max_cycles=25001)
+            reconcile([], [], max_cycles=200001)
         with self.assertRaises(ValueError):
             reconcile([], [], max_cycles=True)
-        self.assertEqual(reconcile([], [], max_cycles=25000)["graph_cycle_limit"], 25000)
+        self.assertEqual(reconcile([], [], max_cycles=200000)["graph_cycle_limit"], 200000)
 
     def test_missing_mints_remain_unverified(self):
         hints=[{"venue":"orca","address":"a"*40}]
