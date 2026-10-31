@@ -47,6 +47,14 @@ class ConnectedPoolDiscoveryTests(unittest.TestCase):
            "vault_base_units":[1,1],"verified":False}
         with self.assertRaises(ValueError): unique_venue_pairs([p])
 
+    def test_underrepresented_pumpswap_pair_search_is_prioritized(self):
+        uncommon="p"*44
+        common="o"*44
+        hints=([{"venue":"orca","mints":[SOL,common]} for _ in range(25)]
+               +[{"venue":"pumpswap","mints":[SOL,uncommon]}])
+        selected=candidate_pairs(hints,max_pairs=1)
+        self.assertEqual(set(selected[0]),{SOL,uncommon})
+        self.assertNotIn(common,selected[0])
     def test_shared_pair_preferred(self):
         mint="x"*44
         hints=[{"venue":"orca","mints":[SOL,mint]},
