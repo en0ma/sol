@@ -60,6 +60,17 @@ class RegistryPairReconciliationTests(unittest.TestCase):
         self.assertEqual(report["venue_coverage"]["orca"]["cross_venue_mint_connected"],0)
         self.assertEqual(report["venue_coverage"]["raydium_clmm"]["cross_venue_mint_connected"],0)
         self.assertFalse(report["seven_venue_target_met"])
+    def test_usdt_anchor_cycles_with_verified_distinct_venue_pools(self):
+        from arb.onchain_pool_discovery import USDT
+        hints=[{"venue":"orca","address":"a"*44},
+               {"venue":"raydium_clmm","address":"b"*44}]
+        evidence=[{"venue":h["venue"],"address":h["address"],
+                   "mints":[USDT,SOL],"verified":True,"slot":123,
+                   "vault_base_units":[100,100]} for h in hints]
+        report=reconcile(hints,evidence,target=1)
+        cycles=discover_cycles(report["graph_pools"],min_hops=2,max_hops=2,starts=(USDT,))
+        self.assertGreater(cycles["cycle_count"],0)
+        self.assertTrue(all(c["tokens"][0]==USDT for c in cycles["cycles"]))
     def test_unknown_symbols_do_not_affect_graph_identity(self):
         hints=[{"venue":"orca","address":"a"*40},
                {"venue":"raydium_cpmm","address":"b"*40}]
