@@ -1,6 +1,6 @@
 """Exact integer arithmetic and missing-cost fail-closed cases."""
 import unittest
-from arb.six_venue_route_economics import assess_offline_cycle_costs
+from arb.six_venue_route_economics import assess_offline_cycle_costs, reconcile_wsol_lamport_costs, WRAPPED_SOL_MINT
 
 def receipt(n=3):
     return {"legs":n,"start_mint":"WSOL","initial_base_units":100000,
@@ -34,6 +34,31 @@ class CostTests(unittest.TestCase):
         r["network_fee_conversion_independently_verified"]=True
         r["verified_costs_start_mint_base_units"]={"network_fee":1}
         self.assertIsNone(assess_offline_cycle_costs(r)["net_base_units"])
+    def test_wsol_exact_lamport_fee_identity_and_mismatch_rejection(self):
+        r=receipt()
+        r["start_mint"]=WRAPPED_SOL_MINT
+        r["network_fee_conversion_independently_verified"]=True
+        r["independent_sol_fee_audit_verified"]=True
+        r["independently_audited_sol_fee_lamports"]={
+            "network_fee":200,"priority_fee":350,"tip":0}
+        r["verified_costs_start_mint_base_units"]={
+            "network_fee":200,"priority_fee":350,"setup_rent_net":0,
+            "flash_loan_fee":0,"tip":0,"other":0}
+        self.assertEqual(reconcile_wsol_lamport_costs(r)["wsol_fee_base_units"],550)
+        self.assertEqual(assess_offline_cycle_costs(r)["net_base_units"],450)
+        for altered in (
+            {"start_mint":"USDC"},
+            {"independent_sol_fee_audit_verified":False},
+            {"independently_audited_sol_fee_lamports":{"network_fee":200,"priority_fee":350,"tip":True}},
+            {"independently_audited_sol_fee_lamports":{"network_fee":200,"priority_fee":351,"tip":0}},
+            {"verified_costs_start_mint_base_units":{**r["verified_costs_start_mint_base_units"],"network_fee":0}},
+        ):
+            with self.subTest(altered=altered):
+                bad={**r,**altered}
+                with self.assertRaises(ValueError):
+                    reconcile_wsol_lamport_costs(bad)
+                self.assertIsNone(assess_offline_cycle_costs(bad)["net_base_units"])
+
     def test_aggregate_cost_overflow_fails_closed(self):
         r=receipt()
         r["network_fee_conversion_independently_verified"]=True
