@@ -87,7 +87,9 @@ def reconcile(original, verified, *, target=TARGET_PER_VENUE):
     for venue in VENUES:
         entries = [row for row in admitted.values() if row["venue"] == venue]
         linked = [row for row in entries if len(pair_venues[tuple(sorted(row["mints"]))]) > 1]
-        connected = [row for row in entries if any(len(mint_venues[m]) > 1 for m in row["mints"])]
+        # An edge touching shared WSOL alone is not necessarily routeable:
+        # the OTHER token must also connect beyond this venue to close cycles.
+        connected = [row for row in entries if all(len(mint_venues[m]) > 1 for m in row["mints"])]
         coverage[venue] = {
             "registered_hints": sum(k[0] == venue for k in expected),
             "authenticated": len(entries),
