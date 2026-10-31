@@ -6,6 +6,20 @@ from arb.orca_whirlpool import SOL, USDC
 
 
 class ConnectedPoolDiscoveryTests(unittest.TestCase):
+    def test_canonical_registry_has_unique_pairs_without_fabricated_eligibility(self):
+        import json
+        from pathlib import Path
+        source=Path(__file__).resolve().parents[1]/"arb"/"pool_registry.json"
+        registry=json.loads(source.read_text())
+        pools=registry["pools"]
+        self.assertGreaterEqual(len(pools),223)
+        self.assertEqual(len(pools),len({(p["venue"],p["address"]) for p in pools}))
+        self.assertEqual(len(pools),len({(p["venue"],p["pair"]) for p in pools}))
+        self.assertEqual(len(pools),len({(p["venue"],tuple(sorted(p["mints"])))
+                                         for p in pools}))
+        self.assertTrue(all(len(p["pair"])<=9 and len(p["mints"])==2
+                            and p["mints"][0]!=p["mints"][1] for p in pools))
+        self.assertTrue(all(p.get("signed_provenance") is None for p in pools))
     def test_committed_clean_snapshot_is_unique_and_short(self):
         import json
         from pathlib import Path
