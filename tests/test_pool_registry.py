@@ -12,6 +12,11 @@ class RegistryTests(unittest.TestCase):
         self.assertLessEqual(len(entries),200)
         self.assertEqual(len(entries),
                          len({(e["venue"],e["address"]) for e in entries}))
+        self.assertEqual(len(entries),
+                         len({(e["venue"],tuple(sorted(e["mints"]))) for e in entries}))
+        self.assertEqual(len(entries),
+                         len({(e["venue"],e["pair"]) for e in entries}))
+        self.assertTrue(all(1 <= len(e["pair"]) <= 9 for e in entries))
         for entry in entries:
             self.assertIn(entry["venue"],VENUES)
             self.assertIsInstance(entry["address"],str)
