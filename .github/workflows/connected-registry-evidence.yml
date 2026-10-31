@@ -5,6 +5,10 @@ on:
       - ".github/workflows/connected-registry-evidence.yml"
       - "arb/connected_pool_discovery.py"
       - "arb/registry_pair_reconciliation.py"
+      - "arb/registry_multihop_cycles.py"
+      - "arb/pool_registry.py"
+      - "tests/test_registry_pair_reconciliation.py"
+      - "tests/test_connected_pool_discovery.py"
       - "arb/chain_token_pair_labels.py"
       - "arb/onchain_pool_discovery.py"
       - "arb/untrusted_pool_index.py"
@@ -60,7 +64,7 @@ jobs:
           python3 -m arb.untrusted_pool_index \
             --rpc http://127.0.0.1:8899 \
             --registry arb/pool_registry.json \
-            --max-mints 16 --max-addresses 120 --max-candidates 80 --amm-v4-candidates 32 \
+            --max-mints 24 --max-addresses 120 --max-candidates 110 --amm-v4-candidates 32 \
             --output "$RUNNER_TEMP/source-owned-index-candidates.json"
       - name: Reauthenticate registered mints and expand connected real-pair pool candidates
         run: |
@@ -68,7 +72,7 @@ jobs:
           python3 -m arb.connected_pool_discovery \
             --rpc http://127.0.0.1:8899 \
             --registry arb/pool_registry.json \
-            --max-pairs 18 --min-per-venue 20 \
+            --max-pairs 36 --min-per-venue 20 \
             --candidate-file "$RUNNER_TEMP/source-owned-index-candidates.json" \
             --output "$RUNNER_TEMP/connected-registry-evidence.json" \
             --clean-registry "$RUNNER_TEMP/source-verified-connected-registry.json"
