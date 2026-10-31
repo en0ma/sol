@@ -54,7 +54,21 @@ def pick_seeds(pools, max_mints=12):
         deficit=max((20-venue_counts[v] for v in venues),default=0)
         return (-deficit,-len(venues),-frequency[mint],mint)
     rest=sorted((m for m in frequency if m not in anchors),key=rank)
-    return anchors+rest[:max(0,max_mints-len(anchors))]
+    # Keep room for tokens seen on multiple other venues, since a new
+    # PumpSwap counterpart needs real cross-venue graph connectivity rather
+    # than another isolated memecoin. This is search prioritization only.
+    shared=sorted((m for m in frequency if m not in anchors),
+                  key=lambda m:(-len(mint_venues.get(m,())),
+                                -frequency[m],m))
+    budget=max(0,max_mints-len(anchors))
+    underserved_slots=(budget+1)//2
+    result=anchors+rest[:underserved_slots]
+    for mint in shared+rest[underserved_slots:]:
+        if len(result)>=max_mints:
+            break
+        if mint not in result:
+            result.append(mint)
+    return result
 
 
 def index_addresses(mints, *, max_addresses=100, fetch=None):
