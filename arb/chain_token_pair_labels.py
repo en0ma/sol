@@ -77,3 +77,43 @@ def fetch_labels(rpc, mints):
                 failures.append({"mint":mint,"reason":str(exc)[:120]})
     return {"status":"MINT_BOUND_DISPLAY_METADATA_ONLY","labels":result,
             "unresolved":failures,"broadcast":False}
+
+def annotate_report(report, metadata):
+    """Project source-checked symbols onto display fields, never route keys."""
+    from arb.registry_pair_reconciliation import SYMBOLS
+    if not isinstance(report,dict) or not isinstance(metadata,dict):
+        raise ValueError("invalid registry or metadata report")
+    verified=metadata.get("labels")
+    if metadata.get("status")!="MINT_BOUND_DISPLAY_METADATA_ONLY" or not isinstance(verified,dict):
+        raise ValueError("metadata not verified")
+    output=dict(report)
+    pools=[]
+    for row in report["graph_pools"]:
+        mints=row["mints"]
+        labels=[]
+        for mint in mints:
+            native=verified.get(mint)
+            label=(SYMBOLS.get(mint) or
+                   (native.get("symbol") if isinstance(native,dict) and
+                    native.get("mint")==mint and
+                    native.get("source")=="METAPLEX_MINT_BOUND_SELF_DECLARED_DISPLAY_ONLY"
+                    else None))
+            labels.append(label or mint[:8]+"…")
+        pools.append({**row,"pair":"/".join(labels),
+                      "symbol_source":"ONCHAIN_METADATA_SELF_DECLARED_DISPLAY_ONLY"})
+    output["graph_pools"]=pools
+    output["token_label_metadata"]=metadata
+    # The shared-pair list is rendered independently; matching stays on mints.
+    shared=[]
+    for row in report["cross_venue_shared_pairs"]:
+        values=[]
+        for mint in row["mints"]:
+            found=verified.get(mint)
+            values.append(SYMBOLS.get(mint) or (
+                found["symbol"] if isinstance(found,dict) and
+                found.get("mint")==mint and
+                found.get("source")=="METAPLEX_MINT_BOUND_SELF_DECLARED_DISPLAY_ONLY"
+                else mint[:8]+"…"))
+        shared.append({**row,"pair":"/".join(values)})
+    output["cross_venue_shared_pairs"]=shared
+    return output
