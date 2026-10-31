@@ -86,6 +86,21 @@ class UntrustedPoolIndexTests(unittest.TestCase):
         self.assertEqual(result["addresses"][1],JUP)
         self.assertIn(result["addresses"][0],[SOL,USDC])
         self.assertEqual(len(set(result["addresses"])),2)
+    def test_known_addresses_do_not_consume_index_selection_budget(self):
+        from arb.onchain_pool_discovery import JUP
+        def fetch(mint):
+            return [{"chainId":"solana","pairAddress":address,
+                     "baseToken":{"address":mint},
+                     "quoteToken":{"address":JUP},
+                     "liquidity":{"usd":100}}
+                    for address in (SOL,USDC,JUP)]
+        result=index_addresses([SOL],max_addresses=2,fetch=fetch,
+                               exclude_addresses={SOL,USDC})
+        self.assertEqual(result["addresses"],[JUP])
+        self.assertEqual(result["candidate_count"],1)
+        with self.assertRaises(ValueError):
+            index_addresses([SOL],fetch=fetch,exclude_addresses="invalid")
+
     def test_only_actual_source_owner_assigns_venue(self):
         program=VENUES["orca"][0]
         response={"value":[{"owner":program,"executable":False},
