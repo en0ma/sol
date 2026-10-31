@@ -175,8 +175,16 @@ def expand(rpc, hints, *, max_pairs=12, per_order_limit=32, target=20, candidate
     # Search before the 90-address refresh to preserve scarce RPC capacity
     # for finding new pools rather than repeatedly rediscovering old ones.
     seeds=candidate_pairs(hints,max_pairs=max_pairs)
+    # A free-tier source may rate-limit getProgramAccounts early. Probe
+    # undercovered venues FIRST instead of burning the entire RPC budget on
+    # well represented Orca/AMM v4. This changes search order, never
+    # on-chain verification, and retains all seven venue attempts.
+    venue_counts=Counter(h["venue"] for h in hints
+                         if isinstance(h,dict) and h.get("venue") in VENUES)
+    venue_order=sorted(VENUES,key=lambda v:(-max(0,target-venue_counts[v]),
+                                             venue_counts[v],v))
     discovered=discover(rpc,seeds,limit=per_order_limit,
-                        registry_entries=None,venues=list(VENUES)) if seeds else {
+                        registry_entries=None,venues=venue_order) if seeds else {
                             "pools":[],"errors":[],"status":"NO_VERIFIED_SEEDS",
                             "venue_attempts":{}}
     base=refresh(rpc,hints+clean_candidates)
@@ -202,6 +210,7 @@ def expand(rpc, hints, *, max_pairs=12, per_order_limit=32, target=20, candidate
     report["unique_pair_target_met"]=all(
         n>=target for n in report["unique_pair_venue_coverage"].values())
     report["external_candidate_addresses_checked"]=len(clean_candidates)
+    report["discovery_venue_order"]=venue_order
     report["discovery_status"]=discovered["status"]
     report["discovery_searched_pairs"]=seeds
     report["discovery_errors"]=discovered["errors"]
