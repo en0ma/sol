@@ -34,7 +34,7 @@ class FinalGates(unittest.TestCase):
         fee={"status":"LOCAL_FEE_EVIDENCE_CORRELATED_NOT_AUTHENTICATED",
              "independent_fee_paid_verified":False,"fee_lamports":None,
              "actionable":False,"live_execution_approved":False,"broadcast":False}
-        route={"legs":[{},{}]}
+        route={"legs":[{"pool":"poolA"},{"pool":"poolB"}]}
         signed={"status":"unsigned"}
         costs={"network_fee":0,"priority_fee":0,"tip":0,
                "flash_loan_fee":0,"setup_rent_net":0,"other":0}
