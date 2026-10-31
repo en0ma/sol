@@ -18,6 +18,9 @@ on:
       - "arb/six_venue_quote_continuity.py"
       - "tests/test_six_venue_quote_continuity.py"
       - "arb/atomic_graph_coordinator.py"
+      - "arb/registry_pair_reconciliation.py"
+      - "arb/registry_multihop_cycles.py"
+      - "tests/test_registry_pair_reconciliation.py"
       - "arb/signed_transaction_inventory.py"
       - "tests/test_signed_transaction_inventory.py"
       - "tests/test_registered_cycle_coordinator.py"
@@ -53,6 +56,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_six_venue_quote_continuity.py -v
       - name: Validate registered 2-6 leg coordinator dispatch and no-broadcast gates
         run: python3 -m unittest discover -s tests -p test_registered_cycle_coordinator.py -v
+      - name: Test authenticated pool-pair reconciliation and shared-mint graph connectivity
+        run: python3 -m unittest discover -s tests -p test_registry_pair_reconciliation.py -v
       - name: Test signed transaction inventory and fail-closed economics
         run: python3 -m unittest discover -s tests -p test_signed_transaction_inventory.py -v
       - name: Assert all six venues are fixed and no DBC/AMM-v4 sneaks into the platform
