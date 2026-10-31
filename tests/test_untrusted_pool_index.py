@@ -98,6 +98,28 @@ class UntrustedPoolIndexTests(unittest.TestCase):
         with patch("arb.untrusted_pool_index.call",return_value={"value":[None]}):
             with self.assertRaises(ValueError):
                 authenticate_owners("rpc",[SOL,USDC])
+    def test_throttled_owner_batch_splits_without_forging_accounts(self):
+        from arb.rpc import RPCError
+        owner=VENUES["pumpswap"][0]
+        calls=[]
+        def rpc(_url,_method,params):
+            keys=params[0]
+            calls.append(list(keys))
+            if len(keys)>1:
+                raise RPCError("429 rate limit")
+            return {"value":[{"owner":owner,"executable":False}]}
+        with patch("arb.untrusted_pool_index.call",side_effect=rpc):
+            rows=authenticate_owners("rpc",[SOL,USDC])
+        self.assertEqual(len(rows["pools"]),2)
+        self.assertEqual(calls,[[SOL,USDC],[SOL],[USDC]])
+        self.assertFalse(rows["actionable"])
+        with patch("arb.untrusted_pool_index.call",side_effect=RPCError("429 rate limit")):
+            with self.assertRaises(RPCError):
+                authenticate_owners("rpc",[SOL])
+        with patch("arb.untrusted_pool_index.call",return_value={"value":[] }):
+            with self.assertRaises(ValueError):
+                authenticate_owners("rpc",[SOL,USDC])
+
     def test_balance_prefers_source_owner_verified_undercovered_venue(self):
         known=[{"venue":"orca"}]*40+[{"venue":"raydium_cpmm"}]*3
         rows=[{"venue":"orca","address":str(i).zfill(44)} for i in range(20)]
