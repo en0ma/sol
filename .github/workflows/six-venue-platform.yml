@@ -143,9 +143,9 @@ jobs:
         if: always()
         run: |
           if test -f "$RUNNER_TEMP/six-venue-source/summary.json" && test -f "$RUNNER_TEMP/six-signed-report.json"; then
-            python3 -m arb.signed_transaction_inventory \\
-              --source "$RUNNER_TEMP/six-venue-source/summary.json" \\
-              --offline "$RUNNER_TEMP/six-signed-report.json" \\
+            python3 -m arb.signed_transaction_inventory \
+              --source "$RUNNER_TEMP/six-venue-source/summary.json" \
+              --offline "$RUNNER_TEMP/six-signed-report.json" \
               --output-dir "$RUNNER_TEMP/transaction-inventory"
             cat "$RUNNER_TEMP/transaction-inventory/summary.md" >> "$GITHUB_STEP_SUMMARY"
           else
