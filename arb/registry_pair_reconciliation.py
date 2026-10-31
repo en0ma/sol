@@ -91,8 +91,9 @@ def reconcile(original, verified, *, target=TARGET_PER_VENUE):
             "authenticated": len(entries),
             "cross_venue_shared_pair": len(linked),
             "cross_venue_mint_connected": len(connected),
-            "target": target, "missing_to_target": max(0, target-len(entries)),
-            "target_met": len(entries) >= target,
+            "target": target,
+            "missing_to_target": max(0, target-len(connected)),
+            "target_met": len(connected) >= target,
         }
     return {
         "status": "SOURCE_AUTHENTICATED_REGISTRY_COVERAGE",
