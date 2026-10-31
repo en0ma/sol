@@ -96,11 +96,21 @@ def main():
     parser.add_argument("--clean-registry",required=True)
     parser.add_argument("--max-pairs",type=int,default=12)
     parser.add_argument("--min-per-venue",type=int,default=20)
+    parser.add_argument("--skip-token-labels",action="store_true")
     args=parser.parse_args()
     from arb.six_venue_pipeline import local_rpc_only
     local_rpc_only(args.rpc)
     registry=json.loads(Path(args.registry).read_text())["pools"]
     report=expand(args.rpc,registry,max_pairs=args.max_pairs,target=args.min_per_venue)
+    if not args.skip_token_labels:
+        from arb.chain_token_pair_labels import fetch_labels, annotate_report
+        mints=sorted({m for row in report["graph_pools"] for m in row["mints"]})
+        try:
+            metadata=fetch_labels(args.rpc,mints)
+            report=annotate_report(report,metadata)
+        except (ValueError,OSError,RuntimeError) as exc:
+            # Missing/blocked display metadata must not forge mint identities.
+            report["token_label_status"]="UNRESOLVED: "+str(exc)[:160]
     Path(args.output).write_text(json.dumps(report,indent=2)+"\n")
     # Only verified accounts can enter this output; never overwrite the
     # original hints automatically, and never claim a target that wasn't met.
