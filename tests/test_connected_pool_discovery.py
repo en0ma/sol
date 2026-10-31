@@ -67,7 +67,7 @@ class ConnectedPoolDiscoveryTests(unittest.TestCase):
                +[{"venue":"pumpswap","address":"p"*44,
                   "mints":[SOL,USDC]}])
         with patch("arb.connected_pool_discovery.refresh",
-                   return_value={"verified_pools":[],"rejected":[]}),\\
+                   return_value={"verified_pools":[],"rejected":[]}),\
              patch("arb.connected_pool_discovery.discover",
                    return_value={"status":"UPSTREAM_RATE_LIMITED",
                                  "pools":[],"errors":[],"venue_attempts":{}}) as scan:
