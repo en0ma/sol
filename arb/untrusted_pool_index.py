@@ -14,7 +14,7 @@ from pathlib import Path
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 
-from arb.rpc import call
+from arb.rpc import call, _throttled, RPCError
 from arb.onchain_pool_discovery import VENUES
 from arb.orca_whirlpool import SOL, USDC
 
@@ -223,12 +223,24 @@ def authenticate_owners(rpc,addresses):
         chunk=addresses[start:start+60]
         for address in chunk:
             Pubkey.from_string(address)
-        answer=call(rpc,"getMultipleAccounts",
-                    [chunk,{"encoding":"base64","commitment":"confirmed"}])
-        values=answer.get("value") if isinstance(answer,dict) else None
-        if not isinstance(values,list) or len(values)!=len(chunk):
-            raise ValueError("source account owner response incomplete")
-        for address,info in zip(chunk,values):
+        # Some upstream RPC plans reject large getMultipleAccounts batches.
+        # After the RPC client's bounded 429 retries, split only throttled
+        # batches; never retry malformed responses or treat missing accounts
+        # as authenticated. Single-account throttling remains a hard failure.
+        def fetch_bounded(keys):
+            try:
+                result=call(rpc,"getMultipleAccounts",
+                            [keys,{"encoding":"base64","commitment":"confirmed"}])
+            except (HTTPError,RPCError) as exc:
+                if not _throttled(exc) or len(keys)==1:
+                    raise
+                middle=len(keys)//2
+                return fetch_bounded(keys[:middle])+fetch_bounded(keys[middle:])
+            values=result.get("value") if isinstance(result,dict) else None
+            if not isinstance(values,list) or len(values)!=len(keys):
+                raise ValueError("source account owner response incomplete")
+            return values
+        for address,info in zip(chunk,fetch_bounded(chunk)):
             venue=(owner_map.get(info.get("owner"))
                    if isinstance(info,dict) and info.get("executable") is False
                    else None)
