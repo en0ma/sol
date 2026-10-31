@@ -8,7 +8,7 @@ from solders.keypair import Keypair
 from solders.pubkey import Pubkey
 from solders.instruction import Instruction
 from solders.transaction import Transaction
-from arb.signed_route_resource_audit import inspect_signed_offline_resources, quote_signed_message_fee_offline
+from arb.signed_route_resource_audit import inspect_signed_offline_resources, quote_signed_message_fee_offline, inspect_local_recorded_transaction_fee
 
 
 def signed_wire():
@@ -90,6 +90,52 @@ class SignedResourceAuditTests(unittest.TestCase):
             quote_signed_message_fee_offline(
                 "https://api.mainnet-beta.solana.com",wire,{"unitsConsumed":1},
                 expected_wire_sha256=digest)
+
+
+    @patch("arb.rpc.call")
+    def test_local_recorded_receipt_exact_wire_fee_diagnostic_only(self, call):
+        wire,digest=signed_wire()
+        call.return_value={
+            "slot":55,"transaction":[base64.b64encode(wire).decode(),"base64"],
+            "meta":{"err":None,"fee":5100,"computeUnitsConsumed":8000}}
+        out=inspect_local_recorded_transaction_fee(
+            "http://127.0.0.1:8899",wire,
+            {"err":None,"unitsConsumed":8000},expected_wire_sha256=digest)
+        self.assertEqual(out["local_recorded_fee_lamports"],5100)
+        self.assertEqual(out["local_recorded_slot"],55)
+        self.assertIsNone(out["fee_lamports"])
+        self.assertFalse(out["independent_fee_paid_verified"])
+        self.assertFalse(out["broadcast"])
+        self.assertEqual(call.call_args.args[1],"getTransaction")
+        self.assertEqual(call.call_args.args[2][0],out["first_signature"])
+
+    @patch("arb.rpc.call")
+    def test_local_recorded_receipt_rejects_forgery_and_missing_fields(self, call):
+        wire,digest=signed_wire()
+        correct={"slot":55,"transaction":[base64.b64encode(wire).decode(),"base64"],
+                 "meta":{"err":None,"fee":5000,"computeUnitsConsumed":8000}}
+        other,_=signed_wire()
+        for altered in (
+            None,
+            {**correct,"transaction":[base64.b64encode(other).decode(),"base64"]},
+            {**correct,"transaction":["not base64!","base64"]},
+            {**correct,"slot":True},
+            {**correct,"meta":{**correct["meta"],"fee":True}},
+            {**correct,"meta":{**correct["meta"],"computeUnitsConsumed":0}},
+            {**correct,"meta":{**correct["meta"],"err":{"InstructionError":[0,"Custom"]}}},
+            {**correct,"transaction":[base64.b64encode(wire).decode(),"base58"]},
+        ):
+            with self.subTest(altered=altered):
+                call.return_value=altered
+                with self.assertRaises(ValueError):
+                    inspect_local_recorded_transaction_fee(
+                        "http://127.0.0.1:8899",wire,
+                        {"err":None,"unitsConsumed":8000},
+                        expected_wire_sha256=digest)
+        with self.assertRaises(ValueError):
+            inspect_local_recorded_transaction_fee(
+                "https://api.mainnet-beta.solana.com",wire,
+                {"err":None,"unitsConsumed":8000},expected_wire_sha256=digest)
 
     def test_wire_size_and_digest_type_blocked(self):
         wire,digest=signed_wire()
