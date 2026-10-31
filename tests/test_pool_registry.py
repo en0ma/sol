@@ -39,6 +39,14 @@ class RegistryTests(unittest.TestCase):
         result=refresh("rpc",entries)
         self.assertEqual(result["verified_count"],1)
         self.assertEqual(result["rejected_count"],0)
+    @patch("arb.pool_registry.call",side_effect=RuntimeError("HTTP 429 too many requests"))
+    def test_rate_limit_stops_repeated_source_reads(self,call):
+        entries=[{"venue":"orca","address":str(i).zfill(40)} for i in range(4)]
+        result=refresh("rpc",entries)
+        self.assertEqual(result["status"],"UPSTREAM_RATE_LIMITED")
+        self.assertEqual(result["rejected_count"],4)
+        self.assertEqual(result["rejected"][-1]["reason"],"SKIPPED_UPSTREAM_RATE_LIMIT")
+        call.assert_called_once()
     @patch("arb.pool_registry.call")
     def test_missing_pool_stays_rejected(self,call):
         call.return_value={"value":None}
