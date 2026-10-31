@@ -31,7 +31,7 @@ Branch: `feat/surfpool-ci-validation`. Handoff's starting implementation HEAD: `
 - Added rejection of total cost components summing outside the unsigned 64-bit start-mint accounting domain, while preserving historical signed gross and non-actionable flags; added adversarial regression test.
 - Implementation SHA: `c845a75349ef11d2a2a1c13c64c6d4d44b8bea71`.
 - Test SHA: `eec2d9bd644d333fcb655a024805f0bae32df931`.
-- GitHub Actions status after these commits: **must inspect actual runs**. Do not assume any green conclusion from earlier SHA.
+- Verified CI on handoff commit `9f62a63bd179493c87b4c108ff6be216cccdb17f`: **15/15 PR workflow runs completed successfully**. Relevant [Six-Venue Arbitrage Pipeline Safety run](https://github.com/en0ma/sol/actions/runs/41164403447) passed both the contract/test job (including the new economics overflow regression) and the isolated source-to-offline simulation job. [AMM v4 Focused Atomic CI](https://github.com/en0ma/sol/actions/runs/41164403734) also passed. [Seven Venue Acceptance Checkpoint](https://github.com/en0ma/sol/actions/runs/41164403704) passed. Other 12 associated runs also returned `completed/success`. This CI report applies to `9f62a63b`, not necessarily the later documentation-only commit containing this report.
 - Relevant check: `.github/workflows/six-venue-platform.yml`, specifically `test_six_venue_route_economics.py`.
 - This cycle does **not** claim newly signed routes, complete net fees, or registry promotion.
 
