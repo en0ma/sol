@@ -132,7 +132,7 @@ def report_signed_source_cycle_preflight(registry, readiness, graph):
 
 def source_research(rpc, registry, fixture_dir, *, amount_in,
                     observed_unix, maximum=12, max_cycles=200,
-                    discovery_pairs=None,pool_probe_limit=4):
+                    discovery_pairs=None,pool_probe_limit=4,sign_all_quotable=False):
     """Read-only source-backed Surfpool: authenticated pools -> ranked fixtures.
 
     This phase MUST complete and stop before a separate --offline Surfpool
@@ -143,7 +143,8 @@ def source_research(rpc, registry, fixture_dir, *, amount_in,
             type(observed_unix)is not int or observed_unix<0 or
             type(maximum)is not int or not 1<=maximum<=12 or
             not isinstance(registry,dict) or
-            type(pool_probe_limit)is not int or not 1<=pool_probe_limit<=12):
+            type(pool_probe_limit)is not int or not 1<=pool_probe_limit<=12 or
+            type(sign_all_quotable) is not bool):
         raise ValueError("bounded source research inputs required")
     if not set(VENUES)<=set(PROGRAMS):
         raise ValueError("six venue source adapters unavailable")
@@ -228,10 +229,14 @@ def source_research(rpc, registry, fixture_dir, *, amount_in,
     # quotable route as an explicitly non-opportunity diagnostic sample.
     diagnostic=([indices[ranking["ranked"][0]["index"]]]
                 if not positive and ranking["ranked"] else [])
-    selected=positive if positive else diagnostic
+    selected=([indices[row["index"]] for row in ranking["ranked"]]
+              if sign_all_quotable else positive if positive else diagnostic)
     selection_mode=("POSITIVE_GROSS_RESEARCH" if positive else
                     "NONPROFITABLE_DIAGNOSTIC_ONLY" if diagnostic else
                     "NO_QUOTABLE_ROUTE")
+    if sign_all_quotable:
+        selection_mode="ALL_SOURCE_QUOTABLE_RESEARCH" if selected else "NO_QUOTABLE_ROUTE"
+        diagnostic=[i for i in selected if i not in positive]
     summary_raw=(root/"summary.json").read_bytes()
     ranking_raw=json.dumps(ranking,sort_keys=True,separators=(",",":")).encode()
     (root/"six-venue-ranking.json").write_bytes(ranking_raw)
@@ -250,6 +255,7 @@ def source_research(rpc, registry, fixture_dir, *, amount_in,
               "positive_gross_indices":positive,
               "diagnostic_only_indices":diagnostic,
               "selection_mode":selection_mode,
+              "sign_all_quotable":sign_all_quotable,
               "selection_is_gross_only":True,
               "cost_conversion_verified":False,**SAFE}
     root.mkdir(parents=True,exist_ok=True)
@@ -459,11 +465,19 @@ def offline_research(rpc, fixture_dir, signed_dir):
         raise ValueError("signed source quote ranking index invalid") from exc
     diagnostic=([original[ranking["ranked"][0]["index"]]["index"]]
                 if not derived and ranking["ranked"] else [])
-    expected=derived if derived else diagnostic
+    all_quotable=[original[r["index"]]["index"] for r in ranking["ranked"]]
+    expanded=manifest.get("sign_all_quotable") is True
+    if manifest.get("sign_all_quotable") not in (True,False):
+        raise ValueError("signed coverage mode missing")
+    if expanded:
+        diagnostic=[i for i in all_quotable if i not in derived]
+    expected=all_quotable if expanded else derived if derived else diagnostic
     if (expected!=indices or
             manifest.get("positive_gross_indices")!=derived or
             manifest.get("diagnostic_only_indices")!=diagnostic or
             manifest.get("selection_mode")!=(
+                "ALL_SOURCE_QUOTABLE_RESEARCH" if expanded and expected else
+                "NO_QUOTABLE_ROUTE" if expanded else
                 "POSITIVE_GROSS_RESEARCH" if derived else
                 "NONPROFITABLE_DIAGNOSTIC_ONLY" if diagnostic else
                 "NO_QUOTABLE_ROUTE")):
@@ -524,6 +538,7 @@ def main():
     parser.add_argument("--maximum",type=int,default=12)
     parser.add_argument("--pool-probe-limit",type=int,default=4)
     parser.add_argument("--max-cycles",type=int,default=200)
+    parser.add_argument("--sign-all-quotable",action="store_true")
     parser.add_argument("--output",required=True)
     args=parser.parse_args()
     if args.phase=="source":
@@ -533,7 +548,8 @@ def main():
            maximum=args.maximum,max_cycles=args.max_cycles,
            pool_probe_limit=args.pool_probe_limit,
            discovery_pairs=(json.loads(Path(args.discovery_pairs).read_text())
-                            if args.discovery_pairs else None))
+                            if args.discovery_pairs else None),
+           sign_all_quotable=args.sign_all_quotable)
     else:
         if not args.signed_dir:
             parser.error("--signed-dir required for offline phase")
