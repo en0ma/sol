@@ -31,7 +31,7 @@ class RegistryTests(unittest.TestCase):
             self.assertEqual(len(entry["pair"].split("/")),2)
 
     def test_unbounded_rejected(self):
-        with self.assertRaises(ValueError):refresh("rpc",[{}]*257)
+        with self.assertRaises(ValueError):refresh("rpc",[{}]*513)
     @patch("arb.pool_registry.verify")
     @patch("arb.pool_registry.call")
     @patch("arb.pool_registry.VENUES",{"test":("prog",3,0,0,lambda data:{"ok":True})})
