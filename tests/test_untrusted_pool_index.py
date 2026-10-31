@@ -12,14 +12,14 @@ class UntrustedPoolIndexTests(unittest.TestCase):
         self.assertIn(x,seeds)
 
     def test_index_only_finds_untrusted_addresses_and_ignores_claimed_symbols(self):
-        address="A"*44
+        address=SOL
         def feed(mint):
             return [{"chainId":"solana","dexId":"forged",
                      "pairAddress":address,
                      "baseToken":{"address":mint,"symbol":"FAKE"},
                      "quoteToken":{"address":USDC},
                      "liquidity":{"usd":9000}},
-                    {"chainId":"ethereum","pairAddress":"B"*44,
+                    {"chainId":"ethereum","pairAddress":USDC,
                      "baseToken":{"address":mint},"quoteToken":{"address":USDC}}]
         report=index_addresses([SOL],fetch=feed)
         self.assertEqual(report["addresses"],[address])
@@ -32,7 +32,7 @@ class UntrustedPoolIndexTests(unittest.TestCase):
                            {"owner":"forged","executable":False}]}
         with patch("arb.untrusted_pool_index.call",return_value=response) as rpc:
             result=authenticate_owners("rpc",["A"*44,"B"*44])
-        self.assertEqual(result["pools"],[{"venue":"orca","address":"A"*44}])
+        self.assertEqual(result["pools"],[{"venue":"orca","address":SOL}])
         self.assertEqual(len(result["rejections"]),1)
         self.assertEqual(rpc.call_args.args[1],"getMultipleAccounts")
         with patch("arb.untrusted_pool_index.call",return_value={"value":[None]}):
@@ -42,7 +42,7 @@ class UntrustedPoolIndexTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             index_addresses([SOL],max_addresses=200)
         with self.assertRaises(ValueError):
-            authenticate_owners("rpc",["A"*44]*121)
+            authenticate_owners("rpc",[SOL]*121)
 
 if __name__=="__main__":
     unittest.main()
