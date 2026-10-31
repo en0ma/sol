@@ -134,13 +134,42 @@ def authenticate_owners(rpc,addresses):
             "pools":candidates,"rejections":rejected,**SAFETY}
 
 
+def balance_candidates(candidates, known, *, limit=80):
+    """Reserve read-only owner-verified candidate slots for underserved venues.
+
+    This is only resource allocation; every emitted pool is still an untrusted
+    candidate until refresh() rechecks program owner, layout, mints and vaults.
+    """
+    from collections import Counter, defaultdict
+    if (not isinstance(candidates,list) or not isinstance(known,list) or
+            type(limit)is not int or not 1<=limit<=120):
+        raise ValueError("invalid bounded index balancing")
+    counts=Counter(x.get("venue") for x in known if isinstance(x,dict))
+    buckets=defaultdict(list)
+    seen=set()
+    for row in candidates:
+        if not isinstance(row,dict) or row.get("venue") not in VENUES:
+            raise ValueError("invalid owner-classified source candidate")
+        key=(row["venue"],row.get("address"))
+        if key in seen:
+            continue
+        seen.add(key)
+        buckets[row["venue"]].append(row)
+    selected=[]
+    while len(selected)<limit and any(buckets.values()):
+        venue=min((v for v in buckets if buckets[v]),key=lambda v:(counts[v],v))
+        selected.append(buckets[venue].pop(0))
+        counts[venue]+=1
+    return selected
+
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument("--registry",default="arb/pool_registry.json")
     parser.add_argument("--rpc",default="http://127.0.0.1:8899")
     parser.add_argument("--output",required=True)
     parser.add_argument("--max-mints",type=int,default=12)
-    parser.add_argument("--max-addresses",type=int,default=80)
+    parser.add_argument("--max-addresses",type=int,default=115)
+    parser.add_argument("--max-candidates",type=int,default=80)
     args=parser.parse_args()
     from arb.six_venue_pipeline import local_rpc_only
     local_rpc_only(args.rpc)
@@ -148,6 +177,8 @@ def main():
     seeds=pick_seeds(hints,args.max_mints)
     inventory=index_addresses(seeds,max_addresses=args.max_addresses)
     owners=authenticate_owners(args.rpc,inventory["addresses"])
+    owners["source_owner_classified_pool_count"]=len(owners["pools"])
+    owners["pools"]=balance_candidates(owners["pools"],hints,limit=args.max_candidates)
     owners["untrusted_index_candidate_count"]=inventory["candidate_count"]
     owners["untrusted_index_errors"]=inventory["errors"]
     owners["seed_mints"]=seeds
