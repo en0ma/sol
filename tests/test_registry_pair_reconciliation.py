@@ -15,6 +15,8 @@ class RegistryPairReconciliationTests(unittest.TestCase):
         self.assertEqual(len(r["cross_venue_shared_pairs"]),1)
         self.assertEqual(r["venue_coverage"]["orca"]["cross_venue_shared_pair"],1)
         self.assertFalse(r["seven_venue_target_met"])
+        self.assertEqual(len(r["venue_coverage"]),7)
+        self.assertEqual(r["venue_coverage"]["raydium_amm_v4"]["authenticated"],0)
         cycles=discover_cycles(r["graph_pools"],min_hops=2,max_hops=2)
         self.assertGreater(cycles["cycle_count"],0)
         self.assertTrue(all(x["broadcast"] is False for x in cycles["cycles"]))
