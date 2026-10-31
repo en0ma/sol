@@ -72,6 +72,11 @@ def screen_signed_cycle_net_acceptance(route, signed_receipt, local_fee,
         identities.append(row["account_address"])
     if len(slots)!=1:
         raise ValueError("cross-slot original account snapshots unsupported")
+    legs=route.get("legs") if isinstance(route,dict) else None
+    if (not isinstance(legs,list) or len(legs)!=len(identities) or
+        any(not isinstance(leg,dict) or leg.get("pool")!=identities[i]
+            for i,leg in enumerate(legs))):
+        raise ValueError("original source accounts must match route legs in order")
     if not isinstance(local_fee,dict) or local_fee.get("status")!=(
         "LOCAL_FEE_EVIDENCE_CORRELATED_NOT_AUTHENTICATED") or (
         local_fee.get("independent_fee_paid_verified") is not False or
