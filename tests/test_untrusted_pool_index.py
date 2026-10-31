@@ -11,6 +11,15 @@ class UntrustedPoolIndexTests(unittest.TestCase):
         self.assertEqual(seeds[:2],[SOL,USDC])
         self.assertIn(x,seeds)
 
+    def test_undercovered_venue_seed_outweighs_common_orca_only_mint(self):
+        rare="r"*44
+        common="c"*44
+        hints=([{"venue":"orca","mints":[SOL,common]} for _ in range(30)]
+               +[{"venue":"pumpswap","mints":[SOL,rare]}])
+        picks=pick_seeds(hints,max_mints=3)
+        self.assertEqual(picks[0],SOL)
+        self.assertEqual(picks[1],rare)
+        self.assertNotIn(common,picks)
     def test_index_only_finds_untrusted_addresses_and_ignores_claimed_symbols(self):
         address=SOL
         def feed(mint):
