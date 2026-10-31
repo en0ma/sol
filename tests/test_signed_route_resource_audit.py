@@ -8,7 +8,7 @@ from solders.keypair import Keypair
 from solders.pubkey import Pubkey
 from solders.instruction import Instruction
 from solders.transaction import Transaction
-from arb.signed_route_resource_audit import inspect_signed_offline_resources, quote_signed_message_fee_offline, inspect_local_recorded_transaction_fee
+from arb.signed_route_resource_audit import inspect_signed_offline_resources, quote_signed_message_fee_offline, inspect_local_recorded_transaction_fee, reconcile_local_fee_observations
 
 
 def signed_wire():
@@ -136,6 +136,44 @@ class SignedResourceAuditTests(unittest.TestCase):
             inspect_local_recorded_transaction_fee(
                 "https://api.mainnet-beta.solana.com",wire,
                 {"err":None,"unitsConsumed":8000},expected_wire_sha256=digest)
+
+
+    @patch("arb.rpc.call")
+    def test_correlate_local_quote_and_recording_without_proving_fee(self, call):
+        wire,digest=signed_wire()
+        simulation={"err":None,"unitsConsumed":8000}
+        call.return_value={"context":{"slot":19},"value":5000}
+        quote=quote_signed_message_fee_offline(
+            "http://127.0.0.1:8899",wire,simulation,expected_wire_sha256=digest)
+        call.return_value={"slot":20,
+            "transaction":[base64.b64encode(wire).decode(),"base64"],
+            "meta":{"err":None,"fee":5100,"computeUnitsConsumed":8100}}
+        recorded=inspect_local_recorded_transaction_fee(
+            "http://127.0.0.1:8899",wire,simulation,expected_wire_sha256=digest)
+        source="a"*64
+        out=reconcile_local_fee_observations(
+            quote,recorded,source_snapshot_sha256=source)
+        self.assertEqual(out["quote_recorded_fee_difference_lamports"],100)
+        self.assertEqual(out["source_snapshot_sha256_unverified"],source)
+        self.assertFalse(out["source_snapshot_authenticated"])
+        self.assertFalse(out["net_profitability_verified"])
+        self.assertIsNone(out["fee_lamports"])
+        self.assertFalse(out["broadcast"])
+        for altered_q,altered_r,source_hash in (
+            ({**quote,"first_signature":"wrong"},recorded,source),
+            ({**quote,"observed_simulation_compute_units":7},recorded,source),
+            (quote,{**recorded,"signed_packet_sha256":"b"*64},source),
+            (quote,{**recorded,"local_recorded_fee_lamports":True},source),
+            (quote,{**recorded,"local_recorded_fee_lamports":-1},source),
+            ({**quote,"independent_fee_paid_verified":True},recorded,source),
+            ({**quote,"fee_lamports":5000},recorded,source),
+            ({**quote,"actionable":True},recorded,source),
+            (quote,recorded,"not-a-sha"),
+        ):
+            with self.subTest(quote=altered_q,recorded=altered_r,source=source_hash):
+                with self.assertRaises(ValueError):
+                    reconcile_local_fee_observations(
+                        altered_q,altered_r,source_snapshot_sha256=source_hash)
 
     def test_wire_size_and_digest_type_blocked(self):
         wire,digest=signed_wire()
