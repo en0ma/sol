@@ -83,7 +83,7 @@ def unique_venue_pairs(pools, *, labels=None):
     return unique
 
 def candidate_pairs(hints, *, max_pairs=30):
-    if (not isinstance(hints, list) or len(hints)>256 or
+    if (not isinstance(hints, list) or len(hints)>512 or
             type(max_pairs) is not int or not 1<=max_pairs<=100):
         raise ValueError("bounded mint-pair source inventory required")
     pairs=defaultdict(set)
@@ -154,10 +154,10 @@ def candidate_pairs(hints, *, max_pairs=30):
 
 
 def expand(rpc, hints, *, max_pairs=12, per_order_limit=32, target=20, candidate_hints=None):
-    if not isinstance(hints,list) or len(hints)>256:
+    if not isinstance(hints,list) or len(hints)>512:
         raise ValueError("bounded registry required")
     candidates=[] if candidate_hints is None else candidate_hints
-    if not isinstance(candidates,list) or len(hints)+len(candidates)>256:
+    if not isinstance(candidates,list) or len(hints)+len(candidates)>512:
         raise ValueError("candidate batch exceeds registry bound")
     known={(x.get("venue"),x.get("address")) for x in hints if isinstance(x,dict)}
     clean_candidates=[]
