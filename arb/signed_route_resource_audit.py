@@ -86,3 +86,47 @@ def quote_signed_message_fee_offline(rpc, wire, simulation, *, expected_wire_sha
             "quote_context_slot":response["context"]["slot"],
             "fee_lamports":None,
             "independent_fee_paid_verified":False}
+
+
+def inspect_local_recorded_transaction_fee(rpc, wire, simulation, *, expected_wire_sha256):
+    """Match a local-fork recorded transaction to the exact signed packet.
+
+    This only reports local ledger metadata, never mainnet settlement or
+    independently authenticated economic spend. A missing transaction fails.
+    """
+    import base64
+    from arb.pumpswap_local_simulation import local_rpc_only
+    from arb.rpc import call
+    local_rpc_only(rpc)
+    report=inspect_signed_offline_resources(
+        wire,simulation,expected_wire_sha256=expected_wire_sha256)
+    response=call(rpc,"getTransaction",[
+        report["first_signature"],
+        {"encoding":"base64","commitment":"confirmed",
+         "maxSupportedTransactionVersion":0}])
+    if not isinstance(response,dict):
+        raise ValueError("local transaction receipt absent")
+    transaction=response.get("transaction")
+    meta=response.get("meta")
+    if (not isinstance(transaction,list) or len(transaction)!=2
+            or transaction[1]!="base64" or not isinstance(transaction[0],str)):
+        raise ValueError("local recorded wire unavailable")
+    try:
+        recorded=base64.b64decode(transaction[0],validate=True)
+    except (ValueError,base64.binascii.Error) as exc:
+        raise ValueError("invalid local transaction encoding") from exc
+    if recorded!=wire:
+        raise ValueError("local transaction signed bytes mismatch")
+    if (type(response.get("slot")) is not int or response["slot"]<0
+            or not isinstance(meta,dict) or meta.get("err") is not None
+            or type(meta.get("fee")) is not int or not 0<=meta["fee"]<2**64
+            or type(meta.get("computeUnitsConsumed")) is not int
+            or not 0<meta["computeUnitsConsumed"]<=MAX_CU):
+        raise ValueError("invalid local recorded fee or execution metadata")
+    return {**report,
+            "status":"LOCAL_RECORDED_TRANSACTION_FEE_DIAGNOSTIC_ONLY",
+            "local_recorded_slot":response["slot"],
+            "local_recorded_fee_lamports":meta["fee"],
+            "local_recorded_compute_units":meta["computeUnitsConsumed"],
+            "independent_fee_paid_verified":False,
+            "fee_lamports":None}
