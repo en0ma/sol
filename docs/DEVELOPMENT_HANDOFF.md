@@ -78,3 +78,9 @@ Implementation: `4408ca7c0965174b0eeba8a5e999a9592450e04c`; adversarial tests: `
 - Fail-closed tests cover mismatched packets/signatures, cost type errors, false fee-paid flags, accidentally actionable evidence and invalid source digest.
 - **No source authentication or new fee-paid acceptance**: both correlated reports can be from the same untrusted fork. The source hash is only a binding label, not independent proof. `fee_lamports=None`, `net_profitability_verified=False`, `actionable=False`, `broadcast=False`. Existing actual signed acceptance counts unchanged.
 - Verify CI on this commit. Next: truly independently authenticate original source snapshot and actual off-chain balance accounting, audit fee-payer lamports and WSOL/SPL poststates at consistent slot, then integrate into shared offline coordinator if and only if independently established.
+
+## 2026-10-31 original-source byte digest checkpoint
+- Code `d5e0be801bdc064805ea5ecdd5c1438178e4d0fb`, adversarial test `11dc87c259705276be08e7186fb9ac84a6a475dc`.
+- Extended existing `reconcile_local_fee_observations` to optionally require actual original snapshot bytes match their declared SHA-256 (bounded 4 MiB, non-empty, strict bytes). New tests reject tampered content, oversized blobs, wrong Python types, and preserve diagnostic-only outcomes.
+- The check proves content-integrity **relative to the supplied digest**, NOT independently authenticated RPC provenance, current state, signed execution SPL acceptance, fee-payer spend, or net profitability. Output `source_snapshot_authenticated=False`, `independent_fee_paid_verified=False`, `fee_lamports=None`, no broadcast.
+- CI status: inspect exact current HEAD workflow runs. Next: independently fetch original account owner/mint/vault/slot and match authenticated source manifest and original bytes, then link genuine signed route execution receipts and fee-payer balances under existing fail-closed coordinator.
