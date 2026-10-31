@@ -83,6 +83,22 @@ class ConnectedPoolDiscoveryTests(unittest.TestCase):
         self.assertEqual(result["venue_coverage"]["raydium_clmm"]["authenticated"],1)
         self.assertFalse(result["broadcast"])
 
+    def test_full_source_candidate_capacity_is_bounded_at_256(self):
+        # Source candidates do not become verified merely by entering a batch.
+        original=[{"venue":"orca","address":str(i).zfill(44)}
+                  for i in range(173)]
+        candidates=[{"venue":"raydium_amm_v4","address":"V"+str(i).zfill(43)}
+                    for i in range(80)]
+        with patch("arb.connected_pool_discovery.refresh",
+                   return_value={"verified_pools":[],"rejected":[]}) as refresh,\
+             patch("arb.connected_pool_discovery.discover") as discovery:
+            result=expand("rpc",original,candidate_hints=candidates)
+        self.assertEqual(result["admitted"],0)
+        self.assertEqual(result["external_candidate_addresses_checked"],80)
+        self.assertEqual(len(refresh.call_args.args[1]),253)
+        discovery.assert_not_called()
+        with self.assertRaisesRegex(ValueError,"candidate batch"):
+            expand("rpc",original,candidate_hints=candidates*2)
     def test_untrusted_candidate_addresses_require_chain_proof(self):
         original=[{"venue":"orca","address":"a"*44}]
         indexed={"venue":"raydium_amm_v4","address":"b"*44,
