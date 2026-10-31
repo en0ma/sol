@@ -123,6 +123,12 @@ def main():
     result = reconcile(original, chain["verified_pools"], target=args.min_per_venue)
     result["source_rejections"] = chain["rejected"]
     Path(args.output).write_text(json.dumps(result, indent=2) + "\n")
+    if args.clean_registry:
+        clean = {"note": "Source-authenticated pool identities; revalidate before every use",
+                 "pools": [{"venue": row["venue"], "address": row["address"],
+                            "mints": row["mints"], "pair": row["pair"]}
+                           for row in result["graph_pools"]]}
+        Path(args.clean_registry).write_text(json.dumps(clean, indent=2) + "\n")
     print(json.dumps({k:v for k,v in result.items() if k not in
                       ("graph_pools", "cross_venue_shared_pairs", "source_rejections")}, indent=2))
     return 0 if result["seven_venue_target_met"] else 2
