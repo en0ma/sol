@@ -30,7 +30,8 @@ class TransactionInventoryTests(unittest.TestCase):
     def test_quote_blockers_explained(self):
         a,b=self.inputs()
         a["routes"].append({"index":4,"venues":["orca","pumpswap"]})
-        ranking={"all_results":[{"index":3,"status":"GROSS_INDICATIVE_ONLY"},
+        ranking={"all_results":[{"index":3,"status":"GROSS_INDICATIVE_ONLY",
+                                 "gross_delta_start_mint_base_units":123,"positive_gross":True},
                                 {"index":4,"status":"QUOTE_BLOCKED",
                                  "reason":"effective fee not authenticated"}]}
         result=collect(a,b,ranking)
