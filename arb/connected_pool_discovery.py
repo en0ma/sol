@@ -144,14 +144,16 @@ def candidate_pairs(hints, *, max_pairs=30):
 def expand(rpc, hints, *, max_pairs=12, per_order_limit=32, target=20):
     if not isinstance(hints,list) or len(hints)>200:
         raise ValueError("bounded registry required")
-    base=refresh(rpc,hints)
-    # Search only trusted existing onchain identities for their exact pairs.
-    # A bad/unverified hint must never inject arbitrary search seeds.
-    seeds=candidate_pairs(base["verified_pools"],max_pairs=max_pairs)
+    # Hint mint pairs are ONLY read-only search seeds. Never promote any
+    # hint: every returned candidate must pass owner/layout/vault verification.
+    # Search before the 90-address refresh to preserve scarce RPC capacity
+    # for finding new pools rather than repeatedly rediscovering old ones.
+    seeds=candidate_pairs(hints,max_pairs=max_pairs)
     discovered=discover(rpc,seeds,limit=per_order_limit,
                         registry_entries=None,venues=list(VENUES)) if seeds else {
                             "pools":[],"errors":[],"status":"NO_VERIFIED_SEEDS",
                             "venue_attempts":{}}
+    base=refresh(rpc,hints)
     joined={}
     for pool in base["verified_pools"]:
         joined[(pool["venue"],pool["address"])]=pool
