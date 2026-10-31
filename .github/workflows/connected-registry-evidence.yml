@@ -73,8 +73,8 @@ jobs:
           from pathlib import Path
           data=json.loads((Path(os.environ["RUNNER_TEMP"])/"connected-registry-evidence.json").read_text())
           with open(os.environ["GITHUB_STEP_SUMMARY"],"a") as fp:
-              fp.write("| Venue | Verified pools | Cross-venue connected | Still needed |\n")
-              fp.write("|---|---:|---:|---:|\n")
+              fp.write("| Venue | Verified pools | Both mints linked | Closed 2-6 hop pools | Still needed |\n")
+              fp.write("|---|---:|---:|---:|---:|\n")
               for venue,counts in sorted(data["venue_coverage"].items()):
                   fp.write(f"| {venue} | {counts['authenticated']} | {counts['cross_venue_mint_connected']} | {counts['closed_cross_venue_cycle_pools']} | {counts['missing_to_target']} |\n")
               fp.write("\nPool/account attestation is read-only and does not verify executable pricing or net profit.\n")
