@@ -1,16 +1,15 @@
 {
-  "note": "Source-authenticated pool identity hints. All 90 canonical mint pairs refreshed by independent owner/vault reads; labels are display only and must never be graph identity. Revalidate on every use.",
+  "note": "Curated unique pool identity hints, independently verified in prior Surfpool source artifact 13053606108; source revalidation mandatory before route use. Pair names are <=9 chars; graph identities remain exact two mint pubkeys. Removed historical duplicates remain available in git history.",
+  "last_identity_refresh_evidence": {
+    "workflow_run_id": 41230030078,
+    "artifact_id": 13053606108,
+    "source_status": "SOURCE_AUTHENTICATED_REGISTRY_COVERAGE",
+    "confirmed_pool_identities": 90,
+    "pair_mints_source": "ONCHAIN_OWNER_VAULT_READ",
+    "labels": "METAPLEX_SELF_DECLARED_OR_CURATED_DISPLAY_ONLY"
+  },
+  "unique_pair_policy": "ONE_PER_VENUE_AND_UNORDERED_CANONICAL_MINT_PAIR_AND_DISPLAY_PAIR",
   "pools": [
-    {
-      "venue": "orca",
-      "address": "7qbRF6YsyGuLUVs6Y1q64bdVrfe4ZcUUz1JRdoVNUJnm",
-      "mints": [
-        "So11111111111111111111111111111111111111112",
-        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
-      ],
-      "pair": "SOL/USDC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
-    },
     {
       "venue": "raydium_cpmm",
       "address": "7JuwJuNU88gurFnyWeiyGKbFmExMWcmRZntn9imEzdny",
@@ -19,7 +18,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "SOL/USDC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "raydium_clmm",
@@ -41,17 +40,7 @@
         "independent_receipt_sha256": "ca636d51efbe0e97b175c7808ca74e157aae9271dbbd292f5c70b70451b0cf8d"
       },
       "pair": "RAY/USDC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
-    },
-    {
-      "venue": "orca",
-      "address": "5sgXhG1c9VBceg6aVQguK3NnbPfHinERZj86As6zW5Be",
-      "mints": [
-        "So11111111111111111111111111111111111111112",
-        "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R"
-      ],
-      "pair": "SOL/RAY",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -61,7 +50,7 @@
         "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R"
       ],
       "pair": "SOL/RAY",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "meteora_damm_v2",
@@ -71,7 +60,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "IGN/USDC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "meteora_dlmm",
@@ -93,29 +82,7 @@
         "independent_receipt_sha256": "744918ebc056b7a195f3e66c6d3d9d70facbff5af0517700b46e6a68859821f9"
       },
       "pair": "SOL/USDC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
-    },
-    {
-      "venue": "meteora_dlmm",
-      "address": "BGm1tav58oGcsQJehL9WXBFXF7D27vZsKefj4xJKD5Y",
-      "mints": [
-        "So11111111111111111111111111111111111111112",
-        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
-      ],
-      "signed_provenance": {
-        "status": "INDEPENDENT_DLMM_SIGNED_NATIVE_SDK_SPL_PARITY",
-        "source_slot": 462752051,
-        "source_digest": "5bba9167611fe87424f33e4444954a6281b2c5019c28801caa8256598f08def9",
-        "signed_transaction_hashes": [
-          "c8e1cbd17e926893a3485f7d258c8630e3e06425607878a5594ef53508473bc4",
-          "76ba10d31013b01ed6e8d9166fbf1956afd4334d295ee1a4d3bc7a7c352fefe0",
-          "e6fc75e922f56f88a5766fc857cc1ba6b66d4bc1dc37bbbd681f5c53e98ef145",
-          "8305469db696a36b75eb09faf4fe098bdb114abfe4d991556f92ec3143a978ae"
-        ],
-        "independent_receipt_sha256": "23cc5504779cebb3de9cc727ce92b189d6e5155ad96e14808080d62e99751384"
-      },
-      "pair": "SOL/USDC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "meteora_dlmm",
@@ -137,29 +104,7 @@
         "independent_receipt_sha256": "f24af87ede5c62374c0ec64190ca472f902ace10efb671e8e5426be81eb514ce"
       },
       "pair": "SOL/HYPE",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
-    },
-    {
-      "venue": "meteora_dlmm",
-      "address": "HTvjzsfX3yU6BUodCjZ5vZkUrAxMDTrBs3CJaq43ashR",
-      "mints": [
-        "So11111111111111111111111111111111111111112",
-        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
-      ],
-      "signed_provenance": {
-        "status": "INDEPENDENT_DLMM_SIGNED_NATIVE_SDK_SPL_PARITY",
-        "source_slot": 462835102,
-        "source_digest": "0db5c6a3c8a270ec8439ef5c1635fe30c4ff2e81992ecff5eae1b63d429efefe",
-        "signed_transaction_hashes": [
-          "473d8d20dfc6be73879d630d8117978bb46dfd586e94e43ce4925a780eda7047",
-          "4c31c8473df9cd22fe6db97bc958adf1be40aed3f96ccbb5121e3d66912640ea",
-          "f0b7e54ffcf72fdf6b423ef1033d2d628138988114ef596799bd769adbdb7f83",
-          "216829d6348db2f6d3f1387b6b8a0522cdf8926341ec63c48593b3bf4a8ef440"
-        ],
-        "independent_receipt_sha256": "9ad2cf2b5030c2ad888a4ba64413b0480e5ccdad4aaf5cafd5dc71056b569dab"
-      },
-      "pair": "SOL/USDC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "meteora_dlmm",
@@ -180,30 +125,8 @@
         ],
         "independent_receipt_sha256": "dd07b2f89633416f7262b79f58948e2419d3ed7ccf2f7a6e3bd4b5f95742356e"
       },
-      "pair": "TRUMP/USDC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
-    },
-    {
-      "venue": "meteora_dlmm",
-      "address": "HRYEjwdo3bZ1TpXKWKcezqiwSV2Ywuh4LxMa2PzoCnG6",
-      "mints": [
-        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-        "So11111111111111111111111111111111111111112"
-      ],
-      "signed_provenance": {
-        "status": "INDEPENDENT_DLMM_SIGNED_NATIVE_SDK_SPL_PARITY",
-        "source_slot": 462835112,
-        "source_digest": "416776e564fa4d98f574a1aed2e23cd480aef4c67c1ba729dc8dd79d02d3bc42",
-        "signed_transaction_hashes": [
-          "af45d61830b033c6c4fdb4bd0c755797f46c6ee5a86a6488fb32cb94c4129d56",
-          "8dcb308e44092c96037008a6b2731b89ec441942cb5ca206fe461a25d9950173",
-          "ae6cf4a027e9d86d82e13fbd5dd2c098f5138836676f09be226eee36615b116f",
-          "6c6dec81460825a01228f38c995732222e387e86ac6a7d630e2420bb9cb55d1f"
-        ],
-        "independent_receipt_sha256": "415e3eee7c3a2e54bc3028d9f425f897bfd6d943f13d43cffde82f9f33ebb466"
-      },
-      "pair": "USDC/SOL",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair": "TRUM/USDC",
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "meteora_damm_v2",
@@ -212,8 +135,8 @@
         "DiStBvLwCtgArqTrYkzW9cNep9RVsXWDpHEvkhkGqE18",
         "So11111111111111111111111111111111111111112"
       ],
-      "pair": "ORIGAMI/SOL",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair": "ORIG/SOL",
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "meteora_damm_v2",
@@ -223,7 +146,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "SOL/USDC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "meteora_damm_v2",
@@ -233,7 +156,7 @@
         "So11111111111111111111111111111111111111112"
       ],
       "pair": "CUTS/SOL",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "meteora_damm_v2",
@@ -242,8 +165,8 @@
         "pbeS17G29TM6kbS6pgezvnH8V8JXN3b6LYd6xRgyway",
         "So11111111111111111111111111111111111111112"
       ],
-      "pair": "MIDWAY/SOL",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair": "MIDW/SOL",
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "meteora_damm_v2",
@@ -253,7 +176,7 @@
         "So11111111111111111111111111111111111111112"
       ],
       "pair": "RIV/SOL",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "meteora_damm_v2",
@@ -262,8 +185,8 @@
         "6Mix12LiHrQFojaQEnfPUC65Qkwd6X4Y5Qg93oFbordr",
         "So11111111111111111111111111111111111111112"
       ],
-      "pair": "BORDR/SOL",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair": "BORD/SOL",
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "meteora_damm_v2",
@@ -272,8 +195,8 @@
         "H8WTvo3ZXSYHJAcYqzCforbG8coR1FDAX2kHFfqHBAGS",
         "So11111111111111111111111111111111111111112"
       ],
-      "pair": "BAGSPAY/SOL",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair": "BAGS/SOL",
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "pumpswap",
@@ -295,7 +218,7 @@
         "independent_receipt_sha256": "d7c92e0901a98b9ae39d27914bb2f3f0077081f66b3299b3398cabd1eac250b2"
       },
       "pair": "USDC/SOL",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "pumpswap",
@@ -316,8 +239,8 @@
         ],
         "independent_receipt_sha256": "dfcf77b60326c6a89dc01ba2d6fdce9d106284f3041a475524e4dff84e6ab8a1"
       },
-      "pair": "neet/SOL",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair": "NEET/SOL",
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "pumpswap",
@@ -339,7 +262,7 @@
         "independent_receipt_sha256": "938d7df533c3e5e6439f8e3d4da18b2d34ded84e25dabf308f3c9006efd3837b"
       },
       "pair": "SOL/RSGP",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "pumpswap",
@@ -361,7 +284,7 @@
         "independent_receipt_sha256": "aa904ae0cf202e663e57027be4a110707307dfddd5cfe8f2e3b12dbb0ef2b19f"
       },
       "pair": "SOL/ALLOX",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "pumpswap",
@@ -383,7 +306,7 @@
         "independent_receipt_sha256": "295cd338e39c890f1861538baf8272fefdbdc285129c0bf8e435ca9d545d4ef8"
       },
       "pair": "SOL/PULT",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "pumpswap",
@@ -392,30 +315,8 @@
         "So11111111111111111111111111111111111111112",
         "BP172LqcuPuADw7WtYg961dVQ778xC6zc1pvm6NfZSR"
       ],
-      "pair": "SOL/SEXCOIN",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
-    },
-    {
-      "venue": "pumpswap",
-      "address": "8dvFN9YTbWW3Lo6zV9Uxs6Mzkgg6fyuA6vAYDN94twvN",
-      "mints": [
-        "So11111111111111111111111111111111111111112",
-        "EjPr9rQuavUaSMs2HHsbPdAi5KWfvwwF2r1AdW9kRkLR"
-      ],
-      "signed_provenance": {
-        "status": "INDEPENDENT_SIGNED_NATIVE_SDK_SPL_PARITY",
-        "source_slot": 462733379,
-        "source_digest": "14c9f1f542735ce3bd6fa1dcd960cc61c42bdf657404fc84dee75aa1c416e674",
-        "signed_transaction_hashes": [
-          "1dff05959aa0f101af82d7e24661f5786bfff26a3b097cf80c2ce90aa37d3e57",
-          "54051ac235089c559fd524ce19856e4d99698f87bbb0e143c550402b778807fe",
-          "5aca3aaae923e541ebb7afbba1d97a4a31368dc7c63778ff8e5990d49cecf66e",
-          "a59aa1132c8730a5241719a5c90d840c99080a911afb3c3178f966db8caf4f8c"
-        ],
-        "independent_receipt_sha256": "5c4e483951d3113cab6d3d9522b8c1a8bb9e460781c0bb69f3f79839030cf1fd"
-      },
-      "pair": "SOL/RSGP",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair": "SOL/SEXCO",
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "pumpswap",
@@ -437,7 +338,7 @@
         "independent_receipt_sha256": "42e58131ea70bb425348ca98da05d36eb09661cfb4ecb3109de7bb80ddba32e4"
       },
       "pair": "SOL/AE",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "pumpswap",
@@ -446,8 +347,8 @@
         "So11111111111111111111111111111111111111112",
         "5cYCnK4mcawrY7tofiERjPr97MceNwiV5iNMY3Sj9hSQ"
       ],
-      "pair": "SOL/MAKERS",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair": "SOL/MAKER",
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "pumpswap",
@@ -457,7 +358,7 @@
         "MFmKFZqoaQ7qN4VsSM8F7E2TnvxWaxoteK2jUmN1wjs"
       ],
       "pair": "SOL/PRIME",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -467,7 +368,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "SOL/USDC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -477,7 +378,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "USX/USDC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -486,8 +387,8 @@
         "AvZZF1YaZDziPY2RCK4oJrRVrbN3mTD9NL24hPeaZeUj",
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
-      "pair": "syrupUSDC/USDC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair": "SYRU/USDC",
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -496,8 +397,8 @@
         "So11111111111111111111111111111111111111112",
         "cbbtcf3aa214zXHbiAZQwf4122FBYbraNdFqgw4iMij"
       ],
-      "pair": "SOL/cbBTC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair": "SOL/CBBTC",
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -506,8 +407,8 @@
         "Ex8hKasfFCfj3yGuN5TyYRUjHePgVs3uYUJRT8geT7rv",
         "HAYQtfJEQ9DbDbaHEhxfGsWbSZ3ywthdsVB3PuB72DYe"
       ],
-      "pair": "apyUSD/apxUSD",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair": "APYU/APXU",
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -517,7 +418,7 @@
         "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs"
       ],
       "pair": "SOL/WETH",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -526,8 +427,8 @@
         "So11111111111111111111111111111111111111112",
         "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn"
       ],
-      "pair": "SOL/JitoSOL",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair": "SOL/JITOS",
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -536,8 +437,8 @@
         "cbbtcf3aa214zXHbiAZQwf4122FBYbraNdFqgw4iMij",
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
-      "pair": "cbBTC/USDC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair": "CBBT/USDC",
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -546,8 +447,8 @@
         "5Y8NV33Vv7WbnLfq3zBcKSdYPrk7g2KoiQoe7M2tcxp5",
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
-      "pair": "ONyc/USDC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair": "ONYC/USDC",
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -557,7 +458,7 @@
         "A7bdiYdS5GjqGFtxf17ppRHtDKPkkRqbKtR27dxvQXaS"
       ],
       "pair": "SOL/ZEC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -566,8 +467,8 @@
         "JuprjznTrTSp2UFa3ZBUFgwdAmtZCq4MQCwysN55USD",
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
-      "pair": "JupUSD/USDC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair": "JUPU/USDC",
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -576,8 +477,8 @@
         "3b8X44fLF9ooXaUm3hhSgjpmVs6rZZ3pPoGnGahc3Uu7",
         "GNE6oDS6jHrfaV3GQVVCCp37fDnT7PiPuewMKBj2bqNm"
       ],
-      "pair": "3b8X44fL…/AUTO",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair": "3B8X/AUTO",
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -587,7 +488,7 @@
         "2zMMhcVQEXDtdE6vsFS7S7D5oUodfJHE8vd1gnBouauv"
       ],
       "pair": "SOL/PENGU",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -597,7 +498,7 @@
         "98sMhvDwXj1RQi5c5Mndm3vPe9cBqPrbLaufMXFNMh5g"
       ],
       "pair": "SOL/HYPE",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -606,8 +507,8 @@
         "cbbtcf3aa214zXHbiAZQwf4122FBYbraNdFqgw4iMij",
         "3orqhCKM5admbcHkHQhRAEKbXhUT5VPgsQqz7fBa6QdF"
       ],
-      "pair": "cbBTC/FBTC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair": "CBBT/FBTC",
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -617,7 +518,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "ZEC/USDC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -627,7 +528,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "USDY/USDC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -636,8 +537,8 @@
         "5YMkXAYccHSGnHn9nob9xEvv6Pvka9DZWH7nTbotTu9E",
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
-      "pair": "hyUSD/USDC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair": "HYUS/USDC",
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -647,7 +548,7 @@
         "6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx"
       ],
       "pair": "SOL/STONK",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -657,7 +558,7 @@
         "27G8MtK7VtTcCHkpASjSDdkWWYfoqT6ggEuKidVJidD4"
       ],
       "pair": "SOL/JLP",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -667,7 +568,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "KMNO/USDC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -677,7 +578,7 @@
         "3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh"
       ],
       "pair": "SOL/WBTC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -687,7 +588,7 @@
         "pSo1f9nQXWgXibFtKf7NWYxb5enAM4qfP6UJSiXRQfL"
       ],
       "pair": "SOL/PSOL",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -697,7 +598,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "NEAR/USDC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -706,8 +607,8 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
         "HAYQtfJEQ9DbDbaHEhxfGsWbSZ3ywthdsVB3PuB72DYe"
       ],
-      "pair": "USDC/apxUSD",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair": "USDC/APXU",
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -716,8 +617,8 @@
         "cbbtcf3aa214zXHbiAZQwf4122FBYbraNdFqgw4iMij",
         "3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh"
       ],
-      "pair": "cbBTC/WBTC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair": "CBBT/WBTC",
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -726,8 +627,8 @@
         "jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL",
         "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn"
       ],
-      "pair": "JTO/JitoSOL",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair": "JTO/JITOS",
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -736,8 +637,8 @@
         "So11111111111111111111111111111111111111112",
         "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump"
       ],
-      "pair": "SOL/Fartcoin",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair": "SOL/FARTC",
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -746,8 +647,8 @@
         "6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN",
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
-      "pair": "TRUMP/USDC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair": "TRUM/USDC",
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -757,7 +658,7 @@
         "orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE"
       ],
       "pair": "SOL/ORCA",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -767,7 +668,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "MPLX/USDC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -776,8 +677,8 @@
         "So11111111111111111111111111111111111111112",
         "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk"
       ],
-      "pair": "SOL/USELESS",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair": "SOL/USELE",
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -787,7 +688,7 @@
         "So11111111111111111111111111111111111111112"
       ],
       "pair": "JUP/SOL",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -797,7 +698,7 @@
         "EicWvteVi2fWepEzS3FYWsnuPoP6caZfjnKqNvydLjCH"
       ],
       "pair": "SOL/LIT",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -807,7 +708,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "RUSH/USDC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -817,7 +718,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "SKR/USDC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -827,7 +728,7 @@
         "3ZLekZYq2qkZiSpnSvabjit34tUkjSwD1JFuW9as9wBG"
       ],
       "pair": "SOL/NEAR",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -837,7 +738,7 @@
         "CARDSccUMFKoPRZxt5vt3ksUbxEFEcnZ3H2pd3dKxYjp"
       ],
       "pair": "SOL/CARDS",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -846,8 +747,8 @@
         "So11111111111111111111111111111111111111112",
         "4sWNB8zGWHkh6UnmwiEtzNxL4XrN7uK9tosbESbJFfVs"
       ],
-      "pair": "SOL/xSOL",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair": "SOL/XSOL",
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -857,7 +758,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "HYPE/USDC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "orca",
@@ -867,7 +768,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "GEOD/USDC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "meteora_damm_v2",
@@ -876,8 +777,8 @@
         "6sXzcNzDk8x4Atcee6vv25iw5bLyg8mLJRtVhwM8Kgan",
         "CWZ6BsdnjkDVTGkmL6bGbJXXig6ceef12KvyGQW14cMt"
       ],
-      "pair": "LUCKY99/ANTFUN",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair": "LUCK/ANTF",
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "meteora_damm_v2",
@@ -886,8 +787,8 @@
         "GM8EysYT8NRSsoULdeYShbRsUdhoUoiB9EN4eW3YETCH",
         "3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh"
       ],
-      "pair": "ETCHY/WBTC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair": "ETCH/WBTC",
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "meteora_damm_v2",
@@ -897,7 +798,7 @@
         "So11111111111111111111111111111111111111112"
       ],
       "pair": "OP/SOL",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "meteora_damm_v2",
@@ -907,7 +808,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "HUMA/USDC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "meteora_damm_v2",
@@ -917,7 +818,7 @@
         "So11111111111111111111111111111111111111112"
       ],
       "pair": "DIOR/SOL",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "meteora_damm_v2",
@@ -927,7 +828,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "USDP/USDC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "raydium_cpmm",
@@ -936,8 +837,8 @@
         "So11111111111111111111111111111111111111112",
         "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk"
       ],
-      "pair": "SOL/USELESS",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair": "SOL/USELE",
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "raydium_cpmm",
@@ -947,7 +848,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "NEAR/USDC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "raydium_cpmm",
@@ -957,7 +858,7 @@
         "egoS1kE1g4JuExTcvG6bB6cg5LWpACQ469uk6DTMuJq"
       ],
       "pair": "SOL/EGO",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "raydium_cpmm",
@@ -967,7 +868,7 @@
         "9Fdne837tZp97nDZTUqxv9t8Gwp2BwRf8EF7PGAAfoNe"
       ],
       "pair": "KBLH/ONE",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "raydium_cpmm",
@@ -977,7 +878,7 @@
         "G3WXHCewhSrDEqb9fWMd8FayngKCahbt4Naz6CbGKoNE"
       ],
       "pair": "ONE/TRNTY",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "raydium_cpmm",
@@ -987,7 +888,7 @@
         "As8wX7HWeCUPabovsTT6RY14GDCfUYiwFW7r9XQSMonE"
       ],
       "pair": "ONE/FOL",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "raydium_cpmm",
@@ -997,7 +898,7 @@
         "C9KxtjQQw1QYUQG62qWnzZh8V7gz3tNpRcqMYmTJponE"
       ],
       "pair": "ONE/GOLDB",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "raydium_cpmm",
@@ -1007,7 +908,7 @@
         "9Fdne837tZp97nDZTUqxv9t8Gwp2BwRf8EF7PGAAfoNe"
       ],
       "pair": "AASB/ONE",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "raydium_clmm",
@@ -1029,7 +930,7 @@
         "independent_receipt_sha256": "dbeaf5a5504bc6bb7a23c810effe718b30ff532a28c0e7adf95d32a2ac3a7a29"
       },
       "pair": "USD1/USDC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "raydium_clmm",
@@ -1051,7 +952,7 @@
         "independent_receipt_sha256": "fd853c216a22b27881c334bd798e8205c2cb33284adc4c7127dde384055cd018"
       },
       "pair": "SOL/USDC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "raydium_clmm",
@@ -1073,7 +974,7 @@
         "independent_receipt_sha256": "f4f173672181b5600588175205e7792c30c9bae66dafb967fd8d8ea69447a1b0"
       },
       "pair": "USX/USDC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "raydium_clmm",
@@ -1095,7 +996,7 @@
         "independent_receipt_sha256": "1fde6712345e3d5222fe21dd6e0e57803304acad673161a1cc92315722f699d2"
       },
       "pair": "SOL/USD1",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "raydium_clmm",
@@ -1116,8 +1017,8 @@
         ],
         "independent_receipt_sha256": "90cc2526e280b32225eb2de64417dc3bdababe7df6741337caf9b8ded0a823b5"
       },
-      "pair": "CARDS/USDC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair": "CARD/USDC",
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     },
     {
       "venue": "raydium_clmm",
@@ -1139,15 +1040,7 @@
         "independent_receipt_sha256": "00bef24ad5d2aba7ea872244682c061de0980006311766059b6e64caef4bea70"
       },
       "pair": "GTR/USDC",
-      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY"
+      "pair_label_source": "ONCHAIN_METADATA_OR_CURATED_DISPLAY_ONLY_TRUNCATED_9"
     }
-  ],
-  "last_identity_refresh_evidence": {
-    "workflow_run_id": 41230030078,
-    "artifact_id": 13053606108,
-    "source_status": "SOURCE_AUTHENTICATED_REGISTRY_COVERAGE",
-    "confirmed_pool_identities": 90,
-    "pair_mints_source": "ONCHAIN_OWNER_VAULT_READ",
-    "labels": "METAPLEX_SELF_DECLARED_OR_CURATED_DISPLAY_ONLY"
-  }
+  ]
 }
