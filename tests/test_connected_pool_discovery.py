@@ -19,7 +19,10 @@ class ConnectedPoolDiscoveryTests(unittest.TestCase):
                                          for p in pools}))
         self.assertTrue(all(len(p["pair"])<=9 and len(p["mints"])==2
                             and p["mints"][0]!=p["mints"][1] for p in pools))
-        self.assertTrue(all(p.get("signed_provenance") is None for p in pools))
+        from arb.six_venue_registry_eligibility import screen_signed_provenance
+        assessed=screen_signed_provenance(registry)
+        self.assertEqual(assessed["coordinator_eligible_count"],0)
+        self.assertFalse(assessed["actionable"])
     def test_committed_clean_snapshot_is_unique_and_short(self):
         import json
         from pathlib import Path
