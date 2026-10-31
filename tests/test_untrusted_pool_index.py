@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import patch
-from arb.untrusted_pool_index import pick_seeds,index_addresses,authenticate_owners,balance_candidates
+from arb.untrusted_pool_index import pick_seeds,index_addresses,authenticate_owners,balance_candidates,pick_amm_v4_leads
 from arb.orca_whirlpool import SOL,USDC
 from arb.onchain_pool_discovery import VENUES
 
@@ -69,6 +69,16 @@ class UntrustedPoolIndexTests(unittest.TestCase):
         old={"venue":"orca","address":"a"*44}
         new={"venue":"orca","address":"b"*44}
         self.assertEqual(balance_candidates([old,new],[old],limit=2),[new])
+    def test_untrusted_amm_v4_leads_only_provide_unverified_addresses(self):
+        leads=[{"address":SOL,"matching_peer_mints":False,
+                "programId":"FAKE","mints":[SOL,USDC]},
+               {"address":USDC,"matching_peer_mints":True,
+                "programId":"FAKE","mints":[USDC,SOL]},
+               {"address":USDC,"matching_peer_mints":True}]
+        self.assertEqual(pick_amm_v4_leads(leads,[],limit=2),[USDC,SOL])
+        self.assertEqual(pick_amm_v4_leads(leads,[{"address":USDC}],limit=2),[SOL])
+        with self.assertRaises(ValueError):
+            pick_amm_v4_leads(leads,[],limit=50)
     def test_index_forgery_and_oversized_batch_fail(self):
         with self.assertRaises(ValueError):
             index_addresses([SOL],max_addresses=200)
