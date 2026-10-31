@@ -11,6 +11,8 @@ on:
       - "tests/test_six_venue_cycle_eligibility.py"
       - "arb/six_venue_route_economics.py"
       - "tests/test_six_venue_route_economics.py"
+      - "arb/signed_route_resource_audit.py"
+      - "tests/test_signed_route_resource_audit.py"
       - "arb/six_venue_quote_continuity.py"
       - "tests/test_six_venue_quote_continuity.py"
       - "arb/atomic_graph_coordinator.py"
@@ -39,6 +41,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_six_venue_cycle_eligibility.py -v
       - name: Verify exact 2-6 leg cost-accounting boundaries
         run: python3 -m unittest discover -s tests -p test_six_venue_route_economics.py -v
+      - name: Independently reject forged signed wire or missing compute evidence
+        run: python3 -m unittest discover -s tests -p test_signed_route_resource_audit.py -v
       - name: Verify source-bound exact quote continuity never promotes live routes
         run: python3 -m unittest discover -s tests -p test_six_venue_quote_continuity.py -v
       - name: Validate registered 2-6 leg coordinator dispatch and no-broadcast gates
