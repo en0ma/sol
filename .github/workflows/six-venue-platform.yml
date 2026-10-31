@@ -20,6 +20,8 @@ on:
       - "arb/atomic_graph_coordinator.py"
       - "arb/registry_pair_reconciliation.py"
       - "arb/connected_pool_discovery.py"
+      - "arb/onchain_pool_discovery.py"
+      - "tests/test_amm_v4_connected_pool_discovery.py"
       - "tests/test_connected_pool_discovery.py"
       - "arb/registry_multihop_cycles.py"
       - "tests/test_registry_pair_reconciliation.py"
@@ -62,6 +64,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_registry_pair_reconciliation.py -v
       - name: Validate source-authenticated shared-pair pool discovery
         run: python3 -m unittest discover -s tests -p test_connected_pool_discovery.py -v
+      - name: Verify AMM v4 seventh venue source-owned mints and reserves
+        run: python3 -m unittest discover -s tests -p test_amm_v4_connected_pool_discovery.py -v
       - name: Test signed transaction inventory and fail-closed economics
         run: python3 -m unittest discover -s tests -p test_signed_transaction_inventory.py -v
       - name: Assert all six venues are fixed and no DBC/AMM-v4 sneaks into the platform
