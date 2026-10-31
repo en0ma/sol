@@ -130,3 +130,56 @@ def inspect_local_recorded_transaction_fee(rpc, wire, simulation, *, expected_wi
             "local_recorded_compute_units":meta["computeUnitsConsumed"],
             "independent_fee_paid_verified":False,
             "fee_lamports":None}
+
+
+def reconcile_local_fee_observations(quote, recorded, *, source_snapshot_sha256):
+    """Correlate diagnostic fee observations without asserting source authenticity.
+
+    Only checks cross-report identity and provenance *labels*. Both reports
+    may originate from an untrusted local RPC; source hash is not independently
+    authenticated here. A quoted fee is not evidence of paid spend.
+    """
+    def digest(value):
+        return (type(value) is str and len(value)==64 and
+                all(ch in "0123456789abcdef" for ch in value))
+    if not digest(source_snapshot_sha256):
+        raise ValueError("source snapshot digest required")
+    if not isinstance(quote,dict) or not isinstance(recorded,dict):
+        raise ValueError("both local observations required")
+    if (quote.get("status")!="SIGNED_MESSAGE_FEE_QUOTE_NOT_PAID_FEE" or
+        recorded.get("status")!="LOCAL_RECORDED_TRANSACTION_FEE_DIAGNOSTIC_ONLY" or
+        any(row.get(k) is not False for row in (quote,recorded) for k in SAFE) or
+        any(row.get("independent_fee_paid_verified") is not False
+            or row.get("fee_lamports") is not None for row in (quote,recorded))):
+        raise ValueError("fee evidence not diagnostic-only")
+    for key in ("signed_packet_sha256","first_signature","packet_size_bytes",
+                "observed_simulation_compute_units","signatures_count"):
+        if not quote.get(key) or type(quote[key]) is not type(recorded.get(key)) or quote[key]!=recorded[key]:
+            raise ValueError("signed packet and simulation observations disagree: "+key)
+    if (not digest(quote["signed_packet_sha256"]) or
+        not digest(quote.get("signed_message_sha256")) or
+        type(quote.get("quoted_fee_lamports")) is not int or
+        not 0<=quote["quoted_fee_lamports"]<2**64 or
+        type(recorded.get("local_recorded_fee_lamports")) is not int or
+        not 0<=recorded["local_recorded_fee_lamports"]<2**64 or
+        type(quote.get("quote_context_slot")) is not int or quote["quote_context_slot"]<0 or
+        type(recorded.get("local_recorded_slot")) is not int or recorded["local_recorded_slot"]<0 or
+        type(recorded.get("local_recorded_compute_units")) is not int or
+        not 0<recorded["local_recorded_compute_units"]<=MAX_CU):
+        raise ValueError("malformed local fee evidence")
+    return {"status":"LOCAL_FEE_EVIDENCE_CORRELATED_NOT_AUTHENTICATED",
+            "source_snapshot_sha256_unverified":source_snapshot_sha256,
+            "signed_packet_sha256":quote["signed_packet_sha256"],
+            "signed_message_sha256":quote["signed_message_sha256"],
+            "first_signature":quote["first_signature"],
+            "quote_context_slot":quote["quote_context_slot"],
+            "local_recorded_slot":recorded["local_recorded_slot"],
+            "fee_quote_lamports":quote["quoted_fee_lamports"],
+            "local_recorded_fee_lamports":recorded["local_recorded_fee_lamports"],
+            "quote_recorded_fee_difference_lamports":
+                recorded["local_recorded_fee_lamports"]-quote["quoted_fee_lamports"],
+            "simulation_compute_units":quote["observed_simulation_compute_units"],
+            "recorded_compute_units":recorded["local_recorded_compute_units"],
+            "source_snapshot_authenticated":False,
+            "independent_fee_paid_verified":False,"fee_lamports":None,
+            "net_profitability_verified":False,**SAFE}
