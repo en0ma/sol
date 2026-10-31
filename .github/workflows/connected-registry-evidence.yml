@@ -54,7 +54,7 @@ jobs:
           python3 -m arb.connected_pool_discovery \
             --rpc http://127.0.0.1:8899 \
             --registry arb/pool_registry.json \
-            --max-pairs 12 --min-per-venue 20 \
+            --max-pairs 18 --min-per-venue 20 \
             --output "$RUNNER_TEMP/connected-registry-evidence.json" \
             --clean-registry "$RUNNER_TEMP/source-verified-connected-registry.json"
           result=$?
