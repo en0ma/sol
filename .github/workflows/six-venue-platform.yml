@@ -11,6 +11,8 @@ on:
       - "tests/test_six_venue_cycle_eligibility.py"
       - "arb/six_venue_route_economics.py"
       - "tests/test_six_venue_route_economics.py"
+      - "arb/registered_cycle_acceptance.py"
+      - "tests/test_registered_cycle_acceptance.py"
       - "arb/signed_route_resource_audit.py"
       - "tests/test_signed_route_resource_audit.py"
       - "arb/six_venue_quote_continuity.py"
@@ -43,6 +45,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_six_venue_route_economics.py -v
       - name: Independently reject forged signed wire or missing compute evidence
         run: python3 -m unittest discover -s tests -p test_signed_route_resource_audit.py -v
+      - name: Require independently authenticated four-gate cycle acceptance
+        run: python3 -m unittest discover -s tests -p test_registered_cycle_acceptance.py -v
       - name: Verify source-bound exact quote continuity never promotes live routes
         run: python3 -m unittest discover -s tests -p test_six_venue_quote_continuity.py -v
       - name: Validate registered 2-6 leg coordinator dispatch and no-broadcast gates
