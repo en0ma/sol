@@ -26,9 +26,14 @@ def pick_seeds(pools, max_mints=12):
     if not isinstance(pools,list) or type(max_mints)is not int or not 1<=max_mints<=40:
         raise ValueError("invalid seed inventory")
     frequency=Counter()
+    venue_counts=Counter()
+    mint_venues={}
     for pool in pools:
         if not isinstance(pool,dict):
             raise ValueError("malformed hint")
+        venue=pool.get("venue")
+        if venue in VENUES:
+            venue_counts[venue]+=1
         mints=pool.get("mints")
         if mints is None:
             continue
@@ -38,9 +43,18 @@ def pick_seeds(pools, max_mints=12):
             if not isinstance(mint,str) or len(mint)<32:
                 raise ValueError("invalid source mint seed")
             frequency[mint]+=1
-    return [m for m in (SOL,USDC) if m in frequency]+[
-        m for m,_ in sorted(frequency.items(),key=lambda x:(-x[1],x[0]))
-        if m not in (SOL,USDC)][:max(0,max_mints-sum(m in frequency for m in (SOL,USDC)))]
+            if venue in VENUES:
+                mint_venues.setdefault(mint,set()).add(venue)
+    # Preserve liquid hub anchors and sample tokens found on underserved
+    # venues, not just the most common SOL/USDC pools. This only selects
+    # UNTRUSTED index searches, never authenticates any returned address.
+    anchors=[m for m in (SOL,USDC) if m in frequency]
+    def rank(mint):
+        venues=mint_venues.get(mint,set())
+        deficit=max((20-venue_counts[v] for v in venues),default=0)
+        return (-deficit,-len(venues),-frequency[mint],mint)
+    rest=sorted((m for m in frequency if m not in anchors),key=rank)
+    return anchors+rest[:max(0,max_mints-len(anchors))]
 
 
 def index_addresses(mints, *, max_addresses=100, fetch=None):
