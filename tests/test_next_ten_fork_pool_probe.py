@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import patch
-from arb.next_ten_fork_pool_probe import candidates,probe
+from arb.next_ten_fork_pool_probe import candidates,probe,prioritized_probe_addresses
 from arb.next_ten_atomic_routes import BATCH_10
 class ForkCandidateTests(unittest.TestCase):
     def test_untrusted_mainnet_rpc_blocked_without_reads(self):
@@ -16,6 +16,26 @@ class ForkCandidateTests(unittest.TestCase):
         self.assertTrue(all(not r["signed_atomic_simulation_verified"]
                             for r in result["route_candidates"]))
         self.assertFalse(result["broadcast"])
+    def test_authenticated_source_probe_prioritizes_actual_peer_pair_hints(self):
+        from arb.orca_whirlpool import SOL,USDC
+        unrelated="u"*44
+        common="c"*44
+        registry={"pools":(
+            [{"venue":"orca","address":"A"+str(i).zfill(43),
+              "mints":[SOL,unrelated]} for i in range(13)]
+            +[{"venue":"orca","address":"target-orca",
+               "mints":[SOL,common]},
+              {"venue":"pumpswap","address":"target-pump",
+               "mints":[common,SOL]},
+              {"venue":"raydium_clmm","address":"other-clmm",
+               "mints":[USDC,SOL]}])}
+        original=candidates(registry)
+        prioritized=prioritized_probe_addresses(registry,original,
+            (("orca","pumpswap"),),maximum=12)
+        self.assertEqual(prioritized["orca"][0],"target-orca")
+        self.assertIn("target-pump",prioritized["pumpswap"])
+        self.assertEqual(len(prioritized["orca"]),12)
+        self.assertFalse(any("source_slot" in x for x in registry["pools"]))
     def test_invalid_registry_rejected(self):
         with self.assertRaises(ValueError):
             candidates({})
