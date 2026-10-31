@@ -27,8 +27,11 @@ def discover_cycles(pools, *, min_hops=2, max_hops=5,
             continue
         venue=pool.get("venue")
         address=pool.get("pool") or pool.get("address")
-        a=pool.get("token_a") or pool.get("mint_a")
-        b=pool.get("token_b") or pool.get("mint_b")
+        mints=pool.get("mints")
+        if mints is not None and (not isinstance(mints,(list,tuple)) or len(mints)!=2):
+            continue
+        a=(mints[0] if mints is not None else pool.get("token_a") or pool.get("mint_a"))
+        b=(mints[1] if mints is not None else pool.get("token_b") or pool.get("mint_b"))
         if not all(isinstance(x,str) and x for x in (venue,address,a,b)) or a==b:
             continue
         for source,target in ((a,b),(b,a)):
