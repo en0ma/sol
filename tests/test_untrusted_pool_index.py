@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import patch
-from arb.untrusted_pool_index import pick_seeds,index_addresses,authenticate_owners
+from arb.untrusted_pool_index import pick_seeds,index_addresses,authenticate_owners,balance_candidates
 from arb.orca_whirlpool import SOL,USDC
 from arb.onchain_pool_discovery import VENUES
 
@@ -38,6 +38,14 @@ class UntrustedPoolIndexTests(unittest.TestCase):
         with patch("arb.untrusted_pool_index.call",return_value={"value":[None]}):
             with self.assertRaises(ValueError):
                 authenticate_owners("rpc",[SOL,USDC])
+    def test_balance_prefers_source_owner_verified_undercovered_venue(self):
+        known=[{"venue":"orca"}]*40+[{"venue":"raydium_cpmm"}]*3
+        rows=[{"venue":"orca","address":str(i).zfill(44)} for i in range(20)]
+        rows+=[{"venue":"raydium_cpmm","address":"b"*43+str(i)} for i in range(5)]
+        selected=balance_candidates(rows,known,limit=8)
+        self.assertEqual(sum(x["venue"]=="raydium_cpmm" for x in selected),5)
+        self.assertEqual(len(selected),8)
+        self.assertEqual(len({(x["venue"],x["address"]) for x in selected}),8)
     def test_index_forgery_and_oversized_batch_fail(self):
         with self.assertRaises(ValueError):
             index_addresses([SOL],max_addresses=200)
