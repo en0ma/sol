@@ -82,7 +82,9 @@ def reconcile(original, verified, *, target=TARGET_PER_VENUE):
                            "pools": sorted(pair_pools[pair],
                                            key=lambda x: (x["venue"], x["address"]))})
     coverage = {}
-    for venue in VENUES:
+    # The active pool verifier currently has six venue decoders. The seventh
+    # AMM v4 must remain visibly unmet rather than disappearing from the goal.
+    for venue in (*VENUES, "raydium_amm_v4"):
         entries = [row for row in admitted.values() if row["venue"] == venue]
         linked = [row for row in entries if len(pair_venues[tuple(sorted(row["mints"]))]) > 1]
         connected = [row for row in entries if any(len(mint_venues[m]) > 1 for m in row["mints"])]
