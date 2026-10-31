@@ -4,7 +4,7 @@ from arb.signed_transaction_inventory import collect
 class TransactionInventoryTests(unittest.TestCase):
     def inputs(self):
         return ({"routes":[{"index":3,"status":"AUTHENTICATED_THREE_VENUE_SOURCE_FIXTURE",
-                             "legs":[{"venue":"orca"},{"venue":"raydium_cpmm"}],"fixture":"route-3.json"}]},
+                             "venues":["orca","raydium_cpmm"],"fixture":"route-3.json"}]},
                 {"status":"SIX_VENUE_SIGNED_OFFLINE_RESEARCH","broadcast":False,"actionable":False,
                  "signed_attempted":1,
                  "route_decisions":{"decisions":[{"index":3,"signed_execution_verified":True,
@@ -15,10 +15,18 @@ class TransactionInventoryTests(unittest.TestCase):
         a,b=self.inputs()
         report=collect(a,b)
         self.assertEqual(report["signed_accepted"],1)
+        self.assertEqual(report["rows"][0]["venues"],"orca>raydium_cpmm")
         self.assertEqual(report["rows"][0]["gross_delta_base_units"],123)
         self.assertIsNone(report["rows"][0]["net_delta_base_units"])
         self.assertEqual(report["rows"][0]["profitability"],"UNKNOWN_COSTS")
         self.assertEqual(report["confirmed_profitable"],0)
+    def test_unattempted_source_candidates_remain_visible(self):
+        a,b=self.inputs()
+        a["routes"].append({"index":4,"status":"SOURCE_BLOCKED","venues":["orca","pumpswap"]})
+        report=collect(a,b)
+        self.assertEqual(report["signed_attempted"],1)
+        self.assertEqual(report["source_routes"],2)
+        self.assertEqual(report["rows"][1]["simulation_status"],"NOT_ATTEMPTED")
     def test_rejection(self):
         a,b=self.inputs()
         b["route_decisions"]["decisions"][0]["signed_execution_verified"]=False
