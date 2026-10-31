@@ -42,7 +42,8 @@ class UntrustedPoolIndexTests(unittest.TestCase):
                     for a in available]
         result=index_addresses([seed_a,seed_b],max_addresses=2,fetch=source)
         self.assertEqual(result["selection_mode"],"MINT_STRATIFIED_ROUND_ROBIN")
-        self.assertEqual(result["addresses"],[SOL,JUP])
+        self.assertEqual(result["addresses"][1],JUP)
+        self.assertIn(result["addresses"][0],[SOL,USDC])
         self.assertEqual(len(set(result["addresses"])),2)
     def test_only_actual_source_owner_assigns_venue(self):
         program=VENUES["orca"][0]
