@@ -13,6 +13,8 @@ class RegistryPairReconciliationTests(unittest.TestCase):
         r=reconcile(hints,evidence,target=1)
         self.assertEqual(r["admitted"],2)
         self.assertEqual(len(r["cross_venue_shared_pairs"]),1)
+        self.assertGreater(r["cross_venue_closed_cycle_count"],0)
+        self.assertEqual(r["venue_coverage"]["orca"]["closed_cross_venue_cycle_pools"],1)
         self.assertEqual(r["venue_coverage"]["orca"]["cross_venue_shared_pair"],1)
         self.assertFalse(r["seven_venue_target_met"])
         self.assertEqual(len(r["venue_coverage"]),7)
@@ -47,6 +49,7 @@ class RegistryPairReconciliationTests(unittest.TestCase):
         self.assertEqual(result["venue_coverage"]["orca"]["authenticated"],20)
         self.assertEqual(result["venue_coverage"]["orca"]["cross_venue_mint_connected"],0)
         self.assertEqual(result["venue_coverage"]["orca"]["missing_to_target"],20)
+        self.assertEqual(result["venue_coverage"]["orca"]["closed_cross_venue_cycle_pools"],0)
         self.assertFalse(result["venue_coverage"]["orca"]["target_met"])
     def test_shared_hub_only_does_not_form_closed_cross_venue_connector(self):
         token="x"*44
