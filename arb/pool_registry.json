@@ -2412,6 +2412,33 @@
       ],
       "pair": "ZEC/USDC",
       "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "meteora_damm_v2",
+      "address": "FscgzeeaoKVrBAhoj83gDsLAHW8Azn7LbtG5f9YvdD6s",
+      "mints": [
+        "TiMSdJrkVwUpeEWJpuqRvHt4wVS7uH77LbNPGGVJXNw",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "TIMM/SOL"
+    },
+    {
+      "venue": "raydium_cpmm",
+      "address": "6W5Y8kmmDV4EPzTgZLbaNhjCRi3Y3sLwpd3rDTr1uMcc",
+      "mints": [
+        "USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB",
+        "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R"
+      ],
+      "pair": "USD1/RAY"
+    },
+    {
+      "venue": "raydium_cpmm",
+      "address": "6H9LwRBATqsFTXtsiMmZhwncpXTezk1KLSJ4BC7jz1NU",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "TiMSdJrkVwUpeEWJpuqRvHt4wVS7uH77LbNPGGVJXNw"
+      ],
+      "pair": "SOL/TIMMY"
     }
   ]
 }
