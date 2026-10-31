@@ -53,7 +53,7 @@ class SignedResourceAuditTests(unittest.TestCase):
                     inspect_signed_offline_resources(wire,result,expected_wire_sha256=digest)
     def test_wire_size_and_digest_type_blocked(self):
         wire,digest=signed_wire()
-        for data,sha in ((wire+"x"*1232,digest),(wire,"f"*63),
+        for data,sha in ((wire+b"x"*1232,digest),(wire,"f"*63),
                          (wire,None),(wire.hex(),digest)):
             with self.assertRaises(ValueError):
                 inspect_signed_offline_resources(data,{"unitsConsumed":1},expected_wire_sha256=sha)
