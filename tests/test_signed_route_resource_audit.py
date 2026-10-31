@@ -175,6 +175,41 @@ class SignedResourceAuditTests(unittest.TestCase):
                     reconcile_local_fee_observations(
                         altered_q,altered_r,source_snapshot_sha256=source_hash)
 
+    @patch("arb.rpc.call")
+    def test_snapshot_bytes_must_match_declared_digest(self, call):
+        wire,digest=signed_wire()
+        simulation={"err":None,"unitsConsumed":8000}
+        call.return_value={"context":{"slot":19},"value":5000}
+        quote=quote_signed_message_fee_offline(
+            "http://127.0.0.1:8899",wire,simulation,expected_wire_sha256=digest)
+        call.return_value={"slot":20,
+            "transaction":[base64.b64encode(wire).decode(),"base64"],
+            "meta":{"err":None,"fee":5100,"computeUnitsConsumed":8100}}
+        recorded=inspect_local_recorded_transaction_fee(
+            "http://127.0.0.1:8899",wire,simulation,expected_wire_sha256=digest)
+        raw=b"source-pool-state-original-bytes"
+        source=hashlib.sha256(raw).hexdigest()
+        checked=reconcile_local_fee_observations(
+            quote,recorded,source_snapshot_sha256=source,source_snapshot_bytes=raw)
+        self.assertTrue(checked["source_snapshot_content_hash_checked"])
+        self.assertFalse(checked["source_snapshot_authenticated"])
+        self.assertFalse(checked["net_profitability_verified"])
+        self.assertFalse(checked["broadcast"])
+        for forged in (b"other bytes",b"",raw+b"tampered"):
+            with self.subTest(forged=forged):
+                with self.assertRaisesRegex(ValueError,"content hash mismatch"):
+                    reconcile_local_fee_observations(
+                        quote,recorded,source_snapshot_sha256=source,
+                        source_snapshot_bytes=forged)
+        for malformed in (True,"text",bytearray(raw),b"x"*(4_194_304+1)):
+            with self.assertRaisesRegex(ValueError,"content hash mismatch"):
+                reconcile_local_fee_observations(
+                    quote,recorded,source_snapshot_sha256=source,
+                    source_snapshot_bytes=malformed)
+        unbound=reconcile_local_fee_observations(
+            quote,recorded,source_snapshot_sha256=source)
+        self.assertFalse(unbound["source_snapshot_content_hash_checked"])
+
     def test_wire_size_and_digest_type_blocked(self):
         wire,digest=signed_wire()
         for data,sha in ((wire+b"x"*1232,digest),(wire,"f"*63),
