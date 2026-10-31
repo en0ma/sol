@@ -46,6 +46,10 @@ class UntrustedPoolIndexTests(unittest.TestCase):
         self.assertEqual(sum(x["venue"]=="raydium_cpmm" for x in selected),5)
         self.assertEqual(len(selected),8)
         self.assertEqual(len({(x["venue"],x["address"]) for x in selected}),8)
+    def test_existing_registry_address_does_not_consume_discovery_quota(self):
+        old={"venue":"orca","address":"a"*44}
+        new={"venue":"orca","address":"b"*44}
+        self.assertEqual(balance_candidates([old,new],[old],limit=2),[new])
     def test_index_forgery_and_oversized_batch_fail(self):
         with self.assertRaises(ValueError):
             index_addresses([SOL],max_addresses=200)
