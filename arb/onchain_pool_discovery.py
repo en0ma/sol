@@ -13,6 +13,8 @@ from arb.raydium_clmm import PROGRAM as CLMM,SIZE as CLMM_SIZE,decode as decode_
 from arb.meteora_dlmm import PROGRAM as DLMM,SIZE as DLMM_SIZE,decode as decode_dlmm,verify as verify_dlmm
 from arb.meteora_damm_v2 import PROGRAM as DAMM,SIZE as DAMM_SIZE,decode as decode_damm,verify as verify_damm
 from arb.pumpswap_pool import PROGRAM as PUMP_PROGRAM, decode as decode_pump, verify as verify_pump
+from arb.raydium_amm_v4 import SIZE as AMM_V4_SIZE, decode as decode_amm_v4
+AMM_V4_PROGRAM="675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"
 from arb.whirlpool_snapshot import snapshot
 from arb.token_vaults import TOKEN_PROGRAM,decode_token_account
 
@@ -25,7 +27,8 @@ VENUES={"orca":(ORCA,ORCA_SIZE,101,181,decode_orca),
         "raydium_clmm":(CLMM,CLMM_SIZE,73,105,decode_clmm),
         "meteora_dlmm":(DLMM,DLMM_SIZE,88,120,decode_dlmm),
         "meteora_damm_v2":(DAMM,DAMM_SIZE,168,200,decode_damm),
-        "pumpswap":(PUMP_PROGRAM,None,43,75,decode_pump)}
+        "pumpswap":(PUMP_PROGRAM,None,43,75,decode_pump),
+        "raydium_amm_v4":(AMM_V4_PROGRAM,AMM_V4_SIZE,400,432,decode_amm_v4)}
 
 def search_pair(rpc,venue,mint_a,mint_b,limit=8,pace_seconds=0):
     if venue not in VENUES or mint_a==mint_b:raise ValueError("invalid search")
@@ -56,14 +59,63 @@ def search_pair(rpc,venue,mint_a,mint_b,limit=8,pace_seconds=0):
                          "meteora_dlmm":("token_x_mint","token_y_mint"),
                          "orca":("token_mint_a","token_mint_b"),
                          "raydium_clmm":("token_mint_0","token_mint_1"),
-                         "raydium_cpmm":("token_0_mint","token_1_mint")}
+                         "raydium_cpmm":("token_0_mint","token_1_mint"),
+                         "raydium_amm_v4":("base_mint","quote_mint")}
             left,right=mint_fields[venue]
             pair=(decoded[left],decoded[right])
             if pair!=(a,b):raise ValueError("mint filter mismatch")
             found[entry["pubkey"]]=decoded
     return found
 
+
+def verify_amm_v4(rpc,address,state):
+    """Re-read owner-owned legacy pool and two SPL vaults at one context slot.
+
+    OpenOrders liquidity and PnL affect executable pricing; this identity-only
+    verifier does NOT imply usable exact pricing, reserves or signed readiness.
+    """
+    if not isinstance(state,dict) or state.get("status")!=6:
+        raise ValueError("AMM v4 swaps not active")
+    keys=[address,state["base_vault"],state["quote_vault"],
+          state["open_orders"],state["market_id"]]
+    response=call(rpc,"getMultipleAccounts",
+                  [keys,{"encoding":"base64","commitment":"confirmed"}])
+    accounts=response.get("value") if isinstance(response,dict) else None
+    slot=response.get("context",{}).get("slot") if isinstance(response,dict) else None
+    if not isinstance(accounts,list) or len(accounts)!=5 or type(slot)is not int:
+        raise ValueError("AMM v4 source account context incomplete")
+    pool=accounts[0]
+    if not pool or pool.get("owner")!=AMM_V4_PROGRAM or pool.get("executable") is not False:
+        raise ValueError("AMM v4 pool owner invalid")
+    raw=base64.b64decode(pool["data"][0],validate=True)
+    if decode_amm_v4(raw)!=state:
+        raise ValueError("AMM v4 source pool mutated during verification")
+    amounts=[]
+    for i,mint in enumerate((state["base_mint"],state["quote_mint"])):
+        vault=accounts[i+1]
+        if not vault or vault.get("owner")!=TOKEN_PROGRAM or vault.get("executable") is not False:
+            raise ValueError("AMM v4 SPL vault owner invalid")
+        info=decode_token_account(base64.b64decode(vault["data"][0],validate=True))
+        if info["mint"]!=mint:
+            raise ValueError("AMM v4 vault mint differs from source pool")
+        amounts.append(info["amount_base_units"])
+    for index in (3,4):
+        extra=accounts[index]
+        if (not extra or extra.get("owner")!=state["market_program"]
+                or extra.get("executable") is not False):
+            raise ValueError("AMM v4 OpenOrders/market ownership mismatch")
+    if min(amounts)<=0:
+        raise ValueError("AMM v4 vault liquidity empty")
+    return {"venue":"raydium_amm_v4","address":address,
+            "mints":[state["base_mint"],state["quote_mint"]],
+            "slot":slot,"vault_base_units":amounts,
+            "open_orders_liquidity_reconciled":False,
+            "protocol_exact_quote_verified":False,
+            "swap_simulated":False}
+
 def verify(rpc,venue,address,state):
+    if venue=="raydium_amm_v4":
+        return verify_amm_v4(rpc,address,state)
     if venue=="pumpswap":
         p=verify_pump(rpc,address,state)
         return {**p,"mints":[p["base_mint"],p["quote_mint"]],
