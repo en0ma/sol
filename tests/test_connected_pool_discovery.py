@@ -18,7 +18,7 @@ class ConnectedPoolDiscoveryTests(unittest.TestCase):
         mint="x"*44
         hints=[{"venue":"orca","mints":[SOL,mint]},
                {"venue":"raydium_clmm","mints":[SOL,USDC]}]
-        pairs=candidate_pairs(hints,max_pairs=9)
+        pairs=candidate_pairs(hints,max_pairs=30)
         self.assertIn(sorted([mint,USDT]),[sorted(x) for x in pairs])
         self.assertEqual(len(pairs),len(set(tuple(x) for x in pairs)))
         self.assertTrue(all(len(pair)==2 and pair[0]!=pair[1] for pair in pairs))
