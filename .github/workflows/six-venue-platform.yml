@@ -22,6 +22,10 @@ on:
       - "arb/pool_registry.py"
       - "tests/test_pool_registry.py"
       - "arb/connected_pool_discovery.py"
+      - "arb/next_ten_fork_pool_probe.py"
+      - "arb/next_ten_signed_atomic_offline.py"
+      - "tests/test_next_ten_fork_pool_probe.py"
+      - "tests/test_next_ten_signed_atomic_offline.py"
       - "arb/untrusted_pool_index.py"
       - "tests/test_untrusted_pool_index.py"
       - "arb/chain_token_pair_labels.py"
@@ -78,6 +82,10 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_pool_registry.py -v
       - name: Check external index cannot promote forged venue or price identity
         run: python3 -m unittest discover -s tests -p test_untrusted_pool_index.py -v
+      - name: Assert diverse source probe ranking and isolated PumpSwap ephemeral PDA safety
+        run: |
+          python3 -m unittest discover -s tests -p test_next_ten_fork_pool_probe.py -v
+          python3 -m unittest discover -s tests -p test_next_ten_signed_atomic_offline.py -v
       - name: Test signed transaction inventory and fail-closed economics
         run: python3 -m unittest discover -s tests -p test_signed_transaction_inventory.py -v
       - name: Assert all six venues are fixed and no DBC/AMM-v4 sneaks into the platform
