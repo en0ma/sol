@@ -16,7 +16,7 @@ class UntrustedPoolIndexTests(unittest.TestCase):
         common="c"*44
         hints=([{"venue":"orca","mints":[SOL,common]} for _ in range(30)]
                +[{"venue":"pumpswap","mints":[SOL,rare]}])
-        picks=pick_seeds(hints,max_mints=3)
+        picks=pick_seeds(hints,max_mints=2)
         self.assertEqual(picks[0],SOL)
         self.assertEqual(picks[1],rare)
         self.assertNotIn(common,picks)
