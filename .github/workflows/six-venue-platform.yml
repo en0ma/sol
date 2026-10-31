@@ -104,7 +104,7 @@ jobs:
             --registry arb/pool_registry.json \
             --source-dir "$RUNNER_TEMP/six-venue-source" \
             --amount-in 1000000 --observed-unix "$(date +%s)" \
-            --maximum 8 --sign-all-quotable --output "$RUNNER_TEMP/six-source-report.json"
+            --maximum 8 --sign-all-authenticated --output "$RUNNER_TEMP/six-source-report.json"
       - name: Destroy source-backed fork before any signing
         run: |
           kill "$(cat "$RUNNER_TEMP/six-source.pid")"
