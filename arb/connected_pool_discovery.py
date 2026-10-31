@@ -181,7 +181,8 @@ def expand(rpc, hints, *, max_pairs=12, per_order_limit=32, target=20, candidate
     # on-chain verification, and retains all seven venue attempts.
     venue_counts=Counter(h["venue"] for h in hints
                          if isinstance(h,dict) and h.get("venue") in VENUES)
-    venue_order=sorted(VENUES,key=lambda v:(-max(0,target-venue_counts[v]),
+    venue_order=sorted(VENUES,key=lambda v:(venue_counts[v]==0,
+                                             -max(0,target-venue_counts[v]),
                                              venue_counts[v],v))
     discovered=discover(rpc,seeds,limit=per_order_limit,
                         registry_entries=None,venues=venue_order) if seeds else {
