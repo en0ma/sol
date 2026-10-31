@@ -106,10 +106,12 @@ class SixVenuePipelineTests(unittest.TestCase):
                 "fully_quoted":2,"blocked":0,"positive_gross":1,
                 "ranked":[quoted(0,[1100,1200,1300]),quoted(1,[950,900,850])],
                 "actionable":False,"live_execution_approved":False,"broadcast":False}
-        signed={"attempted":1,"independent_signed_accepted":1,
+        signed={"attempted":2,"independent_signed_accepted":1,
                 "observed_venue_quote_exact_matches":3,
                 "routes":[{"index":7,"independent_signed_accepted":True,
                            "economics_status":"COST_EVIDENCE_BLOCKED",
+                           "actionable":False,"broadcast":False},
+                          {"index":9,"independent_signed_accepted":False,
                            "actionable":False,"broadcast":False}]}
         with tempfile.TemporaryDirectory() as temp:
             src=Path(temp)/"source"
@@ -129,14 +131,15 @@ class SixVenuePipelineTests(unittest.TestCase):
                  patch("arb.m5_distinct_venue_coverage_batch.source_batch",side_effect=export), \
                  patch("arb.m5_source_triangle_quote_ranking.rank",return_value=ranked):
                 result=source_research("http://127.0.0.1:8899",
-                    {"pools":[]},src,amount_in=1000,observed_unix=1000)
+                    {"pools":[]},src,amount_in=1000,observed_unix=1000,
+                    sign_all_authenticated=True)
             self.assertEqual(len(pm.call_args.kwargs["batch"]),30)
-            self.assertEqual(result["manifest"]["selected_source_route_indices"],[7])
+            self.assertEqual(result["manifest"]["selected_source_route_indices"],[7,9])
             self.assertEqual(result["quote"]["net_profitable_confirmed"],0)
             with patch.dict(os.environ,{"SURFPOOL_EXPLICITLY_OFFLINE":"1"}), \
                  patch("arb.m5_distinct_venue_coverage_batch.offline_batch",return_value=signed) as offline:
                 report=offline_research("http://127.0.0.1:8899",src,dst)
-            self.assertEqual(offline.call_args.kwargs["route_indices"],[7])
+            self.assertEqual(offline.call_args.kwargs["route_indices"],[7,9])
             self.assertEqual(report["independent_signed_accepted"],1)
             self.assertEqual(report["route_decisions"]["signed_accepted"],1)
             self.assertEqual(report["route_decisions"]["net_profitable_candidates"],0)
