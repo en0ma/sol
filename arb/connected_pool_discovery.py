@@ -44,6 +44,8 @@ def candidate_pairs(hints, *, max_pairs=30):
         for m in key:
             mint_venues[m].add(venue)
             frequency[m]+=1
+    if not pairs:
+        return []
     # A token may be paired with USDC on one venue but with SOL or USDT on
     # another. Search cross-hub candidate pairs too; never create a pool
     # merely because the corresponding source-mint query was planned.
