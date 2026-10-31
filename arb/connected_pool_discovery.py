@@ -69,7 +69,18 @@ def unique_venue_pairs(pools, *, labels=None):
         if prior is None or rank[:2]>prior[0][:2] or (
                 rank[:2]==prior[0][:2] and rank[2]<prior[0][2]):
             grouped[key]=(rank,row)
-    return [grouped[k][1] for k in sorted(grouped)]
+    # Prevent display label collisions in the exported registry as well.
+    # Original distinct mint identities remain available in the audit.
+    unique=[]
+    labels_seen=set()
+    for key in sorted(grouped):
+        row=grouped[key][1]
+        label=(row["venue"],row["pair"])
+        if label in labels_seen:
+            continue
+        labels_seen.add(label)
+        unique.append(row)
+    return unique
 
 def candidate_pairs(hints, *, max_pairs=30):
     if (not isinstance(hints, list) or len(hints)>200 or
@@ -156,7 +167,7 @@ def expand(rpc, hints, *, max_pairs=12, per_order_limit=32, target=20):
             original[key]={"venue":key[0],"address":key[1]}
     report=reconcile(list(original.values()),list(joined.values()),target=target)
     report["unique_venue_pair_pools"]=unique_venue_pairs(report["graph_pools"])
-    report["duplicate_venue_pair_pool_count"]=len(report["graph_pools"])-len(report["unique_venue_pair_pools"])
+    report["duplicate_or_label_collision_count"]=len(report["graph_pools"])-len(report["unique_venue_pair_pools"])
     report["discovery_status"]=discovered["status"]
     report["discovery_searched_pairs"]=seeds
     report["discovery_errors"]=discovered["errors"]
@@ -189,6 +200,8 @@ def main():
             report=annotate_report(report,metadata)
             report["unique_venue_pair_pools"]=unique_venue_pairs(
                 report["graph_pools"],labels=metadata.get("labels"))
+            report["duplicate_or_label_collision_count"]=(
+                len(report["graph_pools"])-len(report["unique_venue_pair_pools"]))
         except (ValueError,OSError,RuntimeError) as exc:
             # Missing/blocked display metadata must not forge mint identities.
             report["token_label_status"]="UNRESOLVED: "+str(exc)[:160]
