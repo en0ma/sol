@@ -37,6 +37,20 @@ class TransactionInventoryTests(unittest.TestCase):
         self.assertEqual(result["rows"][1]["reason"],"effective fee not authenticated")
         ranking["all_results"][1]["index"]=3
         with self.assertRaises(ValueError):collect(a,b,ranking)
+    def test_signed_negative_gross_not_promoted_to_net(self):
+        a,b=self.inputs()
+        b["route_decisions"]["decisions"][0]["observed_gross_delta_start_mint_base_units"]=-201
+        result=collect(a,b)
+        self.assertEqual(result["observed_gross_loss_count"],1)
+        self.assertEqual(result["rows"][0]["profitability"],"GROSS_LOSS_NET_NOT_VERIFIED")
+        self.assertEqual(result["confirmed_unprofitable"],0)
+        self.assertIsNone(result["rows"][0]["net_delta_base_units"])
+    def test_source_quote_sign_mismatch_rejected(self):
+        a,b=self.inputs()
+        ranking={"all_results":[{"index":3,"status":"GROSS_INDICATIVE_ONLY",
+                                 "gross_delta_start_mint_base_units":-1,
+                                 "positive_gross":True}]}
+        with self.assertRaises(ValueError):collect(a,b,ranking)
     def test_rejection(self):
         a,b=self.inputs()
         b["route_decisions"]["decisions"][0]["signed_execution_verified"]=False
