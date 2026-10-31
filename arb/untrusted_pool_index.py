@@ -145,13 +145,14 @@ def balance_candidates(candidates, known, *, limit=80):
             type(limit)is not int or not 1<=limit<=120):
         raise ValueError("invalid bounded index balancing")
     counts=Counter(x.get("venue") for x in known if isinstance(x,dict))
+    registered={(x.get("venue"),x.get("address")) for x in known if isinstance(x,dict)}
     buckets=defaultdict(list)
     seen=set()
     for row in candidates:
         if not isinstance(row,dict) or row.get("venue") not in VENUES:
             raise ValueError("invalid owner-classified source candidate")
         key=(row["venue"],row.get("address"))
-        if key in seen:
+        if key in seen or key in registered:
             continue
         seen.add(key)
         buckets[row["venue"]].append(row)
