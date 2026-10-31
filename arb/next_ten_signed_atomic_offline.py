@@ -178,6 +178,43 @@ def preflight_first_leg_output(rpc,ix1,signer,keys,mints,owner,before):
             "standalone_compute_units":simulation.get("unitsConsumed"),
             "standalone_signed":True,**SAFETY}
 
+def authenticate_pumpswap_runtime_metas(rpc, required, accounts, *, rpc_lookup=None):
+    """Verify every existing source account and prove an ephemeral user PDA absent.
+
+    Absent user_volume_accumulator is only a *fork state observation*. It is
+    not an account initialization receipt. Runtime simulation and independent
+    CPI/SPL/rollback verification must still succeed for acceptance.
+    """
+    if not isinstance(required,list) or not isinstance(accounts,dict):
+        raise ValueError("PumpSwap source meta inventory invalid")
+    if rpc_lookup is None:
+        from arb.rpc import call as rpc_lookup
+    ephemeral={"user","user_base_token_account","user_quote_token_account",
+               "system_program","associated_token_program",
+               "base_token_program","quote_token_program",
+               "event_authority","program","fee_program",
+               "coin_creator_vault_authority","protocol_fee_recipient"}
+    missing_user_volume=[]
+    for meta in required:
+        if not isinstance(meta,dict) or not isinstance(meta.get("name"),str) or not isinstance(meta.get("address"),str):
+            raise ValueError("malformed PumpSwap account meta")
+        name,address=meta["name"],meta["address"]
+        if name in ephemeral:
+            continue
+        if address in accounts:
+            continue
+        if name=="user_volume_accumulator":
+            response=rpc_lookup(rpc,"getAccountInfo",[
+                address,{"encoding":"base64","commitment":"confirmed"}])
+            if not isinstance(response,dict) or "value" not in response or response["value"] is not None:
+                raise ValueError("PumpSwap user volume PDA lacks fork absence proof")
+            missing_user_volume.append(address)
+            continue
+        raise ValueError("PumpSwap source account not authenticated: "+name)
+    return {"uninitialized_user_volume_pda_fork_absence_verified":missing_user_volume,
+            "uninitialized_user_volume_pda_runtime_initialized_verified":False}
+
+
 def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache=None,batch=BATCH_10,
         adaptive_cpmm_v4=False, adaptive_all_venues=False, adaptive_three_hop=False, adaptive_hops=None):
     local_rpc_only(rpc)
@@ -259,37 +296,11 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache
         from arb.pumpswap_account_metas import account_metas
         direction=("sell" if mints[pump_idx]==base else "buy_exact_quote_in")
         required=account_metas(direction,addresses)["metas"]
-        from arb.rpc import call as rpc_call
-        missing_user_volume=[]
-        for meta in required:
-            if meta["name"] in ("user","user_base_token_account",
-                                "user_quote_token_account",
-                                "system_program","associated_token_program",
-                                "base_token_program","quote_token_program",
-                                "event_authority","program","fee_program",
-                                "coin_creator_vault_authority",
-                                "protocol_fee_recipient"):
-                continue
-            address=meta["address"]
-            if address in fixture["accounts"]:
-                continue
-            if meta["name"]=="user_volume_accumulator":
-                # The ephemeral offline signer has a fresh per-user PDA;
-                # this account cannot be captured from a source fork before
-                # the user is generated. Require an actual fork RPC proof
-                # that it is absent; the signed runtime MUST initialize it
-                # or the independent atomic auditor will reject the route.
-                account=rpc_call(rpc,"getAccountInfo",[
-                    address,{"encoding":"base64","commitment":"confirmed"}])
-                if not isinstance(account,dict) or "value" not in account or account["value"] is not None:
-                    raise ValueError("PumpSwap user volume PDA lacks fork absence proof")
-                missing_user_volume.append(address)
-                continue
-            raise ValueError("PumpSwap source account not authenticated: "+meta["name"])
+        derived_metas=authenticate_pumpswap_runtime_metas(
+            rpc,required,fixture["accounts"])
         proof["account_addresses"]=addresses
         proof["account_addresses_authenticated"]=True
-        proof["uninitialized_user_volume_pda_fork_absence_verified"]=missing_user_volume
-        proof["uninitialized_user_volume_pda_runtime_initialized_verified"]=False
+        proof.update(derived_metas)
         buyback=proof.get("buyback_fee_recipient")
         if not isinstance(buyback,str) or buyback not in fixture["accounts"]:
             raise ValueError("PumpSwap V2 authenticated buyback ATA missing")
