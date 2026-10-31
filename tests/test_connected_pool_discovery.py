@@ -6,6 +6,20 @@ from arb.orca_whirlpool import SOL, USDC
 
 
 class ConnectedPoolDiscoveryTests(unittest.TestCase):
+    def test_committed_clean_snapshot_is_unique_and_short(self):
+        import json
+        from pathlib import Path
+        file=Path(__file__).resolve().parents[1]/"arb"/"pool_registry_clean_snapshot.json"
+        snapshot=json.loads(file.read_text())
+        rows=snapshot["pools"]
+        self.assertGreater(len(rows),0)
+        self.assertEqual(len(rows),len({(x["venue"],x["pair"]) for x in rows}))
+        self.assertEqual(len(rows),len({(x["venue"],tuple(sorted(x["mints"]))) for x in rows}))
+        for x in rows:
+            self.assertLessEqual(len(x["pair"]),9)
+            self.assertEqual(len(x["mints"]),2)
+            self.assertNotEqual(x["mints"][0],x["mints"][1])
+
     def test_display_pair_is_nine_characters_or_less(self):
         mint="x"*44
         self.assertLessEqual(len(compact_pair([SOL,mint])),9)
