@@ -1,7 +1,10 @@
 import hashlib
 import unittest
+import base64
+from unittest.mock import patch
 from arb.registered_cycle_acceptance import (
-    verify_original_account_snapshot,screen_signed_cycle_net_acceptance)
+    verify_original_account_snapshot,screen_signed_cycle_net_acceptance,
+    inspect_upstream_original_account)
 
 
 def source():
@@ -15,6 +18,40 @@ def source():
 
 
 class FinalGates(unittest.TestCase):
+    @patch("arb.rpc.call")
+    def test_original_upstream_rpc_observation_not_independent_authentication(self, call):
+        blob=b"real-original-pool-account"
+        call.return_value={"context":{"slot":99},"value":{
+            "owner":"expectedProgram","lamports":4500,"executable":False,
+            "data":[base64.b64encode(blob).decode(),"base64"]}}
+        result=inspect_upstream_original_account(
+            "https://rpc.example.org",address="pool",
+            expected_owner="expectedProgram",min_context_slot=98)
+        self.assertEqual(result["source_sha256"],hashlib.sha256(blob).hexdigest())
+        self.assertFalse(result["upstream_origin_independently_authenticated"])
+        self.assertFalse(result["broadcast"])
+        self.assertEqual(call.call_args.args[1],"getAccountInfo")
+        self.assertEqual(call.call_args.args[2][1]["minContextSlot"],98)
+        for bad in ("http://rpc.example.org","http://127.0.0.1:8899",
+                    "https://localhost:8899","https://user:secret@rpc.example.org"):
+            with self.subTest(bad=bad):
+                with self.assertRaises(ValueError):
+                    inspect_upstream_original_account(
+                        bad,address="pool",expected_owner="expectedProgram")
+        for altered in (
+            {"context":{"slot":97},"value":call.return_value["value"]},
+            {"context":{"slot":99},"value":{**call.return_value["value"],"owner":"wrong"}},
+            {"context":{"slot":99},"value":{**call.return_value["value"],"lamports":True}},
+            {"context":{"slot":99},"value":{**call.return_value["value"],"data":["bad!","base64"]}},
+            {"context":{"slot":99},"value":{**call.return_value["value"],"data":["","base64"]}},
+        ):
+            with self.subTest(altered=altered):
+                call.return_value=altered
+                with self.assertRaises(ValueError):
+                    inspect_upstream_original_account(
+                        "https://rpc.example.org",address="pool",
+                        expected_owner="expectedProgram",min_context_slot=98)
+
     def test_source_integrity_not_source_authenticity(self):
         row,raw,expected=source()
         out=verify_original_account_snapshot(row,raw,**expected)
