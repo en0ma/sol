@@ -44,3 +44,11 @@ Branch: `feat/surfpool-ci-validation`. Handoff's starting implementation HEAD: `
 
 ## Restart instruction
 Inspect PR #1 branch HEAD, compare it against the SHAs above, read coordinator/economics/eligibility modules and live CI, run adversarial tests, implement only the next missing accepted gate, push changes, and update **this file every commit cycle** with the implementation commit, actual workflow run IDs/conclusions, tested scope, and the next precise blocker. If GitHub CI is pending, write pending rather than green.
+
+## Follow-on cycle — 2026-10-30/31: WSOL fee-unit reconciliation
+- Implementation commit `e82c589640a4601219e38fd37abe1c7e62d636eb`; adversarial regression commit `2fb7d4155ff403802cc712ab9f906dc1b58badd6`.
+- Added `reconcile_wsol_lamport_costs` in existing `arb/six_venue_route_economics.py`. Only canonical wrapped SOL (`So11111111111111111111111111111111111111112`) can use the exact identity 1 lamport = 1 raw WSOL unit. When an independently audited lamport inventory is supplied, an inconsistent `network_fee`, `priority_fee`, or `tip` now blocks net arithmetic. The independent audit flag is a caller contract and DOES NOT cryptographically authenticate the actual fee: future receipt auditor must establish it.
+- Added tests for matching and mismatching lamport fee values, missing audit flag, wrong mint, boolean substitution and zero-fee fraud.
+- No USD/SOL conversion is invented, no signed transaction fee was independently collected in this cycle, no live approval and no registry promotion.
+- Relevant CI workflow: `.github/workflows/six-venue-platform.yml` (`test_six_venue_route_economics.py`). **Pending at handoff creation**. Inspect HEAD workflow runs; never infer acceptance.
+- Next: independently extract signed fee and compute budget from actual offline transaction and RPC evidence, not arbitrary caller attestations; bind to source digest + transaction signature, then implement fully verified SOL/non-SOL conversion or leave blocked.
