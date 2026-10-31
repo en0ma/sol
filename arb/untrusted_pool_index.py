@@ -71,6 +71,62 @@ def pick_seeds(pools, max_mints=12):
     return result
 
 
+PUBLIC_TOKEN_FEEDS=(
+    "https://api.dexscreener.com/token-profiles/latest/v1",
+    "https://api.dexscreener.com/token-boosts/latest/v1",
+    "https://api.dexscreener.com/token-boosts/top/v1",
+)
+
+
+def public_solana_token_seeds(*, limit=12, fetch=None):
+    """Untrusted public trending addresses, NEVER mint or pool attestation.
+
+    Feeds may contain paid promotions or scams. Only chain-attested program,
+    mint, reserve and vault data may enter the canonical pool registry.
+    """
+    if type(limit)is not int or not 1<=limit<=24:
+        raise ValueError("bounded public mint feed limit required")
+    from solders.pubkey import Pubkey
+    def reader(url):
+        request=Request(url,headers={"Accept":"application/json",
+                       "User-Agent":"sol-pool-address-discovery/1"})
+        with urlopen(request,timeout=8) as response:
+            if response.geturl()!=url:
+                raise ValueError("public token feed redirect rejected")
+            payload=response.read(250001)
+            if len(payload)>250000:
+                raise ValueError("public token feed exceeds byte limit")
+            return json.loads(payload)
+    load=fetch or reader
+    seeds=[];errors=[];seen=set()
+    for url in PUBLIC_TOKEN_FEEDS:
+        try:
+            rows=load(url)
+            if not isinstance(rows,list):
+                raise ValueError("public token feed must be list")
+            for row in rows[:120]:
+                if not isinstance(row,dict) or row.get("chainId")!="solana":
+                    continue
+                mint=row.get("tokenAddress")
+                if (not isinstance(mint,str) or not 32<=len(mint)<=44
+                        or mint in seen):
+                    continue
+                try:
+                    Pubkey.from_string(mint)
+                except ValueError:
+                    continue
+                seen.add(mint)
+                seeds.append(mint)
+                if len(seeds)>=limit:
+                    break
+        except (HTTPError,URLError,OSError,ValueError,RuntimeError) as exc:
+            errors.append({"feed":url,"reason":type(exc).__name__+": "+str(exc)[:120]})
+        if len(seeds)>=limit:
+            break
+    return {"status":"UNTRUSTED_PUBLIC_TOKEN_SEARCH_SEEDS_ONLY",
+            "mints":seeds,"errors":errors,**SAFETY}
+
+
 def index_addresses(mints, *, max_addresses=100, fetch=None):
     if (not isinstance(mints,list) or not 1<=len(mints)<=40 or
             type(max_addresses)is not int or not 1<=max_addresses<=120):
@@ -248,11 +304,18 @@ def main():
     parser.add_argument("--max-addresses",type=int,default=115)
     parser.add_argument("--max-candidates",type=int,default=80)
     parser.add_argument("--amm-v4-candidates",type=int,default=24)
+    parser.add_argument("--public-token-seeds",type=int,default=12)
     args=parser.parse_args()
     from arb.six_venue_pipeline import local_rpc_only
     local_rpc_only(args.rpc)
     hints=json.loads(Path(args.registry).read_text())["pools"]
     seeds=pick_seeds(hints,args.max_mints)
+    feed=public_solana_token_seeds(limit=args.public_token_seeds)
+    # Keep authenticated historical mint seeds first. External feeds
+    # provide search QUERIES only; no pair addresses or prices are trusted.
+    for mint in feed["mints"]:
+        if mint not in seeds and len(seeds)<40:
+            seeds.append(mint)
     inventory=index_addresses(seeds,max_addresses=args.max_addresses)
     owners=authenticate_owners(args.rpc,inventory["addresses"])
     # Target scarce AMM v4 source identities with a SECOND independently
@@ -282,6 +345,8 @@ def main():
     owners["untrusted_index_candidate_count"]=inventory["candidate_count"]
     owners["untrusted_index_errors"]=inventory["errors"]
     owners["seed_mints"]=seeds
+    owners["public_token_seed_feed_errors"]=feed["errors"]
+    owners["public_token_seed_count"]=len(feed["mints"])
     Path(args.output).write_text(json.dumps(owners,indent=2)+"\n")
     print(json.dumps({"source_owner_candidates":len(owners["pools"]),
                       "untrusted_index_errors":len(inventory["errors"])},indent=2))
