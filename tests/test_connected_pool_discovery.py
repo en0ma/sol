@@ -83,6 +83,21 @@ class ConnectedPoolDiscoveryTests(unittest.TestCase):
         self.assertEqual(result["venue_coverage"]["raydium_clmm"]["authenticated"],1)
         self.assertFalse(result["broadcast"])
 
+    def test_untrusted_candidate_addresses_require_chain_proof(self):
+        original=[{"venue":"orca","address":"a"*44}]
+        indexed={"venue":"raydium_amm_v4","address":"b"*44,
+                 "mints":[SOL,USDC],"verified":True}
+        with patch("arb.connected_pool_discovery.refresh",
+                   return_value={"verified_pools":[],"rejected":[{"reason":"OWNER_MISMATCH"}]}) as refresh,\
+             patch("arb.connected_pool_discovery.discover") as discovery:
+            report=expand("http://127.0.0.1:8899",original,candidate_hints=[indexed])
+        discovery.assert_not_called()
+        self.assertEqual(report["admitted"],0)
+        self.assertEqual(report["external_candidate_addresses_checked"],1)
+        self.assertEqual(refresh.call_args.args[1][-1],
+                         {"venue":"raydium_amm_v4","address":"b"*44})
+        with self.assertRaises(ValueError):
+            expand("rpc",original,candidate_hints=[{"venue":"forged","address":"b"*44}])
     def test_no_verified_seeds_no_fabricated_discovery(self):
         initial=[{"venue":"orca","address":"a"*44}]
         with patch("arb.connected_pool_discovery.refresh",
