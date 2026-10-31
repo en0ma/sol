@@ -50,6 +50,14 @@ def assess_offline_cycle_costs(observation):
                 "net_base_units":None,"costs_verified":False,
                 "net_positive_arithmetic":None,**SAFE}
     total=sum(items.values())
+    # Individually valid u64 cost fields can still sum beyond the u64
+    # start-mint accounting domain. Never promote that malformed budget.
+    if total>=UINT64:
+        return {"status":"SIGNED_GROSS_ONLY_COST_SUM_OVERFLOW_BLOCKED",
+                "legs":legs,"start_mint":start,
+                "observed_gross_base_units":gross,
+                "net_base_units":None,"costs_verified":False,
+                "net_positive_arithmetic":None,**SAFE}
     net=gross-total
     return {"status":"OFFLINE_SIGNED_NET_ARITHMETIC_ONLY",
             "legs":legs,"start_mint":start,
