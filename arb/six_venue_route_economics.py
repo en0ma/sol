@@ -8,6 +8,38 @@ SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
 UINT64=2**64
 
 
+# Canonical wrapped SOL mint: 1 lamport is exactly 1 raw WSOL base unit.
+# This identity is not a market quote and cannot be used for other mints.
+WRAPPED_SOL_MINT="So11111111111111111111111111111111111111112"
+SOL_FEE_FIELDS=("network_fee","priority_fee","tip")
+
+
+def reconcile_wsol_lamport_costs(observation):
+    """Check independently supplied lamport fees against same-unit cost rows.
+
+    A caller's boolean attestations are not independent evidence by themselves:
+    only an external signed-transaction/fee auditor may set them. This routine
+    enforces a strict numerical identity, not signature/fee authenticity.
+    """
+    if not isinstance(observation,dict):
+        raise ValueError("cost observation required")
+    if observation.get("start_mint")!=WRAPPED_SOL_MINT:
+        raise ValueError("lamport identity available only for canonical WSOL")
+    lamports=observation.get("independently_audited_sol_fee_lamports")
+    costs=observation.get("verified_costs_start_mint_base_units")
+    if (observation.get("independent_sol_fee_audit_verified") is not True or
+        not isinstance(lamports,dict) or set(lamports)!=set(SOL_FEE_FIELDS) or
+        not isinstance(costs,dict)):
+        raise ValueError("independent SOL fee inventory unavailable")
+    for field in SOL_FEE_FIELDS:
+        amount=lamports[field]
+        if (type(amount)is not int or not 0<=amount<UINT64 or
+                type(costs.get(field))is not int or costs[field]!=amount):
+            raise ValueError("signed SOL fee / WSOL base-unit disagreement: "+field)
+    return {"status":"WSOL_LAMPORT_IDENTITY_RECONCILED_NOT_FEE_AUTHENTICATION",
+            "wsol_fee_base_units":sum(lamports.values()),**SAFE}
+
+
 def assess_offline_cycle_costs(observation):
     """Return gross and possible net arithmetic only when all costs are known.
 
@@ -43,6 +75,13 @@ def assess_offline_cycle_costs(observation):
     if converted is True and isinstance(costs,dict) and set(costs)==set(names):
         if all(type(costs[k]) is int and 0<=costs[k]<UINT64 for k in names):
             items={k:costs[k] for k in names}
+    # When explicit signed SOL fee evidence is provided, do not allow a
+    # caller to substitute different WSOL amounts and still claim net math.
+    if observation.get("independently_audited_sol_fee_lamports") is not None:
+        try:
+            reconcile_wsol_lamport_costs(observation)
+        except ValueError:
+            items=None
     if items is None:
         return {"status":"SIGNED_GROSS_ONLY_COST_CONVERSION_BLOCKED",
                 "legs":legs,"start_mint":start,
