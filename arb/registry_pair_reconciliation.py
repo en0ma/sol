@@ -14,6 +14,7 @@ from pathlib import Path
 from arb.orca_whirlpool import SOL, USDC
 from arb.onchain_pool_discovery import USDT, JUP, RAY
 from arb.pool_registry import refresh
+from arb.registry_multihop_cycles import MAX_CYCLES
 
 SYMBOLS = {SOL: "SOL", USDC: "USDC", USDT: "USDT",
            JUP: "JUP", RAY: "RAY"}
@@ -22,9 +23,10 @@ SAFETY = {"actionable": False, "live_execution_approved": False,
           "broadcast": False}
 
 
-def reconcile(original, verified, *, target=TARGET_PER_VENUE):
+def reconcile(original, verified, *, target=TARGET_PER_VENUE, max_cycles=MAX_CYCLES):
     if (not isinstance(original, list) or not isinstance(verified, list)
-            or type(target) is not int or not 1 <= target <= 100):
+            or type(target) is not int or not 1 <= target <= 100
+            or type(max_cycles) is not int or not 1 <= max_cycles <= MAX_CYCLES):
         raise ValueError("invalid bounded registry reconciliation")
     from arb.onchain_pool_discovery import VENUES
     expected = {}
@@ -87,7 +89,7 @@ def reconcile(original, verified, *, target=TARGET_PER_VENUE):
     from arb.registry_multihop_cycles import discover_cycles
     from arb.onchain_pool_discovery import USDT
     graph = discover_cycles(list(admitted.values()),min_hops=2,max_hops=6,
-                            starts=(SOL,USDC,USDT),max_cycles=5000)
+                            starts=(SOL,USDC,USDT),max_cycles=max_cycles)
     cross_venue_cycles=[route for route in graph["cycles"]
                         if len(route["venues"])>=2]
     cycle_pools={(leg["venue"],leg["pool"])
@@ -122,6 +124,7 @@ def reconcile(original, verified, *, target=TARGET_PER_VENUE):
         "authenticated_graph_cycle_count": graph["cycle_count"],
         "cross_venue_closed_cycle_count": len(cross_venue_cycles),
         "graph_inventory_truncated": graph["truncated"],
+        "graph_cycle_limit": max_cycles,
         "cross_venue_cycle_examples": cross_venue_cycles[:20],
         "graph_pools": list(admitted.values()),
         **SAFETY}
@@ -133,6 +136,8 @@ def main():
     parser.add_argument("--output", required=True)
     parser.add_argument("--rpc", default=os.getenv("SOLANA_RPC_URL", "http://127.0.0.1:8899"))
     parser.add_argument("--min-per-venue", type=int, default=20)
+    parser.add_argument("--max-graph-cycles", type=int, default=MAX_CYCLES,
+                        help="Bound authenticated cycle enumeration (1..25000)")
     parser.add_argument("--clean-registry", default="",
                         help="Write only independently verified, mint-complete pool identities")
     args = parser.parse_args()
@@ -142,7 +147,8 @@ def main():
     local_rpc_only(args.rpc)
     original = json.loads(Path(args.registry).read_text())["pools"]
     chain = refresh(args.rpc, original)
-    result = reconcile(original, chain["verified_pools"], target=args.min_per_venue)
+    result = reconcile(original, chain["verified_pools"], target=args.min_per_venue,
+                       max_cycles=args.max_graph_cycles)
     result["source_rejections"] = chain["rejected"]
     Path(args.output).write_text(json.dumps(result, indent=2) + "\n")
     if args.clean_registry:
