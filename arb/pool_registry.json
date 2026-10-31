@@ -1,15 +1,7 @@
 {
-  "note": "Source-verified pool identity hints from read-only Surfpool CI run 41238036491. Exactly one canonical mint pair and nine-character display label per venue; reauthenticate pool/vault/slot before graph use. No broadcast.",
-  "last_identity_refresh_evidence": {
-    "workflow_run_id": 41230030078,
-    "artifact_id": 13053606108,
-    "source_status": "SOURCE_AUTHENTICATED_REGISTRY_COVERAGE",
-    "confirmed_pool_identities": 90,
-    "pair_mints_source": "ONCHAIN_OWNER_VAULT_READ",
-    "labels": "METAPLEX_SELF_DECLARED_OR_CURATED_DISPLAY_ONLY"
-  },
-  "latest_source_verified_workflow_run": 41238036491,
-  "unique_pair_policy": "ONE_PER_VENUE_UNORDERED_CANONICAL_MINT_PAIR_AND_DISPLAY_PAIR",
+  "note": "129 unique real source-verified pool identity hints from read-only Surfpool CI run 41238566397. Pair strings <=9 characters; no duplicate pair per venue. Route graph uses full canonical mint identities, all states must be refreshed before use, no broadcasting.",
+  "latest_source_verified_workflow_run": 41238566397,
+  "unique_pair_policy": "ONE_PER_VENUE_UNORDERED_MINT_PAIR_AND_DISPLAY_PAIR",
   "pools": [
     {
       "venue": "meteora_damm_v2",
@@ -19,7 +11,7 @@
         "So11111111111111111111111111111111111111112"
       ],
       "pair": "RIV/SOL",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "meteora_damm_v2",
@@ -29,7 +21,7 @@
         "So11111111111111111111111111111111111111112"
       ],
       "pair": "OP/SOL",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "meteora_damm_v2",
@@ -39,7 +31,7 @@
         "3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh"
       ],
       "pair": "ETCH/WBTC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "meteora_damm_v2",
@@ -49,7 +41,7 @@
         "So11111111111111111111111111111111111111112"
       ],
       "pair": "DIOR/SOL",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "meteora_damm_v2",
@@ -59,7 +51,7 @@
         "So11111111111111111111111111111111111111112"
       ],
       "pair": "BORD/SOL",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "meteora_damm_v2",
@@ -69,7 +61,7 @@
         "CWZ6BsdnjkDVTGkmL6bGbJXXig6ceef12KvyGQW14cMt"
       ],
       "pair": "LUCK/ANTF",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "meteora_damm_v2",
@@ -79,7 +71,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "IGN/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "meteora_damm_v2",
@@ -89,7 +81,7 @@
         "So11111111111111111111111111111111111111112"
       ],
       "pair": "ORIG/SOL",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "meteora_damm_v2",
@@ -99,7 +91,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "HUMA/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "meteora_damm_v2",
@@ -109,7 +101,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "SOL/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "meteora_damm_v2",
@@ -119,7 +111,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "USDP/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "meteora_damm_v2",
@@ -129,7 +121,7 @@
         "So11111111111111111111111111111111111111112"
       ],
       "pair": "BAGS/SOL",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "meteora_damm_v2",
@@ -139,7 +131,7 @@
         "So11111111111111111111111111111111111111112"
       ],
       "pair": "CUTS/SOL",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "meteora_damm_v2",
@@ -149,7 +141,7 @@
         "So11111111111111111111111111111111111111112"
       ],
       "pair": "MIDW/SOL",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "meteora_dlmm",
@@ -159,7 +151,27 @@
         "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs"
       ],
       "pair": "WBTC/WETH",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "meteora_dlmm",
+      "address": "3sehQcVywWcFJZ1ri3NmJ7MRkrXbViJMRNN5b6kz8Mqn",
+      "mints": [
+        "3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "pair": "WBTC/USDC",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "meteora_dlmm",
+      "address": "4kdxjt8pKEW4qV4ji4HANixwswDJw3Egn8L4x2BEWQqT",
+      "mints": [
+        "3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "WBTC/SOL",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "meteora_dlmm",
@@ -169,7 +181,7 @@
         "3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh"
       ],
       "pair": "CBBT/WBTC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "meteora_dlmm",
@@ -179,7 +191,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "NEAR/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "meteora_dlmm",
@@ -189,7 +201,7 @@
         "So11111111111111111111111111111111111111112"
       ],
       "pair": "NEAR/SOL",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "meteora_dlmm",
@@ -199,7 +211,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "TRUM/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9",
       "signed_provenance": {
         "status": "INDEPENDENT_DLMM_SIGNED_NATIVE_SDK_SPL_PARITY",
         "source_slot": 462835107,
@@ -221,7 +233,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "HYPE/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "meteora_dlmm",
@@ -231,7 +243,7 @@
         "So11111111111111111111111111111111111111112"
       ],
       "pair": "HYPE/SOL",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "meteora_dlmm",
@@ -241,7 +253,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "ZEC/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "meteora_dlmm",
@@ -251,7 +263,7 @@
         "So11111111111111111111111111111111111111112"
       ],
       "pair": "ZEC/SOL",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "meteora_dlmm",
@@ -261,7 +273,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "CARD/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "meteora_dlmm",
@@ -271,7 +283,17 @@
         "So11111111111111111111111111111111111111112"
       ],
       "pair": "CARD/SOL",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "meteora_dlmm",
+      "address": "54Vp27uLaw4wNLo5n7r4fcC6zLamoQc28xBARjss4EUJ",
+      "mints": [
+        "CWZ6BsdnjkDVTGkmL6bGbJXXig6ceef12KvyGQW14cMt",
+        "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
+      ],
+      "pair": "ANTF/USDT",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "meteora_dlmm",
@@ -281,7 +303,7 @@
         "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
       ],
       "pair": "USDC/USDT",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "meteora_dlmm",
@@ -291,7 +313,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "SOL/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9",
       "signed_provenance": {
         "status": "INDEPENDENT_DLMM_SIGNED_NATIVE_SDK_SPL_PARITY",
         "source_slot": 462752047,
@@ -313,7 +335,17 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "CBBT/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "meteora_dlmm",
+      "address": "AXXo7N2gcLeVyo8nDsN99UW8Fv6NCsa2DP21WD3SKtM3",
+      "mints": [
+        "JDzPbXboQYWVmdxXS3LbvjM52RtsV1QaSv2AzoCiai2o",
+        "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
+      ],
+      "pair": "FO/USDT",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "meteora_dlmm",
@@ -323,7 +355,7 @@
         "So11111111111111111111111111111111111111112"
       ],
       "pair": "CBBT/SOL",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -333,7 +365,7 @@
         "27G8MtK7VtTcCHkpASjSDdkWWYfoqT6ggEuKidVJidD4"
       ],
       "pair": "SOL/JLP",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -343,7 +375,7 @@
         "2zMMhcVQEXDtdE6vsFS7S7D5oUodfJHE8vd1gnBouauv"
       ],
       "pair": "SOL/PENGU",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -353,7 +385,7 @@
         "3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh"
       ],
       "pair": "SOL/WBTC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -363,7 +395,7 @@
         "3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh"
       ],
       "pair": "CBBT/WBTC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -373,7 +405,7 @@
         "6FrrzDk5mQARGc1TDYoyVnSyRdds1t4PbtohCD6p3tgG"
       ],
       "pair": "EUSX/USX",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -383,7 +415,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "NEAR/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -393,7 +425,7 @@
         "3ZLekZYq2qkZiSpnSvabjit34tUkjSwD1JFuW9as9wBG"
       ],
       "pair": "SOL/NEAR",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -403,7 +435,7 @@
         "GNE6oDS6jHrfaV3GQVVCCp37fDnT7PiPuewMKBj2bqNm"
       ],
       "pair": "3B8X/AUTO",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -413,7 +445,7 @@
         "3orqhCKM5admbcHkHQhRAEKbXhUT5VPgsQqz7fBa6QdF"
       ],
       "pair": "CBBT/FBTC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -423,7 +455,7 @@
         "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R"
       ],
       "pair": "SOL/RAY",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -433,7 +465,7 @@
         "4sWNB8zGWHkh6UnmwiEtzNxL4XrN7uK9tosbESbJFfVs"
       ],
       "pair": "SOL/XSOL",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -443,7 +475,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "ONYC/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -453,7 +485,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "HYUS/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -463,7 +495,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "USX/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -473,7 +505,7 @@
         "6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx"
       ],
       "pair": "SOL/STONK",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -483,7 +515,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "TRUM/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -493,7 +525,7 @@
         "6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN"
       ],
       "pair": "SOL/TRUMP",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -503,7 +535,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "GEOD/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -513,7 +545,7 @@
         "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs"
       ],
       "pair": "SOL/WETH",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -523,7 +555,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "HYPE/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -533,7 +565,7 @@
         "98sMhvDwXj1RQi5c5Mndm3vPe9cBqPrbLaufMXFNMh5g"
       ],
       "pair": "SOL/HYPE",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -543,7 +575,7 @@
         "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump"
       ],
       "pair": "SOL/FARTC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -553,7 +585,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "USDY/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -563,7 +595,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "ZEC/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -573,7 +605,7 @@
         "A7bdiYdS5GjqGFtxf17ppRHtDKPkkRqbKtR27dxvQXaS"
       ],
       "pair": "SOL/ZEC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -583,7 +615,7 @@
         "A7bdiYdS5GjqGFtxf17ppRHtDKPkkRqbKtR27dxvQXaS"
       ],
       "pair": "CBBT/ZEC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -593,7 +625,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "SYRU/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -603,7 +635,7 @@
         "CARDSccUMFKoPRZxt5vt3ksUbxEFEcnZ3H2pd3dKxYjp"
       ],
       "pair": "SOL/CARDS",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -613,7 +645,7 @@
         "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk"
       ],
       "pair": "SOL/USELE",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -623,7 +655,7 @@
         "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
       ],
       "pair": "USDC/USDT",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -633,7 +665,7 @@
         "HAYQtfJEQ9DbDbaHEhxfGsWbSZ3ywthdsVB3PuB72DYe"
       ],
       "pair": "USDC/APXU",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -643,7 +675,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "JUPU/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -653,7 +685,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "KMNO/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -663,7 +695,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "MPLX/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -673,7 +705,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "RUSH/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -683,7 +715,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "SKR/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -693,7 +725,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "SOL/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -703,7 +735,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "CBBT/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -713,7 +745,7 @@
         "EicWvteVi2fWepEzS3FYWsnuPoP6caZfjnKqNvydLjCH"
       ],
       "pair": "SOL/LIT",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -723,7 +755,7 @@
         "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
       ],
       "pair": "SOL/USDT",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -733,7 +765,7 @@
         "HAYQtfJEQ9DbDbaHEhxfGsWbSZ3ywthdsVB3PuB72DYe"
       ],
       "pair": "APYU/APXU",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -743,7 +775,7 @@
         "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn"
       ],
       "pair": "SOL/JITOS",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -753,7 +785,7 @@
         "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn"
       ],
       "pair": "JTO/JITOS",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -763,7 +795,7 @@
         "So11111111111111111111111111111111111111112"
       ],
       "pair": "JUP/SOL",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -773,7 +805,7 @@
         "cbbtcf3aa214zXHbiAZQwf4122FBYbraNdFqgw4iMij"
       ],
       "pair": "SOL/CBBTC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -783,7 +815,7 @@
         "orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE"
       ],
       "pair": "SOL/ORCA",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "orca",
@@ -793,7 +825,7 @@
         "pSo1f9nQXWgXibFtKf7NWYxb5enAM4qfP6UJSiXRQfL"
       ],
       "pair": "SOL/PSOL",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "pumpswap",
@@ -803,7 +835,7 @@
         "3TbrqvTKoVDJNWQe5t4f3KAHVLE8iEsL9vdGJd5ximwh"
       ],
       "pair": "SOL/PULT",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9",
       "signed_provenance": {
         "status": "INDEPENDENT_SIGNED_NATIVE_SDK_SPL_PARITY",
         "source_slot": 462733369,
@@ -825,7 +857,7 @@
         "5cYCnK4mcawrY7tofiERjPr97MceNwiV5iNMY3Sj9hSQ"
       ],
       "pair": "SOL/MAKER",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "pumpswap",
@@ -835,7 +867,7 @@
         "BP172LqcuPuADw7WtYg961dVQ778xC6zc1pvm6NfZSR"
       ],
       "pair": "SOL/SEXCO",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "pumpswap",
@@ -845,7 +877,7 @@
         "BcczGav161jFJmdYTpKLco1TEEkhitsEjr7WqBnvbanW"
       ],
       "pair": "SOL/AE",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9",
       "signed_provenance": {
         "status": "INDEPENDENT_SIGNED_NATIVE_SDK_SPL_PARITY",
         "source_slot": 462733384,
@@ -867,7 +899,7 @@
         "So11111111111111111111111111111111111111112"
       ],
       "pair": "NEET/SOL",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9",
       "signed_provenance": {
         "status": "INDEPENDENT_SIGNED_NATIVE_SDK_SPL_PARITY",
         "source_slot": 462733355,
@@ -889,7 +921,7 @@
         "CfRbEWpLB8pWUwrkEGMwMtVBFzAsgJhs4LRNpChUBBDi"
       ],
       "pair": "SOL/RSGP",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9",
       "signed_provenance": {
         "status": "INDEPENDENT_SIGNED_NATIVE_SDK_SPL_PARITY",
         "source_slot": 462733359,
@@ -905,13 +937,23 @@
     },
     {
       "venue": "pumpswap",
+      "address": "Eo9fLk6KzPeyjYLgXyzGfmvBVehKHbpqHpahEe2Casf3",
+      "mints": [
+        "DEkqHyPN7GMRJ5cArtQFAWefqbZb33Hyf6s5iCwjEonT",
+        "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
+      ],
+      "pair": "USDE/USDT",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "pumpswap",
       "address": "Ds2fyB2fnz8F1KjZ8WycHMh2u6aRpjy81errtEtY5nEw",
       "mints": [
         "So11111111111111111111111111111111111111112",
         "DneSmn3NenxC8CMm4vTJUpTYfigZZKWWbyymq8MjFkw3"
       ],
       "pair": "SOL/ALLOX",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9",
       "signed_provenance": {
         "status": "INDEPENDENT_SIGNED_NATIVE_SDK_SPL_PARITY",
         "source_slot": 462733364,
@@ -933,7 +975,7 @@
         "So11111111111111111111111111111111111111112"
       ],
       "pair": "USDC/SOL",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9",
       "signed_provenance": {
         "status": "INDEPENDENT_SIGNED_NATIVE_SDK_SPL_PARITY",
         "source_slot": 462725881,
@@ -955,7 +997,7 @@
         "MFmKFZqoaQ7qN4VsSM8F7E2TnvxWaxoteK2jUmN1wjs"
       ],
       "pair": "SOL/PRIME",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "raydium_amm_v4",
@@ -965,7 +1007,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "RAY/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "raydium_amm_v4",
@@ -975,7 +1017,7 @@
         "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
       ],
       "pair": "RAY/USDT",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "raydium_amm_v4",
@@ -985,7 +1027,17 @@
         "So11111111111111111111111111111111111111112"
       ],
       "pair": "RAY/SOL",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "raydium_amm_v4",
+      "address": "7TbGqz32RsuwXbXY7EyBCiAnMbJq1gm1wKmfjQjuwoyF",
+      "mints": [
+        "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "pair": "USDT/USDC",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "raydium_amm_v4",
@@ -995,7 +1047,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "SOL/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "raydium_amm_v4",
@@ -1005,7 +1057,27 @@
         "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
       ],
       "pair": "SOL/USDT",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "raydium_clmm",
+      "address": "4U21UVm9xVPrsB13pkeVJJyEuvu2WUmRHpsThuTf3aSg",
+      "mints": [
+        "27G8MtK7VtTcCHkpASjSDdkWWYfoqT6ggEuKidVJidD4",
+        "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
+      ],
+      "pair": "JLP/USDT",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "raydium_clmm",
+      "address": "HZ7SArP5PDJ2EyEqkc53sdXnRACoQCRY8jk3phnPvp7d",
+      "mints": [
+        "2o69gwy6ZhL66KQxNk5Z2YeihCNpPjNneqr2Sn771can",
+        "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
+      ],
+      "pair": "IFC/USDT",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "raydium_clmm",
@@ -1015,7 +1087,7 @@
         "3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh"
       ],
       "pair": "CBBT/WBTC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "raydium_clmm",
@@ -1025,7 +1097,7 @@
         "6FrrzDk5mQARGc1TDYoyVnSyRdds1t4PbtohCD6p3tgG"
       ],
       "pair": "EUSX/USX",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "raydium_clmm",
@@ -1035,7 +1107,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "NEAR/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "raydium_clmm",
@@ -1045,7 +1117,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "RAY/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9",
       "signed_provenance": {
         "status": "INDEPENDENT_CLMM_SIGNED_NATIVE_SDK_SPL_PARITY",
         "source_slot": 462857973,
@@ -1067,7 +1139,7 @@
         "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R"
       ],
       "pair": "SOL/RAY",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "raydium_clmm",
@@ -1077,7 +1149,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "USX/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9",
       "signed_provenance": {
         "status": "INDEPENDENT_CLMM_SIGNED_NATIVE_SDK_SPL_PARITY",
         "source_slot": 462866000,
@@ -1099,17 +1171,37 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "TRUM/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "raydium_clmm",
-      "address": "GPxw5YstKrcJDe9GtD3u9myrsKAyLNy8tedsoyVDyN2b",
+      "address": "CHRxbLewDoEbGTfwujPwY6sfLumzhzRsGor9pUQWtc1r",
+      "mints": [
+        "9V4iZc2VcbbbLAwK8Do9YQXRK5ZJ3DEz4EEgaN4nDuns",
+        "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
+      ],
+      "pair": "UNS/USDT",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "raydium_clmm",
+      "address": "H7FjuWx44xCCw1FBWm4s42qjUtu7Q78yRxEoGY4Ssdjg",
       "mints": [
         "So11111111111111111111111111111111111111112",
         "A7bdiYdS5GjqGFtxf17ppRHtDKPkkRqbKtR27dxvQXaS"
       ],
       "pair": "SOL/ZEC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "raydium_clmm",
+      "address": "BmBq2MPZVWJAicnXmZn7s9AyLDMtJMkGK8YrwuGR2hVB",
+      "mints": [
+        "AXGmqhcKcPC4bC7vNpxGtu5oEwoEEnyeQUdw9YwYWF1q",
+        "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
+      ],
+      "pair": "URKO/USDT",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "raydium_clmm",
@@ -1119,7 +1211,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "CARD/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9",
       "signed_provenance": {
         "status": "INDEPENDENT_CLMM_SIGNED_NATIVE_SDK_SPL_PARITY",
         "source_slot": 462866029,
@@ -1141,7 +1233,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "GTR/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9",
       "signed_provenance": {
         "status": "INDEPENDENT_CLMM_SIGNED_NATIVE_SDK_SPL_PARITY",
         "source_slot": 462866135,
@@ -1163,7 +1255,7 @@
         "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
       ],
       "pair": "USDC/USDT",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "raydium_clmm",
@@ -1173,7 +1265,7 @@
         "G7vQWurMkMMm2dU3iZpXYFTHT9Biio4F4gZCrwFpKNwG"
       ],
       "pair": "USDC/BIRB",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "raydium_clmm",
@@ -1183,7 +1275,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "SOL/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9",
       "signed_provenance": {
         "status": "INDEPENDENT_CLMM_SIGNED_NATIVE_SDK_SPL_PARITY",
         "source_slot": 462865947,
@@ -1205,7 +1297,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "USD1/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9",
       "signed_provenance": {
         "status": "INDEPENDENT_CLMM_SIGNED_NATIVE_SDK_SPL_PARITY",
         "source_slot": 462865937,
@@ -1227,7 +1319,7 @@
         "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
       ],
       "pair": "SOL/USDT",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "raydium_clmm",
@@ -1237,7 +1329,7 @@
         "USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB"
       ],
       "pair": "SOL/USD1",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9",
       "signed_provenance": {
         "status": "INDEPENDENT_CLMM_SIGNED_NATIVE_SDK_SPL_PARITY",
         "source_slot": 462866008,
@@ -1259,7 +1351,7 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "NEAR/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "raydium_cpmm",
@@ -1269,7 +1361,7 @@
         "9Fdne837tZp97nDZTUqxv9t8Gwp2BwRf8EF7PGAAfoNe"
       ],
       "pair": "KBLH/ONE",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "raydium_cpmm",
@@ -1279,7 +1371,7 @@
         "9Fdne837tZp97nDZTUqxv9t8Gwp2BwRf8EF7PGAAfoNe"
       ],
       "pair": "AASB/ONE",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "raydium_cpmm",
@@ -1289,7 +1381,7 @@
         "As8wX7HWeCUPabovsTT6RY14GDCfUYiwFW7r9XQSMonE"
       ],
       "pair": "ONE/FOL",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "raydium_cpmm",
@@ -1299,7 +1391,7 @@
         "C9KxtjQQw1QYUQG62qWnzZh8V7gz3tNpRcqMYmTJponE"
       ],
       "pair": "ONE/GOLDB",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "raydium_cpmm",
@@ -1309,7 +1401,17 @@
         "G3WXHCewhSrDEqb9fWMd8FayngKCahbt4Naz6CbGKoNE"
       ],
       "pair": "ONE/TRNTY",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "raydium_cpmm",
+      "address": "AimhV5vMU6kG3zdied585L4Yt4ckn29ETre1v2ijZ1XK",
+      "mints": [
+        "AQDy2eb6uqJLfj4kyX3uFvWLdv6X9WuZX2t9PS51SaXo",
+        "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
+      ],
+      "pair": "HEYA/USDT",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "raydium_cpmm",
@@ -1319,7 +1421,7 @@
         "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk"
       ],
       "pair": "SOL/USELE",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "raydium_cpmm",
@@ -1329,7 +1431,37 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "SOL/USDC",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "raydium_cpmm",
+      "address": "9UV4xi4qNXahp1zZRjiDEzAfNJcmUFmszweCKcMeM35C",
+      "mints": [
+        "Em8DYuvdQ28PNZqSiAvUxjG32XbpFPm9kwu2y5pdTray",
+        "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
+      ],
+      "pair": "BCIN/USDT",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "raydium_cpmm",
+      "address": "HtNfUbDaBamCBPWCFiESkXpewvwVLkwrSWRjjV8FNT7i",
+      "mints": [
+        "ShitJuMfPKCQU7LedLERFYapDta7CCdKExPWX2gETRH",
+        "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
+      ],
+      "pair": "SHIT/USDT",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
+    },
+    {
+      "venue": "raydium_cpmm",
+      "address": "DSQWv6BE8GU11Zo4RSgUGMPjQCh6XRCvXaWshnpZgBVJ",
+      "mints": [
+        "gNyJyS9pQt33o4y4L3gdWZAF2XHgPrCBRQuaiCZStMe",
+        "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
+      ],
+      "pair": "W0G/USDT",
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     },
     {
       "venue": "raydium_cpmm",
@@ -1339,7 +1471,7 @@
         "egoS1kE1g4JuExTcvG6bB6cg5LWpACQ469uk6DTMuJq"
       ],
       "pair": "SOL/EGO",
-      "pair_label_source": "SOURCE_ONCHAIN_METADATA_OR_CURATED_DISPLAY_TRUNCATED_9"
+      "pair_label_source": "SOURCE_AUTHENTICATED_METADATA_OR_CURATED_DISPLAY_9"
     }
   ]
 }
