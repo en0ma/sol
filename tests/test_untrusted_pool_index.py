@@ -1,10 +1,31 @@
 import unittest
 from unittest.mock import patch
-from arb.untrusted_pool_index import pick_seeds,index_addresses,authenticate_owners,balance_candidates,pick_amm_v4_leads
+from arb.untrusted_pool_index import pick_seeds,index_addresses,authenticate_owners,balance_candidates,pick_amm_v4_leads,public_solana_token_seeds,PUBLIC_TOKEN_FEEDS
 from arb.orca_whirlpool import SOL,USDC
 from arb.onchain_pool_discovery import VENUES
 
 class UntrustedPoolIndexTests(unittest.TestCase):
+    def test_public_mint_feeds_are_untrusted_and_strictly_solana(self):
+        from arb.onchain_pool_discovery import JUP
+        seen=[]
+        def feed(url):
+            seen.append(url)
+            if url==PUBLIC_TOKEN_FEEDS[0]:
+                return [{"chainId":"ethereum","tokenAddress":SOL},
+                        {"chainId":"solana","tokenAddress":"not-base58"},
+                        {"chainId":"solana","tokenAddress":JUP}]
+            if url==PUBLIC_TOKEN_FEEDS[1]:
+                raise ValueError("rate limit")
+            return [{"chainId":"solana","tokenAddress":USDC},
+                    {"chainId":"solana","tokenAddress":JUP}]
+        result=public_solana_token_seeds(limit=3,fetch=feed)
+        self.assertEqual(result["mints"],[JUP,USDC])
+        self.assertEqual(len(result["errors"]),1)
+        self.assertEqual(seen,list(PUBLIC_TOKEN_FEEDS))
+        self.assertFalse(result["actionable"])
+        self.assertFalse(result["broadcast"])
+        with self.assertRaises(ValueError):
+            public_solana_token_seeds(limit=100,fetch=feed)
     def test_real_source_mints_select_bounded_search_seeds(self):
         x="x"*44
         seeds=pick_seeds([{"mints":[SOL,USDC]},{"mints":[SOL,x]}],max_mints=3)
