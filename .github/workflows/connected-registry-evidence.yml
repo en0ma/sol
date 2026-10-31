@@ -34,6 +34,9 @@ jobs:
           bash ci/install_surfpool.sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Offline discovery and graph limit regressions
+        run: |
+          python3 -m unittest tests.test_untrusted_pool_index tests.test_registry_pair_reconciliation tests.test_connected_pool_discovery -v
       - name: Launch upstream-backed fork for authentic owner/vault/metadata reads
         run: |
           nohup "$HOME/.local/bin/surfpool" start --ci --rpc-url "$SURFPOOL_DATASOURCE_RPC_URL" --no-deploy > "$RUNNER_TEMP/registry-source.log" 2>&1 < /dev/null &
