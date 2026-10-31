@@ -1,11 +1,38 @@
 import unittest
 from unittest.mock import patch
 
-from arb.connected_pool_discovery import candidate_pairs, expand
+from arb.connected_pool_discovery import candidate_pairs, expand, compact_pair, unique_venue_pairs
 from arb.orca_whirlpool import SOL, USDC
 
 
 class ConnectedPoolDiscoveryTests(unittest.TestCase):
+    def test_display_pair_is_nine_characters_or_less(self):
+        mint="x"*44
+        self.assertLessEqual(len(compact_pair([SOL,mint])),9)
+        self.assertEqual(compact_pair([SOL,USDC]),"SOL/USDC")
+        self.assertLessEqual(len(compact_pair([mint,USDC],
+           {mint:{"mint":mint,"symbol":"VERYLONGTOKEN"}})),9)
+    def test_duplicate_pairs_per_venue_deduplicated_by_mint_not_symbol(self):
+        mint="x"*44
+        other="y"*44
+        def entry(venue,address,mints,amounts):
+            return {"venue":venue,"address":address,"mints":mints,
+                    "vault_base_units":amounts,"verified":True}
+        candidates=[entry("orca","a"*44,[SOL,mint],[10,10]),
+                    entry("orca","b"*44,[mint,SOL],[20,20]),
+                    entry("orca","c"*44,[SOL,other],[15,15]),
+                    entry("raydium_clmm","d"*44,[SOL,mint],[9,9])]
+        clean=unique_venue_pairs(candidates)
+        self.assertEqual(len(clean),3)
+        self.assertEqual({r["address"] for r in clean},{"b"*44,"c"*44,"d"*44})
+        self.assertTrue(all(len(r["pair"])<=9 for r in clean))
+        with self.assertRaises(ValueError):
+            unique_venue_pairs([candidates[0],candidates[0]])
+    def test_unverified_duplicate_cannot_override_real_pool(self):
+        p={"venue":"orca","address":"a"*44,"mints":[SOL,USDC],
+           "vault_base_units":[1,1],"verified":False}
+        with self.assertRaises(ValueError): unique_venue_pairs([p])
+
     def test_shared_pair_preferred(self):
         mint="x"*44
         hints=[{"venue":"orca","mints":[SOL,mint]},
