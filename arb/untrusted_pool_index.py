@@ -357,8 +357,8 @@ def main():
     owners["amm_v4_source_owner_candidate_count"]=len(extra)
     owners["amm_v4_public_lead_error"]=supplemental_error
     owners["source_owner_classified_pool_count"]=len(owners["pools"])
-    # refresh() accepts at most 256 total historical + discovered hints.
-    remaining=max(0,256-len(hints))
+    # refresh() accepts at most 512 total historical + discovered hints.
+    remaining=max(0,512-len(hints))
     owners["pools"]=(balance_candidates(owners["pools"],hints,
                        limit=min(args.max_candidates,remaining)) if remaining else [])
     owners["untrusted_index_candidate_count"]=inventory["candidate_count"]
