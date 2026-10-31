@@ -27,6 +27,16 @@ class TransactionInventoryTests(unittest.TestCase):
         self.assertEqual(report["signed_attempted"],1)
         self.assertEqual(report["source_routes"],2)
         self.assertEqual(report["rows"][1]["simulation_status"],"NOT_ATTEMPTED")
+    def test_quote_blockers_explained(self):
+        a,b=self.inputs()
+        a["routes"].append({"index":4,"venues":["orca","pumpswap"]})
+        ranking={"all_results":[{"index":3,"status":"GROSS_INDICATIVE_ONLY"},
+                                {"index":4,"status":"QUOTE_BLOCKED",
+                                 "reason":"effective fee not authenticated"}]}
+        result=collect(a,b,ranking)
+        self.assertEqual(result["rows"][1]["reason"],"effective fee not authenticated")
+        ranking["all_results"][1]["index"]=3
+        with self.assertRaises(ValueError):collect(a,b,ranking)
     def test_rejection(self):
         a,b=self.inputs()
         b["route_decisions"]["decisions"][0]["signed_execution_verified"]=False
