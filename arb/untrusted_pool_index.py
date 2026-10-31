@@ -61,6 +61,7 @@ def index_addresses(mints, *, max_addresses=100, fetch=None):
                 raise ValueError("public index response too large")
             return json.loads(raw)
     reader=fetch or public_fetch
+    from solders.pubkey import Pubkey
     observed={};errors=[]
     for mint in mints:
         if not isinstance(mint,str) or not 32<=len(mint)<=44:
@@ -75,6 +76,10 @@ def index_addresses(mints, *, max_addresses=100, fetch=None):
                 address=item.get("pairAddress")
                 if not isinstance(address,str) or not 32<=len(address)<=44:
                     continue
+                try:
+                    Pubkey.from_string(address)
+                except ValueError:
+                    continue
                 base=item.get("baseToken")
                 quote=item.get("quoteToken")
                 if not isinstance(base,dict) or not isinstance(quote,dict):
@@ -86,7 +91,8 @@ def index_addresses(mints, *, max_addresses=100, fetch=None):
                 # Source-index liquidity merely prioritizes verification.
                 # Not a trusted vault balance or eligible quote.
                 score=(liquidity.get("usd") if isinstance(liquidity,dict) else 0)
-                if not isinstance(score,(int,float)) or score<0:
+                if (not isinstance(score,(int,float)) or score<0 or
+                        not float(score)<float("inf")):
                     score=0
                 observed[address]=max(float(score),observed.get(address,0))
         except (HTTPError,URLError,OSError,ValueError,RuntimeError) as exc:
