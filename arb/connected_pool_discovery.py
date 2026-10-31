@@ -89,6 +89,7 @@ def candidate_pairs(hints, *, max_pairs=30):
     pairs=defaultdict(set)
     mint_venues=defaultdict(set)
     frequency=Counter()
+    venue_counts=Counter()
     for row in hints:
         if not isinstance(row,dict):
             raise ValueError("malformed registry hint")
@@ -104,6 +105,7 @@ def candidate_pairs(hints, *, max_pairs=30):
         if venue not in VENUES:
             continue
         pairs[key].add(venue)
+        venue_counts[venue]+=1
         for m in key:
             mint_venues[m].add(venue)
             frequency[m]+=1
@@ -126,10 +128,20 @@ def candidate_pairs(hints, *, max_pairs=30):
                 pair=tuple(sorted((a,b)))
                 if pair not in pairs:
                     novel.add(pair)
+    # Prefer genuinely underserved venue pair identities. Ranking affects
+    # SEARCH ORDER ONLY; the original on-chain program and vault checks
+    # remain mandatory for every admission. Shared pairs retain priority
+    # when they can close a cross-venue route.
+    def shortfall(pair):
+        venues=set(pairs.get(pair,()))
+        return max((max(0,20-venue_counts[v]) for v in venues),default=0)
     ranked_existing=sorted(pairs,key=lambda pair: (
-        -len(pairs[pair]), -sum(len(mint_venues[m]) for m in pair),
+        -shortfall(pair),-len(pairs[pair]),
+        -sum(len(mint_venues[m]) for m in pair),
         -sum(frequency[m] for m in pair),pair))
     ranked_new=sorted(novel,key=lambda pair: (
+        -max((max(0,20-venue_counts[v]) for m in pair
+              for v in mint_venues.get(m,())),default=0),
         -sum(len(mint_venues[m]) for m in pair),
         -sum(frequency[m] for m in pair),
         0 if SOL in pair else 1 if USDC in pair else 2,pair))
