@@ -48,6 +48,18 @@ class RegistryPairReconciliationTests(unittest.TestCase):
         self.assertEqual(result["venue_coverage"]["orca"]["cross_venue_mint_connected"],0)
         self.assertEqual(result["venue_coverage"]["orca"]["missing_to_target"],20)
         self.assertFalse(result["venue_coverage"]["orca"]["target_met"])
+    def test_shared_hub_only_does_not_form_closed_cross_venue_connector(self):
+        token="x"*44
+        hints=[{"venue":"orca","address":"a"*44},
+               {"venue":"raydium_clmm","address":"b"*44}]
+        evidence=[{"venue":"orca","address":"a"*44,"mints":[SOL,token],
+                   "verified":True,"slot":123,"vault_base_units":[1,1]},
+                  {"venue":"raydium_clmm","address":"b"*44,"mints":[SOL,USDC],
+                   "verified":True,"slot":123,"vault_base_units":[1,1]}]
+        report=reconcile(hints,evidence,target=1)
+        self.assertEqual(report["venue_coverage"]["orca"]["cross_venue_mint_connected"],0)
+        self.assertEqual(report["venue_coverage"]["raydium_clmm"]["cross_venue_mint_connected"],0)
+        self.assertFalse(report["seven_venue_target_met"])
     def test_unknown_symbols_do_not_affect_graph_identity(self):
         hints=[{"venue":"orca","address":"a"*40},
                {"venue":"raydium_cpmm","address":"b"*40}]
