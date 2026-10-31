@@ -26,6 +26,24 @@ class UntrustedPoolIndexTests(unittest.TestCase):
         self.assertNotIn("mints",str(report["addresses"]))
         self.assertFalse(report["broadcast"])
 
+    def test_mint_stratification_prevents_sol_from_monopolizing_candidate_budget(self):
+        from arb.onchain_pool_discovery import JUP
+        # All account addresses are real Pubkey strings. The same mint can
+        # return many more liquid addresses, but every seed earns a probe.
+        addresses=[SOL,USDC,JUP]
+        seed_a=SOL
+        seed_b=USDC
+        def source(mint):
+            available=addresses[:2] if mint==seed_a else addresses[2:]
+            return [{"chainId":"solana","pairAddress":a,
+                     "baseToken":{"address":mint},
+                     "quoteToken":{"address":JUP},
+                     "liquidity":{"usd":10000 if mint==seed_a else 1}}
+                    for a in available]
+        result=index_addresses([seed_a,seed_b],max_addresses=2,fetch=source)
+        self.assertEqual(result["selection_mode"],"MINT_STRATIFIED_ROUND_ROBIN")
+        self.assertEqual(result["addresses"],[SOL,JUP])
+        self.assertEqual(len(set(result["addresses"])),2)
     def test_only_actual_source_owner_assigns_venue(self):
         program=VENUES["orca"][0]
         response={"value":[{"owner":program,"executable":False},
