@@ -178,7 +178,10 @@ def main():
     inventory=index_addresses(seeds,max_addresses=args.max_addresses)
     owners=authenticate_owners(args.rpc,inventory["addresses"])
     owners["source_owner_classified_pool_count"]=len(owners["pools"])
-    owners["pools"]=balance_candidates(owners["pools"],hints,limit=args.max_candidates)
+    # refresh() accepts at most 200 total historical + discovered hints.
+    remaining=max(0,200-len(hints))
+    owners["pools"]=(balance_candidates(owners["pools"],hints,
+                       limit=min(args.max_candidates,remaining)) if remaining else [])
     owners["untrusted_index_candidate_count"]=inventory["candidate_count"]
     owners["untrusted_index_errors"]=inventory["errors"]
     owners["seed_mints"]=seeds
