@@ -81,6 +81,17 @@ def reconcile(original, verified, *, target=TARGET_PER_VENUE):
                            "venues": sorted(venues),
                            "pools": sorted(pair_pools[pair],
                                            key=lambda x: (x["venue"], x["address"]))})
+    # A pair can have shared mint endpoints yet still fail to close a
+    # multi-venue arbitrage route. Run the existing bounded 2–6-leg graph
+    # engine on these actual source-authenticated pool identities.
+    from arb.registry_multihop_cycles import discover_cycles
+    from arb.onchain_pool_discovery import USDT
+    graph = discover_cycles(list(admitted.values()),min_hops=2,max_hops=6,
+                            starts=(SOL,USDC,USDT),max_cycles=5000)
+    cross_venue_cycles=[route for route in graph["cycles"]
+                        if len(route["venues"])>=2]
+    cycle_pools={(leg["venue"],leg["pool"])
+                 for route in cross_venue_cycles for leg in route["legs"]}
     coverage = {}
     # The active pool verifier currently has six venue decoders. The seventh
     # AMM v4 must remain visibly unmet rather than disappearing from the goal.
@@ -90,14 +101,16 @@ def reconcile(original, verified, *, target=TARGET_PER_VENUE):
         # An edge touching shared WSOL alone is not necessarily routeable:
         # the OTHER token must also connect beyond this venue to close cycles.
         connected = [row for row in entries if all(len(mint_venues[m]) > 1 for m in row["mints"])]
+        routeable=[row for row in entries if (row["venue"],row["address"]) in cycle_pools]
         coverage[venue] = {
             "registered_hints": sum(k[0] == venue for k in expected),
             "authenticated": len(entries),
             "cross_venue_shared_pair": len(linked),
             "cross_venue_mint_connected": len(connected),
+            "closed_cross_venue_cycle_pools": len(routeable),
             "target": target,
-            "missing_to_target": max(0, target-len(connected)),
-            "target_met": len(connected) >= target,
+            "missing_to_target": max(0, target-len(routeable)),
+            "target_met": len(routeable) >= target,
         }
     return {
         "status": "SOURCE_AUTHENTICATED_REGISTRY_COVERAGE",
@@ -106,6 +119,10 @@ def reconcile(original, verified, *, target=TARGET_PER_VENUE):
         "pool_target_per_venue": target,
         "seven_venue_target_met": all(v["target_met"] for v in coverage.values()),
         "venue_coverage": coverage, "cross_venue_shared_pairs": shared,
+        "authenticated_graph_cycle_count": graph["cycle_count"],
+        "cross_venue_closed_cycle_count": len(cross_venue_cycles),
+        "graph_inventory_truncated": graph["truncated"],
+        "cross_venue_cycle_examples": cross_venue_cycles[:20],
         "graph_pools": list(admitted.values()),
         **SAFETY}
 
