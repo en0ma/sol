@@ -141,9 +141,23 @@ def candidate_pairs(hints, *, max_pairs=30):
     return [list(pair) for pair in selected[:max_pairs]]
 
 
-def expand(rpc, hints, *, max_pairs=12, per_order_limit=32, target=20):
+def expand(rpc, hints, *, max_pairs=12, per_order_limit=32, target=20, candidate_hints=None):
     if not isinstance(hints,list) or len(hints)>200:
         raise ValueError("bounded registry required")
+    candidates=[] if candidate_hints is None else candidate_hints
+    if not isinstance(candidates,list) or len(hints)+len(candidates)>200:
+        raise ValueError("candidate batch exceeds registry bound")
+    known={(x.get("venue"),x.get("address")) for x in hints if isinstance(x,dict)}
+    clean_candidates=[]
+    for item in candidates:
+        if (not isinstance(item,dict) or item.get("venue") not in VENUES or
+                not isinstance(item.get("address"),str) or
+                not 32<=len(item["address"])<=44):
+            raise ValueError("invalid external pool address candidate")
+        key=(item["venue"],item["address"])
+        if key not in known:
+            clean_candidates.append({"venue":key[0],"address":key[1]})
+            known.add(key)
     # Hint mint pairs are ONLY read-only search seeds. Never promote any
     # hint: every returned candidate must pass owner/layout/vault verification.
     # Search before the 90-address refresh to preserve scarce RPC capacity
@@ -153,7 +167,7 @@ def expand(rpc, hints, *, max_pairs=12, per_order_limit=32, target=20):
                         registry_entries=None,venues=list(VENUES)) if seeds else {
                             "pools":[],"errors":[],"status":"NO_VERIFIED_SEEDS",
                             "venue_attempts":{}}
-    base=refresh(rpc,hints)
+    base=refresh(rpc,hints+clean_candidates)
     joined={}
     for pool in base["verified_pools"]:
         joined[(pool["venue"],pool["address"])]=pool
@@ -161,7 +175,7 @@ def expand(rpc, hints, *, max_pairs=12, per_order_limit=32, target=20):
         key=(pool["venue"],pool["address"])
         if key not in joined:
             joined[key]={**pool,"verified":True}
-    original={(p["venue"],p["address"]):dict(p) for p in hints
+    original={(p["venue"],p["address"]):dict(p) for p in hints+clean_candidates
               if isinstance(p,dict) and p.get("venue") in VENUES and
               isinstance(p.get("address"),str)}
     for key in joined:
@@ -170,6 +184,7 @@ def expand(rpc, hints, *, max_pairs=12, per_order_limit=32, target=20):
     report=reconcile(list(original.values()),list(joined.values()),target=target)
     report["unique_venue_pair_pools"]=unique_venue_pairs(report["graph_pools"])
     report["duplicate_or_label_collision_count"]=len(report["graph_pools"])-len(report["unique_venue_pair_pools"])
+    report["external_candidate_addresses_checked"]=len(clean_candidates)
     report["discovery_status"]=discovered["status"]
     report["discovery_searched_pairs"]=seeds
     report["discovery_errors"]=discovered["errors"]
@@ -188,12 +203,16 @@ def main():
     parser.add_argument("--per-order-limit",type=int,default=32)
     parser.add_argument("--min-per-venue",type=int,default=20)
     parser.add_argument("--skip-token-labels",action="store_true")
+    parser.add_argument("--candidate-file",default="")
     args=parser.parse_args()
     from arb.six_venue_pipeline import local_rpc_only
     local_rpc_only(args.rpc)
     registry=json.loads(Path(args.registry).read_text())["pools"]
+    candidates=(json.loads(Path(args.candidate_file).read_text())["pools"]
+                if args.candidate_file else [])
     report=expand(args.rpc,registry,max_pairs=args.max_pairs,
-                  per_order_limit=args.per_order_limit,target=args.min_per_venue)
+                  per_order_limit=args.per_order_limit,target=args.min_per_venue,
+                  candidate_hints=candidates)
     if not args.skip_token_labels:
         from arb.chain_token_pair_labels import fetch_labels, annotate_report
         mints=sorted({m for row in report["graph_pools"] for m in row["mints"]})
