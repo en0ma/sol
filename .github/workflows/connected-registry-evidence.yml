@@ -7,6 +7,8 @@ on:
       - "arb/registry_pair_reconciliation.py"
       - "arb/chain_token_pair_labels.py"
       - "arb/onchain_pool_discovery.py"
+      - "arb/untrusted_pool_index.py"
+      - "tests/test_untrusted_pool_index.py"
       - "arb/pool_registry.json"
   workflow_dispatch:
 permissions:
@@ -48,6 +50,13 @@ jobs:
           else:
               raise SystemExit("source fork unavailable; refusing unverified pool admission")
           PY
+      - name: Enumerate public index pool addresses and authenticate source owners
+        run: |
+          python3 -m arb.untrusted_pool_index \
+            --rpc http://127.0.0.1:8899 \
+            --registry arb/pool_registry.json \
+            --max-mints 12 --max-addresses 80 \
+            --output "$RUNNER_TEMP/source-owned-index-candidates.json"
       - name: Reauthenticate registered mints and expand connected real-pair pool candidates
         run: |
           set +e
@@ -55,6 +64,7 @@ jobs:
             --rpc http://127.0.0.1:8899 \
             --registry arb/pool_registry.json \
             --max-pairs 18 --min-per-venue 20 \
+            --candidate-file "$RUNNER_TEMP/source-owned-index-candidates.json" \
             --output "$RUNNER_TEMP/connected-registry-evidence.json" \
             --clean-registry "$RUNNER_TEMP/source-verified-connected-registry.json"
           result=$?
@@ -88,4 +98,5 @@ jobs:
             ${{ runner.temp }}/connected-registry-evidence.json
             ${{ runner.temp }}/source-verified-connected-registry.json
             ${{ runner.temp }}/registry-source.log
+            ${{ runner.temp }}/source-owned-index-candidates.json
           if-no-files-found: warn
