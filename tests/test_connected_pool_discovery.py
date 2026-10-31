@@ -61,6 +61,20 @@ class ConnectedPoolDiscoveryTests(unittest.TestCase):
            "vault_base_units":[1,1],"verified":False}
         with self.assertRaises(ValueError): unique_venue_pairs([p])
 
+    def test_pumpswap_is_probed_first_under_upstream_rpc_rate_limits(self):
+        hints=([{"venue":"orca","address":str(i).zfill(44),
+                 "mints":[SOL,USDC]} for i in range(21)]
+               +[{"venue":"pumpswap","address":"p"*44,
+                  "mints":[SOL,USDC]}])
+        with patch("arb.connected_pool_discovery.refresh",
+                   return_value={"verified_pools":[],"rejected":[]}),\\
+             patch("arb.connected_pool_discovery.discover",
+                   return_value={"status":"UPSTREAM_RATE_LIMITED",
+                                 "pools":[],"errors":[],"venue_attempts":{}}) as scan:
+            result=expand("rpc",hints,max_pairs=1)
+        self.assertEqual(scan.call_args.kwargs["venues"][0],"pumpswap")
+        self.assertEqual(result["discovery_venue_order"][0],"pumpswap")
+        self.assertEqual(result["admitted"],0)
     def test_underrepresented_pumpswap_pair_search_is_prioritized(self):
         uncommon="p"*44
         common="o"*44
