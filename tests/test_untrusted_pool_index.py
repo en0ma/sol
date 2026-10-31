@@ -31,13 +31,13 @@ class UntrustedPoolIndexTests(unittest.TestCase):
         response={"value":[{"owner":program,"executable":False},
                            {"owner":"forged","executable":False}]}
         with patch("arb.untrusted_pool_index.call",return_value=response) as rpc:
-            result=authenticate_owners("rpc",["A"*44,"B"*44])
+            result=authenticate_owners("rpc",[SOL,USDC])
         self.assertEqual(result["pools"],[{"venue":"orca","address":SOL}])
         self.assertEqual(len(result["rejections"]),1)
         self.assertEqual(rpc.call_args.args[1],"getMultipleAccounts")
         with patch("arb.untrusted_pool_index.call",return_value={"value":[None]}):
             with self.assertRaises(ValueError):
-                authenticate_owners("rpc",["A"*44,"B"*44])
+                authenticate_owners("rpc",[SOL,USDC])
     def test_index_forgery_and_oversized_batch_fail(self):
         with self.assertRaises(ValueError):
             index_addresses([SOL],max_addresses=200)
