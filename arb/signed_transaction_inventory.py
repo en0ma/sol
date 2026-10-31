@@ -12,7 +12,7 @@ COLUMNS = ("index", "venues", "legs", "source_status", "simulation_status",
            "compute_units", "reason", "source_fixture", "broadcast")
 
 
-def collect(source, offline):
+def collect(source, offline, ranking=None):
     if not isinstance(source, dict) or not isinstance(offline, dict):
         raise ValueError("both source and signed offline reports required")
     if offline.get("status") != "SIX_VENUE_SIGNED_OFFLINE_RESEARCH":
@@ -34,6 +34,19 @@ def collect(source, offline):
         if r["index"] in source_index:
             raise ValueError("duplicate source route index")
         source_index[r["index"]] = r
+    blocked = {}
+    if ranking is not None:
+        if not isinstance(ranking, dict) or not isinstance(ranking.get("all_results"), list):
+            raise ValueError("source quote ranking invalid")
+        for item in ranking["all_results"]:
+            if not isinstance(item, dict) or type(item.get("index")) is not int:
+                raise ValueError("invalid ranking item")
+            idx = item["index"]
+            if idx in blocked or idx not in source_index:
+                raise ValueError("ranking/source indices inconsistent")
+            blocked[idx] = item
+        if set(blocked) != set(source_index):
+            raise ValueError("ranking must account for all source candidates")
     seen = set()
     output = []
     for d in decisions:
@@ -89,7 +102,9 @@ def collect(source, offline):
             "gross_delta_base_units": None,
             "net_delta_base_units": None,
             "compute_units": None,
-            "reason": "source candidate not selected for signed offline simulation",
+            "reason": (blocked[i].get("reason", "source candidate not selected for signing")
+                       if blocked.get(i, {}).get("status") == "QUOTE_BLOCKED"
+                       else "source candidate not selected for signed offline simulation"),
             "source_fixture": r.get("fixture"),
             "broadcast": False,
         })
@@ -109,8 +124,10 @@ def collect(source, offline):
 
 def write(source_path, offline_path, output_dir):
     source = json.loads(Path(source_path).read_text())
+    ranking_path = Path(source_path).parent / "six-venue-ranking.json"
+    ranking = json.loads(ranking_path.read_text()) if ranking_path.is_file() else None
     offline = json.loads(Path(offline_path).read_text())
-    result = collect(source, offline)
+    result = collect(source, offline, ranking)
     target = Path(output_dir)
     target.mkdir(parents=True, exist_ok=True)
     (target / "transactions.json").write_text(json.dumps(result, indent=2) + "\n")
@@ -125,7 +142,8 @@ def write(source_path, offline_path, output_dir):
         f"- Independently signed accepted: {result['signed_accepted']}",
         "- Verified net profitable: **0 (not established)**",
         "- Verified net unprofitable: **0 (not established)**",
-        "- Unknown / rejected: " + str(result["unknown_or_rejected"]),
+        "- Unknown / rejected / unattempted: " + str(result["unknown_or_rejected"]),
+        "- Source quote blockers are shown per route when the ranking artifact exists.",
         "",
         "Net P&L remains unknown until independent complete costs are audited. "
         "Gross signed SPL delta is not net profit. No mainnet broadcasts.",
