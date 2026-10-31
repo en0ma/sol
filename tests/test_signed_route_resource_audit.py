@@ -1,12 +1,14 @@
 """Signed offline packet/resource diagnostics must never certify network fees."""
 import hashlib
 import unittest
+import base64
+from unittest.mock import patch
 from solders.hash import Hash
 from solders.keypair import Keypair
 from solders.pubkey import Pubkey
 from solders.instruction import Instruction
 from solders.transaction import Transaction
-from arb.signed_route_resource_audit import inspect_signed_offline_resources
+from arb.signed_route_resource_audit import inspect_signed_offline_resources, quote_signed_message_fee_offline
 
 
 def signed_wire():
@@ -51,6 +53,44 @@ class SignedResourceAuditTests(unittest.TestCase):
             with self.subTest(result=result):
                 with self.assertRaises(ValueError):
                     inspect_signed_offline_resources(wire,result,expected_wire_sha256=digest)
+    @patch("arb.rpc.call")
+    def test_fee_quote_is_bound_to_signed_message_but_never_paid(self, call):
+        wire,digest=signed_wire()
+        call.return_value={"context":{"slot":123},"value":5000}
+        report=quote_signed_message_fee_offline(
+            "http://127.0.0.1:8899",wire,{"err":None,"unitsConsumed":30000},
+            expected_wire_sha256=digest)
+        self.assertEqual(report["quoted_fee_lamports"],5000)
+        self.assertEqual(report["quote_context_slot"],123)
+        self.assertIsNone(report["fee_lamports"])
+        self.assertFalse(report["independent_fee_paid_verified"])
+        self.assertFalse(report["actionable"])
+        args=call.call_args.args
+        self.assertEqual(args[1],"getFeeForMessage")
+        self.assertEqual(base64.b64decode(args[2][0]),bytes(
+            __import__("solders.transaction",fromlist=["VersionedTransaction"]).VersionedTransaction.from_bytes(wire).message))
+        self.assertEqual(args[2][1],{"commitment":"processed"})
+
+    @patch("arb.rpc.call")
+    def test_fee_quote_invalid_or_absent_never_accepted(self, call):
+        wire,digest=signed_wire()
+        for response in ({"context":{"slot":12},"value":None},
+                         {"context":{"slot":12},"value":True},
+                         {"context":{"slot":12},"value":-1},
+                         {"context":{"slot":12},"value":2**64},
+                         {"context":{"slot":True},"value":123},
+                         {"value":123},None):
+            with self.subTest(response=response):
+                call.return_value=response
+                with self.assertRaises(ValueError):
+                    quote_signed_message_fee_offline(
+                        "http://127.0.0.1:8899",wire,{"unitsConsumed":1},
+                        expected_wire_sha256=digest)
+        with self.assertRaises(ValueError):
+            quote_signed_message_fee_offline(
+                "https://api.mainnet-beta.solana.com",wire,{"unitsConsumed":1},
+                expected_wire_sha256=digest)
+
     def test_wire_size_and_digest_type_blocked(self):
         wire,digest=signed_wire()
         for data,sha in ((wire+b"x"*1232,digest),(wire,"f"*63),
