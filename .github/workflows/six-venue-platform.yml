@@ -18,6 +18,8 @@ on:
       - "arb/six_venue_quote_continuity.py"
       - "tests/test_six_venue_quote_continuity.py"
       - "arb/atomic_graph_coordinator.py"
+      - "arb/signed_transaction_inventory.py"
+      - "tests/test_signed_transaction_inventory.py"
       - "tests/test_registered_cycle_coordinator.py"
   workflow_dispatch:
 concurrency:
@@ -51,6 +53,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_six_venue_quote_continuity.py -v
       - name: Validate registered 2-6 leg coordinator dispatch and no-broadcast gates
         run: python3 -m unittest discover -s tests -p test_registered_cycle_coordinator.py -v
+      - name: Test signed transaction inventory and fail-closed economics
+        run: python3 -m unittest discover -s tests -p test_signed_transaction_inventory.py -v
       - name: Assert all six venues are fixed and no DBC/AMM-v4 sneaks into the platform
         run: |
           python3 - <<'PY'
@@ -135,6 +139,18 @@ jobs:
             --source-dir "$RUNNER_TEMP/six-venue-source" \
             --signed-dir "$RUNNER_TEMP/six-venue-signed" \
             --output "$RUNNER_TEMP/six-signed-report.json"
+      - name: Export per-route transaction JSON, CSV and CI summary
+        if: always()
+        run: |
+          if test -f "$RUNNER_TEMP/six-venue-source/summary.json" && test -f "$RUNNER_TEMP/six-signed-report.json"; then
+            python3 -m arb.signed_transaction_inventory \\
+              --source "$RUNNER_TEMP/six-venue-source/summary.json" \\
+              --offline "$RUNNER_TEMP/six-signed-report.json" \\
+              --output-dir "$RUNNER_TEMP/transaction-inventory"
+            cat "$RUNNER_TEMP/transaction-inventory/summary.md" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Signed transaction inventory unavailable: source or offline report missing." >> "$GITHUB_STEP_SUMMARY"
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -146,4 +162,5 @@ jobs:
             ${{ runner.temp }}/six-venue-signed/
             ${{ runner.temp }}/six-source.log
             ${{ runner.temp }}/six-offline.log
+            ${{ runner.temp }}/transaction-inventory/
           if-no-files-found: warn
