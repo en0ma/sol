@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import patch
-from arb.next_ten_signed_atomic_offline import run,hydrate,top_level_events
+from arb.next_ten_signed_atomic_offline import run,hydrate,top_level_events,authenticate_pumpswap_runtime_metas
 from arb.venue_swap_adapter import build_leg
 
 class SignedNextTenTests(unittest.TestCase):
@@ -36,6 +36,28 @@ class SignedNextTenTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     hydrate("http://localhost:8899",{"source":"MOCK"})
                 rpc.assert_not_called()
+    def test_ephemeral_pump_volume_pda_only_allowed_after_fork_absence_proof(self):
+        from unittest.mock import Mock
+        required=[{"name":"pool","address":"source-pool"},
+                  {"name":"user_volume_accumulator","address":"ephemeral-pda"}]
+        source={"source-pool":{"owner":"authenticated"}}
+        read=Mock(return_value={"value":None})
+        result=authenticate_pumpswap_runtime_metas(
+            "http://127.0.0.1:8899",required,source,rpc_lookup=read)
+        self.assertEqual(result["uninitialized_user_volume_pda_fork_absence_verified"],
+                         ["ephemeral-pda"])
+        self.assertFalse(result["uninitialized_user_volume_pda_runtime_initialized_verified"])
+        self.assertEqual(read.call_args.args[1],"getAccountInfo")
+        for response in ({"value":{"owner":"forged"}},{},{"value":False}):
+            with self.subTest(response=response):
+                with self.assertRaisesRegex(ValueError,"fork absence proof"):
+                    authenticate_pumpswap_runtime_metas(
+                        "rpc",required,source,rpc_lookup=Mock(return_value=response))
+        with self.assertRaisesRegex(ValueError,"source account not authenticated"):
+            authenticate_pumpswap_runtime_metas(
+                "rpc",required+[{"name":"fee_config","address":"missing-fee"}],
+                source,rpc_lookup=read)
+        read.assert_called()
     def test_pumpswap_unverified_accounts_fail_closed(self):
         with self.assertRaises(ValueError):
             build_leg("pumpswap","pool",{"base_mint":"x","quote_mint":"y"},{},"owner","a","b",
