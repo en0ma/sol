@@ -127,7 +127,7 @@ def public_solana_token_seeds(*, limit=12, fetch=None):
             "mints":seeds,"errors":errors,**SAFETY}
 
 
-def index_addresses(mints, *, max_addresses=100, fetch=None):
+def index_addresses(mints, *, max_addresses=100, fetch=None, exclude_addresses=()):
     if (not isinstance(mints,list) or not 1<=len(mints)<=40 or
             type(max_addresses)is not int or not 1<=max_addresses<=120):
         raise ValueError("bounded public index request required")
@@ -145,6 +145,10 @@ def index_addresses(mints, *, max_addresses=100, fetch=None):
                 raise ValueError("public index response too large")
             return json.loads(raw)
     reader=fetch or public_fetch
+    if not isinstance(exclude_addresses,(set,tuple,list)) or any(
+            not isinstance(a,str) for a in exclude_addresses):
+        raise ValueError("invalid excluded known addresses")
+    excluded=set(exclude_addresses)
     from solders.pubkey import Pubkey
     observed={};by_seed={mint:{} for mint in mints};errors=[]
     for mint in mints:
@@ -158,7 +162,8 @@ def index_addresses(mints, *, max_addresses=100, fetch=None):
                 if not isinstance(item,dict) or item.get("chainId")!="solana":
                     continue
                 address=item.get("pairAddress")
-                if not isinstance(address,str) or not 32<=len(address)<=44:
+                if (not isinstance(address,str) or not 32<=len(address)<=44
+                        or address in excluded):
                     continue
                 try:
                     Pubkey.from_string(address)
@@ -328,7 +333,9 @@ def main():
     for mint in feed["mints"]:
         if mint not in seeds and len(seeds)<40:
             seeds.append(mint)
-    inventory=index_addresses(seeds,max_addresses=args.max_addresses)
+    inventory=index_addresses(seeds,max_addresses=args.max_addresses,
+                              exclude_addresses={h["address"] for h in hints
+                                                 if isinstance(h,dict) and isinstance(h.get("address"),str)})
     owners=authenticate_owners(args.rpc,inventory["addresses"])
     # Target scarce AMM v4 source identities with a SECOND independently
     # owner-authenticated path. Never trust Raydium API pool identities.
