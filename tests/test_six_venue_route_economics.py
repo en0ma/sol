@@ -34,6 +34,18 @@ class CostTests(unittest.TestCase):
         r["network_fee_conversion_independently_verified"]=True
         r["verified_costs_start_mint_base_units"]={"network_fee":1}
         self.assertIsNone(assess_offline_cycle_costs(r)["net_base_units"])
+    def test_aggregate_cost_overflow_fails_closed(self):
+        r=receipt()
+        r["network_fee_conversion_independently_verified"]=True
+        r["verified_costs_start_mint_base_units"]={
+            "network_fee":2**64-1,"priority_fee":1,"setup_rent_net":0,
+            "flash_loan_fee":0,"tip":0,"other":0}
+        out=assess_offline_cycle_costs(r)
+        self.assertEqual(out["status"],"SIGNED_GROSS_ONLY_COST_SUM_OVERFLOW_BLOCKED")
+        self.assertFalse(out["costs_verified"])
+        self.assertIsNone(out["net_base_units"])
+        self.assertFalse(out["broadcast"])
+
     def test_unsigned_or_missing_rollback_rejected(self):
         for field in ("independent_signed_accepted","signed_cpi_per_leg_verified",
                       "rollback_control_verified","offline_only"):
