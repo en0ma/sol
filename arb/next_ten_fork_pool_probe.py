@@ -106,6 +106,57 @@ def candidates(registry):
             result[venue].insert(0,pool)
     return result
 
+def prioritized_probe_addresses(registry, addresses, batch, *, maximum=12):
+    """Prioritize *hinted* cross-venue pair overlap before source RPC reads.
+
+    This is scheduling ONLY. Mint labels in registry cannot authenticate any
+    pool, and snapshot() still independently checks the actual program owner,
+    decoder, mint identity and reserves before route consideration.
+    """
+    if type(maximum) is not int or not 1<=maximum<=24:
+        raise ValueError("bounded paired source pool probes required")
+    entries=registry.get("pools") if isinstance(registry,dict) else None
+    if not isinstance(entries,list) or not isinstance(addresses,dict):
+        raise ValueError("malformed pool probe inventory")
+    relevant={venue for route in batch for venue in route}
+    peers={venue:set() for venue in relevant}
+    for a,b in batch:
+        peers[a].add(b)
+        peers[b].add(a)
+    pair_by_id={}
+    for row in entries:
+        if not isinstance(row,dict):
+            continue
+        mints=row.get("mints")
+        if (not isinstance(mints,list) or len(mints)!=2 or
+                not all(isinstance(m,str) and m for m in mints)
+                or mints[0]==mints[1]):
+            continue
+        pair_by_id[(row.get("venue"),row.get("address"))]=tuple(sorted(mints))
+    by_venue={}
+    for (venue,address),pair in pair_by_id.items():
+        by_venue.setdefault(venue,{}).setdefault(pair,set()).add(address)
+    from arb.damm_cpmm_atomic_offline import DAMM_POOL, CPMM_POOL
+    legacy={"meteora_damm_v2":DAMM_POOL,"raydium_cpmm":CPMM_POOL}
+    result={}
+    for venue in relevant:
+        options=addresses.get(venue,[])
+        if not isinstance(options,list):
+            raise ValueError("malformed per-venue pool addresses")
+        chosen=[legacy[venue]] if venue in legacy and legacy[venue] in options else []
+        ranked=[]
+        for position,address in enumerate(options):
+            if not isinstance(address,str) or address in chosen:
+                continue
+            pair=pair_by_id.get((venue,address))
+            shared=sum(pair in by_venue.get(peer,{}) for peer in peers[venue]) if pair else 0
+            ranked.append((-shared,position,address))
+        ranked.sort()
+        chosen.extend(address for _,_,address in ranked[:maximum-len(chosen)])
+        result[venue]=chosen
+    return result
+
+
 def select_distinct_triangle_coverage(candidates, *, maximum=4):
     """Deterministic greedy venue-triple and pair diversity, not first-N duplicates."""
     if type(maximum) is not int or not 1<=maximum<=30:
@@ -201,7 +252,7 @@ def authenticated_distinct_venue_triangles(authenticated_pools, *, limit=30):
 
 def probe(rpc, registry, *, batch=BATCH_10):
     local_rpc_only(rpc)
-    entries=candidates(registry)
+    entries=prioritized_probe_addresses(registry,candidates(registry),batch)
     relevant={v for pair in batch for v in pair}
     pools={}
     failures=[]
