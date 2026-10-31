@@ -132,7 +132,7 @@ def inspect_local_recorded_transaction_fee(rpc, wire, simulation, *, expected_wi
             "fee_lamports":None}
 
 
-def reconcile_local_fee_observations(quote, recorded, *, source_snapshot_sha256):
+def reconcile_local_fee_observations(quote, recorded, *, source_snapshot_sha256, source_snapshot_bytes=None):
     """Correlate diagnostic fee observations without asserting source authenticity.
 
     Only checks cross-report identity and provenance *labels*. Both reports
@@ -144,6 +144,11 @@ def reconcile_local_fee_observations(quote, recorded, *, source_snapshot_sha256)
                 all(ch in "0123456789abcdef" for ch in value))
     if not digest(source_snapshot_sha256):
         raise ValueError("source snapshot digest required")
+    if source_snapshot_bytes is not None:
+        if (type(source_snapshot_bytes) is not bytes or
+                not 0<len(source_snapshot_bytes)<=4_194_304 or
+                hashlib.sha256(source_snapshot_bytes).hexdigest()!=source_snapshot_sha256):
+            raise ValueError("source snapshot content hash mismatch")
     if not isinstance(quote,dict) or not isinstance(recorded,dict):
         raise ValueError("both local observations required")
     if (quote.get("status")!="SIGNED_MESSAGE_FEE_QUOTE_NOT_PAID_FEE" or
@@ -169,6 +174,7 @@ def reconcile_local_fee_observations(quote, recorded, *, source_snapshot_sha256)
         raise ValueError("malformed local fee evidence")
     return {"status":"LOCAL_FEE_EVIDENCE_CORRELATED_NOT_AUTHENTICATED",
             "source_snapshot_sha256_unverified":source_snapshot_sha256,
+            "source_snapshot_content_hash_checked":source_snapshot_bytes is not None,
             "signed_packet_sha256":quote["signed_packet_sha256"],
             "signed_message_sha256":quote["signed_message_sha256"],
             "first_signature":quote["first_signature"],
