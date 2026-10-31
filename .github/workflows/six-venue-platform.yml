@@ -19,6 +19,8 @@ on:
       - "tests/test_six_venue_quote_continuity.py"
       - "arb/atomic_graph_coordinator.py"
       - "arb/registry_pair_reconciliation.py"
+      - "arb/pool_registry.py"
+      - "tests/test_pool_registry.py"
       - "arb/connected_pool_discovery.py"
       - "arb/chain_token_pair_labels.py"
       - "tests/test_chain_token_pair_labels.py"
@@ -70,6 +72,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_amm_v4_connected_pool_discovery.py -v
       - name: Validate mint-bound onchain token symbols and immutable graph pubkeys
         run: python3 -m unittest discover -s tests -p test_chain_token_pair_labels.py -v
+      - name: Ensure source rate limits cannot silently promote pool identities
+        run: python3 -m unittest discover -s tests -p test_pool_registry.py -v
       - name: Test signed transaction inventory and fail-closed economics
         run: python3 -m unittest discover -s tests -p test_signed_transaction_inventory.py -v
       - name: Assert all six venues are fixed and no DBC/AMM-v4 sneaks into the platform
