@@ -11,7 +11,7 @@ import os
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from arb.onchain_pool_discovery import discover, VENUES
+from arb.onchain_pool_discovery import discover, VENUES, USDT
 from arb.orca_whirlpool import SOL, USDC
 from arb.pool_registry import refresh
 from arb.registry_pair_reconciliation import reconcile
@@ -44,15 +44,36 @@ def candidate_pairs(hints, *, max_pairs=30):
         for m in key:
             mint_venues[m].add(venue)
             frequency[m]+=1
-    # Prefer already shared pool pairs, then those touching highly
-    # interconnected hub mints; pair discovery still requires actual RPC.
-    ranked=sorted(pairs, key=lambda pair: (
-        -len(pairs[pair]),
+    # A token may be paired with USDC on one venue but with SOL or USDT on
+    # another. Search cross-hub candidate pairs too; never create a pool
+    # merely because the corresponding source-mint query was planned.
+    hubs=(SOL,USDC,USDT)
+    novel=set()
+    for mint in mint_venues:
+        for hub in hubs:
+            if mint!=hub:
+                pair=tuple(sorted((mint,hub)))
+                if pair not in pairs:
+                    novel.add(pair)
+    for a in hubs:
+        for b in hubs:
+            if a!=b:
+                pair=tuple(sorted((a,b)))
+                if pair not in pairs:
+                    novel.add(pair)
+    ranked_existing=sorted(pairs,key=lambda pair: (
+        -len(pairs[pair]), -sum(len(mint_venues[m]) for m in pair),
+        -sum(frequency[m] for m in pair),pair))
+    ranked_new=sorted(novel,key=lambda pair: (
         -sum(len(mint_venues[m]) for m in pair),
         -sum(frequency[m] for m in pair),
-        0 if SOL in pair else 1 if USDC in pair else 2,
-        pair))
-    return [list(x) for x in ranked[:max_pairs]]
+        0 if SOL in pair else 1 if USDC in pair else 2,pair))
+    reserve=(min(max_pairs//3,len(ranked_new)) if max_pairs>=3 else 0)
+    selected=[*ranked_existing[:max_pairs-reserve],*ranked_new[:reserve]]
+    if len(selected)<max_pairs:
+        remaining=max_pairs-len(selected)
+        selected.extend(ranked_new[reserve:reserve+remaining])
+    return [list(pair) for pair in selected[:max_pairs]]
 
 
 def expand(rpc, hints, *, max_pairs=12, per_order_limit=8, target=20):
