@@ -62,7 +62,7 @@ def index_addresses(mints, *, max_addresses=100, fetch=None):
             return json.loads(raw)
     reader=fetch or public_fetch
     from solders.pubkey import Pubkey
-    observed={};errors=[]
+    observed={};by_seed={mint:{} for mint in mints};errors=[]
     for mint in mints:
         if not isinstance(mint,str) or not 32<=len(mint)<=44:
             raise ValueError("untrusted invalid mint search")
@@ -95,11 +95,33 @@ def index_addresses(mints, *, max_addresses=100, fetch=None):
                         not float(score)<float("inf")):
                     score=0
                 observed[address]=max(float(score),observed.get(address,0))
+                by_seed[mint][address]=max(float(score),by_seed[mint].get(address,0))
         except (HTTPError,URLError,OSError,ValueError,RuntimeError) as exc:
             errors.append({"mint":mint,"reason":type(exc).__name__+": "+str(exc)[:140]})
-    addresses=[a for a,_ in sorted(observed.items(),key=lambda x:(-x[1],x[0]))]
+    # A single global liquidity rank is dominated by SOL/USDC.
+    # Round-robin each independent mint search for broader candidate coverage.
+    ranked={mint:[a for a,_ in sorted(entries.items(),
+            key=lambda x:(-x[1],x[0]))] for mint,entries in by_seed.items()}
+    addresses=[];selected=set()
+    while len(addresses)<max_addresses and any(ranked.values()):
+        made_progress=False
+        for mint in mints:
+            bucket=ranked[mint]
+            while bucket and bucket[0] in selected:
+                bucket.pop(0)
+            if not bucket:
+                continue
+            address=bucket.pop(0)
+            selected.add(address)
+            addresses.append(address)
+            made_progress=True
+            if len(addresses)>=max_addresses:
+                break
+        if not made_progress:
+            break
     return {"status":"UNTRUSTED_INDEX_ADDRESSES_ONLY",
-            "addresses":addresses[:max_addresses],
+            "selection_mode":"MINT_STRATIFIED_ROUND_ROBIN",
+            "addresses":addresses,
             "candidate_count":len(observed),
             "errors":errors,**SAFETY}
 
