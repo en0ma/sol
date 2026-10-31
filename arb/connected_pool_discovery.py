@@ -184,6 +184,11 @@ def expand(rpc, hints, *, max_pairs=12, per_order_limit=32, target=20, candidate
     report=reconcile(list(original.values()),list(joined.values()),target=target)
     report["unique_venue_pair_pools"]=unique_venue_pairs(report["graph_pools"])
     report["duplicate_or_label_collision_count"]=len(report["graph_pools"])-len(report["unique_venue_pair_pools"])
+    report["unique_pair_venue_coverage"]={
+        venue:sum(pool["venue"]==venue for pool in report["unique_venue_pair_pools"])
+        for venue in VENUES}
+    report["unique_pair_target_met"]=all(
+        n>=target for n in report["unique_pair_venue_coverage"].values())
     report["external_candidate_addresses_checked"]=len(clean_candidates)
     report["discovery_status"]=discovered["status"]
     report["discovery_searched_pairs"]=seeds
@@ -223,6 +228,13 @@ def main():
                 report["graph_pools"],labels=metadata.get("labels"))
             report["duplicate_or_label_collision_count"]=(
                 len(report["graph_pools"])-len(report["unique_venue_pair_pools"]))
+            report["unique_pair_venue_coverage"]={
+                venue:sum(pool["venue"]==venue
+                          for pool in report["unique_venue_pair_pools"])
+                for venue in VENUES}
+            report["unique_pair_target_met"]=all(
+                n>=args.min_per_venue for n in
+                report["unique_pair_venue_coverage"].values())
         except (ValueError,OSError,RuntimeError) as exc:
             # Missing/blocked display metadata must not forge mint identities.
             report["token_label_status"]="UNRESOLVED: "+str(exc)[:160]
@@ -237,7 +249,7 @@ def main():
     print(json.dumps({"verified":report["admitted"],
                       "targets":report["venue_coverage"],
                       "seven_venue_target_met":report["seven_venue_target_met"]},indent=2))
-    return 0 if report["seven_venue_target_met"] else 2
+    return 0 if report["seven_venue_target_met"] and report["unique_pair_target_met"] else 2
 
 
 if __name__=="__main__":
