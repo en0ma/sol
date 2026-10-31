@@ -233,7 +233,7 @@ def main():
     extra=[]
     try:
         from arb.atomic_missing_venue_candidates import discover_amm_v4_candidates
-        leads=discover_amm_v4_candidates({"pools":hints},max_pages=2)
+        leads=discover_amm_v4_candidates({"pools":hints},max_pages=5)
         selected=pick_amm_v4_leads(
             leads,hints,limit=args.amm_v4_candidates)
         selected=[a for a in selected if a not in inventory["addresses"]]
@@ -247,8 +247,8 @@ def main():
     owners["amm_v4_source_owner_candidate_count"]=len(extra)
     owners["amm_v4_public_lead_error"]=supplemental_error
     owners["source_owner_classified_pool_count"]=len(owners["pools"])
-    # refresh() accepts at most 200 total historical + discovered hints.
-    remaining=max(0,200-len(hints))
+    # refresh() accepts at most 256 total historical + discovered hints.
+    remaining=max(0,256-len(hints))
     owners["pools"]=(balance_candidates(owners["pools"],hints,
                        limit=min(args.max_candidates,remaining)) if remaining else [])
     owners["untrusted_index_candidate_count"]=inventory["candidate_count"]
