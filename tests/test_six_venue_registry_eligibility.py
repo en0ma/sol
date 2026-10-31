@@ -68,6 +68,17 @@ class EligibilityTests(unittest.TestCase):
             reauthenticate_screened_pool_identities(
                 "https://api.mainnet-beta.solana.com",{"pools":[row()]})
 
+    def test_large_authenticated_registry_screen_still_fail_closed(self):
+        # Screen may examine all current 223 registry hints without
+        # granting executable status to unsigned or seventh-venue entries.
+        hints=[{"venue":"orca","address":"pool"+str(i)} for i in range(223)]
+        examined=screen_signed_provenance({"pools":hints})
+        self.assertEqual(examined["blocked_count"],223)
+        self.assertEqual(examined["candidate_count"],0)
+        self.assertEqual(examined["coordinator_eligible_count"],0)
+        with self.assertRaisesRegex(ValueError,"unbounded registry"):
+            screen_signed_provenance({"pools":hints+[
+                {"venue":"orca","address":"more"+str(i)} for i in range(34)]})
     def test_unrelated_seventh_venue_excluded(self):
         out=screen_signed_provenance({"pools":[row("meteora_dbc")]})
         self.assertEqual(out["candidate_count"],0)
