@@ -22,6 +22,15 @@ class RegistryPairReconciliationTests(unittest.TestCase):
         cycles=discover_cycles(r["graph_pools"],min_hops=2,max_hops=2)
         self.assertGreater(cycles["cycle_count"],0)
         self.assertTrue(all(x["broadcast"] is False for x in cycles["cycles"]))
+    def test_expanded_cycle_limit(self):
+        from arb.registry_multihop_cycles import MAX_CYCLES
+        self.assertEqual(MAX_CYCLES, 25000)
+        with self.assertRaises(ValueError):
+            reconcile([], [], max_cycles=25001)
+        with self.assertRaises(ValueError):
+            reconcile([], [], max_cycles=True)
+        self.assertEqual(reconcile([], [], max_cycles=25000)["graph_cycle_limit"], 25000)
+
     def test_missing_mints_remain_unverified(self):
         hints=[{"venue":"orca","address":"a"*40}]
         r=reconcile(hints,[],target=20)
