@@ -76,7 +76,7 @@ jobs:
               fp.write("| Venue | Verified pools | Cross-venue connected | Still needed |\n")
               fp.write("|---|---:|---:|---:|\n")
               for venue,counts in sorted(data["venue_coverage"].items()):
-                  fp.write(f"| {venue} | {counts['authenticated']} | {counts['cross_venue_mint_connected']} | {counts['missing_to_target']} |\n")
+                  fp.write(f"| {venue} | {counts['authenticated']} | {counts['cross_venue_mint_connected']} | {counts['closed_cross_venue_cycle_pools']} | {counts['missing_to_target']} |\n")
               fp.write("\nPool/account attestation is read-only and does not verify executable pricing or net profit.\n")
           PY
       - name: Upload actual verified pools and unresolved source evidence
