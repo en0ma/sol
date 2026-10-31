@@ -48,6 +48,15 @@ def collect(source, offline, ranking=None):
         if set(blocked) != set(source_index):
             raise ValueError("ranking must account for all source candidates")
     seen = set()
+    if ranking is not None:
+        for i, item in blocked.items():
+            r = source_index[i]
+            if item.get("status") not in ("GROSS_INDICATIVE_ONLY", "QUOTE_BLOCKED"):
+                raise ValueError("unsupported source quote evidence status")
+            if item.get("status") == "GROSS_INDICATIVE_ONLY":
+                delta = item.get("gross_delta_start_mint_base_units")
+                if type(delta) is not int or item.get("positive_gross") is not (delta > 0):
+                    raise ValueError("source gross ranking inconsistency")
     output = []
     for d in decisions:
         if not isinstance(d, dict) or type(d.get("index")) is not int:
@@ -75,11 +84,15 @@ def collect(source, offline, ranking=None):
                     else len(r["legs"]) if isinstance(r.get("legs"), list) else None,
             "source_status": r.get("status"),
             "simulation_status": "SIGNED_ACCEPTED" if accepted else "SIGNED_REJECTED",
-            "profitability": "UNKNOWN_COSTS" if accepted else "NOT_ESTABLISHED",
+            "profitability": ("GROSS_LOSS_NET_NOT_VERIFIED" if accepted and gross is not None and gross < 0
+                               else "GROSS_BREAK_EVEN_NET_NOT_VERIFIED" if accepted and gross == 0
+                               else "UNKNOWN_COSTS" if accepted else "NOT_ESTABLISHED"),
             "gross_delta_base_units": gross if accepted else None,
             "net_delta_base_units": None,
             "compute_units": d.get("observed_compute_units") if accepted else None,
-            "reason": "independent fee and net cost verification missing" if accepted
+            "reason": ("observed signed gross loss; complete net fees not independently verified"
+                       if gross is not None and gross < 0 else
+                       "independent fee and net cost verification missing") if accepted
                       else "signed simulation not independently accepted",
             "source_fixture": r.get("fixture"),
             "broadcast": False,
@@ -111,6 +124,7 @@ def collect(source, offline, ranking=None):
     output.sort(key=lambda row: row["index"])
     return {
         "status": "SIGNED_SIMULATION_TRANSACTION_INVENTORY",
+        "observed_gross_loss_count": sum(r["profitability"] == "GROSS_LOSS_NET_NOT_VERIFIED" for r in output),
         "source_routes": len(routes),
         "signed_attempted": len(decisions),
         "signed_accepted": sum(r["simulation_status"] == "SIGNED_ACCEPTED" for r in output),
@@ -144,6 +158,7 @@ def write(source_path, offline_path, output_dir):
         "- Verified net unprofitable: **0 (not established)**",
         "- Unknown / rejected / unattempted: " + str(result["unknown_or_rejected"]),
         "- Source quote blockers are shown per route when the ranking artifact exists.",
+        "- Accepted gross-loss receipts are labelled as gross losses, never net-verified outcomes.",
         "",
         "Net P&L remains unknown until independent complete costs are audited. "
         "Gross signed SPL delta is not net profit. No mainnet broadcasts.",
