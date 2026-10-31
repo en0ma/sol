@@ -55,7 +55,7 @@ jobs:
           python3 -m arb.untrusted_pool_index \
             --rpc http://127.0.0.1:8899 \
             --registry arb/pool_registry.json \
-            --max-mints 12 --max-addresses 80 \
+            --max-mints 12 --max-addresses 115 --max-candidates 80 \
             --output "$RUNNER_TEMP/source-owned-index-candidates.json"
       - name: Reauthenticate registered mints and expand connected real-pair pool candidates
         run: |
