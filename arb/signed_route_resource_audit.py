@@ -50,3 +50,39 @@ def inspect_signed_offline_resources(wire, simulation, *, expected_wire_sha256):
             "signed_cpi_per_leg_verified":False,
             "signed_spl_poststate_verified":False,
             "rollback_control_verified":False,**SAFE}
+
+
+def quote_signed_message_fee_offline(rpc, wire, simulation, *, expected_wire_sha256):
+    """Read an RPC fee quote bound to the exact verified signed message.
+
+    getFeeForMessage is a *quote*, not an actual paid transaction fee.
+    Never insert this return value into verified net-profitability fields.
+    No send, simulateTransaction or write RPC calls are made here.
+    """
+    import base64
+    from solders.transaction import VersionedTransaction
+    from arb.pumpswap_local_simulation import local_rpc_only
+    from arb.rpc import call
+
+    local_rpc_only(rpc)
+    report=inspect_signed_offline_resources(
+        wire,simulation,expected_wire_sha256=expected_wire_sha256)
+    tx=VersionedTransaction.from_bytes(wire)
+    message_bytes=bytes(tx.message)
+    response=call(rpc,"getFeeForMessage",[
+        base64.b64encode(message_bytes).decode("ascii"),
+        {"commitment":"processed"}])
+    if (not isinstance(response,dict)
+            or type(response.get("value")) is not int
+            or not 0<=response["value"]<2**64
+            or not isinstance(response.get("context"),dict)
+            or type(response["context"].get("slot")) is not int
+            or response["context"]["slot"]<0):
+        raise ValueError("authenticated-looking but invalid fee quote response")
+    return {**report,
+            "status":"SIGNED_MESSAGE_FEE_QUOTE_NOT_PAID_FEE",
+            "signed_message_sha256":hashlib.sha256(message_bytes).hexdigest(),
+            "quoted_fee_lamports":response["value"],
+            "quote_context_slot":response["context"]["slot"],
+            "fee_lamports":None,
+            "independent_fee_paid_verified":False}
