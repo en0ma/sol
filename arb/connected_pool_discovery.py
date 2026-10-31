@@ -19,6 +19,58 @@ from arb.registry_pair_reconciliation import reconcile
 SAFE = {"actionable": False, "live_execution_approved": False, "broadcast": False}
 
 
+def compact_pair(mints, labels=None):
+    """At most nine characters total. Mint addresses remain the identity."""
+    from arb.registry_pair_reconciliation import SYMBOLS
+    if not isinstance(mints,(list,tuple)) or len(mints)!=2:
+        raise ValueError("exactly two canonical token mints required")
+    labels=labels or {}
+    def symbol(m):
+        record=labels.get(m)
+        declared=(record.get("symbol") if isinstance(record,dict) and
+                  record.get("mint")==m else None)
+        return str(SYMBOLS.get(m) or declared or m[:4]).upper()
+    a,b=map(symbol,mints)
+    # Three characters per token for long names, up to four for short names.
+    left=min(len(a),4)
+    right=min(len(b),8-left)
+    if right<1: raise ValueError("invalid token label")
+    return a[:left]+"/"+b[:right]
+
+
+def unique_venue_pairs(pools, *, labels=None):
+    """One authenticated pool per (venue, unordered mint pair).
+
+    Highest conservative observed vault floor wins within a venue/pair;
+    deterministic tie break by address. Duplicate symbols never collapse
+    distinct mint pairs; duplicate pool identities are rejected.
+    """
+    grouped={}
+    seen=set()
+    for pool in pools:
+        if not isinstance(pool,dict) or pool.get("verified") is not True:
+            raise ValueError("unverified pool cannot be exported")
+        mints=pool.get("mints")
+        if (not isinstance(mints,list) or len(mints)!=2 or
+                not all(isinstance(m,str) and len(m)>=32 for m in mints)
+                or mints[0]==mints[1]):
+            raise ValueError("invalid canonical mint pair")
+        identity=(pool.get("venue"),pool.get("address"))
+        if identity in seen: raise ValueError("duplicate pool identity")
+        seen.add(identity)
+        amounts=pool.get("vault_base_units")
+        if (not isinstance(amounts,list) or len(amounts)!=2
+                or any(type(v)is not int or v<=0 for v in amounts)):
+            raise ValueError("unverified vault liquidity")
+        key=(pool["venue"],tuple(sorted(mints)))
+        row={**pool,"pair":compact_pair(mints,labels)}
+        rank=(min(amounts),sum(amounts),pool["address"])
+        prior=grouped.get(key)
+        if prior is None or rank[:2]>prior[0][:2] or (
+                rank[:2]==prior[0][:2] and rank[2]<prior[0][2]):
+            grouped[key]=(rank,row)
+    return [grouped[k][1] for k in sorted(grouped)]
+
 def candidate_pairs(hints, *, max_pairs=30):
     if (not isinstance(hints, list) or len(hints)>200 or
             type(max_pairs) is not int or not 1<=max_pairs<=100):
@@ -103,6 +155,8 @@ def expand(rpc, hints, *, max_pairs=12, per_order_limit=32, target=20):
         if key not in original:
             original[key]={"venue":key[0],"address":key[1]}
     report=reconcile(list(original.values()),list(joined.values()),target=target)
+    report["unique_venue_pair_pools"]=unique_venue_pairs(report["graph_pools"])
+    report["duplicate_venue_pair_pool_count"]=len(report["graph_pools"])-len(report["unique_venue_pair_pools"])
     report["discovery_status"]=discovered["status"]
     report["discovery_searched_pairs"]=seeds
     report["discovery_errors"]=discovered["errors"]
@@ -133,6 +187,8 @@ def main():
         try:
             metadata=fetch_labels(args.rpc,mints)
             report=annotate_report(report,metadata)
+            report["unique_venue_pair_pools"]=unique_venue_pairs(
+                report["graph_pools"],labels=metadata.get("labels"))
         except (ValueError,OSError,RuntimeError) as exc:
             # Missing/blocked display metadata must not forge mint identities.
             report["token_label_status"]="UNRESOLVED: "+str(exc)[:160]
@@ -142,7 +198,7 @@ def main():
     clean={"note":"Source-authenticated mint-complete pool identities, revalidate each use",
            "pools":[{"venue":x["venue"],"address":x["address"],
                      "mints":x["mints"],"pair":x["pair"]}
-                    for x in report["graph_pools"]]}
+                    for x in report["unique_venue_pair_pools"]]}
     Path(args.clean_registry).write_text(json.dumps(clean,indent=2)+"\n")
     print(json.dumps({"verified":report["admitted"],
                       "targets":report["venue_coverage"],
