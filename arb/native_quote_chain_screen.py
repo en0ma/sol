@@ -160,3 +160,72 @@ def screen_fee_bounded_candidates(quote_reports, *, fee_upper_bound_base_units,
             "candidates":candidates[:maximum_candidates],
             "fee_bound_independently_verified":False,
             "net_profitability_verified":False,**SAFE}
+
+def reconcile_sequential_native_signed_observations(route, observations, *, initial_base_units):
+    """Reconcile 2..6 separate real native-program signed simulation outputs.
+
+    These quotes are observed from native execution, but each leg was simulated
+    separately. This arithmetic does NOT establish an atomic signed 2..6-leg
+    execution, source-slot consistency, independent origin, or network spend.
+    """
+    if (not isinstance(route,dict) or not isinstance(observations,list)
+        or type(initial_base_units) is not int or not 0<initial_base_units<U64):
+        raise ValueError("native sequential route input invalid")
+    legs=route.get("legs")
+    if (not isinstance(legs,list) or not 2<=len(legs)<=MAX_LEGS
+        or len(observations)!=len(legs)):
+        raise ValueError("complete bounded native program observations required")
+    start=legs[0].get("from") if isinstance(legs[0],dict) else None
+    if not isinstance(start,str) or len(start)<32:
+        raise ValueError("canonical start mint absent")
+    mint=start
+    amount=initial_base_units
+    seen_wires=set()
+    rows=[]
+    for hop,(leg,report) in enumerate(zip(legs,observations),1):
+        if not isinstance(leg,dict) or not isinstance(report,dict):
+            raise ValueError("invalid observed native leg")
+        wire=report.get("signed_wire_sha256")
+        if (not isinstance(wire,str) or len(wire)!=64
+            or any(c not in "0123456789abcdef" for c in wire)
+            or wire in seen_wires
+            or report.get("status")!=
+                "SIGNED_LOCAL_NATIVE_PROGRAM_OUTPUT_QUOTE_NOT_INDEPENDENT_PREDICTION"
+            or report.get("native_swap_signed_simulation_verified") is not True
+            or report.get("native_math_independently_predicted") is not False
+            or report.get("signed_atomic_route_verified") is not False
+            or report.get("independent_mainnet_fee_verified") is not False
+            or report.get("net_profitability_verified") is not False
+            or report.get("fee_lamports_paid") is not None
+            or any(report.get(k) is not False for k in SAFE)
+            or leg.get("from")!=mint
+            or not isinstance(leg.get("to"),str) or len(leg["to"])<32
+            or report.get("venue")!=leg.get("venue")
+            or report.get("pool")!=leg.get("pool")
+            or report.get("input_mint")!=mint
+            or report.get("output_mint")!=leg["to"]
+            or type(report.get("amount_in_base_units")) is not int
+            or report["amount_in_base_units"]!=amount
+            or type(report.get("amount_out_base_units")) is not int
+            or not 0<report["amount_out_base_units"]<U64):
+            raise ValueError("native signed observation/route mismatch or reuse")
+        seen_wires.add(wire)
+        rows.append({"hop":hop,"venue":leg["venue"],"pool":leg["pool"],
+                     "input_mint":mint,"output_mint":leg["to"],
+                     "observed_in_base_units":amount,
+                     "observed_out_base_units":report["amount_out_base_units"],
+                     "signed_wire_sha256":wire})
+        amount=report["amount_out_base_units"]
+        mint=leg["to"]
+    if mint!=start:
+        raise ValueError("sequential native observations do not close route")
+    return {"status":"SEQUENTIAL_NATIVE_SIGNED_OUTPUT_ARITHMETIC_NOT_ATOMIC",
+            "start_mint":start,"observed_gross_base_units":amount-initial_base_units,
+            "initial_base_units":initial_base_units,
+            "terminal_base_units":amount,"legs":rows,
+            "native_program_execution_per_leg_observed":True,
+            "joint_atomic_signed_route_verified":False,
+            "independent_native_quote_parity_verified":False,
+            "same_slot_source_state_verified":False,
+            "actual_transaction_fees_paid_verified":False,
+            "net_profitability_verified":False,**SAFE}
