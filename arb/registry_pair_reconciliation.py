@@ -18,6 +18,10 @@ from arb.registry_multihop_cycles import MAX_CYCLES
 
 SYMBOLS = {SOL: "SOL", USDC: "USDC", USDT: "USDT",
            JUP: "JUP", RAY: "RAY"}
+def token_display_label(mint):
+    """Seven-character display token, never an identity or graph join key."""
+    return SYMBOLS.get(mint, mint[:7])[:7]
+
 TARGET_PER_VENUE = 20
 SAFETY = {"actionable": False, "live_execution_approved": False,
           "broadcast": False}
@@ -61,7 +65,7 @@ def reconcile(original, verified, *, target=TARGET_PER_VENUE, max_cycles=MAX_CYC
             raise ValueError("positive authenticated vault liquidity required")
         admitted[key] = {
             "venue": key[0], "address": key[1], "mints": list(mint),
-            "pair": "/".join(SYMBOLS.get(x, x[:8] + "…") for x in mint),
+            "pair": "/".join(token_display_label(x) for x in mint),
             "symbol_source": "CURATED_DISPLAY_ONLY",
             "slot": row["slot"], "vault_base_units": list(amounts),
             "all_pools_onchain_verified": True,
@@ -79,7 +83,7 @@ def reconcile(original, verified, *, target=TARGET_PER_VENUE, max_cycles=MAX_CYC
     for pair, venues in sorted(pair_venues.items()):
         if len(venues) > 1:
             shared.append({"mints": list(pair),
-                           "pair": "/".join(SYMBOLS.get(x, x[:8] + "…") for x in pair),
+                           "pair": "/".join(token_display_label(x) for x in pair),
                            "venues": sorted(venues),
                            "pools": sorted(pair_pools[pair],
                                            key=lambda x: (x["venue"], x["address"]))})
@@ -128,7 +132,11 @@ def reconcile(original, verified, *, target=TARGET_PER_VENUE, max_cycles=MAX_CYC
         "cross_venue_closed_cycle_count": graph["cross_venue_cycle_count"],
         "graph_inventory_truncated": graph["truncated"],
         "graph_cycle_limit": max_cycles,
-        "cross_venue_cycle_examples": cross_venue_cycles[:20],
+        "cross_venue_cycle_examples": [{**route,
+            "token_labels": [token_display_label(m) for m in route["tokens"]],
+            "legs": [{**leg, "from_label": token_display_label(leg["from"]),
+                       "to_label": token_display_label(leg["to"])} for leg in route["legs"]]}
+            for route in cross_venue_cycles[:20]],
         "graph_pools": list(admitted.values()),
         **SAFETY}
 
