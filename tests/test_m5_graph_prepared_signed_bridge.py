@@ -187,6 +187,24 @@ class PreparedNativeSignedBridge(unittest.TestCase):
     @patch("arb.m5_four_to_six_signed_handoff.extract_pool_states",return_value=ROWS)
     @patch("arb.m5_four_to_six_signed_handoff.verify")
     @patch("arb.next_ten_signed_atomic_offline.run_four_to_six_venue")
+    def test_coverage_persists_missing_builder_blocker_without_false_signed_attempt(self,runner,*unused):
+        from arb.m5_four_to_six_signed_handoff import run_graph_selected_source_coverage_offline
+        runner.side_effect=ValueError("authenticated venue builder unavailable")
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            (root/"source.json").write_text(json.dumps(SOURCE))
+            report=run_graph_selected_source_coverage_offline(
+                "http://127.0.0.1:8899",root/"source.json",root/"report.json")
+            self.assertEqual(report["status"],"GRAPH_SOURCE_COVERAGE_SIGNED_BLOCKED")
+            self.assertFalse(report["signed_attempted"])
+            self.assertFalse(report["signed_atomic_simulation_verified"])
+            self.assertFalse(report["native_full_route_quote_verified"])
+            self.assertIn("authenticated venue builder unavailable",report["reason"])
+            self.assertEqual(json.loads((root/"report.json").read_text()),report)
+
+    @patch("arb.m5_four_to_six_signed_handoff.extract_pool_states",return_value=ROWS)
+    @patch("arb.m5_four_to_six_signed_handoff.verify")
+    @patch("arb.next_ten_signed_atomic_offline.run_four_to_six_venue")
     def test_coverage_rejects_failed_independent_audit(self,runner,*unused):
         from arb.m5_four_to_six_signed_handoff import run_graph_selected_source_coverage_offline
         runner.return_value={**RECEIPT}
