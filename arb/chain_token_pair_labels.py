@@ -117,4 +117,20 @@ def annotate_report(report, metadata):
                 else mint[:8]+"…"))
         shared.append({**row,"pair":"/".join(v[:7] for v in values)})
     output["cross_venue_shared_pairs"]=shared
+    # Apply the same mint-bound display projection to retained graph routes.
+    # Never modify the original from/to mint keys used by route discovery.
+    def display(mint):
+        record=verified.get(mint)
+        label=(SYMBOLS.get(mint) or
+               (record.get("symbol") if isinstance(record,dict) and
+                record.get("mint")==mint and
+                record.get("source")=="METAPLEX_MINT_BOUND_SELF_DECLARED_DISPLAY_ONLY"
+                else None))
+        return (label or mint[:7])[:7]
+    output["cross_venue_cycle_examples"]=[
+        {**route,
+         "token_labels":[display(m) for m in route["tokens"]],
+         "legs":[{**leg,"from_label":display(leg["from"]),
+                  "to_label":display(leg["to"])} for leg in route["legs"]]}
+        for route in report.get("cross_venue_cycle_examples",[])]
     return output
