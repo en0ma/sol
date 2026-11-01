@@ -23,7 +23,8 @@ def encode(amount,other_amount_threshold,sqrt_price_limit_x64=0,is_base_input=Tr
             sqrt_price_limit_x64.to_bytes(16,"little")+bytes([is_base_input]))
 
 def build(pool,state,payer,user_input,user_output,amount,threshold,tick_arrays,
-          input_is_token_0=True,sqrt_price_limit_x64=0,is_base_input=True,\n          bitmap_extension=None):
+          input_is_token_0=True,sqrt_price_limit_x64=0,is_base_input=True,
+          bitmap_extension=None):
     from solders.pubkey import Pubkey
     from solders.instruction import Instruction,AccountMeta
     if type(input_is_token_0)is not bool:raise TypeError("input direction must be bool")
