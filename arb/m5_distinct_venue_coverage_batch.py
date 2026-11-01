@@ -178,7 +178,7 @@ def offline_batch(rpc,fixtures,directory,*,observed_unix,fee_observations=None,r
             "simulated_estimated_net_start_mint_base_units":simulated_net,
             "outcome":economic_outcome,
             "realized_net_profit_verified":False,
-            "paid_network_fee_verified":False,**SAFE},sort_keys=True,indent=2)+"\\n")
+            "paid_network_fee_verified":False,**SAFE},sort_keys=True,indent=2)+chr(10))
         rows.append({"index":row["index"],"status":result["status"],
                      "price_measurement_status":experiment["status"] if experiment is not None else "UNAVAILABLE",
                      "route_venues":fixture.get("route_venues") if isinstance(fixture,dict) else None,
