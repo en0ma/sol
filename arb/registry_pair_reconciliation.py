@@ -88,12 +88,15 @@ def reconcile(original, verified, *, target=TARGET_PER_VENUE, max_cycles=MAX_CYC
     # engine on these actual source-authenticated pool identities.
     from arb.registry_multihop_cycles import discover_cycles
     from arb.onchain_pool_discovery import USDT
+    # The five-million-cycle enumeration counts routes without retaining
+    # millions of verbose receipts. The graph engine collects exact observed
+    # cross-venue participation across the entire bounded search.
     graph = discover_cycles(list(admitted.values()),min_hops=2,max_hops=6,
-                            starts=(SOL,USDC,USDT),max_cycles=max_cycles)
+                            starts=(SOL,USDC,USDT),max_cycles=max_cycles,
+                            retain_cycles=20)
     cross_venue_cycles=[route for route in graph["cycles"]
                         if len(route["venues"])>=2]
-    cycle_pools={(leg["venue"],leg["pool"])
-                 for route in cross_venue_cycles for leg in route["legs"]}
+    cycle_pools=set(map(tuple,graph["cross_venue_cycle_pool_ids"]))
     coverage = {}
     # The active pool verifier currently has six venue decoders. The seventh
     # AMM v4 must remain visibly unmet rather than disappearing from the goal.
@@ -122,7 +125,7 @@ def reconcile(original, verified, *, target=TARGET_PER_VENUE, max_cycles=MAX_CYC
         "seven_venue_target_met": all(v["target_met"] for v in coverage.values()),
         "venue_coverage": coverage, "cross_venue_shared_pairs": shared,
         "authenticated_graph_cycle_count": graph["cycle_count"],
-        "cross_venue_closed_cycle_count": len(cross_venue_cycles),
+        "cross_venue_closed_cycle_count": graph["cross_venue_cycle_count"],
         "graph_inventory_truncated": graph["truncated"],
         "graph_cycle_limit": max_cycles,
         "cross_venue_cycle_examples": cross_venue_cycles[:20],
@@ -137,7 +140,7 @@ def main():
     parser.add_argument("--rpc", default=os.getenv("SOLANA_RPC_URL", "http://127.0.0.1:8899"))
     parser.add_argument("--min-per-venue", type=int, default=20)
     parser.add_argument("--max-graph-cycles", type=int, default=MAX_CYCLES,
-                        help="Bound authenticated cycle enumeration (1..1000000)")
+                        help="Bound authenticated cycle enumeration (1..5000000)")
     parser.add_argument("--clean-registry", default="",
                         help="Write only independently verified, mint-complete pool identities")
     args = parser.parse_args()
