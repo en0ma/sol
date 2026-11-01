@@ -141,6 +141,44 @@ def offline_batch(rpc,fixtures,directory,*,observed_unix,fee_observations=None,r
         if economics is not None:
             economics_reports.append(economics)
             (root/("economics-%02d.json"%row["index"])).write_text(json.dumps(economics,indent=2)+"\n")
+        # Classify the genuine independently accepted signed route economics,
+        # never a synthetic graph quote or an unaccepted simulated receipt.
+        # Swap fees are already reflected in actual signed SPL balances.
+        economic_outcome="UNASSESSABLE"
+        simulated_net=None
+        if (economics is not None and parity is not None
+                and parity.get("signed_execution_accepted") is True):
+            gross=economics.get("gross_delta_start_mint_base_units")
+            if type(gross) is int:
+                if gross<0:
+                    economic_outcome="SIMULATED_GROSS_LOSS_NONNEGATIVE_COSTS"
+                elif gross==0:
+                    economic_outcome="SIMULATED_GROSS_BREAK_EVEN_BEFORE_COSTS"
+                # Signed WSOL routes have an exact lamport denomination and
+                # may admit a getFeeForMessage-based *estimated*, unpaid cost.
+                estimated=economics.get("estimated_net_delta_wsol_base_units")
+                if (type(estimated) is int and
+                    economics.get("estimated_cost_is_paid_fee") is False and
+                    fixture.get("route_mints",[None])[0]==
+                        "So11111111111111111111111111111111111111112"):
+                    simulated_net=estimated
+                    economic_outcome=("SIMULATED_ESTIMATED_NET_GAIN" if estimated>0
+                                      else "SIMULATED_ESTIMATED_NET_LOSS" if estimated<0
+                                      else "SIMULATED_ESTIMATED_NET_BREAK_EVEN")
+        # Persist one route-level economic decision alongside the actual
+        # acceptance and signed receipt; do not attach it to unquoted cycles.
+        (root/("outcome-%02d.json"%row["index"])).write_text(json.dumps({
+            "source_route_index":row["index"],
+            "signed_receipt_status":result.get("status"),
+            "independent_signed_accepted":bool(
+                parity is not None and parity.get("signed_execution_accepted") is True),
+            "economics_status":economics.get("status") if economics else "UNAVAILABLE",
+            "simulated_gross_start_mint_base_units":(
+                economics.get("gross_delta_start_mint_base_units") if economics else None),
+            "simulated_estimated_net_start_mint_base_units":simulated_net,
+            "outcome":economic_outcome,
+            "realized_net_profit_verified":False,
+            "paid_network_fee_verified":False,**SAFE},sort_keys=True,indent=2)+"\\n")
         rows.append({"index":row["index"],"status":result["status"],
                      "price_measurement_status":experiment["status"] if experiment is not None else "UNAVAILABLE",
                      "route_venues":fixture.get("route_venues") if isinstance(fixture,dict) else None,
@@ -152,6 +190,8 @@ def offline_batch(rpc,fixtures,directory,*,observed_unix,fee_observations=None,r
                      "independent_signed_accepted":parity is not None and parity["signed_execution_accepted"],
                      "independently_validated_quote_samples":0,
                      "economics_status":economics["status"] if economics is not None else "UNAVAILABLE",
+                     "simulated_economic_outcome":economic_outcome,
+                     "simulated_estimated_net_start_mint_base_units":simulated_net,
                      "source_price_economics_gate":evidence["status"] if evidence is not None else "UNAVAILABLE",
                      "quote_diagnostic_legs":len(parity["leg_comparisons"]) if parity is not None else 0,**SAFE})
     report={"selection_mode":"QUOTE_RANKED" if route_indices is not None else "SOURCE_COVERAGE",
