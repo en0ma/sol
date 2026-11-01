@@ -1,5 +1,6 @@
 """Prepared graph-native route -> existing signed N-leg verifier contract."""
 import unittest
+import os
 from unittest.mock import patch
 from arb.m5_four_to_six_signed_handoff import execute_prepared_offline
 
@@ -28,6 +29,11 @@ RECEIPT={"status":"SIGNED_N_LEG_ATOMIC_AND_ROLLBACK_VERIFIED",
          **SAFE}
 
 class PreparedNativeSignedBridge(unittest.TestCase):
+    def setUp(self):
+        self.offline=patch.dict(os.environ,{"SURFPOOL_EXPLICITLY_OFFLINE":"1"})
+        self.offline.start()
+        self.addCleanup(self.offline.stop)
+
     @patch("arb.m5_four_to_six_signed_handoff.extract_pool_states",return_value=ROWS)
     @patch("arb.m5_four_to_six_signed_handoff.verify")
     @patch("arb.atomic_graph_coordinator.coordinate_registered_cycle_offline")
@@ -63,6 +69,11 @@ class PreparedNativeSignedBridge(unittest.TestCase):
         with self.assertRaises(ValueError):
             execute_prepared_offline("http://127.0.0.1:8899",SOURCE,bad,PREP)
         coordinator.assert_not_called()
+
+    def test_fork_isolation_gate_blocks_prepared_signer(self):
+        with patch.dict(os.environ,{"SURFPOOL_EXPLICITLY_OFFLINE":"0"}):
+            with self.assertRaises(ValueError):
+                execute_prepared_offline("http://127.0.0.1:8899",SOURCE,QUOTE,PREP)
 
     def test_remote_rpc_denied_before_any_source_or_signing(self):
         with self.assertRaises(ValueError):
