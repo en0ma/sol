@@ -110,3 +110,49 @@ def compare_quote_to_signed_spl(quote_report, signed_observations):
             "signed_receipt_independently_authenticated_here":False,
             "native_quote_independently_authenticated_here":False,
             "net_profitability_verified":False,**SAFE}
+
+def screen_fee_bounded_candidates(quote_reports, *, fee_upper_bound_base_units,
+                                  maximum_candidates=20):
+    """Rank only *hypothetical* start-mint surplus after a conservative fee cap.
+
+    No route is declared profitable: fee cap is caller input, never a
+    witnessed paid fee or a validated exchange-rate conversion. Unknown
+    observations are rejected instead of being silently assigned zero fees.
+    """
+    if (not isinstance(quote_reports,list) or len(quote_reports)>10000
+        or type(maximum_candidates) is not int or not 1<=maximum_candidates<=100
+        or type(fee_upper_bound_base_units) is not int
+        or not 0<=fee_upper_bound_base_units<U64):
+        raise ValueError("bounded candidate screen and explicit fee upper bound required")
+    candidates=[]
+    for i,report in enumerate(quote_reports):
+        if (not isinstance(report,dict)
+            or report.get("status")!="COMPLETE_QUOTE_CHAIN_ARITHMETIC_ONLY"
+            or report.get("native_quote_authenticity_established_here") is not False
+            or report.get("signed_atomic_simulation_verified") is not False
+            or report.get("net_profitability_verified") is not False
+            or any(report.get(k) is not False for k in SAFE)
+            or type(report.get("gross_quoted_delta_base_units")) is not int
+            or not isinstance(report.get("start_mint"),str)
+            or not isinstance(report.get("legs"),list)
+            or not 2<=len(report["legs"])<=MAX_LEGS):
+            raise ValueError("unqualified or fabricated quote candidate")
+        if report["gross_quoted_delta_base_units"]<=fee_upper_bound_base_units:
+            continue
+        candidates.append({
+            "candidate_index":i,
+            "start_mint":report["start_mint"],
+            "quoted_gross_delta_base_units":report["gross_quoted_delta_base_units"],
+            "assumed_fee_upper_bound_base_units":fee_upper_bound_base_units,
+            "hypothetical_surplus_base_units":
+                report["gross_quoted_delta_base_units"]-fee_upper_bound_base_units,
+            "verified_native_quote":False,"verified_actual_fee":False,
+            "net_profitability_verified":False,**SAFE})
+    candidates.sort(key=lambda c:(-c["hypothetical_surplus_base_units"],
+                                   c["candidate_index"]))
+    return {"status":"HYPOTHETICAL_FEE_CAPPED_QUOTE_SCREEN_NOT_PROFIT_EVIDENCE",
+            "examined":len(quote_reports),
+            "candidates_above_assumed_bound":len(candidates),
+            "candidates":candidates[:maximum_candidates],
+            "fee_bound_independently_verified":False,
+            "net_profitability_verified":False,**SAFE}
