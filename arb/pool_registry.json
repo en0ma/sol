@@ -2439,6 +2439,42 @@
         "TiMSdJrkVwUpeEWJpuqRvHt4wVS7uH77LbNPGGVJXNw"
       ],
       "pair": "SOL/TIMMY"
+    },
+    {
+      "venue": "raydium_cpmm",
+      "address": "HKuJrP5tYQLbEUdjKwjgnHs2957QKjR2iWhJKTtMa1xs",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN"
+      ],
+      "pair": "SOL/6P6X"
+    },
+    {
+      "venue": "raydium_cpmm",
+      "address": "CpgZ2cH1x646AssMWjFnRzh9UeNEd5vuQbetxpm5Tdem",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "F6v4wfAdJB8D8p77bMXZgYt8TDKsYxLYxH5AFhUkYx9W"
+      ],
+      "pair": "SOL/F6V4"
+    },
+    {
+      "venue": "raydium_amm_v4",
+      "address": "uCk125EJf7iCjz43aSdzuyMAT5eii6c5zKVxEnGnosa",
+      "mints": [
+        "6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "6P6X/SOL"
+    },
+    {
+      "venue": "raydium_amm_v4",
+      "address": "8iQFhWyceGREsWnLM8NkG9GC8DvZunGZyMzuyUScgkMK",
+      "mints": [
+        "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
+        "2FPyTwcZLUg1MDrwsyoP4D6s1tM7hAkHYRjkNb5w6Pxk"
+      ],
+      "pair": "RAY/2FPY"
     }
   ]
 }
