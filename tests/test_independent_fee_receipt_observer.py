@@ -1,7 +1,8 @@
 import unittest
 from unittest.mock import patch
 from arb.independent_fee_receipt_observer import (
-    corroborate_signed_fee_receipts,fetch_confirmed_fee_observation)
+    corroborate_signed_fee_receipts,fetch_confirmed_fee_observation,
+    inspect_fee_two_read_only_observers)
 
 class FeeReceiptTests(unittest.TestCase):
     def test_reject_missing_or_duplicate_remote_observer(self):
@@ -33,6 +34,15 @@ class FeeReceiptTests(unittest.TestCase):
             "meta":{"fee":5000,"err":None}}):
             a=fetch_confirmed_fee_observation("https://rpc-one.example",wire)
             b=fetch_confirmed_fee_observation("https://rpc-two.example",wire)
+        with patch("arb.rpc.call",return_value={"slot":123,
+            "transaction":[base64.b64encode(wire).decode(),"base64"],
+            "meta":{"fee":5000,"err":None}}):
+            direct=inspect_fee_two_read_only_observers(
+                "https://rpc-one.example","https://rpc-two.example",wire)
+        self.assertEqual(direct["observed_fee_lamports"],5000)
+        with self.assertRaises(ValueError):
+            inspect_fee_two_read_only_observers(
+                "https://rpc-one.example","https://rpc-one.example",wire)
         report=corroborate_signed_fee_receipts(wire,[a,b])
         self.assertEqual(report["observed_fee_lamports"],5000)
         self.assertFalse(report["actual_mainnet_fee_payer_spend_independently_proven"])
