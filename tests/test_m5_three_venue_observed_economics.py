@@ -34,6 +34,16 @@ class Tests(unittest.TestCase):
         self.assertFalse(r["profitability_verified"])
         r=evaluate(f,self.receipt(),observed_fee_lamports=5,start_mint_base_units_per_sol=5,conversion_authenticated=True)
         self.assertEqual(r["status"],"COST_EVIDENCE_BLOCKED")
+    @patch("arb.m5_three_venue_observed_economics.accept",return_value={})
+    def test_wrong_number_of_signed_spl_accounts_cannot_produce_economics(self,_):
+        for n in (3,5):
+            receipt=self.receipt()
+            receipt["initial_balances_base_units"]=[100]+[0]*(n-1)
+            receipt["positive_post_balances_base_units"]=[0]*(n-1)+[120]
+            result=evaluate(self.source(),receipt)
+            self.assertEqual(result["status"],"COST_EVIDENCE_BLOCKED")
+            self.assertEqual(result["reason"],"SIGNED_START_AND_TERMINAL_SPL_AMOUNTS_MISSING")
+
     @patch("arb.m5_three_venue_observed_economics.accept",side_effect=ValueError("fake"))
     def test_unaccepted_signed_receipt_blocks(self,_):
         self.assertEqual(evaluate({},self.receipt())["status"],"COST_EVIDENCE_BLOCKED")
