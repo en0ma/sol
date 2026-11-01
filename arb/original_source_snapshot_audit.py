@@ -65,8 +65,7 @@ def corroborate_original_source_batches(first, second, identities, *,
     b=inspect_original_source_batch(second,identities,required_slot=required_slot)
     if a["source_slot"]!=b["source_slot"]:
         raise ValueError("original account snapshots are not same-slot")
-    if a["accounts"]!=b["accounts"]:
-        raise ValueError("original account bytes, order or owners disagree")
+    # Compare account monetary metadata before decoded account-row equality.
     # Byte equality alone is not account-state equality: fee payer, vault,
     # and rent analysis also depends on lamports/rentEpoch. Never silently
     # merge two observers that disagree on the enclosing account metadata.
@@ -74,6 +73,8 @@ def corroborate_original_source_batches(first, second, identities, *,
         if (left.get("lamports")!=right.get("lamports")
             or left.get("rentEpoch")!=right.get("rentEpoch")):
             raise ValueError("original account lamports or rent epoch disagree")
+    if a["accounts"]!=b["accounts"]:
+        raise ValueError("original account bytes, order or owners disagree")
     return {"status":"TWO_OBSERVER_SAME_SLOT_ORIGINAL_ACCOUNT_CORROBORATION",
             "source_slot":a["source_slot"],
             "account_count":len(a["accounts"]),
