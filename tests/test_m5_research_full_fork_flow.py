@@ -54,6 +54,49 @@ class M5EndToEndResearch(unittest.TestCase):
         signed.assert_called_once_with("http://127.0.0.1:8899",
             "/tmp/source","/tmp/signed",observed_unix=123)
 
+    @patch("arb.m5_distinct_venue_coverage_batch.offline_batch")
+    @patch("arb.m5_distinct_venue_coverage_batch.source_batch")
+    @patch("arb.m5_seven_venue_route_scan.probe")
+    @patch("arb.m5_seven_venue_route_scan.local_rpc_only")
+    def test_signed_outcome_joins_only_identical_directed_graph_route(
+            self,local,probe,source,signed):
+        import tempfile,json
+        from pathlib import Path
+        probe.return_value=readiness()
+        # Distinct venue triangle with three different pools and mints.
+        snapshot=readiness()
+        for venue, pool, mints in (
+            ("orca","o",["A","B"]),("raydium_cpmm","c",["B","C"]),
+            ("raydium_amm_v4","v",["C","A"])):
+            snapshot["authenticated_pools"][venue][0].update(pool=pool,mints=mints)
+        probe.return_value=snapshot
+        source.return_value={"attempted":1,"exported":1,"routes":[{
+            "index":0,"status":"AUTHENTICATED_THREE_VENUE_SOURCE_FIXTURE",
+            "fixture":"triangle-00.json"}]}
+        signed.return_value={"attempted":1,"independent_signed_accepted":1,
+            "independently_validated_quote_samples":0,"routes":[{
+            "index":0,"independent_signed_accepted":True,
+            "economics_status":"COST_EVIDENCE_BLOCKED",
+            "simulated_economic_outcome":"SIMULATED_GROSS_LOSS_NONNEGATIVE_COSTS",
+            "simulated_estimated_net_start_mint_base_units":None}]}
+        with tempfile.TemporaryDirectory() as temp,patch.dict(
+                os.environ,{"SURFPOOL_EXPLICITLY_OFFLINE":"1"}):
+            Path(temp,"triangle-00.json").write_text(json.dumps({
+                "route_venues":["orca","raydium_cpmm","raydium_amm_v4"],
+                "route_pool_addresses":["o","c","v"],
+                "route_mints":["A","B","C","A"]}))
+            report=run_m5_research("http://127.0.0.1:8899",{},
+                source_dir=temp,signed_dir=temp,observed_unix=1,max_cycles=100)
+        self.assertEqual(report["signed_route_economic_outcome_counts"],
+                         {"SIMULATED_GROSS_LOSS_NONNEGATIVE_COSTS":1})
+        matched=[r for r in report["routes"] if r.get("source_batch_route_index")==0]
+        self.assertEqual(len(matched),1)
+        self.assertEqual(matched[0]["signed_simulation_status"],
+                         "SOURCE_ROUTE_INDEPENDENTLY_SIGNED")
+        self.assertEqual(report["graph_routes_with_source_bound_signed_outcome"],1)
+        self.assertGreater(report["graph_routes_unassessed_by_signed_batch"],0)
+        self.assertFalse(report["realized_net_profit_verified"])
+
     @patch("arb.m5_seven_venue_route_scan.probe")
     @patch("arb.m5_seven_venue_route_scan.local_rpc_only")
     def test_missing_explicit_fork_gate_blocks_before_source_export(self,local,probe):
