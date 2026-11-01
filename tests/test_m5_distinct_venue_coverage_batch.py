@@ -55,6 +55,10 @@ class Tests(unittest.TestCase):
             self.assertEqual(report["routes"][0]["price_measurement_status"],"PRICE_MEASUREMENT_BLOCKED")
             self.assertTrue((Path(output)/"native-aux-00.json").exists())
             self.assertTrue((Path(output)/"signed-price-experiment-00.json").exists())
+            outcome=json.loads((Path(output)/"outcome-00.json").read_text())
+            self.assertEqual(outcome["outcome"],"UNASSESSABLE")
+            self.assertFalse(outcome["realized_net_profit_verified"])
+
             pricing=json.loads((Path(output)/"signed-price-experiment-00.json").read_text())
             self.assertEqual(pricing["observed_compared_samples"],0)
             self.assertFalse(pricing["broadcast"])
