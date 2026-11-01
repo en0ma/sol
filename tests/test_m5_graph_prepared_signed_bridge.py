@@ -101,6 +101,45 @@ class PreparedNativeSignedBridge(unittest.TestCase):
             execute_prepared_offline("http://127.0.0.1:8899",SOURCE,QUOTE,PREP)
         coordinator.assert_not_called()
 
+    @patch("arb.m5_four_to_six_signed_handoff.extract_pool_states",return_value=ROWS)
+    @patch("arb.m5_four_to_six_signed_handoff.verify")
+    @patch("arb.next_ten_signed_atomic_offline.run_four_to_six_venue")
+    def test_automatic_existing_signer_and_receipt_written(self,runner,*unused):
+        from arb.m5_four_to_six_signed_handoff import run_graph_selected_automatic_offline
+        runner.return_value={**RECEIPT,
+            "route_venues":VENUES,"route_pool_addresses":POOLS,
+            "route_mints":MINTS,
+            "state_account_manifest_sha256":"d"*64,
+            "state_accounts_observed_slot":44,
+            "hydrated_fork_state_readback":{"status":"HYDRATED_FORK_ACCOUNT_BYTES_MATCH"}}
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            (root/"source.json").write_text(json.dumps(SOURCE))
+            (root/"quote.json").write_text(json.dumps(QUOTE))
+            target=root/"result.json"
+            result=run_graph_selected_automatic_offline("http://127.0.0.1:8899",
+                root/"source.json",root/"quote.json",target)
+            self.assertEqual(result["status"],"GRAPH_SELECTED_SIGNED_ATOMIC_ACCEPTED")
+            self.assertEqual(json.loads(target.read_text())["status"],result["status"])
+            runner.assert_called_once()
+            self.assertEqual(runner.call_args.kwargs["amount_in"],100)
+
+    @patch("arb.m5_four_to_six_signed_handoff.extract_pool_states",return_value=ROWS)
+    @patch("arb.m5_four_to_six_signed_handoff.verify")
+    @patch("arb.next_ten_signed_atomic_offline.run_four_to_six_venue")
+    def test_automatic_rejects_quote_tamper_before_runner(self,runner,*unused):
+        from arb.m5_four_to_six_signed_handoff import run_graph_selected_automatic_offline
+        bad={**QUOTE,"quoted_legs":[dict(x) for x in TRACE]}
+        bad["quoted_legs"][1]["input_base_units"]=5
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            (root/"source.json").write_text(json.dumps(SOURCE))
+            (root/"quote.json").write_text(json.dumps(bad))
+            with self.assertRaises(ValueError):
+                run_graph_selected_automatic_offline("http://127.0.0.1:8899",
+                    root/"source.json",root/"quote.json",root/"result.json")
+        runner.assert_not_called()
+
     def test_fork_isolation_gate_blocks_prepared_signer(self):
         with patch.dict(os.environ,{"SURFPOOL_EXPLICITLY_OFFLINE":"0"}):
             with self.assertRaises(ValueError):
