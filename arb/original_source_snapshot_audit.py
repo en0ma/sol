@@ -8,7 +8,7 @@ import hashlib
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
 def inspect_original_source_batch(snapshot, identities, *, required_slot=None):
     if (not isinstance(snapshot,dict) or not isinstance(identities,list)
-        or not 1<=len(identities)<=128
+        or not 1<=len(identities)<=100
         or (required_slot is not None and
             (type(required_slot)is not int or required_slot<0))):
         raise ValueError("bounded snapshot and account identities required")
@@ -84,7 +84,7 @@ def capture_original_source_two_observers(rpc_a, rpc_b, identities, *,
     """
     from urllib.parse import urlsplit
     from arb.rpc import call
-    if not isinstance(identities,list) or not 1<=len(identities)<=128:
+    if not isinstance(identities,list) or not 1<=len(identities)<=100:
         raise ValueError("bounded account manifest required")
     if any(not isinstance(i,dict) or not isinstance(i.get("address"),str)
            or not i["address"] for i in identities):
