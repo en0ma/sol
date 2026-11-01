@@ -53,6 +53,31 @@ def quote_signed_single_leg(rpc, *, venue, pool, state, evidence, signer,
         payer=str(signer.pubkey())
     except Exception as exc:
         raise ValueError("local signed fee payer required") from exc
+    # Bind caller's initial balances to the same ordered, synchronized LOCAL
+    # RPC prestate. Never subtract fabricated caller balances from poststate.
+    pre=call(rpc,"getMultipleAccounts",[
+        [input_token_account,output_token_account],
+        {"encoding":"base64","commitment":"confirmed"}])
+    pre_accounts=pre.get("value") if isinstance(pre,dict) else None
+    source_slot=pre.get("context",{}).get("slot") if isinstance(pre,dict) else None
+    if (type(source_slot)is not int or source_slot<0
+        or not isinstance(pre_accounts,list) or len(pre_accounts)!=2):
+        raise ValueError("synchronized native input/output source accounts absent")
+    pre_hashes=[]
+    for account,mint,expected in zip(
+            pre_accounts,(input_mint,output_mint),
+            (initial_input_base_units,initial_output_base_units)):
+        if (not isinstance(account,dict) or account.get("owner")!=TOKEN_PROGRAM
+            or account.get("executable") is not False
+            or not isinstance(account.get("data"),list)
+            or len(account["data"])!=2 or account["data"][1]!="base64"):
+            raise ValueError("invalid classic SPL token prestate")
+        original=base64.b64decode(account["data"][0],validate=True)
+        token=decode_token_account(original)
+        if (token["mint"]!=mint or token["amount_base_units"]!=expected
+            or token["authority"]!=payer):
+            raise ValueError("native signed swap prestate mint, balance or authority mismatch")
+        pre_hashes.append(hashlib.sha256(original).hexdigest())
     instruction=build_leg(
         venue,pool,state,evidence,payer,input_token_account,output_token_account,
         input_mint,output_mint,amount_in_base_units,min_output_base_units)
@@ -71,6 +96,7 @@ def quote_signed_single_leg(rpc, *, venue, pool, state, evidence, signer,
         base64.b64encode(wire).decode("ascii"),{
             "encoding":"base64","sigVerify":True,
             "replaceRecentBlockhash":False,
+            "minContextSlot":source_slot,
             "accounts":{"encoding":"base64",
                         "addresses":[input_token_account,output_token_account]}}])
     value=raw.get("value") if isinstance(raw,dict) else None
@@ -112,6 +138,9 @@ def quote_signed_single_leg(rpc, *, venue, pool, state, evidence, signer,
             "amount_out_base_units":received,
             "requested_input_base_units":amount_in_base_units,
             "signed_wire_sha256":hashlib.sha256(wire).hexdigest(),
+            "original_local_spl_source_slot":source_slot,
+            "prestate_account_sha256":pre_hashes,
+            "original_mainnet_source_independently_authenticated":False,
             "first_signature":str(tx.signatures[0]),
             "observed_compute_units":units,
             "fee_lamports_paid":None,
