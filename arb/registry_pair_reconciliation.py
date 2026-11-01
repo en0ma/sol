@@ -137,7 +137,7 @@ def main():
     parser.add_argument("--rpc", default=os.getenv("SOLANA_RPC_URL", "http://127.0.0.1:8899"))
     parser.add_argument("--min-per-venue", type=int, default=20)
     parser.add_argument("--max-graph-cycles", type=int, default=MAX_CYCLES,
-                        help="Bound authenticated cycle enumeration (1..200000)")
+                        help="Bound authenticated cycle enumeration (1..1000000)")
     parser.add_argument("--clean-registry", default="",
                         help="Write only independently verified, mint-complete pool identities")
     args = parser.parse_args()
