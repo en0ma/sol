@@ -116,7 +116,6 @@ jobs:
           else:raise SystemExit("source fork still serving RPC; isolated signing prohibited")
           PY
       - name: Start separate fork without any upstream datasource
-        if: ${{ hashFiles('**/never-exists') == '' }}
         run: |
           nohup "$HOME/.local/bin/surfpool" start --ci --offline --no-deploy > "$RUNNER_TEMP/graph-offline.log" 2>&1 < /dev/null &
           python3 - <<'PY'
