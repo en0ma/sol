@@ -172,8 +172,20 @@ jobs:
             else
               echo "No independently accepted signed graph receipt; see offline logs." >> "$GITHUB_STEP_SUMMARY"
             fi
+          elif test -s "$RUNNER_TEMP/graph-native-source.json"; then
+            # Source-coverage mode is explicitly NOT a native-priced candidate.
+            # It still produces genuine isolated signed evidence when eligible.
+            set +e
+            python3 -m arb.m5_four_to_six_signed_handoff \
+              --rpc http://127.0.0.1:8899 \
+              --source "$RUNNER_TEMP/graph-native-source.json" \
+              --source-coverage-only --amount 100000 \
+              --output "$RUNNER_TEMP/graph-native-source-coverage-signed.json"
+            result=$?
+            set -e
+            echo "No complete native quote; separate source-coverage signed trial exit: $result" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "No fully source-quoted 4–6-leg graph candidate; zero signed attempts (not a simulated loss)." >> "$GITHUB_STEP_SUMMARY"
+            echo "No authenticated 4–6-leg source fixture; zero signed attempts (not a simulated loss)." >> "$GITHUB_STEP_SUMMARY"
           fi
       - uses: actions/upload-artifact@v4
         if: always()
@@ -185,6 +197,7 @@ jobs:
             ${{ runner.temp }}/graph-native-quote.json
             ${{ runner.temp }}/graph-native-source-summary.json
             ${{ runner.temp }}/graph-native-signed.json
+            ${{ runner.temp }}/graph-native-source-coverage-signed.json
             ${{ runner.temp }}/graph-source.log
             ${{ runner.temp }}/graph-offline.log
           if-no-files-found: warn
