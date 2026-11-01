@@ -9,7 +9,7 @@ class OriginalSnapshotTests(unittest.TestCase):
         raw=b"actual account bytes"
         encoded=base64.b64encode(raw).decode()
         ids=[{"address":"a"*44,"owner":"program","sha256":hashlib.sha256(raw).hexdigest()}]
-        snap={"context":{"slot":120},"value":[{"owner":"program","executable":False,
+        snap={"context":{"slot":120},"value":[{"owner":"program","executable":False,"lamports":100,"rentEpoch":0,
                "data":[encoded,"base64"]}]}
         r=inspect_original_source_batch(snap,ids,required_slot=100)
         self.assertEqual(r["source_slot"],120)
@@ -25,7 +25,7 @@ class OriginalSnapshotTests(unittest.TestCase):
         raw=b"verified bytes at exact snapshot"
         ids=[{"address":"a"*44,"owner":"program",
               "sha256":hashlib.sha256(raw).hexdigest()}]
-        account={"owner":"program","executable":False,
+        account={"owner":"program","executable":False,"lamports":100,"rentEpoch":0,
                  "data":[base64.b64encode(raw).decode(),"base64"]}
         snap={"context":{"slot":200},"value":[account]}
         result=corroborate_original_source_batches(snap,snap,ids)
@@ -41,7 +41,7 @@ class OriginalSnapshotTests(unittest.TestCase):
             corroborate_original_source_batches(snap,changed,ids)
     def test_same_bytes_but_different_lamport_state_rejected(self):
         raw=b"same onchain data"
-        account={"owner":"program","executable":False,
+        account={"owner":"program","executable":False,"lamports":100,"rentEpoch":0,
                  "data":[base64.b64encode(raw).decode(),"base64"],
                  "lamports":100,"rentEpoch":4}
         ids=[{"address":"a"*44,"owner":"program"}]
@@ -66,7 +66,7 @@ class OriginalSnapshotTests(unittest.TestCase):
         raw=b"raw account original"
         ids=[{"address":"a"*44,"owner":"program",
               "sha256":hashlib.sha256(raw).hexdigest()}]
-        account={"owner":"program","executable":False,
+        account={"owner":"program","executable":False,"lamports":100,"rentEpoch":0,
                  "data":[base64.b64encode(raw).decode(),"base64"]}
         snap={"context":{"slot":400},"value":[account]}
         with patch("arb.rpc.call",side_effect=[snap,snap]) as rpc:
