@@ -60,7 +60,15 @@ def run_cycle_pipeline(snapshot, *, now, quote_provider, cost_provider,
                     and (type(q.get("amount_in")) is not int
                          or q["amount_in"] != initial_input)):
                     raise ValueError("first quote does not consume requested exact input")
-                if quotes and q.get("amount_in")!=quotes[-1].get("amount_out"):
+                # Exact-input continuity is numeric AND type-safe for every hop.
+                # Python bools compare equal to 0/1; malformed/negative/out-of-u64
+                # amounts cannot enter economics or a signed transaction.
+                if (type(q.get("amount_in")) is not int
+                    or type(q.get("amount_out")) is not int
+                    or not 0 < q["amount_in"] < 2**64
+                    or not 0 < q["amount_out"] < 2**64):
+                    raise ValueError("quote raw amounts must be positive u64 integers")
+                if quotes and q["amount_in"] != quotes[-1]["amount_out"]:
                     raise ValueError("provider input does not consume quoted previous output")
                 quotes.append(q)
             except (ValueError,KeyError,TypeError) as exc:
