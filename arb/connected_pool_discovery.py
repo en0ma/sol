@@ -69,15 +69,26 @@ def unique_venue_pairs(pools, *, labels=None):
         if prior is None or rank[:2]>prior[0][:2] or (
                 rank[:2]==prior[0][:2] and rank[2]<prior[0][2]):
             grouped[key]=(rank,row)
-    # Prevent display label collisions in the exported registry as well.
-    # Original distinct mint identities remain available in the audit.
+    # Display collisions must NOT discard distinct authenticated mint pairs.
+    # Assign a deterministic compact disambiguator to the later pair instead.
+    # The canonical sorted mint addresses are still the identity.
+    import hashlib
     unique=[]
     labels_seen=set()
     for key in sorted(grouped):
         row=grouped[key][1]
         label=(row["venue"],row["pair"])
         if label in labels_seen:
-            continue
+            prefix=row["pair"].split("/")[0][:4]
+            digest=hashlib.sha256("|".join(key[1]).encode()).hexdigest().upper()
+            for offset in range(0,len(digest)-3):
+                candidate=(prefix+"/"+digest[offset:offset+4])[:9]
+                if (row["venue"],candidate) not in labels_seen:
+                    row={**row,"pair":candidate,"pair_label_disambiguated":True}
+                    label=(row["venue"],candidate)
+                    break
+            else:
+                raise ValueError("distinct authenticated mint pair display collision budget exhausted")
         labels_seen.add(label)
         unique.append(row)
     return unique
