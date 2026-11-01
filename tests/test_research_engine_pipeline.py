@@ -49,6 +49,43 @@ class PipelineTests(unittest.TestCase):
                               cost_provider=lambda *x:COSTS,initial_input=1)
     self.assertEqual(result["research_positive"],0)
     self.assertEqual(result["metrics"]["signed_attempted"],0)
+ def test_later_hop_bool_and_overflow_cannot_reach_economics_or_signing(self):
+    for bad in (True, False, -1, 0, 2**64, "1100"):
+        calls={"cost":0,"signed":0}
+        def quote(leg,amount):
+            if leg["venue"]=="raydium_cpmm":
+                return dict(leg,amount_in=bad,amount_out=1100,
+                            source_authenticated=True,quote_source="snapshot",
+                            observed_unix=995,liquidity_input_units=100000)
+            return dict(leg,amount_in=1000,amount_out=1100,
+                        source_authenticated=True,quote_source="snapshot",
+                        observed_unix=995,liquidity_input_units=100000)
+        def costs(*args):
+            calls["cost"]+=1
+            return COSTS
+        def signed(*args):
+            calls["signed"]+=1
+            return {}
+        result=run_cycle_pipeline(POOLS,now=NOW,quote_provider=quote,
+                                  cost_provider=costs,simulate_provider=signed,
+                                  initial_input=1000)
+        self.assertEqual(result["metrics"]["signed_attempted"],0)
+        self.assertTrue(all(row["status"]=="UNASSESSABLE" for row in result["results"]))
+        self.assertEqual(calls,{"cost":0,"signed":0})
+ def test_invalid_output_amount_cannot_enter_later_hop(self):
+    for bad in (True, 0, -2, 2**64, None):
+        calls={"cost":0}
+        def quote(leg,amount):
+            return dict(leg,amount_in=1000,amount_out=bad,
+                        source_authenticated=True,quote_source="snapshot",
+                        observed_unix=995,liquidity_input_units=100000)
+        def costs(*args):
+            calls["cost"]+=1
+            return COSTS
+        result=run_cycle_pipeline(POOLS,now=NOW,quote_provider=quote,
+                                  cost_provider=costs,initial_input=1000)
+        self.assertTrue(all(row["status"]=="UNASSESSABLE" for row in result["results"]))
+        self.assertEqual(calls["cost"],0)
  def test_provider_wrong_identity_fails_closed(self):
     report=run_cycle_pipeline(POOLS,now=NOW,
         quote_provider=lambda leg,amount:dict(leg,pool="fake"),
