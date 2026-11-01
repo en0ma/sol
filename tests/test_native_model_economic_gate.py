@@ -2,7 +2,7 @@ import unittest
 from arb.native_math_kernel import exact_constant_product_quote
 from arb.seven_venue_native_model_gate import VENUE_MODELS,model_requirements,quote_native
 from arb.offline_atomic_economic_gate import (audit_complete_atomic_economics,
-    screen_prospective_atomic_cost_budget)
+    screen_prospective_atomic_cost_budget,screen_source_bound_signed_route_budget)
 
 class EconomicModelGateTests(unittest.TestCase):
     def test_native_constant_product_exact_integer_fees(self):
@@ -88,5 +88,50 @@ class EconomicModelGateTests(unittest.TestCase):
             screen_prospective_atomic_cost_budget(
                 route,{**signed,"rollback_control_verified":False},chain,costs
             )["cost_budget_status"],"UNASSESSABLE")
+
+
+    def test_bound_complete_signed_route_rejects_swapped_identity_and_gross(self):
+        start="So11111111111111111111111111111111111111112"
+        other="T"*44
+        legs=[{"venue":"orca","pool":"first","input_mint":start,"output_mint":other},
+              {"venue":"raydium_cpmm","pool":"second","input_mint":other,"output_mint":start}]
+        route={"start_mint":start,"legs":legs}
+        quotes=[{"venue":leg["venue"],"pool":leg["pool"],
+                 "from":leg["input_mint"],"to":leg["output_mint"]}
+                for leg in legs]
+        chain={"status":"COMPLETE_QUOTE_CHAIN_ARITHMETIC_ONLY","legs":quotes,
+               "native_quote_authenticity_established_here":False,
+               "start_mint":start,"source_slot":123,
+               "initial_base_units":100,"terminal_quoted_base_units":110,
+               "gross_quoted_delta_base_units":10}
+        signed={"signed_atomic_execution_verified":True,
+                "independent_spl_poststate_verified":True,
+                "rollback_control_verified":True,
+                "offline_only":True,"broadcast":False,
+                "source_snapshot_slot":123,"route_pool_addresses":["first","second"],
+                "route_venues":["orca","raydium_cpmm"],
+                "route_mints":[start,other,start],
+                "initial_input_base_units":100,"terminal_output_base_units":108,
+                "gross_start_mint_base_units":8}
+        costs={name:{"amount_start_mint_base_units":1,"start_mint":start,
+                     "observation_id":"captured-"+name,
+                     "actual_fee_paid_verified":False,"broadcast":False}
+               for name in ("network_fee","priority_fee","compute_cost",
+                            "rent","borrow_cost","tip")}
+        report=screen_source_bound_signed_route_budget(route,signed,chain,costs)
+        self.assertTrue(report["signed_route_identity_and_gross_arithmetic_bound"])
+        self.assertEqual(report["prospective_net_base_units"],2)
+        self.assertEqual(report["signed_minus_quoted_terminal_base_units"],-2)
+        self.assertFalse(report["independent_receipt_proof_established_here"])
+        for bad in ({"source_snapshot_slot":124},
+                    {"route_pool_addresses":["second","first"]},
+                    {"route_venues":["raydium_cpmm","orca"]},
+                    {"route_mints":[start,other,other]},
+                    {"gross_start_mint_base_units":9},
+                    {"initial_input_base_units":101},
+                    {"terminal_output_base_units":True}):
+            with self.subTest(bad=bad),self.assertRaises(ValueError):
+                screen_source_bound_signed_route_budget(
+                    route,{**signed,**bad},chain,costs)
 
 if __name__=="__main__":unittest.main()
