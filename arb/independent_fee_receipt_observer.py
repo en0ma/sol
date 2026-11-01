@@ -145,3 +145,60 @@ def inspect_fee_two_read_only_observers(rpc_a, rpc_b, signed_wire):
     first=fetch_confirmed_fee_observation(rpc_a,signed_wire)
     second=fetch_confirmed_fee_observation(rpc_b,signed_wire)
     return corroborate_signed_fee_receipts(signed_wire,[first,second])
+
+def quote_signed_message_fee_two_read_only_observers(rpc_a, rpc_b, signed_wire):
+    """Corroborate getFeeForMessage for the exact verified signed message.
+
+    These are *quotes* from two HTTPS RPC providers, never an observed paid
+    fee. On-chain transaction fees depend on signatures, budget/priority
+    instructions and blockhash context. No transaction submission occurs.
+    """
+    from arb.rpc import call
+    from solders.transaction import VersionedTransaction
+    urls=(rpc_a,rpc_b)
+    hosts=[]
+    for rpc in urls:
+        if not isinstance(rpc,str):
+            raise ValueError("explicit independent RPC URLs required")
+        parsed=urlsplit(rpc)
+        if (parsed.scheme!="https" or not parsed.hostname or
+            parsed.username or parsed.password or parsed.fragment or
+            parsed.hostname in ("localhost","127.0.0.1","::1")):
+            raise ValueError("read-only remote HTTPS fee source required")
+        hosts.append(parsed.hostname)
+    if hosts[0]==hosts[1]:
+        raise ValueError("same RPC provider cannot corroborate fee quote")
+    if not isinstance(signed_wire,bytes) or not 0<len(signed_wire)<=1232:
+        raise ValueError("bounded signed packet required")
+    try:
+        tx=VersionedTransaction.from_bytes(signed_wire)
+        tx.verify_and_hash_message()
+        if not tx.signatures:
+            raise ValueError("unsigned transaction")
+        message=bytes(tx.message)
+    except Exception as exc:
+        raise ValueError("signed transaction cryptographic verification failed") from exc
+    quoted=[];slots=[]
+    encoded=base64.b64encode(message).decode("ascii")
+    for rpc in urls:
+        result=call(rpc,"getFeeForMessage",[
+            encoded,{"commitment":"confirmed"}])
+        fee=result.get("value") if isinstance(result,dict) else None
+        slot=result.get("context",{}).get("slot") if isinstance(result,dict) else None
+        if (type(fee)is not int or not 0<=fee<2**64
+            or type(slot)is not int or slot<0):
+            raise ValueError("unavailable or malformed signed message fee quote")
+        quoted.append(fee)
+        slots.append(slot)
+    if quoted[0]!=quoted[1]:
+        raise ValueError("independent fee quotes disagree")
+    return {"status":"TWO_RPC_SIGNED_MESSAGE_FEE_QUOTE_NOT_PAID_SPEND",
+            "message_sha256":hashlib.sha256(message).hexdigest(),
+            "signed_packet_sha256":hashlib.sha256(signed_wire).hexdigest(),
+            "first_signature":str(tx.signatures[0]),
+            "quoted_fee_lamports":quoted[0],
+            "quote_context_slots":slots,
+            "remote_provider_count":2,
+            "independent_provider_ownership_proven":False,
+            "independent_paid_fee_verified":False,
+            "net_profitability_verified":False,**SAFE}
