@@ -2,7 +2,8 @@ import unittest
 from unittest.mock import patch
 from arb.independent_fee_receipt_observer import (
     corroborate_signed_fee_receipts,fetch_confirmed_fee_observation,
-    inspect_fee_two_read_only_observers)
+    inspect_fee_two_read_only_observers,
+    quote_signed_message_fee_two_read_only_observers)
 
 class FeeReceiptTests(unittest.TestCase):
     def test_reject_missing_or_duplicate_remote_observer(self):
@@ -29,6 +30,22 @@ class FeeReceiptTests(unittest.TestCase):
         digest=sha256(wire).hexdigest()
         base={"signature":sig,"wire_sha256":digest,"slot":123,
               "fee_lamports":5000,"err":None,"confirmed_transaction":True}
+        with patch("arb.rpc.call",return_value={
+            "value":5000,"context":{"slot":123}}):
+            quoted=quote_signed_message_fee_two_read_only_observers(
+                "https://rpc-one.example","https://rpc-two.example",wire)
+        self.assertEqual(quoted["quoted_fee_lamports"],5000)
+        self.assertFalse(quoted["independent_paid_fee_verified"])
+        self.assertFalse(quoted["net_profitability_verified"])
+        with patch("arb.rpc.call",side_effect=[
+            {"value":5000,"context":{"slot":123}},
+            {"value":6000,"context":{"slot":124}}]):
+            with self.assertRaises(ValueError):
+                quote_signed_message_fee_two_read_only_observers(
+                    "https://rpc-one.example","https://rpc-two.example",wire)
+        with self.assertRaises(ValueError):
+            quote_signed_message_fee_two_read_only_observers(
+                "https://rpc-one.example","https://rpc-one.example",wire)
         with patch("arb.rpc.call",return_value={"slot":123,
             "transaction":[base64.b64encode(wire).decode(),"base64"],
             "meta":{"fee":5000,"err":None,
