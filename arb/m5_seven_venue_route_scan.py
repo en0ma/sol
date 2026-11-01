@@ -216,6 +216,10 @@ def run_m5_research(rpc, registry, *, max_cycles=200, source_dir=None,
                     signed_graph=execute_prepared_offline(
                         rpc,source,quote_report,signed_preparation)
                     report["four_to_six_signed_handoff"]=signed_graph
+                    report["graph_selected_signed_attempts"]=1
+                    report["graph_selected_signed_accepted"]=int(
+                        signed_graph["signed_atomic_simulation_verified"] is True)
+                    report["signed_simulation_attempts"]+=1
                     destination=Path(signed_dir)
                     destination.mkdir(parents=True,exist_ok=True)
                     (destination/"graph-selected-four-to-six-signed.json").write_text(
