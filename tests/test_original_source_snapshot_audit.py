@@ -39,6 +39,16 @@ class OriginalSnapshotTests(unittest.TestCase):
             {**account,"data":[base64.b64encode(b"changed").decode(),"base64"]}]}
         with self.assertRaises(ValueError):
             corroborate_original_source_batches(snap,changed,ids)
+    def test_rpc_account_count_matches_official_maximum(self):
+        # Solana getMultipleAccounts accepts at most 100 keys per request.
+        too_many=[{"address":str(i),"owner":"program"} for i in range(101)]
+        with self.assertRaises(ValueError):
+            capture_original_source_two_observers(
+                "https://rpc-a.example","https://rpc-b.example",too_many)
+        with self.assertRaises(ValueError):
+            inspect_original_source_batch(
+                {"context":{"slot":1},"value":[]},too_many)
+
     def test_bounded_read_only_remote_corrob_and_adversarial_endpoints(self):
         raw=b"raw account original"
         ids=[{"address":"a"*44,"owner":"program",
