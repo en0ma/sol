@@ -46,6 +46,9 @@ class M5EndToEndResearch(unittest.TestCase):
         self.assertEqual(report["independently_signed_triangles_accepted"],1)
         self.assertEqual(report["ranked_profitable_candidates"],0)
         self.assertEqual(report["protocol_exact_quote_samples"],0)
+        self.assertEqual(report["signed_route_economic_outcomes"],[])
+        self.assertEqual(report["signed_route_simulated_net_gain_count"],0)
+        self.assertFalse(report["realized_net_profit_verified"])
         self.assertFalse(report["broadcast"])
         source.assert_called_once()
         signed.assert_called_once_with("http://127.0.0.1:8899",
