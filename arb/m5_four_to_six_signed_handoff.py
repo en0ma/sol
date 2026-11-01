@@ -197,3 +197,84 @@ def run_captured_offline(rpc, source_path, quote_path, preparation, output_path)
     report=execute_prepared_offline(rpc,source,native,preparation)
     Path(output_path).write_text(json.dumps(report,sort_keys=True,indent=2)+"\n")
     return report
+
+def run_graph_selected_automatic_offline(rpc, source_path, quote_path, output_path,
+                                         *, amount_in=None):
+    """Use existing genuine 4-6-hop ephemeral signer and SPL account runner.
+
+    Source fixture and native chain must be separately persisted by the
+    upstream-backed source stage. This offline stage uses only localhost RPC,
+    rehydrates the original manifest accounts, verifies their readback and
+    delegates ephemeral signer, user accounts, compiled swap instructions,
+    signed CPI/SPL continuity and negative rollback to the existing runner.
+    A native quote is not substituted for signed prefix amount observations.
+    """
+    import os,json
+    from pathlib import Path
+    from arb.pumpswap_local_simulation import local_rpc_only
+    from arb.next_ten_signed_atomic_offline import run_four_to_six_venue
+    local_rpc_only(rpc)
+    if os.environ.get("SURFPOOL_EXPLICITLY_OFFLINE")!="1":
+        raise ValueError("separate isolated offline Surfpool process required")
+    fixture=json.loads(Path(source_path).read_text())
+    quotes=json.loads(Path(quote_path).read_text())
+    verify(fixture)
+    rows=extract_pool_states(fixture)
+    if (fixture.get("fixture_kind")!="AUTHENTICATED_FOUR_TO_SIX_HOP_SOURCE_ROUTE"
+        or any(fixture.get(k) is not False for k in SAFE)
+        or not 4<=len(rows)<=6
+        or not isinstance(quotes,dict)
+        or any(quotes.get(k) is not False for k in SAFE)
+        or quotes.get("status")!="SOURCE_BOUND_INDICATIVE_CHAIN_NOT_EXECUTION_VERIFIED"
+        or quotes.get("hops")!=len(rows)
+        or quotes.get("indicative_all_legs") is not True):
+        raise ValueError("complete source-bound native graph quote required")
+    initial=quotes.get("input_base_units")
+    if (type(initial)is not int or not 0<initial<2**64
+        or (amount_in is not None and (type(amount_in)is not int or amount_in!=initial))):
+        raise ValueError("graph quote and signed initial amount mismatch")
+    trace=quotes.get("quoted_legs")
+    if not isinstance(trace,list) or len(trace)!=len(rows):
+        raise ValueError("native quote trace incomplete")
+    current=initial
+    for i,(row,leg) in enumerate(zip(rows,trace)):
+        if (not isinstance(leg,dict) or leg.get("index")!=i
+            or leg.get("venue")!=row["venue"] or leg.get("pool")!=row["address"]
+            or leg.get("source_slot")!=fixture["state_accounts_observed_slot"]
+            or type(leg.get("input_base_units")) is not int
+            or leg["input_base_units"]!=current
+            or type(leg.get("output_base_units")) is not int
+            or not 0<leg["output_base_units"]<2**64):
+            raise ValueError("graph-native quote hop source or amount discontinuity")
+        current=leg["output_base_units"]
+    if (quotes.get("output_base_units")!=current
+        or quotes.get("gross_delta_start_mint_base_units")!=current-initial):
+        raise ValueError("native quote chain terminal mismatch")
+    receipt=run_four_to_six_venue(rpc,fixture,amount_in=initial)
+    if not isinstance(receipt,dict) or any(receipt.get(k) is not False for k in SAFE):
+        raise ValueError("unsafe or invalid signed runner result")
+    verified=(receipt.get("status")=="SIGNED_N_LEG_ATOMIC_AND_ROLLBACK_VERIFIED"
+        and receipt.get("signed_packet_crypto_bound") is True
+        and receipt.get("signed_cpi_per_leg_verified") is True
+        and receipt.get("rollback_failure_case_verified") is True
+        and receipt.get("signed_atomic_simulation_verified") is True
+        and receipt.get("route_venues")==fixture["route_venues"]
+        and receipt.get("route_pool_addresses")==fixture["route_pool_addresses"]
+        and receipt.get("route_mints")==fixture["route_mints"]
+        and receipt.get("state_account_manifest_sha256")==fixture["state_account_manifest_sha256"]
+        and receipt.get("state_accounts_observed_slot")==fixture["state_accounts_observed_slot"]
+        and receipt.get("hydrated_fork_state_readback",{}).get("status")==
+            "HYDRATED_FORK_ACCOUNT_BYTES_MATCH")
+    report={"status":("GRAPH_SELECTED_SIGNED_ATOMIC_ACCEPTED" if verified
+                      else "GRAPH_SELECTED_SIGNED_ATOMIC_UNVERIFIED"),
+            "source_slot":fixture["state_accounts_observed_slot"],
+            "source_manifest_sha256":fixture["state_account_manifest_sha256"],
+            "amount_in_base_units":initial,
+            "signed_attempted":True,
+            "signed_atomic_simulation_verified":verified,
+            "signed_receipt":receipt,
+            "native_quote_parity_independently_verified":False,
+            "source_consensus_root_verified":False,
+            "net_profitability_verified":False,**SAFE}
+    Path(output_path).write_text(json.dumps(report,sort_keys=True,indent=2)+"\n")
+    return report
