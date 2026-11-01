@@ -16,6 +16,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install builder dependency
         run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Verify seven-venue native quote evidence u64 and offline safety boundaries
+        run: |
+          python3 -m py_compile arb/venue_quote_contract.py tests/test_venue_quote_contract_boundaries.py
+          python3 -m unittest discover -s tests -p test_venue_quote_contract_boundaries.py -v
       - name: Enforce three-venue pool lifecycle admission regression
         run: python3 -m unittest discover -s tests -p test_signed_registry_admission.py -v
       - name: Enforce fourth-venue PumpSwap source-capture fail-closed regression
