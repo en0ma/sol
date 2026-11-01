@@ -20,7 +20,7 @@ def quote_one_bin(*,amount_in,swap_x_for_y,price_q64,bin_x,bin_y,total_fee_rate,
     if effective<=0:raise ValueError("fees exhaust DLMM input")
     output=effective*price_q64//Q if swap_x_for_y else effective*Q//price_q64
     capacity=bin_y if swap_x_for_y else bin_x
-    if output<=0 or output>capacity:
+    if output<=0 or output>=2**64 or output>capacity:
         raise ValueError("DLMM multi-bin traversal required; refusing partial quote")
     return {"amount_out":output,"fee_input_base_units":fee,
             "one_bin_only":True,"dynamic_fee_source_required":True,
@@ -85,8 +85,8 @@ def quote_bins(*,amount_in,swap_x_for_y,bins,total_fee_rate,max_bins=32):
                          "fee_input_base_units":fee,"output_base_units":got,
                          "effective_fee_rate":rate})
         if remaining==0:break
-    if remaining or not output:
-        raise ValueError("DLMM bin inventory cannot fill complete exact input")
+    if remaining or not 0<output<2**64 or not 0<=fees<2**64:
+        raise ValueError("DLMM bin inventory cannot fill bounded exact input/output")
     return {"amount_out":output,"fee_input_base_units":fees,
             "bins_traversed":consumed,"exact_input_filled":True,
             "protocol_exact_verified":False,"actionable":False,
