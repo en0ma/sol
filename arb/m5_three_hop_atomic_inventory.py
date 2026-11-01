@@ -9,7 +9,7 @@ from pathlib import Path
 
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
 
-def source_capture(rpc, graph, directory):
+def source_capture(rpc, graph, directory, *, shard_index=0, shard_count=1):
     from arb.m5_four_to_six_source_capture import capture
     root=Path(directory)
     root.mkdir(parents=True,exist_ok=True)
@@ -18,7 +18,12 @@ def source_capture(rpc, graph, directory):
     rows=[]
     venue_cache={}
     selected=[(i,r) for i,r in enumerate(graph["routes"]) if r.get("hops")==3]
+    if (type(shard_index)is not int or type(shard_count)is not int
+            or shard_count<1 or not 0<=shard_index<shard_count):
+        raise ValueError("invalid three-hop route shard")
     for j,(index,route) in enumerate(selected):
+        if j % shard_count != shard_index:
+            continue
         entry={"id":"3H-%02d"%(j+1),"graph_route_index":index,
                "mints":[route["start_mint"]]+[x["output"] for x in route["legs"]],
                "venues":[x["venue"] for x in route["legs"]],
@@ -38,7 +43,9 @@ def source_capture(rpc, graph, directory):
         rows.append(entry)
         (root/"three-hop-inventory.json").write_text(json.dumps(
             {"status":"SOURCE_THREE_HOP_INVENTORY",
-             "cycle_count":len(selected),"attempted_source_captures":len(rows),
+             "cycle_count":len(selected),"shard_index":shard_index,
+             "shard_count":shard_count,"shard_cycle_count":len(rows),
+             "attempted_source_captures":len(rows),
              "cached_distinct_pool_directions":len(venue_cache),
             "three_hop_truncated":graph.get("cycle_coverage_by_hops",{}).get("3",{}).get("truncated"),
              "routes":rows,**SAFE},indent=2)+"\n")
@@ -95,10 +102,13 @@ def main():
     p.add_argument("--graph")
     p.add_argument("--directory",required=True)
     p.add_argument("--amount",type=int,default=100000)
+    p.add_argument("--shard-index",type=int,default=0)
+    p.add_argument("--shard-count",type=int,default=1)
     args=p.parse_args()
     if args.phase=="source":
         if not args.graph: p.error("--graph required for source")
-        result=source_capture(args.rpc,json.loads(Path(args.graph).read_text()),args.directory)
+        result=source_capture(args.rpc,json.loads(Path(args.graph).read_text()),args.directory,
+                              shard_index=args.shard_index,shard_count=args.shard_count)
         print(json.dumps({"three_hop_capture_attempts":len(result),
                           "source_captured":sum(r["source_status"]=="CAPTURED" for r in result)}))
     else:
