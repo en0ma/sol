@@ -28,7 +28,7 @@ def evaluate(fixture,receipt,*,observed_fee_lamports=None,
     after=receipt.get("positive_post_balances_base_units")
     spent=receipt.get("planned_inputs")
     if (not isinstance(before,list) or not isinstance(after,list)
-            or len(before)!=len(after)!=4 or
+            or len(before)!=4 or len(after)!=4 or
             any(type(x)is not int or x<0 for x in before+after)
             or not isinstance(spent,list) or len(spent)!=3
             or any(type(x)is not int or x<=0 for x in spent)
