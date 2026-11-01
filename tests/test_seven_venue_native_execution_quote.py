@@ -31,7 +31,7 @@ class NativeExecutionQuoteTests(unittest.TestCase):
         accounts=[{"owner":TOKEN_PROGRAM,"executable":False,
                    "data":[base64.b64encode(b"token-state").decode(),"base64"]}
                   for _ in range(2)]
-        def rpc(_rpc,method,_params):
+        def rpc(_rpc,method,_params=None):
             if method=="getLatestBlockhash":
                 return {"value":{"blockhash":str(Hash.default())}}
             if method=="simulateTransaction":
