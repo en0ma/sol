@@ -99,6 +99,7 @@ def annotate_report(report, metadata):
                     native.get("source")=="METAPLEX_MINT_BOUND_SELF_DECLARED_DISPLAY_ONLY"
                     else None))
             labels.append(label or mint[:8]+"…")
+        labels=[label[:7] for label in labels]
         pools.append({**row,"pair":"/".join(labels),
                       "symbol_source":"ONCHAIN_METADATA_SELF_DECLARED_DISPLAY_ONLY"})
     output["graph_pools"]=pools
@@ -114,6 +115,6 @@ def annotate_report(report, metadata):
                 found.get("mint")==mint and
                 found.get("source")=="METAPLEX_MINT_BOUND_SELF_DECLARED_DISPLAY_ONLY"
                 else mint[:8]+"…"))
-        shared.append({**row,"pair":"/".join(values)})
+        shared.append({**row,"pair":"/".join(v[:7] for v in values)})
     output["cross_venue_shared_pairs"]=shared
     return output
