@@ -2475,6 +2475,42 @@
         "2FPyTwcZLUg1MDrwsyoP4D6s1tM7hAkHYRjkNb5w6Pxk"
       ],
       "pair": "RAY/2FPY"
+    },
+    {
+      "venue": "meteora_damm_v2",
+      "address": "9tjT5yQzZzS4Dwvd79FKMfGqbHarnSdZJq8CfofqqdHS",
+      "mints": [
+        "F6v4wfAdJB8D8p77bMXZgYt8TDKsYxLYxH5AFhUkYx9W",
+        "x95HN3DWvbfCBtTjGm587z8suK3ec6cwQwgZNLbWKyp"
+      ],
+      "pair": "F6V4/X95H"
+    },
+    {
+      "venue": "raydium_amm_v4",
+      "address": "HKprCtGbnh1j8xeQggzWhhVd3kwDUdphqPqDP8vMay8b",
+      "mints": [
+        "69kdRLyP5DTRkpHraaSZAQbWmAwzF9guKjZfzMXzcbAs",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "69KD/SOL"
+    },
+    {
+      "venue": "raydium_amm_v4",
+      "address": "HBS7a3br8GMMWuqVa7VB3SMFa7xVi1tSFdoF5w4ZZ3kS",
+      "mints": [
+        "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "pair": "7GCI/USDC"
+    },
+    {
+      "venue": "raydium_amm_v4",
+      "address": "58tbtrcUfFGLcgsFzSYjXSHLUbmfiHw1wxcGixubzVfg",
+      "mints": [
+        "6NKqYaVGC7H5cyKekgPMeHrb1REEXGEeBcpxqWc2g8nc",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "6NKQ/SOL"
     }
   ]
 }
