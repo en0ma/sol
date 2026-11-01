@@ -122,10 +122,8 @@ def run_m5_research(rpc, registry, *, max_cycles=200, source_dir=None,
         raise ValueError("bounded three-venue trial count required")
     if four_to_six_source_output is not None and source_dir is None:
         raise ValueError("four-to-six source output requires explicit fixture mode")
-    if signed_preparation is not None and (
-            four_to_six_source_output is None or quote_input is None
-            or signed_dir is None or not isinstance(signed_preparation,dict)):
-        raise ValueError("prepared multihop signing requires source, native quote and signed directories")
+    if signed_preparation is not None:
+        raise ValueError("source capture and offline signing must use separately isolated fork stages")
     if (source_dir is not None or signed_dir is not None) and (
             os.environ.get("SURFPOOL_EXPLICITLY_OFFLINE") != "1"):
         raise ValueError("explicit isolated fork gate required for fixture operations")
@@ -211,19 +209,6 @@ def run_m5_research(rpc, registry, *, max_cycles=200, source_dir=None,
                         json.dumps(quote_report,sort_keys=True,indent=2)+"\n")
                 handoff=assess(source,quote_report=quote_report)
                 report["four_to_six_signed_handoff"]=handoff
-                if signed_preparation is not None:
-                    from arb.m5_four_to_six_signed_handoff import execute_prepared_offline
-                    signed_graph=execute_prepared_offline(
-                        rpc,source,quote_report,signed_preparation)
-                    report["four_to_six_signed_handoff"]=signed_graph
-                    report["graph_selected_signed_attempts"]=1
-                    report["graph_selected_signed_accepted"]=int(
-                        signed_graph["signed_atomic_simulation_verified"] is True)
-                    report["signed_simulation_attempts"]+=1
-                    destination=Path(signed_dir)
-                    destination.mkdir(parents=True,exist_ok=True)
-                    (destination/"graph-selected-four-to-six-signed.json").write_text(
-                        json.dumps(signed_graph,sort_keys=True,indent=2)+"\\n")
                 report["four_to_six_source_fixture"]={
                     **result,"graph_route_index":chosen_index,
                     "candidate_capture_attempts":len(capture_failures)+1,
