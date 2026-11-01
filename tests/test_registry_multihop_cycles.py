@@ -29,6 +29,20 @@ class RegistryMultihopTests(unittest.TestCase):
         data=discover_cycles([p(USDC,B,"a"),p(USDC,B,"b")],starts=(USDC,))
         self.assertEqual(data["cycle_count"],2)
         self.assertTrue(all(c["tokens"][0]==USDC for c in data["cycles"]))
+    def test_count_only_mode_preserves_all_cross_venue_pool_evidence(self):
+        pools=[p(SOL,A,"one","orca"),p(SOL,A,"two","meteora_dlmm"),
+               p(SOL,A,"three","pumpswap")]
+        full=discover_cycles(pools,starts=(SOL,),max_hops=2)
+        compact=discover_cycles(pools,starts=(SOL,),max_hops=2,retain_cycles=1)
+        self.assertEqual(compact["cycle_count"],full["cycle_count"])
+        self.assertEqual(compact["cross_venue_cycle_count"],full["cross_venue_cycle_count"])
+        self.assertEqual(compact["cross_venue_cycle_pool_ids"],
+                         full["cross_venue_cycle_pool_ids"])
+        self.assertEqual(len(compact["cycles"]),1)
+        self.assertFalse(compact["broadcast"])
+        with self.assertRaises(ValueError):
+            discover_cycles(pools,retain_cycles=True)
+
     def test_bounded_and_deterministic(self):
         pools=[p(SOL,A,str(i)) for i in range(8)]
         a=discover_cycles(pools,starts=(SOL,),max_cycles=3)
