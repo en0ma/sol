@@ -41,6 +41,11 @@ class PreparedNativeSignedBridge(unittest.TestCase):
                           "accounts_checked":4,"captured_source_slot":44,**SAFE})
         self.hydrated=self.hydration.start()
         self.addCleanup(self.hydration.stop)
+        self.independent=patch("arb.m5_four_to_six_source_signed_acceptance.assess",
+            return_value={"status":"VERIFIED_SIGNED_FOUR_TO_SIX_HOP_ROLLBACK",
+                          "signed_atomic_simulation_verified":True,**SAFE})
+        self.auditor=self.independent.start()
+        self.addCleanup(self.independent.stop)
 
     @patch("arb.m5_four_to_six_signed_handoff.extract_pool_states",return_value=ROWS)
     @patch("arb.m5_four_to_six_signed_handoff.verify")
@@ -123,6 +128,27 @@ class PreparedNativeSignedBridge(unittest.TestCase):
             self.assertEqual(json.loads(target.read_text())["status"],result["status"])
             runner.assert_called_once()
             self.assertEqual(runner.call_args.kwargs["amount_in"],100)
+
+    @patch("arb.m5_four_to_six_signed_handoff.extract_pool_states",return_value=ROWS)
+    @patch("arb.m5_four_to_six_signed_handoff.verify")
+    @patch("arb.next_ten_signed_atomic_offline.run_four_to_six_venue")
+    def test_automatic_flags_only_cannot_bypass_independent_audit(self,runner,*unused):
+        from arb.m5_four_to_six_signed_handoff import run_graph_selected_automatic_offline
+        runner.return_value={**RECEIPT, "route_venues":VENUES,
+            "route_pool_addresses":POOLS,"route_mints":MINTS,
+            "state_account_manifest_sha256":"d"*64,
+            "state_accounts_observed_slot":44,
+            "hydrated_fork_state_readback":{"status":"HYDRATED_FORK_ACCOUNT_BYTES_MATCH"}}
+        self.auditor.return_value={"status":"SOURCE_FOUR_TO_SIX_SIGNED_ROLLBACK_UNVERIFIED",
+                                   "signed_atomic_simulation_verified":False,**SAFE}
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            (root/"source.json").write_text(json.dumps(SOURCE))
+            (root/"quote.json").write_text(json.dumps(QUOTE))
+            report=run_graph_selected_automatic_offline("http://127.0.0.1:8899",
+                root/"source.json",root/"quote.json",root/"result.json")
+        self.assertEqual(report["status"],"GRAPH_SELECTED_SIGNED_ATOMIC_UNVERIFIED")
+        self.assertFalse(report["signed_atomic_simulation_verified"])
 
     @patch("arb.m5_four_to_six_signed_handoff.extract_pool_states",return_value=ROWS)
     @patch("arb.m5_four_to_six_signed_handoff.verify")
