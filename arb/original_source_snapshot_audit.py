@@ -28,6 +28,10 @@ def inspect_original_source_batch(snapshot, identities, *, required_slot=None):
             not isinstance(account,dict) or
             account.get("owner")!=identity["owner"] or
             account.get("executable") is not False or
+            type(account.get("lamports")) is not int or
+            not 0<=account["lamports"]<2**64 or
+            type(account.get("rentEpoch")) is not int or
+            not 0<=account["rentEpoch"]<2**64 or
             not isinstance(account.get("data"),list) or
             len(account["data"])!=2 or
             account["data"][1]!="base64"):
@@ -41,7 +45,9 @@ def inspect_original_source_batch(snapshot, identities, *, required_slot=None):
         if expected is not None and digest!=expected:
             raise ValueError("original account expected digest mismatch")
         checked.append({"address":identity["address"],"owner":identity["owner"],
-                        "sha256":digest,"source_slot":slot,"length":len(raw)})
+                        "sha256":digest,"source_slot":slot,"length":len(raw),
+                        "lamports":account["lamports"],
+                        "rent_epoch":account["rentEpoch"]})
     return {"status":"SAME_SLOT_ORIGINAL_RPC_BYTES_AND_OWNERS_CHECKED",
             "source_slot":slot,"accounts":checked,
             "upstream_rpc_operator_trust_independently_proven":False,
