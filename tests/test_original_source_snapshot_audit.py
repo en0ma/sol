@@ -39,6 +39,19 @@ class OriginalSnapshotTests(unittest.TestCase):
             {**account,"data":[base64.b64encode(b"changed").decode(),"base64"]}]}
         with self.assertRaises(ValueError):
             corroborate_original_source_batches(snap,changed,ids)
+    def test_same_bytes_but_different_lamport_state_rejected(self):
+        raw=b"same onchain data"
+        account={"owner":"program","executable":False,
+                 "data":[base64.b64encode(raw).decode(),"base64"],
+                 "lamports":100,"rentEpoch":4}
+        ids=[{"address":"a"*44,"owner":"program"}]
+        left={"context":{"slot":300},"value":[account]}
+        right={"context":{"slot":300},"value":[{**account,"lamports":101}]}
+        with self.assertRaisesRegex(ValueError,"lamports or rent"):
+            corroborate_original_source_batches(left,right,ids)
+        right={"context":{"slot":300},"value":[{**account,"rentEpoch":5}]}
+        with self.assertRaisesRegex(ValueError,"lamports or rent"):
+            corroborate_original_source_batches(left,right,ids)
     def test_rpc_account_count_matches_official_maximum(self):
         # Solana getMultipleAccounts accepts at most 100 keys per request.
         too_many=[{"address":str(i),"owner":"program"} for i in range(101)]
