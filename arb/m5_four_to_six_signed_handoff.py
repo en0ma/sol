@@ -133,6 +133,18 @@ def execute_prepared_offline(rpc, fixture, quote_report, preparation):
               "negative_instructions")
     if any(key not in preparation for key in required):
         raise ValueError("offline signer, user accounts and negative control missing")
+    # The source fixture is not proof that the isolated fork actually contains
+    # those original account bytes. Require existing read-only hydrated-state
+    # verifier before submitting even a local signed simulation.
+    from arb.hydrated_fork_state_audit import verify_hydrated_state
+    hydrated=verify_hydrated_state(rpc,fixture)
+    if (not isinstance(hydrated,dict)
+        or hydrated.get("status")!="HYDRATED_FORK_ACCOUNT_BYTES_MATCH"
+        or type(hydrated.get("accounts_checked")) is not int
+        or hydrated["accounts_checked"]<len(rows)
+        or hydrated.get("captured_source_slot")!=source_slot
+        or any(hydrated.get(k) is not False for k in SAFE)):
+        raise ValueError("isolated fork source-account readback not independently matched")
     registry={"pools":[{"venue":row["venue"],"address":row["address"],
                          "mints":row["mints"]} for row in rows]}
     route={"start_mint":mints[0],"legs":legs}
@@ -160,6 +172,7 @@ def execute_prepared_offline(rpc, fixture, quote_report, preparation):
             "route_venues":fixture["route_venues"],
             "route_pool_addresses":fixture["route_pool_addresses"],
             "route_mints":mints,
+            "hydrated_fork_readback":hydrated,
             "signed_receipt":receipt,
             "observed_signed_economics":result.get("observed_signed_economics"),
             "signed_atomic_simulation_verified":verified,
