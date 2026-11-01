@@ -1,7 +1,8 @@
 import unittest
 from arb.native_math_kernel import exact_constant_product_quote
 from arb.seven_venue_native_model_gate import VENUE_MODELS,model_requirements,quote_native
-from arb.offline_atomic_economic_gate import audit_complete_atomic_economics
+from arb.offline_atomic_economic_gate import (audit_complete_atomic_economics,
+    screen_prospective_atomic_cost_budget)
 
 class EconomicModelGateTests(unittest.TestCase):
     def test_native_constant_product_exact_integer_fees(self):
@@ -41,5 +42,51 @@ class EconomicModelGateTests(unittest.TestCase):
         signed["offline_only"]=False
         r=audit_complete_atomic_economics(route,signed,quoted,{})
         self.assertEqual(r["status"],"ATOMIC_SIGNED_EVIDENCE_INCOMPLETE")
+
+
+    def test_complete_cost_budget_is_prospective_not_paid_fee(self):
+        route={"start_mint":"So11111111111111111111111111111111111111112",
+               "legs":[{"pool":"a"},{"pool":"b"}]}
+        signed={"signed_atomic_execution_verified":True,
+                "independent_spl_poststate_verified":True,
+                "rollback_control_verified":True,
+                "offline_only":True,"broadcast":False,
+                "gross_start_mint_base_units":100}
+        chain={"status":"COMPLETE_QUOTE_CHAIN_ARITHMETIC_ONLY",
+               "legs":[{},{}],
+               "native_quote_authenticity_established_here":False}
+        types=("network_fee","priority_fee","compute_cost","rent",
+               "borrow_cost","tip")
+        costs={name:{"amount_start_mint_base_units":2,
+                     "start_mint":route["start_mint"],
+                     "observation_id":"source-"+name,
+                     "actual_fee_paid_verified":False,
+                     "broadcast":False} for name in types}
+        report=screen_prospective_atomic_cost_budget(route,signed,chain,costs)
+        self.assertEqual(report["prospective_total_cost_start_mint_base_units"],12)
+        self.assertEqual(report["prospective_net_base_units"],88)
+        self.assertIsNone(report["net_base_units"])
+        self.assertFalse(report["net_profitability_verified"])
+        self.assertFalse(report["costs_independently_proven_as_paid"])
+        with self.assertRaises(ValueError):
+            screen_prospective_atomic_cost_budget(route,signed,chain,
+                {**costs,"network_fee":{**costs["network_fee"],
+                                       "actual_fee_paid_verified":True}})
+        with self.assertRaises(ValueError):
+            screen_prospective_atomic_cost_budget(route,signed,chain,
+                {**costs,"rent":{**costs["rent"],
+                                 "start_mint":"another-mint"}})
+        with self.assertRaises(ValueError):
+            screen_prospective_atomic_cost_budget(route,signed,chain,
+                {**costs,"tip":{**costs["tip"],
+                               "amount_start_mint_base_units":True}})
+        with self.assertRaises(ValueError):
+            screen_prospective_atomic_cost_budget(route,signed,chain,
+                {**costs,"tip":{**costs["tip"],
+                               "amount_start_mint_base_units":2**64-1}})
+        self.assertEqual(
+            screen_prospective_atomic_cost_budget(
+                route,{**signed,"rollback_control_verified":False},chain,costs
+            )["cost_budget_status"],"UNASSESSABLE")
 
 if __name__=="__main__":unittest.main()
