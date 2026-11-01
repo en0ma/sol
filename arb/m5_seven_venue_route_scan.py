@@ -222,7 +222,7 @@ def run_m5_research(rpc, registry, *, max_cycles=200, source_dir=None,
                    "independent_signed_accepted":
                        item.get("independent_signed_accepted") is True,
                    "economics_status":item.get("economics_status"),**SAFE}
-                  for item in signed["routes"]]
+                  for item in signed.get("routes",[])]
         report["signed_route_economic_outcomes"]=outcomes
         report["signed_route_economic_outcome_counts"]={
             status:sum(row["outcome"]==status for row in outcomes)
