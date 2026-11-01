@@ -59,6 +59,21 @@ class ConnectedPoolDiscoveryTests(unittest.TestCase):
         self.assertTrue(all(len(r["pair"])<=9 for r in clean))
         with self.assertRaises(ValueError):
             unique_venue_pairs([candidates[0],candidates[0]])
+    def test_colliding_compact_labels_preserve_distinct_mint_pairs(self):
+        # First four characters are identical, but canonical mint keys differ.
+        mint_a="ABCD"+"x"*40
+        mint_b="ABCD"+"y"*40
+        def pool(address,mint):
+            return {"venue":"pumpswap","address":address,"mints":[SOL,mint],
+                    "vault_base_units":[20,30],"verified":True}
+        rows=unique_venue_pairs([pool("a"*44,mint_a),
+                                 pool("b"*44,mint_b)])
+        self.assertEqual(len(rows),2)
+        self.assertEqual(len({r["pair"] for r in rows}),2)
+        self.assertEqual({tuple(sorted(r["mints"])) for r in rows},
+                         {tuple(sorted([SOL,mint_a])),tuple(sorted([SOL,mint_b]))})
+        self.assertTrue(all(len(r["pair"])<=9 for r in rows))
+
     def test_unverified_duplicate_cannot_override_real_pool(self):
         p={"venue":"orca","address":"a"*44,"mints":[SOL,USDC],
            "vault_base_units":[1,1],"verified":False}
