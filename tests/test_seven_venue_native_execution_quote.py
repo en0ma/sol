@@ -32,17 +32,23 @@ class NativeExecutionQuoteTests(unittest.TestCase):
                    "data":[base64.b64encode(b"token-state").decode(),"base64"]}
                   for _ in range(2)]
         def rpc(_rpc,method,_params=None):
+            if method=="getMultipleAccounts":
+                return {"context":{"slot":555},"value":accounts}
             if method=="getLatestBlockhash":
                 return {"value":{"blockhash":str(Hash.default())}}
             if method=="simulateTransaction":
                 self.assertTrue(_params[1]["sigVerify"])
                 self.assertFalse(_params[1]["replaceRecentBlockhash"])
+                self.assertEqual(_params[1]["minContextSlot"],555)
                 return {"value":{"err":None,"unitsConsumed":12345,
                          "logs":["Program "+str(ix.program_id)+" invoke [1]"],
                          "accounts":accounts}}
             raise AssertionError("unexpected RPC method: "+method)
-        decoded=[{"mint":"c"*44,"amount_base_units":100},
-                 {"mint":"d"*44,"amount_base_units":40}]
+        payer=str(signer.pubkey())
+        decoded=[{"mint":"c"*44,"amount_base_units":200,"authority":payer},
+                 {"mint":"d"*44,"amount_base_units":3,"authority":payer},
+                 {"mint":"c"*44,"amount_base_units":100,"authority":payer},
+                 {"mint":"d"*44,"amount_base_units":40,"authority":payer}]
         with patch("arb.seven_venue_native_execution_quote.build_leg",return_value=ix),\
              patch("arb.seven_venue_native_execution_quote.call",side_effect=rpc),\
              patch("arb.seven_venue_native_execution_quote.decode_token_account",
@@ -54,6 +60,7 @@ class NativeExecutionQuoteTests(unittest.TestCase):
                 input_mint="c"*44,output_mint="d"*44,
                 initial_input_base_units=200,initial_output_base_units=3,
                 amount_in_base_units=100)
+        self.assertEqual(result["original_local_spl_source_slot"],555)
         self.assertEqual(result["amount_in_base_units"],100)
         self.assertEqual(result["amount_out_base_units"],37)
         self.assertTrue(result["native_swap_signed_simulation_verified"])
