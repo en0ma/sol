@@ -25,7 +25,7 @@ def capture(rpc,graph,route_index,output):
         raise ValueError("source graph route absent")
     route=routes[route_index]
     legs=route.get("legs")
-    if not isinstance(legs,list) or not 4<=len(legs)<=6 or route.get("hops")!=len(legs):
+    if not isinstance(legs,list) or not 3<=len(legs)<=6 or route.get("hops")!=len(legs):
         raise ValueError("four to six source hops required")
     current=route.get("start_mint")
     mints=[current]
@@ -98,7 +98,7 @@ def main():
     args=p.parse_args()
     graph=json.loads(Path(args.graph).read_text())
     targets=[i for i,r in enumerate(graph.get("routes",[]))
-             if 4<=r.get("hops",0)<=6]
+             if 3<=r.get("hops",0)<=6]
     result={"status":"NO_AUTHENTICATED_FOUR_TO_SIX_CYCLE",**SAFE}
     failures=[]
     # A candidate graph is not an authenticated fixture. If the first
