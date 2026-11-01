@@ -28,7 +28,7 @@ def validate(quote,pool,*,requested_input,now,max_age=60):
     # Research quote records are not broadcast instructions or attestations.
     # A provider asserting elevated privileges must not be laundered into a
     # validated quote, even if the returned wrapper carries safe flags.
-    if any(quote.get(k) is not False for k in SAFETY):
+    if any(k in quote and quote[k] is not False for k in SAFETY):
         reasons.append("unsafe quote authority assertion")
     for key in ("amount_out","fee_input_units","liquidity_input_units","price_impact_bps"):
         val=quote.get(key)
