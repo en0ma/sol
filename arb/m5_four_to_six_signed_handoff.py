@@ -278,3 +278,24 @@ def run_graph_selected_automatic_offline(rpc, source_path, quote_path, output_pa
             "net_profitability_verified":False,**SAFE}
     Path(output_path).write_text(json.dumps(report,sort_keys=True,indent=2)+"\n")
     return report
+
+def main():
+    """CLI on a separately launched offline fork; no secrets or funded wallet."""
+    import argparse,json
+    p=argparse.ArgumentParser(description="Graph-selected signed Surfpool research only")
+    p.add_argument("--rpc",default="http://127.0.0.1:8899")
+    p.add_argument("--source",required=True)
+    p.add_argument("--native-quotes",required=True)
+    p.add_argument("--output",required=True)
+    p.add_argument("--amount",type=int)
+    args=p.parse_args()
+    report=run_graph_selected_automatic_offline(
+        args.rpc,args.source,args.native_quotes,args.output,amount_in=args.amount)
+    print(json.dumps({"status":report["status"],
+                      "signed_atomic_simulation_verified":
+                          report["signed_atomic_simulation_verified"],
+                      "net_profitability_verified":False,**SAFE}))
+    return 0 if report["signed_atomic_simulation_verified"] else 1
+
+if __name__=="__main__":
+    raise SystemExit(main())
