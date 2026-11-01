@@ -136,6 +136,7 @@ def run_m5_research(rpc, registry, *, max_cycles=200, source_dir=None,
     report["signed_triangles"] = {"status": "NOT_REQUESTED"}
     report["signed_selection"] = {"status": "NOT_REQUESTED", **SAFE}
     report["four_to_six_source_fixture"] = {"status": "NOT_REQUESTED", **SAFE}
+    report["four_to_six_native_quote_chain"] = {"status": "NOT_REQUESTED", **SAFE}
     report["four_to_six_signed_handoff"] = {"status": "NOT_REQUESTED", **SAFE}
     if source_dir is not None:
         from arb.m5_distinct_venue_coverage_batch import source_batch
@@ -170,9 +171,25 @@ def run_m5_research(rpc, registry, *, max_cycles=200, source_dir=None,
             report["four_to_six_source_fixture"]={
                 "status":"NO_AUTHENTICATED_FOUR_TO_SIX_CYCLE_IN_BOUNDED_GRAPH",**SAFE}
         else:
-            try:
-                path.parent.mkdir(parents=True,exist_ok=True)
-                result=capture(rpc,report,targets[0],path)
+            capture_failures=[]
+            chosen_index=None
+            result=None
+            for index in targets[:8]:
+                try:
+                    path.parent.mkdir(parents=True,exist_ok=True)
+                    result=capture(rpc,report,index,path)
+                    chosen_index=index
+                    break
+                except (ValueError,TypeError,KeyError,RuntimeError) as exc:
+                    capture_failures.append({"graph_route_index":index,
+                        "reason":str(exc)[:240]})
+            if chosen_index is None:
+                report["four_to_six_source_fixture"]={
+                    "status":"FOUR_TO_SIX_SOURCE_CAPTURE_BLOCKED",
+                    "candidate_capture_attempts":len(capture_failures),
+                    "candidate_failures":capture_failures,**SAFE}
+            else:
+              try:
                 from arb.m5_four_to_six_signed_handoff import assess
                 source=json.loads(path.read_text())
                 # Reuse the existing source-native seven-venue dispatcher for
@@ -190,13 +207,15 @@ def run_m5_research(rpc, registry, *, max_cycles=200, source_dir=None,
                 handoff=assess(source,quote_report=quote_report)
                 report["four_to_six_signed_handoff"]=handoff
                 report["four_to_six_source_fixture"]={
-                    **result,"graph_route_index":targets[0],
+                    **result,"graph_route_index":chosen_index,
+                    "candidate_capture_attempts":len(capture_failures)+1,
+                    "previous_candidate_failures":capture_failures,
                     "source_fixture_path":str(path),
                     "signed_simulation_verified":False,**SAFE}
             except (ValueError,TypeError,KeyError,RuntimeError) as exc:
                 report["four_to_six_source_fixture"]={
                     "status":"FOUR_TO_SIX_SOURCE_CAPTURE_BLOCKED",
-                    "graph_route_index":targets[0],"reason":str(exc)[:240],**SAFE}
+                    "graph_route_index":chosen_index,"reason":str(exc)[:240],**SAFE}
     if signed_dir is not None:
         from arb.m5_distinct_venue_coverage_batch import offline_batch
         if quote_input is not None:
