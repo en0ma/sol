@@ -1,6 +1,9 @@
 """Prepared graph-native route -> existing signed N-leg verifier contract."""
 import unittest
 import os
+import json
+import tempfile
+from pathlib import Path
 from unittest.mock import patch
 from arb.m5_four_to_six_signed_handoff import execute_prepared_offline
 
@@ -69,6 +72,19 @@ class PreparedNativeSignedBridge(unittest.TestCase):
         with self.assertRaises(ValueError):
             execute_prepared_offline("http://127.0.0.1:8899",SOURCE,bad,PREP)
         coordinator.assert_not_called()
+
+    @patch("arb.m5_four_to_six_signed_handoff.execute_prepared_offline")
+    def test_separate_offline_artifact_is_parseable_json(self,execute):
+        from arb.m5_four_to_six_signed_handoff import run_captured_offline
+        execute.return_value={"status":"GRAPH_SOURCE_SIGNED_ATOMIC_UNVERIFIED",**SAFE}
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            (root/"source.json").write_text(json.dumps(SOURCE))
+            (root/"native.json").write_text(json.dumps(QUOTE))
+            path=root/"signed.json"
+            run_captured_offline("http://127.0.0.1:8899",
+                root/"source.json",root/"native.json",PREP,path)
+            self.assertEqual(json.loads(path.read_text()),execute.return_value)
 
     def test_fork_isolation_gate_blocks_prepared_signer(self):
         with patch.dict(os.environ,{"SURFPOOL_EXPLICITLY_OFFLINE":"0"}):
