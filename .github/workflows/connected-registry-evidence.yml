@@ -6,6 +6,8 @@ on:
       - "arb/connected_pool_discovery.py"
       - "arb/registry_pair_reconciliation.py"
       - "arb/registry_multihop_cycles.py"
+      - "arb/native_quote_chain_screen.py"
+      - "tests/test_native_quote_chain_screen.py"
       - "arb/pool_registry.py"
       - "tests/test_registry_pair_reconciliation.py"
       - "tests/test_connected_pool_discovery.py"
@@ -43,6 +45,7 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_untrusted_pool_index.py' -v
           python3 -m unittest discover -s tests -p 'test_registry_pair_reconciliation.py' -v
           python3 -m unittest discover -s tests -p 'test_connected_pool_discovery.py' -v
+          python3 -m unittest discover -s tests -p 'test_native_quote_chain_screen.py' -v
       - name: Launch upstream-backed fork for authentic owner/vault/metadata reads
         run: |
           nohup "$HOME/.local/bin/surfpool" start --ci --rpc-url "$SURFPOOL_DATASOURCE_RPC_URL" --no-deploy > "$RUNNER_TEMP/registry-source.log" 2>&1 < /dev/null &
