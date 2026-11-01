@@ -89,3 +89,73 @@ def screen_prospective_atomic_cost_budget(route, signed, quote_chain,
             "costs_independently_proven_as_paid":False,
             "independent_actual_fee_paid":False,
             "net_base_units":None,"net_profitability_verified":False,**SAFE}
+
+def screen_source_bound_signed_route_budget(route, signed, quote_chain,
+                                            cost_components):
+    """Require the prospective budget to refer to the very signed route.
+
+    The baseline offline economic gate intentionally accepts generic mockable
+    evidence dictionaries. This stricter entry point binds each canonical leg
+    and exact initial/final amount to a signed simulator's independently
+    audited source-slot/pool/mint trace before considering a cost budget.
+    It still cannot authenticate its caller or infer any paid transaction fee.
+    """
+    if not isinstance(route,dict) or not isinstance(signed,dict) or not isinstance(quote_chain,dict):
+        raise ValueError("source route, quote chain and signed observation required")
+    legs=route.get("legs")
+    quotes=quote_chain.get("legs")
+    if (not isinstance(legs,list) or not 2<=len(legs)<=6
+        or not isinstance(quotes,list) or len(quotes)!=len(legs)):
+        raise ValueError("bounded complete source route needed")
+    start=route.get("start_mint")
+    if (not isinstance(start,str) or not start
+        or quote_chain.get("start_mint")!=start):
+        raise ValueError("signed route start mint identity mismatch")
+    pool_addresses=[]
+    mints=[start]
+    venues=[]
+    for leg,quote in zip(legs,quotes):
+        if (not isinstance(leg,dict) or not isinstance(quote,dict)
+            or leg.get("input_mint")!=mints[-1]
+            or not isinstance(leg.get("output_mint"),str)
+            or not leg["output_mint"] or not isinstance(leg.get("venue"),str)
+            or not leg["venue"] or not isinstance(leg.get("pool"),str)
+            or not leg["pool"]
+            or quote.get("venue")!=leg["venue"]
+            or quote.get("pool")!=leg["pool"]
+            or quote.get("from")!=leg["input_mint"]
+            or quote.get("to")!=leg["output_mint"]):
+            raise ValueError("signed route leg/quote source identity mismatch")
+        pool_addresses.append(leg["pool"])
+        venues.append(leg["venue"])
+        mints.append(leg["output_mint"])
+    if mints[-1]!=start:
+        raise ValueError("signed route must close in original start mint")
+    slot=quote_chain.get("source_slot")
+    initial=quote_chain.get("initial_base_units")
+    terminal=quote_chain.get("terminal_quoted_base_units")
+    if (type(slot)is not int or slot<0
+        or type(initial)is not int or not 0<initial<2**64
+        or type(terminal)is not int or not 0<terminal<2**64
+        or signed.get("source_snapshot_slot")!=slot
+        or signed.get("route_pool_addresses")!=pool_addresses
+        or signed.get("route_mints")!=mints
+        or signed.get("route_venues")!=venues
+        or signed.get("initial_input_base_units")!=initial
+        or type(signed.get("terminal_output_base_units")) is not int
+        or not 0<signed["terminal_output_base_units"]<2**64):
+        raise ValueError("signed source slot, route identities or amounts mismatch")
+    if signed["gross_start_mint_base_units"]!=signed["terminal_output_base_units"]-initial:
+        raise ValueError("signed gross delta not derived from signed terminal SPL")
+    if type(quote_chain.get("gross_quoted_delta_base_units")) is not int or quote_chain["gross_quoted_delta_base_units"]!=terminal-initial:
+        raise ValueError("quote gross delta inconsistent with quoted exact amounts")
+    report=screen_prospective_atomic_cost_budget(route,signed,quote_chain,cost_components)
+    return {**report,
+            "signed_route_identity_and_gross_arithmetic_bound":(
+                report.get("cost_budget_status")=="PROSPECTIVE_ONLY_UNPAID"),
+            "signed_terminal_output_base_units":signed["terminal_output_base_units"],
+            "quoted_terminal_output_base_units":terminal,
+            "signed_minus_quoted_terminal_base_units":signed["terminal_output_base_units"]-terminal,
+            "independent_receipt_proof_established_here":False,
+            "paid_transaction_costs_verified":False,
+            "net_profitability_verified":False,**SAFE}
