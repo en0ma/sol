@@ -211,6 +211,26 @@ def run_m5_research(rpc, registry, *, max_cycles=200, source_dir=None,
         report["signed_simulation_attempts"] = signed["attempted"]
         report["independently_signed_triangles_accepted"] = signed["independent_signed_accepted"]
         report["protocol_exact_quote_samples"] = signed["independently_validated_quote_samples"]
+        # The source-route-index identifies the same fixture from graph-era
+        # source export through independently accepted signed simulation.
+        # This is signed source-coverage research, not proof that a graph-
+        # selected cycle was profitable or that an unpaid fee was settled.
+        outcomes=[{"source_route_index":item["index"],
+                   "outcome":item.get("simulated_economic_outcome","UNASSESSABLE"),
+                   "simulated_estimated_net_start_mint_base_units":
+                       item.get("simulated_estimated_net_start_mint_base_units"),
+                   "independent_signed_accepted":
+                       item.get("independent_signed_accepted") is True,
+                   "economics_status":item.get("economics_status"),**SAFE}
+                  for item in signed["routes"]]
+        report["signed_route_economic_outcomes"]=outcomes
+        report["signed_route_economic_outcome_counts"]={
+            status:sum(row["outcome"]==status for row in outcomes)
+            for status in sorted({row["outcome"] for row in outcomes})}
+        report["signed_route_simulated_net_gain_count"]=sum(
+            row["outcome"]=="SIMULATED_ESTIMATED_NET_GAIN" for row in outcomes)
+        report["realized_net_profit_verified"]=False
+
     return report
 
 def main():
