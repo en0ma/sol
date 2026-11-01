@@ -67,7 +67,7 @@ def hydrate(rpc, fixture, *, program_cache=None, batch=BATCH_10):
         expected=3 if fixture["fixture_kind"]=="THREE_DISTINCT_VENUE_CLOSED_ROUTE" else None
         if (not isinstance(route,list) or
                 (len(route)!=3 and expected==3) or
-                (not 4<=len(route)<=6 and expected is None) or
+                (not 3<=len(route)<=6 and expected is None) or
                 (len(set(route))!=3 and expected==3) or
                 any(v not in PROGRAMS for v in route)):
             raise ValueError("invalid authenticated multihop source fixture")
@@ -586,7 +586,7 @@ def run_four_to_six_venue(rpc,fixture,*,amount_in=100_000,program_cache=None,
     proofs=fixture.get("leg_evidence_by_index")
     if (not isinstance(venues,list) or not isinstance(pools,list)
             or not isinstance(mints,list) or not isinstance(proofs,list)
-            or not 4<=len(venues)<=6 or len(pools)!=len(venues)
+            or not 3<=len(venues)<=6 or len(pools)!=len(venues)
             or len(proofs)!=len(venues) or len(mints)!=len(venues)+1
             or len(set(pools))!=len(pools) or mints[0]!=mints[-1]
             or any(v not in PROGRAMS for v in venues)
