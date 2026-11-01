@@ -72,3 +72,41 @@ def check_quote_chain(route, quotes, *, initial_base_units, min_output_base_unit
             "signed_atomic_simulation_verified":False,
             "net_profitability_verified":False,
             "actual_paid_network_fees_verified":False,**SAFE}
+
+def compare_quote_to_signed_spl(quote_report, signed_observations):
+    """Compare independent exact-unit quoted outputs to signed CPI observations.
+
+    This is strict numerical parity, not receipt/quote origin authentication.
+    The signed CPI parser, pool source reader, and rollback verifier remain
+    independent prerequisites; a matching pair of caller dicts proves none.
+    """
+    if (not isinstance(quote_report,dict)
+        or quote_report.get("status")!="COMPLETE_QUOTE_CHAIN_ARITHMETIC_ONLY"
+        or not isinstance(signed_observations,list)
+        or len(signed_observations)!=len(quote_report.get("legs",[]))
+        or not 2<=len(signed_observations)<=MAX_LEGS):
+        raise ValueError("complete bounded native quote and CPI evidence required")
+    diffs=[]
+    for quote,observation in zip(quote_report["legs"],signed_observations):
+        if (not isinstance(observation,dict)
+            or observation.get("pool")!=quote["pool"]
+            or observation.get("venue")!=quote["venue"]
+            or observation.get("input_mint")!=quote["from"]
+            or observation.get("output_mint")!=quote["to"]
+            or observation.get("hop")!=quote["hop"]
+            or type(observation.get("observed_input_base_units")) is not int
+            or observation["observed_input_base_units"]!=quote["amount_in_base_units"]
+            or type(observation.get("observed_output_base_units")) is not int
+            or not 0<observation["observed_output_base_units"]<U64):
+            raise ValueError("signed CPI leg disconnected, incomplete or wrong input")
+        delta=observation["observed_output_base_units"]-quote["amount_out_base_units"]
+        diffs.append({"hop":quote["hop"],"venue":quote["venue"],"pool":quote["pool"],
+                      "native_minus_signed_output_base_units":-delta,
+                      "signed_minus_native_output_base_units":delta,
+                      "exact_parity":delta==0})
+    return {"status":"QUOTE_SIGNED_SPL_NUMERICAL_PARITY_DIAGNOSTIC_ONLY",
+            "all_legs_numerically_equal":all(x["exact_parity"] for x in diffs),
+            "leg_comparisons":diffs,
+            "signed_receipt_independently_authenticated_here":False,
+            "native_quote_independently_authenticated_here":False,
+            "net_profitability_verified":False,**SAFE}
