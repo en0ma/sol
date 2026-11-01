@@ -10,6 +10,10 @@ on:
       - "arb/independent_fee_receipt_observer.py"
       - "arb/raydium_cpmm_native_quote.py"
       - "arb/seven_venue_native_execution_quote.py"
+      - "arb/native_math_kernel.py"
+      - "arb/seven_venue_native_model_gate.py"
+      - "arb/offline_atomic_economic_gate.py"
+      - "tests/test_native_model_economic_gate.py"
       - "tests/test_seven_venue_native_execution_quote.py"
       - "tests/test_raydium_cpmm_native_quote.py"
       - "tests/test_independent_fee_receipt_observer.py"
@@ -55,6 +59,7 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_independent_fee_receipt_observer.py' -v
           python3 -m unittest discover -s tests -p 'test_raydium_cpmm_native_quote.py' -v
           python3 -m unittest discover -s tests -p 'test_seven_venue_native_execution_quote.py' -v
+          python3 -m unittest discover -s tests -p 'test_native_model_economic_gate.py' -v
       - name: Launch upstream-backed fork for authentic owner/vault/metadata reads
         run: |
           nohup "$HOME/.local/bin/surfpool" start --ci --rpc-url "$SURFPOOL_DATASOURCE_RPC_URL" --no-deploy > "$RUNNER_TEMP/registry-source.log" 2>&1 < /dev/null &
