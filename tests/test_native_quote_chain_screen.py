@@ -1,6 +1,6 @@
 import unittest
 from copy import deepcopy
-from arb.native_quote_chain_screen import check_quote_chain, compare_quote_to_signed_spl, screen_fee_bounded_candidates
+from arb.native_quote_chain_screen import check_quote_chain, compare_quote_to_signed_spl, screen_fee_bounded_candidates, reconcile_sequential_native_signed_observations
 
 A="a"*44
 B="b"*44
@@ -70,6 +70,40 @@ class QuoteChainTests(unittest.TestCase):
                                           fee_upper_bound_base_units=0,start_mint=A)
         with self.assertRaises(ValueError):
             screen_fee_bounded_candidates([candidate],fee_upper_bound_base_units=True,start_mint=A)
+
+    def test_sequential_native_program_outputs_remain_non_atomic(self):
+        route,quotes=sample()
+        reports=[]
+        for i,(leg,q) in enumerate(zip(route["legs"],quotes)):
+            reports.append({
+                "status":"SIGNED_LOCAL_NATIVE_PROGRAM_OUTPUT_QUOTE_NOT_INDEPENDENT_PREDICTION",
+                "venue":leg["venue"],"pool":leg["pool"],
+                "input_mint":leg["from"],"output_mint":leg["to"],
+                "amount_in_base_units":q["amount_in_base_units"],
+                "amount_out_base_units":q["amount_out_base_units"],
+                "signed_wire_sha256":str(i+1).zfill(64),
+                "native_swap_signed_simulation_verified":True,
+                "native_math_independently_predicted":False,
+                "signed_atomic_route_verified":False,
+                "independent_mainnet_fee_verified":False,
+                "net_profitability_verified":False,
+                "fee_lamports_paid":None,
+                "actionable":False,"live_execution_approved":False,
+                "broadcast":False})
+        result=reconcile_sequential_native_signed_observations(
+            route,reports,initial_base_units=100)
+        self.assertEqual(result["observed_gross_base_units"],-10)
+        self.assertFalse(result["joint_atomic_signed_route_verified"])
+        self.assertFalse(result["net_profitability_verified"])
+        with self.assertRaises(ValueError):
+            reconcile_sequential_native_signed_observations(
+                route,[reports[0],{**reports[1],"amount_in_base_units":1},
+                       reports[2]],initial_base_units=100)
+        with self.assertRaises(ValueError):
+            reconcile_sequential_native_signed_observations(
+                route,[reports[0],{**reports[1],"signed_wire_sha256":
+                       reports[0]["signed_wire_sha256"]},reports[2]],
+                initial_base_units=100)
 
     def test_forgery_and_disconnected_leg_are_rejected(self):
         for mutate in (
