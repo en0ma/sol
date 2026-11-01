@@ -17,6 +17,10 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
     env:
       SURFPOOL_DATASOURCE_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
       SOLANA_RPC_MIN_INTERVAL_SECONDS: "0.5"
@@ -64,7 +68,7 @@ jobs:
           print(json.dumps({"three_hop_discovered":sum(r["hops"]==3 for r in graph["routes"]),
                             "three_hop_truncated":graph["cycle_coverage_by_hops"]["3"]["truncated"]}))
           PY
-          python3 -m arb.m5_three_hop_atomic_inventory --phase source --graph "$RUNNER_TEMP/triangles/graph.json" --directory "$RUNNER_TEMP/triangles"
+          python3 -m arb.m5_three_hop_atomic_inventory --phase source --graph "$RUNNER_TEMP/triangles/graph.json" --directory "$RUNNER_TEMP/triangles" --shard-index ${{ matrix.shard }} --shard-count 4
       - name: Terminate source fork before offline account mutation
         if: always()
         run: |
@@ -109,7 +113,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: m5-three-hop-atomic-inventory
+          name: m5-three-hop-atomic-inventory-shard-${{ matrix.shard }}
           path: |
             ${{ runner.temp }}/triangles/
             ${{ runner.temp }}/triangle-source.log
