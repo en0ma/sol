@@ -13,7 +13,7 @@ from arb.rpc import call
 from arb.source_snapshot_manifest import digest,verify
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
 
-def capture(rpc,graph,route_index,output):
+def capture(rpc,graph,route_index,output,*,venue_cache=None):
     local_rpc_only(rpc)
     if (not isinstance(graph,dict) or
             graph.get("status")!="SOURCE_AUTHENTICATED_ROUTE_DISCOVERY_ONLY"
@@ -27,6 +27,8 @@ def capture(rpc,graph,route_index,output):
     legs=route.get("legs")
     if not isinstance(legs,list) or not 3<=len(legs)<=6 or route.get("hops")!=len(legs):
         raise ValueError("four to six source hops required")
+    if venue_cache is not None and not isinstance(venue_cache,dict):
+        raise ValueError("source venue cache must be a per-fork mapping")
     current=route.get("start_mint")
     mints=[current]
     addresses=[]
@@ -36,11 +38,18 @@ def capture(rpc,graph,route_index,output):
         if (venue not in PROGRAMS or not isinstance(pool,str) or not pool or
                 leg.get("input")!=current or not isinstance(leg.get("output"),str)):
             raise ValueError("source graph mint/venue continuity absent")
-        proof=snapshot(rpc,pool,venue)
+        cache_key=(venue,pool,tuple(sorted((current,leg["output"]))))
+        cached=venue_cache.get(cache_key) if venue_cache is not None else None
+        if cached is None:
+            proof=snapshot(rpc,pool,venue)
+            extra,aux=venue_accounts(rpc,venue,pool,[current,leg["output"]])
+            if venue_cache is not None:
+                venue_cache[cache_key]=(proof,tuple(extra),aux)
+        else:
+            proof,extra,aux=cached
         if (proof.get("authenticated") is not True or
                 set(proof.get("mints",[]))!={current,leg["output"]}):
             raise ValueError("source pool reauthentication failed")
-        extra,aux=venue_accounts(rpc,venue,pool,[current,leg["output"]])
         addresses.extend(extra)
         evidence.append({"venue":venue,"pool":pool,"source_slot":proof["slot"],"auxiliary":aux})
         current=leg["output"]
