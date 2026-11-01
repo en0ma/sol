@@ -1,6 +1,6 @@
 import unittest
 from copy import deepcopy
-from arb.native_quote_chain_screen import check_quote_chain, compare_quote_to_signed_spl
+from arb.native_quote_chain_screen import check_quote_chain, compare_quote_to_signed_spl, screen_fee_bounded_candidates
 
 A="a"*44
 B="b"*44
@@ -53,6 +53,23 @@ class QuoteChainTests(unittest.TestCase):
         observed[1]["input_mint"]=A
         with self.assertRaises(ValueError):
             compare_quote_to_signed_spl(native,observed)
+
+    def test_fee_bound_ranking_remains_hypothetical_and_fail_closed(self):
+        route,quotes=sample()
+        quotes[-1]["amount_out_base_units"]=120
+        candidate=check_quote_chain(route,quotes,initial_base_units=100)
+        low=screen_fee_bounded_candidates([candidate],fee_upper_bound_base_units=25)
+        self.assertEqual(low["candidates_above_assumed_bound"],0)
+        ranked=screen_fee_bounded_candidates([candidate],fee_upper_bound_base_units=10)
+        self.assertEqual(ranked["candidates_above_assumed_bound"],1)
+        self.assertEqual(ranked["candidates"][0]["hypothetical_surplus_base_units"],10)
+        self.assertFalse(ranked["net_profitability_verified"])
+        self.assertFalse(ranked["fee_bound_independently_verified"])
+        with self.assertRaises(ValueError):
+            screen_fee_bounded_candidates([{**candidate,"net_profitability_verified":True}],
+                                          fee_upper_bound_base_units=0)
+        with self.assertRaises(ValueError):
+            screen_fee_bounded_candidates([candidate],fee_upper_bound_base_units=True)
 
     def test_forgery_and_disconnected_leg_are_rejected(self):
         for mutate in (
