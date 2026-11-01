@@ -1,6 +1,6 @@
 import unittest
 from copy import deepcopy
-from arb.native_quote_chain_screen import check_quote_chain
+from arb.native_quote_chain_screen import check_quote_chain, compare_quote_to_signed_spl
 
 A="a"*44
 B="b"*44
@@ -34,6 +34,25 @@ class QuoteChainTests(unittest.TestCase):
         self.assertEqual(r["gross_quoted_delta_base_units"],10)
         self.assertFalse(r["actual_paid_network_fees_verified"])
         self.assertFalse(r["net_profitability_verified"])
+
+    def test_quote_to_signed_per_leg_exact_parity_is_diagnostic_only(self):
+        route,quotes=sample()
+        native=check_quote_chain(route,quotes,initial_base_units=100)
+        observed=[{"hop":i+1,"pool":leg["pool"],"venue":leg["venue"],
+                   "input_mint":leg["from"],"output_mint":leg["to"],
+                   "observed_input_base_units":quote["amount_in_base_units"],
+                   "observed_output_base_units":quote["amount_out_base_units"]}
+                  for i,(leg,quote) in enumerate(zip(route["legs"],quotes))]
+        equal=compare_quote_to_signed_spl(native,observed)
+        self.assertTrue(equal["all_legs_numerically_equal"])
+        self.assertFalse(equal["net_profitability_verified"])
+        self.assertFalse(equal["signed_receipt_independently_authenticated_here"])
+        observed[1]["observed_output_base_units"]-=2
+        nonmatching=compare_quote_to_signed_spl(native,observed)
+        self.assertFalse(nonmatching["all_legs_numerically_equal"])
+        observed[1]["input_mint"]=A
+        with self.assertRaises(ValueError):
+            compare_quote_to_signed_spl(native,observed)
 
     def test_forgery_and_disconnected_leg_are_rejected(self):
         for mutate in (
