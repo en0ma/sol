@@ -24,6 +24,8 @@ jobs:
         run: |
           python3 -m py_compile arb/m5_seven_venue_route_scan.py arb/m5_four_to_six_source_capture.py tests/test_m5_graph_native_handoff_integration.py
           python3 -m unittest discover -s tests -p test_m5_graph_native_handoff_integration.py -v
+          python3 -m py_compile arb/m5_four_to_six_signed_handoff.py tests/test_m5_graph_prepared_signed_bridge.py
+          python3 -m unittest discover -s tests -p test_m5_graph_prepared_signed_bridge.py -v
       - name: Enforce three-venue pool lifecycle admission regression
         run: python3 -m unittest discover -s tests -p test_signed_registry_admission.py -v
       - name: Enforce fourth-venue PumpSwap source-capture fail-closed regression
