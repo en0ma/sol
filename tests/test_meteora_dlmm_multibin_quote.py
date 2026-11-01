@@ -17,4 +17,10 @@ class Tests(unittest.TestCase):
    quote_bins(amount_in=150,swap_x_for_y=True,total_fee_rate=0,
       bins=[{"bin_id":5,"price_q64":Q,"amount_x":1000,"amount_y":100},
             {"bin_id":6,"price_q64":Q,"amount_x":1000,"amount_y":100}])
+ def test_rejects_output_overflow_even_when_bin_has_capacity(self):
+  # Q64 price can yield more than u64 tokens from a valid u64 input.
+  with self.assertRaises(ValueError):
+   quote_bins(amount_in=2**63,swap_x_for_y=True,total_fee_rate=0,
+      bins=[{"bin_id":7,"price_q64":Q*4,"amount_x":2**63,
+             "amount_y":2**65}])
 if __name__=="__main__":unittest.main()
