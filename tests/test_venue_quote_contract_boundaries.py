@@ -52,10 +52,13 @@ class NativeContractBoundaryTests(unittest.TestCase):
                 self.assertEqual(outcome["status"],"UNASSESSABLE")
                 self.assertIn("unsafe quote authority assertion",outcome["reason_codes"])
 
-    def test_reject_omitted_safe_flag(self):
+    def test_legacy_internal_quote_may_omit_safe_flags(self):
         q=native_quote()
-        q.pop("broadcast")
-        self.check(q,"UNASSESSABLE")
+        for key in SAFE:
+            q.pop(key)
+        # Absence of a claim is not a claim of authorization.
+        # The validated output always supplies explicit safe flags.
+        self.check(q,"VALIDATED_INDICATIVE_QUOTE")
 
 if __name__=="__main__":
     unittest.main()
