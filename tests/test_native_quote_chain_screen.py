@@ -58,18 +58,18 @@ class QuoteChainTests(unittest.TestCase):
         route,quotes=sample()
         quotes[-1]["amount_out_base_units"]=120
         candidate=check_quote_chain(route,quotes,initial_base_units=100)
-        low=screen_fee_bounded_candidates([candidate],fee_upper_bound_base_units=25)
+        low=screen_fee_bounded_candidates([candidate],fee_upper_bound_base_units=25,start_mint=A)
         self.assertEqual(low["candidates_above_assumed_bound"],0)
-        ranked=screen_fee_bounded_candidates([candidate],fee_upper_bound_base_units=10)
+        ranked=screen_fee_bounded_candidates([candidate],fee_upper_bound_base_units=10,start_mint=A)
         self.assertEqual(ranked["candidates_above_assumed_bound"],1)
         self.assertEqual(ranked["candidates"][0]["hypothetical_surplus_base_units"],10)
         self.assertFalse(ranked["net_profitability_verified"])
         self.assertFalse(ranked["fee_bound_independently_verified"])
         with self.assertRaises(ValueError):
             screen_fee_bounded_candidates([{**candidate,"net_profitability_verified":True}],
-                                          fee_upper_bound_base_units=0)
+                                          fee_upper_bound_base_units=0,start_mint=A)
         with self.assertRaises(ValueError):
-            screen_fee_bounded_candidates([candidate],fee_upper_bound_base_units=True)
+            screen_fee_bounded_candidates([candidate],fee_upper_bound_base_units=True,start_mint=A)
 
     def test_forgery_and_disconnected_leg_are_rejected(self):
         for mutate in (
