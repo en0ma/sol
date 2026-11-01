@@ -128,6 +128,7 @@ class PreparedNativeSignedBridge(unittest.TestCase):
             self.assertEqual(json.loads(target.read_text())["status"],result["status"])
             runner.assert_called_once()
             self.assertEqual(runner.call_args.kwargs["amount_in"],100)
+            self.assertIs(runner.call_args.kwargs["ephemeral_source_registry"],True)
 
     @patch("arb.m5_four_to_six_signed_handoff.extract_pool_states",return_value=ROWS)
     @patch("arb.m5_four_to_six_signed_handoff.verify")
@@ -183,6 +184,7 @@ class PreparedNativeSignedBridge(unittest.TestCase):
             self.assertFalse(report["net_profitability_verified"])
             self.assertEqual(json.loads((root/"report.json").read_text()),report)
             runner.assert_called_once()
+            self.assertIs(runner.call_args.kwargs["ephemeral_source_registry"],True)
 
     @patch("arb.m5_four_to_six_signed_handoff.extract_pool_states",return_value=ROWS)
     @patch("arb.m5_four_to_six_signed_handoff.verify")
