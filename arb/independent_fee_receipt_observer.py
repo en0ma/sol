@@ -31,6 +31,9 @@ def corroborate_signed_fee_receipts(wire, observations):
     distinct=set()
     fees=set()
     slots=set()
+    fee_payers=set()
+    payer_balances=set()
+    payer=str(tx.message.account_keys[0])
     for row in observations:
         if not isinstance(row,dict):
             raise ValueError("invalid fee observation")
@@ -48,17 +51,28 @@ def corroborate_signed_fee_receipts(wire, observations):
             or type(row.get("fee_lamports")) is not int
             or not 0<=row["fee_lamports"]<2**64
             or type(row.get("slot")) is not int or row["slot"]<0
-            or row.get("confirmed_transaction") is not True):
+            or row.get("confirmed_transaction") is not True
+            or row.get("fee_payer")!=payer
+            or type(row.get("fee_payer_pre_lamports")) is not int
+            or type(row.get("fee_payer_post_lamports")) is not int
+            or not row["fee_lamports"]<=row["fee_payer_pre_lamports"]<2**64
+            or not 0<=row["fee_payer_post_lamports"]<2**64):
             raise ValueError("signed receipt identity, status or fee mismatch")
         fees.add(row["fee_lamports"])
         slots.add(row["slot"])
-    if len(fees)!=1 or len(slots)!=1:
+        fee_payers.add(row["fee_payer"])
+        payer_balances.add((row["fee_payer_pre_lamports"],
+                            row["fee_payer_post_lamports"]))
+    if len(fees)!=1 or len(slots)!=1 or len(fee_payers)!=1 or len(payer_balances)!=1:
         raise ValueError("independent fee observations disagree")
     return {"status":"TWO_RPC_RECORDED_FEE_CORROBORATION_NO_TRUST_ROOT",
             "signed_packet_sha256":fingerprint,
             "first_signature":signature,
             "observed_fee_lamports":next(iter(fees)),
             "observed_slot":next(iter(slots)),
+            "fee_payer":payer,
+            "fee_payer_pre_post_lamports":list(next(iter(payer_balances))),
+            "fee_payer_balance_change_is_not_fee_only":True,
             "rpc_observers_count":2,
             "upstream_independence_cryptographically_proven":False,
             "actual_mainnet_fee_payer_spend_independently_proven":False,
@@ -96,7 +110,16 @@ def fetch_confirmed_fee_observation(rpc, wire):
     if actual!=wire:
         raise ValueError("remote recorded signed wire not identical")
     meta=receipt["meta"]
+    pre=meta.get("preBalances")
+    post=meta.get("postBalances")
+    if (not isinstance(pre,list) or not isinstance(post,list) or
+        len(pre)!=len(post) or not pre or
+        any(type(n)is not int or not 0<=n<2**64 for n in pre+post)):
+        raise ValueError("remote fee payer pre/post balance evidence unavailable")
     return {"rpc_url":rpc,"signature":signature,
+            "fee_payer":str(tx.message.account_keys[0]),
+            "fee_payer_pre_lamports":pre[0],
+            "fee_payer_post_lamports":post[0],
             "wire_sha256":hashlib.sha256(wire).hexdigest(),
             "slot":receipt.get("slot"),"fee_lamports":meta.get("fee"),
             "err":meta.get("err"),"confirmed_transaction":True}
