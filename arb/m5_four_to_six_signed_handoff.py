@@ -253,7 +253,15 @@ def run_graph_selected_automatic_offline(rpc, source_path, quote_path, output_pa
     receipt=run_four_to_six_venue(rpc,fixture,amount_in=initial)
     if not isinstance(receipt,dict) or any(receipt.get(k) is not False for k in SAFE):
         raise ValueError("unsafe or invalid signed runner result")
-    verified=(receipt.get("status")=="SIGNED_N_LEG_ATOMIC_AND_ROLLBACK_VERIFIED"
+    from arb.m5_four_to_six_source_signed_acceptance import assess as independent_audit
+    independently_audited=independent_audit(fixture,receipt)
+    if not isinstance(independently_audited,dict) or any(
+            independently_audited.get(k) is not False for k in SAFE):
+        raise ValueError("unsafe independent signed source receipt audit")
+    verified=(independently_audited.get("status")==
+              "VERIFIED_SIGNED_FOUR_TO_SIX_HOP_ROLLBACK"
+        and independently_audited.get("signed_atomic_simulation_verified") is True
+        and receipt.get("status")=="SIGNED_N_LEG_ATOMIC_AND_ROLLBACK_VERIFIED"
         and receipt.get("signed_packet_crypto_bound") is True
         and receipt.get("signed_cpi_per_leg_verified") is True
         and receipt.get("rollback_failure_case_verified") is True
@@ -273,6 +281,7 @@ def run_graph_selected_automatic_offline(rpc, source_path, quote_path, output_pa
             "signed_attempted":True,
             "signed_atomic_simulation_verified":verified,
             "signed_receipt":receipt,
+            "independent_signed_receipt_audit":independently_audited,
             "native_quote_parity_independently_verified":False,
             "source_consensus_root_verified":False,
             "net_profitability_verified":False,**SAFE}
