@@ -175,7 +175,19 @@ def run_m5_research(rpc, registry, *, max_cycles=200, source_dir=None,
                 result=capture(rpc,report,targets[0],path)
                 from arb.m5_four_to_six_signed_handoff import assess
                 source=json.loads(path.read_text())
-                handoff=assess(source)
+                # Reuse the existing source-native seven-venue dispatcher for
+                # this exact graph-selected, manifest-verified 4..6-hop route.
+                # Failure of any native leg remains a bounded blocker: never
+                # route a fabricated last price to the signer.
+                quote_report=None
+                if quote_input is not None:
+                    from arb.m5_source_indicative_route_chain import research_chain
+                    quote_report=research_chain(source,amount_in=quote_input,
+                                                observed_unix=observed_unix)
+                    report["four_to_six_native_quote_chain"]=quote_report
+                    (path.parent/(path.stem+"-native-chain.json")).write_text(
+                        json.dumps(quote_report,sort_keys=True,indent=2)+"\n")
+                handoff=assess(source,quote_report=quote_report)
                 report["four_to_six_signed_handoff"]=handoff
                 report["four_to_six_source_fixture"]={
                     **result,"graph_route_index":targets[0],
