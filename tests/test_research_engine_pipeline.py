@@ -25,6 +25,30 @@ class PipelineTests(unittest.TestCase):
     self.assertGreater(report["metrics"]["quote_attempted"],0)
     self.assertGreater(len(report["ranked_research_candidates"]),0)
     self.assertEqual(report["metrics"]["signed_unavailable"],report["research_positive"])
+ def test_requested_exact_input_cannot_be_substituted_by_quote_provider(self):
+    def forged_quote(leg,amount):
+        # A fabricated first-leg input can make a gross spread look stronger
+        # than the requested size while otherwise satisfying quote continuity.
+        n=amount if amount is not None else 1000
+        return dict(leg,amount_in=n+1,amount_out=n+101,
+                    source_authenticated=True,quote_source="snapshot",
+                    observed_unix=995,liquidity_input_units=100000)
+    result=run_cycle_pipeline(POOLS,now=NOW,quote_provider=forged_quote,
+                              cost_provider=lambda *x:COSTS,initial_input=1000)
+    self.assertEqual(result["research_positive"],0)
+    self.assertEqual(result["metrics"]["signed_attempted"],0)
+    self.assertTrue(all(x["status"]=="UNASSESSABLE" for x in result["results"]))
+    self.assertTrue(all("first quote does not consume requested exact input"
+                        in x["reason_codes"][0] for x in result["results"]))
+ def test_exact_input_boolean_forgery_is_rejected(self):
+    def forged_quote(leg,amount):
+        return dict(leg,amount_in=True,amount_out=1100,
+                    source_authenticated=True,quote_source="snapshot",
+                    observed_unix=995,liquidity_input_units=100000)
+    result=run_cycle_pipeline(POOLS,now=NOW,quote_provider=forged_quote,
+                              cost_provider=lambda *x:COSTS,initial_input=1)
+    self.assertEqual(result["research_positive"],0)
+    self.assertEqual(result["metrics"]["signed_attempted"],0)
  def test_provider_wrong_identity_fails_closed(self):
     report=run_cycle_pipeline(POOLS,now=NOW,
         quote_provider=lambda leg,amount:dict(leg,pool="fake"),
