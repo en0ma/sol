@@ -212,10 +212,14 @@ def run_m5_research(rpc, registry, *, max_cycles=200, source_dir=None,
                     "previous_candidate_failures":capture_failures,
                     "source_fixture_path":str(path),
                     "signed_simulation_verified":False,**SAFE}
-            except (ValueError,TypeError,KeyError,RuntimeError) as exc:
+              except (ValueError,TypeError,KeyError,RuntimeError) as exc:
+                report["four_to_six_native_quote_chain"]={
+                    "status":"NATIVE_QUOTE_CHAIN_BLOCKED",
+                    "reason":str(exc)[:240],**SAFE}
                 report["four_to_six_source_fixture"]={
-                    "status":"FOUR_TO_SIX_SOURCE_CAPTURE_BLOCKED",
-                    "graph_route_index":chosen_index,"reason":str(exc)[:240],**SAFE}
+                    **result,"graph_route_index":chosen_index,
+                    "status":"AUTHENTICATED_SOURCE_QUOTE_OR_HANDOFF_BLOCKED",
+                    "reason":str(exc)[:240],**SAFE}
     if signed_dir is not None:
         from arb.m5_distinct_venue_coverage_batch import offline_batch
         if quote_input is not None:
