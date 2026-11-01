@@ -563,7 +563,8 @@ def run_three_venue(rpc,fixture,*,amount_in=100_000_000,program_cache=None):
     return receipt
 
 
-def run_four_to_six_venue(rpc,fixture,*,amount_in=100_000,program_cache=None):
+def run_four_to_six_venue(rpc,fixture,*,amount_in=100_000,program_cache=None,
+                          ephemeral_source_registry=False):
     """Actually hydrate, construct, sign and simulate an authenticated 4–6-hop route.
 
     Reuse the existing 2–6-hop adaptive signer and independent CPI/rollback
@@ -658,13 +659,40 @@ def run_four_to_six_venue(rpc,fixture,*,amount_in=100_000,program_cache=None):
         # The same admitted registry is now the routing authority for genuine
         # 4-6 hop signed/rollback validation, using the existing hydrator.
         from arb.atomic_graph_coordinator import coordinate_registered_cycle_offline
-        registered=json.loads(Path("arb/pool_registry.json").read_text())
-        wrapped=coordinate_registered_cycle_offline(
-            rpc,registered,{"start_mint":mints[0],"legs":route},
-            states,evidence,owner,keys,amount_in,signer,
-            negative_instructions=negative)
-        receipt=wrapped["signed_receipt"]
-        receipt["registered_coordinator_signed_economics"]=wrapped.get("observed_signed_economics")
+        if "raydium_amm_v4" in venues:
+            # The registered six-venue coordinator intentionally excludes AMM
+            # v4. Reuse the already implemented SEVEN-venue signed N-leg
+            # simulator, as the three-venue source runner already does.
+            # It is a source-coverage experiment, not registry promotion.
+            receipt=simulate_adaptive_n_leg_offline(
+                rpc,route,mints,states,evidence,owner,keys,amount_in,None,
+                signer,negative_instructions=negative,require_closed=True)
+            receipt["coordinator_registry_mode"]="AMM_V4_ISOLATED_SOURCE_RUNNER"
+        else:
+            registered=json.loads(Path("arb/pool_registry.json").read_text())
+            if ephemeral_source_registry is True:
+                # This route was independently captured from original pool
+                # bytes and read back after hydrating an isolated fork. Its
+                # transient registry is scoped to this one offline signing
+                # attempt; NEVER write or promote a pool_registry.json entry.
+                if (not isinstance(readback,dict)
+                    or readback.get("status")!="HYDRATED_FORK_ACCOUNT_BYTES_MATCH"
+                    or readback.get("captured_source_slot")!=fixture["state_accounts_observed_slot"]
+                    or type(readback.get("accounts_checked")) is not int
+                    or readback["accounts_checked"]<len(venues)):
+                    raise ValueError("ephemeral registry requires exact original source readback")
+                registered={"pools":[{"venue":venue,"address":pool,
+                                      "mints":[mints[i],mints[i+1]]}
+                                     for i,(venue,pool) in enumerate(zip(venues,pools))]}
+            wrapped=coordinate_registered_cycle_offline(
+                rpc,registered,{"start_mint":mints[0],"legs":route},
+                states,evidence,owner,keys,amount_in,signer,
+                negative_instructions=negative)
+            receipt=wrapped["signed_receipt"]
+            receipt["coordinator_registry_mode"]=(
+                "EPHEMERAL_SOURCE_ONLY_NOT_PERSISTENTLY_PROMOTED"
+                if ephemeral_source_registry is True else "PERSISTENT_REGISTERED_POOLS")
+            receipt["registered_coordinator_signed_economics"]=wrapped.get("observed_signed_economics")
         if "orca" in venues:
             try:
                 orca_clock_after=fork_clock(rpc)
