@@ -250,7 +250,8 @@ def run_graph_selected_automatic_offline(rpc, source_path, quote_path, output_pa
     if (quotes.get("output_base_units")!=current
         or quotes.get("gross_delta_start_mint_base_units")!=current-initial):
         raise ValueError("native quote chain terminal mismatch")
-    receipt=run_four_to_six_venue(rpc,fixture,amount_in=initial)
+    receipt=run_four_to_six_venue(rpc,fixture,amount_in=initial,
+                                  ephemeral_source_registry=True)
     if not isinstance(receipt,dict) or any(receipt.get(k) is not False for k in SAFE):
         raise ValueError("unsafe or invalid signed runner result")
     from arb.m5_four_to_six_source_signed_acceptance import assess as independent_audit
@@ -315,7 +316,8 @@ def run_graph_selected_source_coverage_offline(rpc,source_path,output_path,
         or not 4<=len(rows)<=6):
         raise ValueError("safe captured four-to-six graph required")
     try:
-        receipt=run_four_to_six_venue(rpc,fixture,amount_in=amount_in)
+        receipt=run_four_to_six_venue(rpc,fixture,amount_in=amount_in,
+                                      ephemeral_source_registry=True)
     except (ValueError,TypeError,KeyError,RuntimeError,OSError) as exc:
         blocked={"status":"GRAPH_SOURCE_COVERAGE_SIGNED_BLOCKED",
                  "source_manifest_sha256":fixture["state_account_manifest_sha256"],
