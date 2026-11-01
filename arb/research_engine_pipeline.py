@@ -53,6 +53,13 @@ def run_cycle_pipeline(snapshot, *, now, quote_provider, cost_provider,
                 q=quote_provider(leg,quotes[-1]["amount_out"] if quotes else initial_input)
                 if not isinstance(q,dict) or any(q.get(k)!=leg[k] for k in leg):
                     raise ValueError("provider quote identity mismatch")
+                # The first signed candidate must consume the exact amount selected
+                # by the caller, not a provider-chosen replacement. Without this
+                # check a quote can inflate its gross surplus before screening.
+                if (not quotes and initial_input is not None
+                    and (type(q.get("amount_in")) is not int
+                         or q["amount_in"] != initial_input)):
+                    raise ValueError("first quote does not consume requested exact input")
                 if quotes and q.get("amount_in")!=quotes[-1].get("amount_out"):
                     raise ValueError("provider input does not consume quoted previous output")
                 quotes.append(q)
