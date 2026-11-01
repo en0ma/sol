@@ -93,8 +93,12 @@ class RegistryPairReconciliationTests(unittest.TestCase):
         r=reconcile(hints,evidence,target=1)
         self.assertEqual(len(r["cross_venue_shared_pairs"]),1)
         self.assertIn(mint, r["graph_pools"][0]["mints"])
-        self.assertIn("zzzzzzzz",r["graph_pools"][0]["pair"])
+        self.assertIn("zzzzzzz",r["graph_pools"][0]["pair"])
         self.assertGreater(discover_cycles(r["graph_pools"],min_hops=2,max_hops=2)["cycle_count"],0)
+        self.assertTrue(all(len(part)<=7 for part in r["graph_pools"][0]["pair"].split("/")))
+        example=r["cross_venue_cycle_examples"][0]
+        self.assertEqual(example["legs"][0]["from_label"],"SOL")
+        self.assertTrue(all(len(leg["to_label"])<=7 for leg in example["legs"]))
 
 if __name__=="__main__":
     unittest.main()
