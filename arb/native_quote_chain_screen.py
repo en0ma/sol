@@ -112,15 +112,18 @@ def compare_quote_to_signed_spl(quote_report, signed_observations):
             "net_profitability_verified":False,**SAFE}
 
 def screen_fee_bounded_candidates(quote_reports, *, fee_upper_bound_base_units,
-                                  maximum_candidates=20):
+                                  start_mint, maximum_candidates=20):
     """Rank only *hypothetical* start-mint surplus after a conservative fee cap.
 
-    No route is declared profitable: fee cap is caller input, never a
-    witnessed paid fee or a validated exchange-rate conversion. Unknown
+    Fee cap must be supplied in the exact starting mint base units for EACH
+    candidate. Mixed start mints require separate calls. No route is declared
+    profitable: fee cap is caller input, never a witnessed paid fee or a
+    validated exchange-rate conversion. Unknown
     observations are rejected instead of being silently assigned zero fees.
     """
     if (not isinstance(quote_reports,list) or len(quote_reports)>10000
         or type(maximum_candidates) is not int or not 1<=maximum_candidates<=100
+        or not isinstance(start_mint,str) or len(start_mint)<32
         or type(fee_upper_bound_base_units) is not int
         or not 0<=fee_upper_bound_base_units<U64):
         raise ValueError("bounded candidate screen and explicit fee upper bound required")
@@ -133,7 +136,7 @@ def screen_fee_bounded_candidates(quote_reports, *, fee_upper_bound_base_units,
             or report.get("net_profitability_verified") is not False
             or any(report.get(k) is not False for k in SAFE)
             or type(report.get("gross_quoted_delta_base_units")) is not int
-            or not isinstance(report.get("start_mint"),str)
+            or report.get("start_mint")!=start_mint
             or not isinstance(report.get("legs"),list)
             or not 2<=len(report["legs"])<=MAX_LEGS):
             raise ValueError("unqualified or fabricated quote candidate")
@@ -152,6 +155,7 @@ def screen_fee_bounded_candidates(quote_reports, *, fee_upper_bound_base_units,
                                    c["candidate_index"]))
     return {"status":"HYPOTHETICAL_FEE_CAPPED_QUOTE_SCREEN_NOT_PROFIT_EVIDENCE",
             "examined":len(quote_reports),
+            "start_mint":start_mint,
             "candidates_above_assumed_bound":len(candidates),
             "candidates":candidates[:maximum_candidates],
             "fee_bound_independently_verified":False,
