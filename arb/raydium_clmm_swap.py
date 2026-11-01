@@ -23,12 +23,15 @@ def encode(amount,other_amount_threshold,sqrt_price_limit_x64=0,is_base_input=Tr
             sqrt_price_limit_x64.to_bytes(16,"little")+bytes([is_base_input]))
 
 def build(pool,state,payer,user_input,user_output,amount,threshold,tick_arrays,
-          input_is_token_0=True,sqrt_price_limit_x64=0,is_base_input=True):
+          input_is_token_0=True,sqrt_price_limit_x64=0,is_base_input=True,\n          bitmap_extension=None):
     from solders.pubkey import Pubkey
     from solders.instruction import Instruction,AccountMeta
     if type(input_is_token_0)is not bool:raise TypeError("input direction must be bool")
     if not isinstance(tick_arrays,(tuple,list)) or not 1<=len(tick_arrays)<=5:
         raise ValueError("must supply one to five verified tick arrays")
+    if bitmap_extension is not None:
+        if not isinstance(bitmap_extension,str) or bitmap_extension in tick_arrays:
+            raise ValueError("invalid separately authenticated CLMM bitmap extension")
     input_ix=0 if input_is_token_0 else 1
     output_ix=1-input_ix
     mint_input=state[f"token_mint_{input_ix}"]
@@ -41,8 +44,10 @@ def build(pool,state,payer,user_input,user_output,amount,threshold,tick_arrays,
           (state["observation_key"],False,True),
           (TOKEN_PROGRAM,False,False),(TOKEN_2022,False,False),
           (MEMO,False,False),(mint_input,False,False),(mint_output,False,False)]
+    if bitmap_extension is not None:
+        keys.append((bitmap_extension,False,True))
     keys.extend((a,False,True) for a in tick_arrays)
-    if len({str(a) for a,_,_ in keys[13:]})!=len(tick_arrays):
+    if len({str(a) for a,_,_ in keys[13:]})!=len(tick_arrays)+(bitmap_extension is not None):
         raise ValueError("duplicate tick arrays")
     metas=[AccountMeta(Pubkey.from_string(key),signer,writable)
            for key,signer,writable in keys]
