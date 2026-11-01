@@ -9,15 +9,18 @@ from arb.orca_whirlpool import SOL, USDC
 from arb.onchain_pool_discovery import USDT
 
 MAX_HOPS=8
-MAX_CYCLES=1000000
+MAX_CYCLES=5000000
 MAX_EDGES=50000
 
 def discover_cycles(pools, *, min_hops=2, max_hops=5,
-                    starts=(SOL,USDC), max_cycles=MAX_CYCLES):
+                    starts=(SOL,USDC), max_cycles=MAX_CYCLES, retain_cycles=None):
     if type(min_hops) is not int or type(max_hops) is not int or not 2<=min_hops<=max_hops<=MAX_HOPS:
         raise ValueError("bounded 2..8 hop limits required")
     if type(max_cycles) is not int or not 1<=max_cycles<=MAX_CYCLES:
         raise ValueError("bounded cycle count required")
+    if (retain_cycles is not None and (type(retain_cycles) is not int or
+            not 0 <= retain_cycles <= 10000)):
+        raise ValueError("invalid retained cycle evidence limit")
     if not isinstance(pools,list) or len(pools)>MAX_EDGES:
         raise ValueError("bounded list of registry pools required")
     if not isinstance(starts,(tuple,list)) or not starts or any(s not in (SOL,USDC,USDT) for s in starts):
@@ -40,10 +43,13 @@ def discover_cycles(pools, *, min_hops=2, max_hops=5,
     for edges in adjacency.values():
         edges.sort(key=lambda e:(e[0],e[1],e[2]))
     results=[]
-    unique=set()
+    unique=set() if retain_cycles is None else None
+    observed_count=0
+    cross_venue_count=0
+    cross_venue_pool_ids=set()
     stopped=False
     def visit(start,current,tokens,legs,used_pools,used_tokens):
-        nonlocal stopped
+        nonlocal stopped,observed_count,cross_venue_count
         if stopped:return
         for dest,venue,pool in adjacency[current]:
             if pool in used_pools:
@@ -53,15 +59,23 @@ def discover_cycles(pools, *, min_hops=2, max_hops=5,
                 if depth>=min_hops:
                     key=(start,tuple((x["venue"],x["pool"],x["from"],x["to"]) for x in legs),
                          (venue,pool,current,start))
-                    if key in unique:continue
-                    unique.add(key)
-                    full_legs=legs+[{"venue":venue,"pool":pool,"from":current,"to":start}]
-                    results.append({"tokens":tokens+[start],"legs":full_legs,
-                        "hop_count":depth,"venues":sorted({l["venue"] for l in full_legs}),
-                        "all_pools_onchain_verified":True,
-                        "signed_atomic_simulation_verified":False,
-                        "actionable":False,"live_execution_approved":False,"broadcast":False})
-                    if len(results)>=max_cycles:
+                    if unique is not None:
+                        if key in unique:continue
+                        unique.add(key)
+                    observed_count+=1
+                    venues=sorted({l["venue"] for l in legs}|{venue})
+                    if len(venues)>=2:
+                        cross_venue_count+=1
+                        cross_venue_pool_ids.update((l["venue"],l["pool"]) for l in legs)
+                        cross_venue_pool_ids.add((venue,pool))
+                    if retain_cycles is None or len(results)<retain_cycles:
+                        full_legs=legs+[{"venue":venue,"pool":pool,"from":current,"to":start}]
+                        results.append({"tokens":tokens+[start],"legs":full_legs,
+                            "hop_count":depth,"venues":venues,
+                            "all_pools_onchain_verified":True,
+                            "signed_atomic_simulation_verified":False,
+                            "actionable":False,"live_execution_approved":False,"broadcast":False})
+                    if observed_count>=max_cycles:
                         stopped=True
                         return
                 continue
@@ -74,7 +88,10 @@ def discover_cycles(pools, *, min_hops=2, max_hops=5,
         visit(start,start,[start],[],set(),{start})
         if stopped:break
     return {"status":"VERIFIED_REGISTRY_GRAPH_CYCLE_DISCOVERY",
-            "cycles":results,"cycle_count":len(results),
+            "cycles":results,"cycle_count":observed_count,
+            "cross_venue_cycle_count":cross_venue_count,
+            "cross_venue_cycle_pool_ids":sorted(cross_venue_pool_ids),
+            "retained_cycle_count":len(results),
             "min_hops":min_hops,"max_hops":max_hops,
             "truncated":stopped,
             "actionable":False,"live_execution_approved":False,"broadcast":False}
