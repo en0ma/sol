@@ -182,5 +182,5 @@ def run_captured_offline(rpc, source_path, quote_path, preparation, output_path)
     source=json.loads(Path(source_path).read_text())
     native=json.loads(Path(quote_path).read_text())
     report=execute_prepared_offline(rpc,source,native,preparation)
-    Path(output_path).write_text(json.dumps(report,sort_keys=True,indent=2)+"\\n")
+    Path(output_path).write_text(json.dumps(report,sort_keys=True,indent=2)+"\n")
     return report
