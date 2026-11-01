@@ -77,7 +77,20 @@ jobs:
               (root/"graph-selected-discovery.json").write_text(json.dumps(graph,indent=2)+"\n")
               choices=[i for i,r in enumerate(graph["routes"]) if 4<=r["hops"]<=6]
               summary["graph_cycles"]=len(choices)
-              for index in choices[:8]:
+              # The graph's native enumeration order groups near-identical
+              # routes. Prefer candidates with fewer known missing fee/bin
+              # source prerequisites, while retaining ALL source identities.
+              # This is discovery ordering, never synthetic quote admission.
+              deferred={"meteora_dlmm":8,"meteora_damm_v2":4,
+                        "pumpswap":4,"raydium_clmm":2,"orca":1}
+              choices.sort(key=lambda index: (
+                  sum(deferred.get(leg["venue"],0)
+                      for leg in graph["routes"][index]["legs"]),
+                  -len(set(leg["venue"] for leg in graph["routes"][index]["legs"])),
+                  index))
+              summary["selection_order"]="LOWEST_UNVERIFIED_AUXILIARY_MODEL_BURDEN_FIRST"
+              summary["selected_graph_indices"]=choices[:16]
+              for index in choices[:16]:
                   summary["capture_attempts"]+=1
                   try:
                       capture("http://127.0.0.1:8899",graph,index,root/"graph-native-source.json")
