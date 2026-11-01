@@ -100,3 +100,25 @@ def fetch_confirmed_fee_observation(rpc, wire):
             "wire_sha256":hashlib.sha256(wire).hexdigest(),
             "slot":receipt.get("slot"),"fee_lamports":meta.get("fee"),
             "err":meta.get("err"),"confirmed_transaction":True}
+
+def inspect_fee_two_read_only_observers(rpc_a, rpc_b, signed_wire):
+    """Fetch both confirmed receipts directly; do not trust supplied reports.
+
+    HTTPS hosts are only a weak proxy for different infrastructure. This
+    remains corroborated RPC evidence, not cryptographic proof of settlement.
+    """
+    hosts=[]
+    for rpc in (rpc_a,rpc_b):
+        if not isinstance(rpc,str):
+            raise ValueError("two explicit RPC URLs required")
+        parsed=urlsplit(rpc)
+        if (parsed.scheme!="https" or not parsed.hostname
+            or parsed.username or parsed.password or parsed.fragment
+            or parsed.hostname in ("localhost","127.0.0.1","::1")):
+            raise ValueError("two independently supplied HTTPS endpoints required")
+        hosts.append(parsed.hostname)
+    if hosts[0]==hosts[1]:
+        raise ValueError("same remote source cannot independently corroborate itself")
+    first=fetch_confirmed_fee_observation(rpc_a,signed_wire)
+    second=fetch_confirmed_fee_observation(rpc_b,signed_wire)
+    return corroborate_signed_fee_receipts(signed_wire,[first,second])
