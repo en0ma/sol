@@ -230,6 +230,43 @@ def run_m5_research(rpc, registry, *, max_cycles=200, source_dir=None,
         report["signed_route_simulated_net_gain_count"]=sum(
             row["outcome"]=="SIMULATED_ESTIMATED_NET_GAIN" for row in outcomes)
         report["realized_net_profit_verified"]=False
+        # Join *actual* signed source triangles back to the matching directed
+        # graph routes by every pool, mint and venue. Topology-only routes
+        # that were not selected stay explicitly unassessed. Never copy one
+        # signed triangle's economics onto a different rotation or route.
+        signed_by_index={row["source_route_index"]:row for row in outcomes}
+        route_keys={}
+        for graph_idx,graph_route in enumerate(report["routes"]):
+            key=tuple((leg["venue"],leg["pool"],leg["input"],
+                       leg["output"]) for leg in graph_route["legs"])
+            route_keys.setdefault(key,[]).append(graph_idx)
+        matched=set()
+        for source_row in report["source_triangles"].get("routes",[]):
+            idx=source_row.get("index")
+            if (idx not in signed_by_index or
+                source_row.get("status")!="AUTHENTICATED_THREE_VENUE_SOURCE_FIXTURE"):
+                continue
+            fixture=json.loads((Path(source_dir)/source_row["fixture"]).read_text())
+            venues=fixture.get("route_venues")
+            pools=fixture.get("route_pool_addresses")
+            mints=fixture.get("route_mints")
+            if (not isinstance(venues,list) or len(venues)!=3
+                or not isinstance(pools,list) or len(pools)!=3
+                or not isinstance(mints,list) or len(mints)!=4):
+                raise ValueError("signed graph join requires complete source route identities")
+            key=tuple((venues[i],pools[i],mints[i],mints[i+1])
+                      for i in range(3))
+            for graph_idx in route_keys.get(key,[]):
+                report["routes"][graph_idx]["signed_simulation_status"]=(
+                    "SOURCE_ROUTE_INDEPENDENTLY_SIGNED" if
+                    signed_by_index[idx]["independent_signed_accepted"]
+                    else "SOURCE_ROUTE_SIGNED_UNVERIFIED")
+                report["routes"][graph_idx]["source_batch_route_index"]=idx
+                report["routes"][graph_idx]["simulated_economic_outcome"]=signed_by_index[idx]["outcome"]
+                matched.add(graph_idx)
+        report["graph_routes_with_source_bound_signed_outcome"]=len(matched)
+        report["graph_routes_unassessed_by_signed_batch"]=len(report["routes"])-len(matched)
+
 
     return report
 
