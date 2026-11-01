@@ -288,18 +288,77 @@ def run_graph_selected_automatic_offline(rpc, source_path, quote_path, output_pa
     Path(output_path).write_text(json.dumps(report,sort_keys=True,indent=2)+"\n")
     return report
 
+def run_graph_selected_source_coverage_offline(rpc,source_path,output_path,
+                                               *,amount_in=100000):
+    """Separately labelled signed source-coverage trial when native pricing blocks.
+
+    This path never uses an invented quote, never appears as a ranked or
+    native-priced graph opportunity and remains independent of full-route
+    net economics. It exercises genuine signed atomic CPI/SPL and rollback
+    against a real captured graph fixture only on the isolated fork.
+    """
+    import os,json
+    from pathlib import Path
+    from arb.pumpswap_local_simulation import local_rpc_only
+    from arb.next_ten_signed_atomic_offline import run_four_to_six_venue
+    from arb.m5_four_to_six_source_signed_acceptance import assess as independent_audit
+    local_rpc_only(rpc)
+    if os.environ.get("SURFPOOL_EXPLICITLY_OFFLINE")!="1":
+        raise ValueError("disconnected source-coverage signing fork required")
+    if type(amount_in) is not int or not 0<amount_in<2**64:
+        raise ValueError("invalid exact unsigned SPL input")
+    fixture=json.loads(Path(source_path).read_text())
+    verify(fixture)
+    rows=extract_pool_states(fixture)
+    if (fixture.get("fixture_kind")!="AUTHENTICATED_FOUR_TO_SIX_HOP_SOURCE_ROUTE"
+        or any(fixture.get(k) is not False for k in SAFE)
+        or not 4<=len(rows)<=6):
+        raise ValueError("safe captured four-to-six graph required")
+    receipt=run_four_to_six_venue(rpc,fixture,amount_in=amount_in)
+    audit=independent_audit(fixture,receipt)
+    if (not isinstance(receipt,dict) or not isinstance(audit,dict)
+        or any(receipt.get(k) is not False for k in SAFE)
+        or any(audit.get(k) is not False for k in SAFE)):
+        raise ValueError("unsafe signed source-coverage receipt")
+    verified=(audit.get("status")=="VERIFIED_SIGNED_FOUR_TO_SIX_HOP_ROLLBACK"
+              and audit.get("signed_atomic_simulation_verified") is True)
+    report={"status":("GRAPH_SOURCE_COVERAGE_SIGNED_ATOMIC_VERIFIED" if verified
+                      else "GRAPH_SOURCE_COVERAGE_SIGNED_UNVERIFIED"),
+            "source_manifest_sha256":fixture["state_account_manifest_sha256"],
+            "source_slot":fixture["state_accounts_observed_slot"],
+            "initial_base_units":amount_in,
+            "signed_attempted":True,
+            "signed_atomic_simulation_verified":verified,
+            "native_full_route_quote_verified":False,
+            "native_priced_research_opportunity":False,
+            "independent_signed_receipt_audit":audit,
+            "signed_receipt":receipt,
+            "net_profitability_verified":False,**SAFE}
+    Path(output_path).write_text(json.dumps(report,sort_keys=True,indent=2)+"\n")
+    return report
+
 def main():
     """CLI on a separately launched offline fork; no secrets or funded wallet."""
     import argparse,json
     p=argparse.ArgumentParser(description="Graph-selected signed Surfpool research only")
     p.add_argument("--rpc",default="http://127.0.0.1:8899")
     p.add_argument("--source",required=True)
-    p.add_argument("--native-quotes",required=True)
+    p.add_argument("--native-quotes")
+    p.add_argument("--source-coverage-only",action="store_true")
     p.add_argument("--output",required=True)
     p.add_argument("--amount",type=int)
     args=p.parse_args()
-    report=run_graph_selected_automatic_offline(
-        args.rpc,args.source,args.native_quotes,args.output,amount_in=args.amount)
+    if args.source_coverage_only:
+        if args.native_quotes is not None:
+            p.error("source coverage must not be misrepresented as native quoted")
+        report=run_graph_selected_source_coverage_offline(
+            args.rpc,args.source,args.output,
+            amount_in=100000 if args.amount is None else args.amount)
+    else:
+        if args.native_quotes is None:
+            p.error("native-quoted graph path requires --native-quotes")
+        report=run_graph_selected_automatic_offline(
+            args.rpc,args.source,args.native_quotes,args.output,amount_in=args.amount)
     print(json.dumps({"status":report["status"],
                       "signed_atomic_simulation_verified":
                           report["signed_atomic_simulation_verified"],
