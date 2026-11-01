@@ -48,8 +48,8 @@ def capture(rpc,graph,route_index,output):
     if current!=mints[0] or len({leg["pool"] for leg in legs})!=len(legs):
         raise ValueError("four-to-six route must be closed with distinct pools")
     addresses=list(dict.fromkeys(addresses))
-    if not addresses or len(addresses)>192:
-        raise ValueError("source auxiliary inventory exceeds bound")
+    if not addresses or len(addresses)>100:
+        raise ValueError("source auxiliary inventory exceeds getMultipleAccounts 100-key limit")
     response=call(rpc,"getMultipleAccounts",[addresses,{"encoding":"base64","commitment":"confirmed"}])
     slot=response.get("context",{}).get("slot")
     values=response.get("value")
