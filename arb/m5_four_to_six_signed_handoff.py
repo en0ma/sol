@@ -85,6 +85,9 @@ def execute_prepared_offline(rpc, fixture, quote_report, preparation):
     from arb.pumpswap_local_simulation import local_rpc_only
     from arb.atomic_graph_coordinator import coordinate_registered_cycle_offline
     local_rpc_only(rpc)
+    import os
+    if os.environ.get("SURFPOOL_EXPLICITLY_OFFLINE")!="1":
+        raise ValueError("separate isolated offline fork environment required")
     verify(fixture)
     if fixture.get("fixture_kind")!="AUTHENTICATED_FOUR_TO_SIX_HOP_SOURCE_ROUTE":
         raise ValueError("actual authenticated graph source fixture required")
@@ -163,3 +166,21 @@ def execute_prepared_offline(rpc, fixture, quote_report, preparation):
             "independent_source_consensus_root_verified":False,
             "quote_accuracy_verified":False,
             "net_profitability_verified":False,**SAFE}
+
+
+def run_captured_offline(rpc, source_path, quote_path, preparation, output_path):
+    """Read source-stage artifacts on a separately launched offline fork.
+
+    The caller must first end the upstream-backed source fork, start a fresh
+    disconnected offline Surfpool process, hydrate the captured source bytes,
+    provision distinct ephemeral user accounts/signers, and supply a negative
+    last-instruction mutation. This interface does not bootstrap a funded
+    signer or silently sign on an upstream-connected source process.
+    """
+    import json
+    from pathlib import Path
+    source=json.loads(Path(source_path).read_text())
+    native=json.loads(Path(quote_path).read_text())
+    report=execute_prepared_offline(rpc,source,native,preparation)
+    Path(output_path).write_text(json.dumps(report,sort_keys=True,indent=2)+"\\n")
+    return report
