@@ -314,7 +314,21 @@ def run_graph_selected_source_coverage_offline(rpc,source_path,output_path,
         or any(fixture.get(k) is not False for k in SAFE)
         or not 4<=len(rows)<=6):
         raise ValueError("safe captured four-to-six graph required")
-    receipt=run_four_to_six_venue(rpc,fixture,amount_in=amount_in)
+    try:
+        receipt=run_four_to_six_venue(rpc,fixture,amount_in=amount_in)
+    except (ValueError,TypeError,KeyError,RuntimeError,OSError) as exc:
+        blocked={"status":"GRAPH_SOURCE_COVERAGE_SIGNED_BLOCKED",
+                 "source_manifest_sha256":fixture["state_account_manifest_sha256"],
+                 "source_slot":fixture["state_accounts_observed_slot"],
+                 "initial_base_units":amount_in,
+                 "signed_attempted":False,
+                 "signed_atomic_simulation_verified":False,
+                 "native_full_route_quote_verified":False,
+                 "native_priced_research_opportunity":False,
+                 "net_profitability_verified":False,
+                 "reason":str(exc)[:320],**SAFE}
+        Path(output_path).write_text(json.dumps(blocked,sort_keys=True,indent=2)+"\n")
+        return blocked
     audit=independent_audit(fixture,receipt)
     if (not isinstance(receipt,dict) or not isinstance(audit,dict)
         or any(receipt.get(k) is not False for k in SAFE)
