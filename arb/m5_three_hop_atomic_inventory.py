@@ -16,6 +16,7 @@ def source_capture(rpc, graph, directory):
     if graph.get("status")!="SOURCE_AUTHENTICATED_ROUTE_DISCOVERY_ONLY":
         raise ValueError("authenticated graph required")
     rows=[]
+    venue_cache={}
     selected=[(i,r) for i,r in enumerate(graph["routes"]) if r.get("hops")==3]
     for j,(index,route) in enumerate(selected):
         entry={"id":"3H-%02d"%(j+1),"graph_route_index":index,
@@ -28,7 +29,7 @@ def source_capture(rpc, graph, directory):
                "simulation_status":"NOT_ATTEMPTED",**SAFE}
         fixture=root/("source-%02d.json"%j)
         try:
-            capture(rpc,graph,index,fixture)
+            capture(rpc,graph,index,fixture,venue_cache=venue_cache)
             entry["source_status"]="CAPTURED"
             entry["fixture"]=fixture.name
         except (ValueError,KeyError,TypeError,RuntimeError,OSError) as exc:
@@ -38,7 +39,8 @@ def source_capture(rpc, graph, directory):
         (root/"three-hop-inventory.json").write_text(json.dumps(
             {"status":"SOURCE_THREE_HOP_INVENTORY",
              "cycle_count":len(selected),"attempted_source_captures":len(rows),
-             "three_hop_truncated":graph.get("cycle_coverage_by_hops",{}).get("3",{}).get("truncated"),
+             "cached_distinct_pool_directions":len(venue_cache),
+            "three_hop_truncated":graph.get("cycle_coverage_by_hops",{}).get("3",{}).get("truncated"),
              "routes":rows,**SAFE},indent=2)+"\n")
     return rows
 
