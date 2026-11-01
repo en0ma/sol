@@ -21,11 +21,19 @@ def validate(quote,pool,*,requested_input,now,max_age=60):
     if not isinstance(mints,(list,tuple)) or len(mints)!=2 or (
         quote.get("input_mint"),quote.get("output_mint")) not in ((mints[0],mints[1]),(mints[1],mints[0])):
         reasons.append("quote mint direction mismatch")
-    if type(requested_input)is not int or requested_input<=0 or quote.get("amount_in")!=requested_input:
+    if (type(requested_input)is not int or not 0<requested_input<2**64
+        or type(quote.get("amount_in")) is not int
+        or quote["amount_in"]!=requested_input):
         reasons.append("quote exact input mismatch")
+    # Research quote records are not broadcast instructions or attestations.
+    # A provider asserting elevated privileges must not be laundered into a
+    # validated quote, even if the returned wrapper carries safe flags.
+    if any(quote.get(k) is not False for k in SAFETY):
+        reasons.append("unsafe quote authority assertion")
     for key in ("amount_out","fee_input_units","liquidity_input_units","price_impact_bps"):
         val=quote.get(key)
-        if type(val)is not int or val<0 or (key in ("amount_out","liquidity_input_units") and val==0):
+        if (type(val)is not int or not 0<=val<2**64
+            or (key in ("amount_out","liquidity_input_units") and val==0)):
             reasons.append("invalid or unpriced "+key)
     if type(quote.get("price_impact_bps"))is int and quote["price_impact_bps"]>10000:
         reasons.append("price impact exceeds 10000bps")
