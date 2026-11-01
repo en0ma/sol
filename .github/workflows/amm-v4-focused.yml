@@ -500,6 +500,12 @@ jobs:
           python3 -m py_compile arb/m5_complex_venue_native_quote.py arb/fixture_all_venue_signed_quotes.py
           python3 -m unittest discover -s tests -p test_m5_complex_venue_native_quote.py -v
           echo "::endgroup::"
+      - name: Strict original-state and complete offline cost research regressions
+        run: |
+          set -e
+          python3 -m py_compile arb/original_source_snapshot_audit.py arb/offline_atomic_economic_gate.py
+          python3 -m unittest discover -s tests -p test_original_source_snapshot_audit.py -v
+          python3 -m unittest discover -s tests -p test_native_model_economic_gate.py -v
       - name: Fast safety regression batch 9 (16 existing checks)
         run: |
           set -e
