@@ -36,6 +36,11 @@ class PreparedNativeSignedBridge(unittest.TestCase):
         self.offline=patch.dict(os.environ,{"SURFPOOL_EXPLICITLY_OFFLINE":"1"})
         self.offline.start()
         self.addCleanup(self.offline.stop)
+        self.hydration=patch("arb.hydrated_fork_state_audit.verify_hydrated_state",
+            return_value={"status":"HYDRATED_FORK_ACCOUNT_BYTES_MATCH",
+                          "accounts_checked":4,"captured_source_slot":44,**SAFE})
+        self.hydrated=self.hydration.start()
+        self.addCleanup(self.hydration.stop)
 
     @patch("arb.m5_four_to_six_signed_handoff.extract_pool_states",return_value=ROWS)
     @patch("arb.m5_four_to_six_signed_handoff.verify")
@@ -85,6 +90,16 @@ class PreparedNativeSignedBridge(unittest.TestCase):
             run_captured_offline("http://127.0.0.1:8899",
                 root/"source.json",root/"native.json",PREP,path)
             self.assertEqual(json.loads(path.read_text()),execute.return_value)
+
+    @patch("arb.m5_four_to_six_signed_handoff.extract_pool_states",return_value=ROWS)
+    @patch("arb.m5_four_to_six_signed_handoff.verify")
+    @patch("arb.atomic_graph_coordinator.coordinate_registered_cycle_offline")
+    def test_forged_hydrated_account_match_cannot_reach_signer(self,coordinator,*unused):
+        self.hydrated.return_value={"status":"UNVERIFIED","accounts_checked":4,
+                                    "captured_source_slot":44,**SAFE}
+        with self.assertRaises(ValueError):
+            execute_prepared_offline("http://127.0.0.1:8899",SOURCE,QUOTE,PREP)
+        coordinator.assert_not_called()
 
     def test_fork_isolation_gate_blocks_prepared_signer(self):
         with patch.dict(os.environ,{"SURFPOOL_EXPLICITLY_OFFLINE":"0"}):
