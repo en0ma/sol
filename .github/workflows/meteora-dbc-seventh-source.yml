@@ -1,10 +1,5 @@
 name: Seventh Venue Meteora DBC Source Authentication
 on:
-  pull_request:
-    paths:
-      - "arb/meteora_dbc_seventh_venue_source.py"
-      - "tests/test_meteora_dbc_seventh_source.py"
-      - ".github/workflows/meteora-dbc-seventh-source.yml"
   workflow_dispatch:
 permissions:
   contents: read
