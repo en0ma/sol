@@ -128,6 +128,7 @@ jobs:
           assert len(r["routes"])<=10, "shard must contain at most ten routes"
           with open(os.environ["GITHUB_STEP_SUMMARY"],"a") as f:
               f.write(f"Shard {r['shard_index']}: {r.get('build_confirmed',0)}/{len(r['routes'])} signed builds; {r.get('simulations_verified',0)}/{len(r['routes'])} verified simulations.\n")
+          assert all(row.get("source_status")=="CAPTURED" and row.get("atomic_build_status")=="SIGNED_ATOMIC_PACKET_BUILT" and row.get("simulation_status")=="SIGNED_SIMULATION_AND_ROLLBACK_VERIFIED" for row in r["routes"]), "not all selected routes passed signed simulation and rollback"
           PY
       - uses: actions/upload-artifact@v4
         if: always()
