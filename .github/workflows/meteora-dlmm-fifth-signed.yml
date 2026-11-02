@@ -1,18 +1,7 @@
 name: Fifth Venue Meteora DLMM Genuine Signed Surfpool
 
 on:
-  pull_request:
-    paths:
-      - "arb/meteora_dlmm_fifth_signed_fork.py"
-      - "arb/meteora_dlmm_native_candidate_audit.py"
-      - ".github/workflows/meteora-dlmm-fifth-signed.yml"
   workflow_dispatch:
-    inputs:
-      pool_count:
-        description: "Registered authenticated DLMM pools with four signed swaps each (1-3)"
-        required: false
-        default: "3"
-
 concurrency:
   group: dlmm-fifth-signed-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
