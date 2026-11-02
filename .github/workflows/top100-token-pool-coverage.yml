@@ -1,5 +1,9 @@
 name: Top 100 Token Authenticated Pool Coverage
 on:
+  push:
+    branches: [feat/surfpool-ci-validation]
+    paths:
+      - ".github/workflows/top100-token-pool-coverage.yml"
   workflow_dispatch:
     inputs:
       start:
@@ -51,8 +55,8 @@ jobs:
           PY
       - name: Discover and authenticate selected high-activity token pools
         run: |
-          test "${{ inputs.count }}" -le 8
-          python3 -m arb.top100_pool_coverage --start "${{ inputs.start }}" --count "${{ inputs.count }}" --output "$RUNNER_TEMP/top100-coverage.json"
+          test "${{ inputs.count || 8 }}" -le 8
+          python3 -m arb.top100_pool_coverage --start "${{ inputs.start || 0 }}" --count "${{ inputs.count || 8 }}" --output "$RUNNER_TEMP/top100-coverage.json"
       - name: Stop source fork
         if: always()
         run: |
@@ -61,7 +65,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: top100-token-pool-coverage-${{ inputs.start }}
+          name: top100-token-pool-coverage-${{ inputs.start || 0 }}
           path: |
             ${{ runner.temp }}/top100-coverage.json
             ${{ runner.temp }}/top100-source.log
