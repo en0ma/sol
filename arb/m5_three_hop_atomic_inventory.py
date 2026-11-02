@@ -55,7 +55,7 @@ def diversified_three_hop_graph(readiness, maximum=40):
         cycle_budget=maximum,cycle_inventory_truncated=True,
         cycle_count_is_exhaustive=False,
         three_hop_candidate_identities_considered=len(seen),
-        three_hop_distinct_token_paths=len({tuple(r["start_mint"] for r in result)}),
+        three_hop_distinct_token_paths=len({tuple([r["start_mint"]]+[leg["output"] for leg in r["legs"][:2]]) for r in result}),
         three_hop_sample_policy="ROTATION_DEDUP_TOKEN_PATH_ROUND_ROBIN",
         cycle_coverage_by_hops={"3":{"returned":len(result),
             "budget":maximum,"truncated":len(seen)>len(result)}})
