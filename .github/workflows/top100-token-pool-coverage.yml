@@ -1,5 +1,9 @@
 name: Top 100 Token Authenticated Pool Coverage
 on:
+  push:
+    branches: [feat/surfpool-ci-validation]
+    paths:
+      - ".github/workflows/top100-token-pool-coverage.yml"
   workflow_dispatch:
     inputs:
       start:
