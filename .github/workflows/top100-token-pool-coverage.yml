@@ -1,0 +1,68 @@
+name: Top 100 Token Authenticated Pool Coverage
+on:
+  workflow_dispatch:
+    inputs:
+      start:
+        description: "Rank offset (0, 8, 16, ... 96)"
+        type: number
+        required: true
+        default: 0
+      count:
+        description: "Number of top-token targets (max 8 per execution)"
+        type: number
+        required: true
+        default: 8
+permissions:
+  contents: read
+concurrency:
+  group: top100-pool-coverage
+  cancel-in-progress: false
+jobs:
+  source-authenticated-discovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    env:
+      SURFPOOL_DATASOURCE_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
+      JUPITER_API_KEY: ${{ secrets.JUPITER_API_KEY }}
+      SOLANA_RPC_MIN_INTERVAL_SECONDS: "0.5"
+      SOLANA_RPC_ALCHEMY_FREE_TIER: "1"
+      SOLANA_RPC_PACING_FILE: /tmp/top100-pool-pacing
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Surfpool and Solana client
+        run: |
+          test -n "$SURFPOOL_DATASOURCE_RPC_URL"
+          python3 -m py_compile arb/top100_pool_coverage.py
+          bash ci/install_surfpool.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          python3 -m pip install solders==0.26.0
+      - name: Start read-only mainnet-backed source fork
+        run: |
+          nohup "$HOME/.local/bin/surfpool" start --ci --rpc-url "$SURFPOOL_DATASOURCE_RPC_URL" --no-deploy > "$RUNNER_TEMP/top100-source.log" 2>&1 < /dev/null &
+          echo $! > "$RUNNER_TEMP/top100-source.pid"
+          python3 - <<'PY'
+          import time
+          from arb.rpc import call
+          for _ in range(80):
+              try:
+                  if call("http://127.0.0.1:8899","getLatestBlockhash")["value"]["blockhash"]:break
+              except Exception:time.sleep(1)
+          else:raise SystemExit("source RPC unavailable")
+          PY
+      - name: Discover and authenticate selected high-activity token pools
+        run: |
+          test "${{ inputs.count }}" -le 8
+          python3 -m arb.top100_pool_coverage --start "${{ inputs.start }}" --count "${{ inputs.count }}" --output "$RUNNER_TEMP/top100-coverage.json"
+      - name: Stop source fork
+        if: always()
+        run: |
+          if test -f "$RUNNER_TEMP/top100-source.pid"; then kill "$(cat "$RUNNER_TEMP/top100-source.pid")" || true; fi
+      - name: Upload authenticated candidates and failures for review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: top100-token-pool-coverage-${{ inputs.start }}
+          path: |
+            ${{ runner.temp }}/top100-coverage.json
+            ${{ runner.temp }}/top100-source.log
+          if-no-files-found: warn
