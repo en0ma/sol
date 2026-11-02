@@ -9,7 +9,7 @@ from pathlib import Path
 
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
 
-def diversified_three_hop_graph(readiness, maximum=40):
+def diversified_three_hop_graph(readiness, maximum=100):
     """Bounded round-robin across authenticated token cycles and pool identities."""
     from collections import defaultdict, deque
     from arb.m5_seven_venue_route_scan import analyze, ORDER, SAFE
@@ -19,46 +19,54 @@ def diversified_three_hop_graph(readiness, maximum=40):
     pools=[{"venue":v,"address":p["pool"],"mints":p["mints"],"verified":True}
            for v in ORDER for p in readiness["authenticated_pools"][v]]
     graph=analyze(readiness,max_cycles=100)
+    # Keep rotations as alternative start-token choices for each genuine pool
+    # cycle. Select one unique pool cycle per round-robin starting token.
     candidates=defaultdict(deque)
-    seen=set()
+    seen_by_start=defaultdict(set)
+    unique_identities=set()
     for anchor in sorted({m for p in pools for m in p["mints"]}):
         for route in cycles(pools,anchors=[anchor],min_hops=3,max_hops=3,
-                            max_cycles=250,truncate=True):
+                            max_cycles=1000,truncate=True):
             legs=route["legs"]
             keys=tuple((x["venue"],x["pool"],x["input"]) for x in legs)
             identity=min(keys[i:]+keys[:i] for i in range(3))
-            if identity in seen:
+            unique_identities.add(identity)
+            if identity in seen_by_start[anchor]:
                 continue
-            seen.add(identity)
-            path=tuple([route["start_mint"]]+[x["output"] for x in legs[:2]])
-            path=min(path[i:]+path[:i] for i in range(3))
-            candidates[path].append(route)
+            seen_by_start[anchor].add(identity)
+            candidates[anchor].append((identity,route))
     result=[]
-    paths=sorted(candidates,key=lambda x:(len(candidates[x]),x))
-    while paths and len(result)<maximum:
-        next_paths=[]
-        for path in paths:
-            if candidates[path]:
-                r=candidates[path].popleft()
+    selected_identities=set()
+    starts=sorted(candidates)
+    while starts and len(result)<maximum:
+        next_starts=[]
+        for start in starts:
+            q=candidates[start]
+            while q and q[0][0] in selected_identities:
+                q.popleft()
+            if q:
+                identity,r=q.popleft()
+                selected_identities.add(identity)
                 result.append({"start_mint":r["start_mint"],"hops":3,
                     "legs":r["legs"],"venue_count":len(r["venues"]),
                     "quote_status":"NOT_QUOTED",
                     "signed_simulation_status":"NOT_ATTEMPTED",**SAFE})
-            if candidates[path]:
-                next_paths.append(path)
-            if len(result)==maximum:
+            if q:
+                next_starts.append(start)
+            if len(result)>=maximum:
                 break
-        paths=next_paths
+        starts=next_starts
     if not result:
         raise ValueError("no authenticated triangles found")
     graph.update(routes=result,connected_cycles=len(result),
         cycle_budget=maximum,cycle_inventory_truncated=True,
         cycle_count_is_exhaustive=False,
-        three_hop_candidate_identities_considered=len(seen),
+        three_hop_candidate_identities_considered=len(unique_identities),
         three_hop_distinct_token_paths=len({tuple([r["start_mint"]]+[leg["output"] for leg in r["legs"][:2]]) for r in result}),
-        three_hop_sample_policy="ROTATION_DEDUP_TOKEN_PATH_ROUND_ROBIN",
+        three_hop_distinct_start_mints=len({r["start_mint"] for r in result}),
+        three_hop_sample_policy="START_MINT_ROUND_ROBIN_ROTATION_DEDUP",
         cycle_coverage_by_hops={"3":{"returned":len(result),
-            "budget":maximum,"truncated":len(seen)>len(result)}})
+            "budget":maximum,"truncated":len(unique_identities)>len(result)}})
     return graph
 
 def source_capture(rpc, graph, directory, *, shard_index=0, shard_count=1):
