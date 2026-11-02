@@ -14,7 +14,7 @@ def ranked_tokens(limit=100,api_key=None):
     if not 1<=limit<=100:raise ValueError("rank limit must be 1..100")
     seen={}
     # Organic ranking includes majors; traded ranking supplements coverage.
-    for category in ("toporganicscore","toptraded"):
+    for category in ("toptraded","toporganicscore"):
         req=urllib.request.Request(f"{API}/{category}/24h?limit=100",
             headers={"Accept":"application/json",**({"x-api-key":api_key} if api_key else {})})
         with urllib.request.urlopen(req,timeout=35) as response:
@@ -26,7 +26,7 @@ def ranked_tokens(limit=100,api_key=None):
             mint=item.get("id")
             if (not isinstance(mint,str) or not 32<=len(mint)<=44
                     or item.get("isVerified") is not True
-                    or item.get("audit",{}).get("isSus") is True):
+                    or (item.get("audit") or {}).get("isSus") is True):
                 continue
             seen.setdefault(mint,{"mint":mint,"symbol":item.get("symbol"),
                 "name":item.get("name"),"source_category":category,
@@ -35,11 +35,10 @@ def ranked_tokens(limit=100,api_key=None):
         if len(seen)>=limit:break
         time.sleep(2)
     # Always include known primary hubs as tracked, even if ranking omits them.
-    for label in HUBS:
-        mint=MINTS[label]
-        seen.setdefault(mint,{"mint":mint,"symbol":label,
-            "source_category":"CORE_HUB"})
-    return list(seen.values())[:limit]
+    hubs=[{"mint":MINTS[label],"symbol":label,"source_category":"CORE_HUB"}
+          for label in HUBS]
+    hub_mints={x["mint"] for x in hubs}
+    return (hubs+[row for mint,row in seen.items() if mint not in hub_mints])[:limit]
 
 def campaign(rpc,registry,ranked,*,start=0,count=8,pace=0.5):
     if not 0<=start<len(ranked) or not 1<=count<=100:
