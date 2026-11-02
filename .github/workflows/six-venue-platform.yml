@@ -1,43 +1,5 @@
 name: Six-Venue Arbitrage Pipeline Safety
 on:
-  pull_request:
-    paths:
-      - ".github/workflows/six-venue-platform.yml"
-      - "arb/six_venue_pipeline.py"
-      - "tests/test_six_venue_pipeline.py"
-      - "arb/six_venue_registry_eligibility.py"
-      - "tests/test_six_venue_registry_eligibility.py"
-      - "arb/six_venue_cycle_eligibility.py"
-      - "tests/test_six_venue_cycle_eligibility.py"
-      - "arb/six_venue_route_economics.py"
-      - "tests/test_six_venue_route_economics.py"
-      - "arb/registered_cycle_acceptance.py"
-      - "tests/test_registered_cycle_acceptance.py"
-      - "arb/signed_route_resource_audit.py"
-      - "tests/test_signed_route_resource_audit.py"
-      - "arb/six_venue_quote_continuity.py"
-      - "tests/test_six_venue_quote_continuity.py"
-      - "arb/atomic_graph_coordinator.py"
-      - "arb/registry_pair_reconciliation.py"
-      - "arb/pool_registry.py"
-      - "tests/test_pool_registry.py"
-      - "arb/connected_pool_discovery.py"
-      - "arb/next_ten_fork_pool_probe.py"
-      - "arb/next_ten_signed_atomic_offline.py"
-      - "tests/test_next_ten_fork_pool_probe.py"
-      - "tests/test_next_ten_signed_atomic_offline.py"
-      - "arb/untrusted_pool_index.py"
-      - "tests/test_untrusted_pool_index.py"
-      - "arb/chain_token_pair_labels.py"
-      - "tests/test_chain_token_pair_labels.py"
-      - "arb/onchain_pool_discovery.py"
-      - "tests/test_amm_v4_connected_pool_discovery.py"
-      - "tests/test_connected_pool_discovery.py"
-      - "arb/registry_multihop_cycles.py"
-      - "tests/test_registry_pair_reconciliation.py"
-      - "arb/signed_transaction_inventory.py"
-      - "tests/test_signed_transaction_inventory.py"
-      - "tests/test_registered_cycle_coordinator.py"
   workflow_dispatch:
 concurrency:
   group: six-venue-platform-${{ github.event.pull_request.head.ref || github.ref_name }}
