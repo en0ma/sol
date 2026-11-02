@@ -1,9 +1,5 @@
 name: Sixth Venue Raydium CLMM Source Authentication
 on:
-  pull_request:
-    paths:
-      - "arb/raydium_clmm_sixth_venue_source.py"
-      - ".github/workflows/raydium-clmm-sixth-source.yml"
   workflow_dispatch:
 permissions:
   contents: read
