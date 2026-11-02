@@ -1,6 +1,5 @@
 name: Non-v4 Adaptive Signed Research
 on:
-  pull_request:
   workflow_dispatch:
 concurrency:
   group: adaptive-non-v4-${{ github.event.pull_request.head.ref || github.ref_name }}
