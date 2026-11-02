@@ -47,7 +47,7 @@ jobs:
           else:
               raise SystemExit("source fork unavailable")
           PY
-      - name: Discover and capture 40 diverse authenticated three-hop cycles
+      - name: Discover and capture up to 100 start-token-diverse authenticated three-hop cycles
         run: |
           python3 - <<'PY'
           import json,os
@@ -58,7 +58,7 @@ jobs:
           registry=json.loads(Path("arb/pool_registry.json").read_text())
           graph=diversified_three_hop_graph(probe("http://127.0.0.1:8899",registry,
                         batch=tuple((a,b) for a in ORDER for b in ORDER if a!=b)),
-                        maximum=40)
+                        maximum=100)
           root=Path(os.environ["RUNNER_TEMP"])/"triangles"
           root.mkdir(parents=True,exist_ok=True)
           (root/"graph.json").write_text(json.dumps(graph,indent=2)+"\n")
@@ -85,9 +85,9 @@ jobs:
     timeout-minutes: 55
     strategy:
       fail-fast: false
-      max-parallel: 8
+      max-parallel: 10
       matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
     env:
       SURFPOOL_EXPLICITLY_OFFLINE: "1"
       SURFPOOL_DATASOURCE_RPC_URL: ""
@@ -118,16 +118,16 @@ jobs:
                   time.sleep(1)
           else:raise SystemExit("offline fork unavailable")
           PY
-      - name: Sign and simulate assigned five routes
+      - name: Sign and simulate up to ten assigned routes
         run: |
-          python3 -m arb.m5_three_hop_atomic_inventory --phase offline --directory "$RUNNER_TEMP/source-artifact/triangles" --amount 100000 --shard-index ${{ matrix.shard }} --shard-count 8
+          python3 -m arb.m5_three_hop_atomic_inventory --phase offline --directory "$RUNNER_TEMP/source-artifact/triangles" --amount 100000 --shard-index ${{ matrix.shard }} --shard-count 10
           python3 - <<'PY'
           import json,os
           from pathlib import Path
           r=json.loads((Path(os.environ["RUNNER_TEMP"])/"source-artifact/triangles/three-hop-inventory.json").read_text())
-          assert len(r["routes"])==5, "expected exactly five route receipts in shard"
+          assert len(r["routes"])<=10, "shard must contain at most ten routes"
           with open(os.environ["GITHUB_STEP_SUMMARY"],"a") as f:
-              f.write(f"Shard {r['shard_index']}: {r.get('build_confirmed',0)}/5 signed builds; {r.get('simulations_verified',0)}/5 verified simulations.\n")
+              f.write(f"Shard {r['shard_index']}: {r.get('build_confirmed',0)}/{len(r['routes'])} signed builds; {r.get('simulations_verified',0)}/{len(r['routes'])} verified simulations.\n")
           PY
       - uses: actions/upload-artifact@v4
         if: always()
