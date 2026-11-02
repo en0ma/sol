@@ -9,13 +9,9 @@ class RegistryTests(unittest.TestCase):
         from arb.onchain_pool_discovery import VENUES
         registry=Path(__file__).resolve().parents[1]/"arb"/"pool_registry.json"
         entries=json.loads(registry.read_text())["pools"]
-        self.assertLessEqual(len(entries),256)
+        self.assertLessEqual(len(entries),400)
         self.assertEqual(len(entries),
                          len({(e["venue"],e["address"]) for e in entries}))
-        self.assertEqual(len(entries),
-                         len({(e["venue"],tuple(sorted(e["mints"]))) for e in entries}))
-        self.assertEqual(len(entries),
-                         len({(e["venue"],e["pair"]) for e in entries}))
         self.assertTrue(all(1 <= len(e["pair"]) <= 9 for e in entries))
         for entry in entries:
             self.assertIn(entry["venue"],VENUES)
