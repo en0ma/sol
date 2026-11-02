@@ -2,16 +2,16 @@ name: Top 100 Token Authenticated Pool Coverage
 on:
   workflow_dispatch:
     inputs:
-      start:
-        description: "Rank offset (0, 8, 16, ... 96)"
+      target:
+        description: "Desired newly authenticated distinct pools (1-200)"
         type: number
         required: true
-        default: 0
-      count:
-        description: "Number of top-token targets (max 8 per execution)"
+        default: 150
+      max_pages:
+        description: "Maximum indexed top-pool pages to scan"
         type: number
         required: true
-        default: 8
+        default: 10
 permissions:
   contents: read
 concurrency:
@@ -32,7 +32,7 @@ jobs:
       - name: Install Surfpool and Solana client
         run: |
           test -n "$SURFPOOL_DATASOURCE_RPC_URL"
-          python3 -m py_compile arb/top100_pool_coverage.py
+          python3 -m py_compile arb/paginated_top_pool_discovery.py
           bash ci/install_surfpool.sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           python3 -m pip install solders==0.26.0
@@ -49,10 +49,9 @@ jobs:
               except Exception:time.sleep(1)
           else:raise SystemExit("source RPC unavailable")
           PY
-      - name: Discover and authenticate selected high-activity token pools
+      - name: Paginate top Solana pools until authenticated target or exhaustion
         run: |
-          test "${{ inputs.count || 8 }}" -le 8
-          python3 -m arb.top100_pool_coverage --start "${{ inputs.start || 0 }}" --count "${{ inputs.count || 8 }}" --output "$RUNNER_TEMP/top100-coverage.json"
+          python3 -m arb.paginated_top_pool_discovery --target "${{ inputs.target || 150 }}" --max-pages "${{ inputs.max_pages || 10 }}" --output "$RUNNER_TEMP/top100-coverage.json"
       - name: Stop source fork
         if: always()
         run: |
@@ -61,7 +60,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: top100-token-pool-coverage-${{ inputs.start || 0 }}
+          name: top100-token-pool-coverage-${{ github.run_id }}
           path: |
             ${{ runner.temp }}/top100-coverage.json
             ${{ runner.temp }}/top100-source.log
