@@ -633,6 +633,41 @@ def run_four_to_six_venue(rpc,fixture,*,amount_in=100_000,program_cache=None,
     before=_post(rpc,keys,mints,owner)
     if before!=[amount_in]+[0]*len(venues):
         raise ValueError("four-to-six-hop source user token initialization inconsistent")
+    # Reuse the authenticated two-leg PumpSwap runtime-account preparation.
+    # Pool source evidence is stable; signer/temporary SPL account PDAs are not.
+    for i,(venue,pool) in enumerate(zip(venues,pools)):
+        if venue!="pumpswap":
+            continue
+        from arb.pumpswap_account_resolver import resolve as resolve_pump
+        from arb.pumpswap_pool import verify as verify_pump
+        from arb.pumpswap_account_metas import account_metas
+        proof=evidence[(venue,pool)]
+        actual=verify_pump(rpc,pool,states[(venue,pool)])
+        source_verified=proof.get("verified_pool")
+        if (not isinstance(source_verified,dict)
+                or source_verified.get("address")!=pool
+                or source_verified.get("base_mint")!=actual.get("base_mint")
+                or source_verified.get("quote_mint")!=actual.get("quote_mint")
+                or source_verified.get("global_config")!=actual.get("global_config")
+                or source_verified.get("fee_config")!=actual.get("fee_config")):
+            raise ValueError("hydrated PumpSwap authentication diverged from source")
+        base=states[(venue,pool)]["base_mint"]
+        quote=states[(venue,pool)]["quote_mint"]
+        user_base=keys[i] if mints[i]==base else keys[i+1]
+        user_quote=keys[i] if mints[i]==quote else keys[i+1]
+        recipient=proof.get("protocol_fee_recipient")
+        addresses=resolve_pump(actual,owner,user_base,user_quote,recipient)
+        direction="sell" if mints[i]==base else "buy_exact_quote_in"
+        required=account_metas(direction,addresses)["metas"]
+        proof.update(authenticate_pumpswap_runtime_metas(
+            rpc,required,fixture["accounts"]))
+        buyback=proof.get("buyback_fee_recipient")
+        if not isinstance(buyback,str) or buyback not in fixture["accounts"]:
+            raise ValueError("PumpSwap V2 authenticated buyback ATA missing")
+        addresses["buyback_fee_recipient"]=buyback
+        addresses["buyback_fee_recipient_authenticated"]=True
+        proof["account_addresses"]=addresses
+        proof["account_addresses_authenticated"]=True
     def negative(instructions,amounts):
         last=len(venues)-1
         bad=build_leg(venues[last],pools[last],states[(venues[last],pools[last])],
