@@ -1,19 +1,7 @@
 name: Fifth Venue Meteora DLMM Source Authentication
 
 on:
-  pull_request:
-    paths:
-      - "arb/meteora_dlmm_fifth_venue_source.py"
-      - "tools/meteora_dlmm_sdk_source_oracle.js"
-      - ".github/workflows/meteora-dlmm-fifth-source.yml"
-      - "tests/test_meteora_dlmm_fifth_venue_source.py"
   workflow_dispatch:
-    inputs:
-      pool_count:
-        description: "Distinct registered DLMM pools to authenticate (1-6)"
-        required: false
-        default: "3"
-
 concurrency:
   group: dlmm-fifth-source-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
