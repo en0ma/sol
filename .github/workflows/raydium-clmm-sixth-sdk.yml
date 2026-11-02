@@ -1,11 +1,5 @@
 name: Sixth Venue Raydium CLMM Genuine Signed Acceptance
 on:
-  pull_request:
-    paths:
-      - "tools/raydium_clmm_official_sdk_oracle.js"
-      - "arb/raydium_clmm_native_single_tick.py"
-      - "arb/raydium_clmm_tick_source.py"
-      - ".github/workflows/raydium-clmm-sixth-sdk.yml"
   workflow_dispatch:
 permissions:
   contents: read
