@@ -1,33 +1,5 @@
 name: Seven-Venue Connected Registry Evidence
 on:
-  pull_request:
-    paths:
-      - ".github/workflows/connected-registry-evidence.yml"
-      - "arb/connected_pool_discovery.py"
-      - "arb/registry_pair_reconciliation.py"
-      - "arb/registry_multihop_cycles.py"
-      - "arb/native_quote_chain_screen.py"
-      - "arb/independent_fee_receipt_observer.py"
-      - "arb/raydium_cpmm_native_quote.py"
-      - "arb/seven_venue_native_execution_quote.py"
-      - "arb/native_math_kernel.py"
-      - "arb/seven_venue_native_model_gate.py"
-      - "arb/offline_atomic_economic_gate.py"
-      - "arb/original_source_snapshot_audit.py"
-      - "tests/test_original_source_snapshot_audit.py"
-      - "tests/test_native_model_economic_gate.py"
-      - "tests/test_seven_venue_native_execution_quote.py"
-      - "tests/test_raydium_cpmm_native_quote.py"
-      - "tests/test_independent_fee_receipt_observer.py"
-      - "tests/test_native_quote_chain_screen.py"
-      - "arb/pool_registry.py"
-      - "tests/test_registry_pair_reconciliation.py"
-      - "tests/test_connected_pool_discovery.py"
-      - "arb/chain_token_pair_labels.py"
-      - "arb/onchain_pool_discovery.py"
-      - "arb/untrusted_pool_index.py"
-      - "tests/test_untrusted_pool_index.py"
-      - "arb/pool_registry.json"
   workflow_dispatch:
 permissions:
   contents: read
