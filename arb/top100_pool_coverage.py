@@ -5,7 +5,7 @@ exclusively from existing Solana RPC discovery and per-venue verifiers.
 """
 import argparse,json,os,time,urllib.request
 from pathlib import Path
-from arb.onchain_pool_discovery import discover,MINTS,VENUES
+from arb.onchain_pool_discovery import MINTS,VENUES
 from arb.pool_registry import refresh
 
 API="https://api.jup.ag/tokens/v2"
@@ -40,31 +40,92 @@ def ranked_tokens(limit=100,api_key=None):
     hub_mints={x["mint"] for x in hubs}
     return (hubs+[row for mint,row in seen.items() if mint not in hub_mints])[:limit]
 
+def indexed_candidates(mint, hubs, *, min_liquidity_usd=10000):
+    """DEX Screener proposes addresses only; on-chain verification is mandatory."""
+    from urllib.parse import quote
+    url="https://api.dexscreener.com/token-pairs/v1/solana/"+quote(mint,safe="")
+    request=urllib.request.Request(url,headers={"Accept":"application/json","User-Agent":"sol-pool-coverage/1"})
+    with urllib.request.urlopen(request,timeout=35) as response:
+        rows=json.load(response)
+    if not isinstance(rows,list):
+        raise ValueError("invalid indexed pair response")
+    found={}
+    for row in rows:
+        if not isinstance(row,dict) or row.get("chainId")!="solana":
+            continue
+        base=(row.get("baseToken") or {}).get("address")
+        quote_mint=(row.get("quoteToken") or {}).get("address")
+        if mint not in (base,quote_mint) or not {base,quote_mint}.intersection(hubs):
+            continue
+        liquidity=(row.get("liquidity") or {}).get("usd")
+        if not isinstance(liquidity,(int,float)) or liquidity<min_liquidity_usd:
+            continue
+        address=row.get("pairAddress")
+        if not isinstance(address,str) or not 32<=len(address)<=44:
+            continue
+        found[address]={"address":address,"indexed_mints":[base,quote_mint],
+            "indexed_dex":row.get("dexId"),"indexed_liquidity_usd":liquidity}
+    return sorted(found.values(),key=lambda x:-x["indexed_liquidity_usd"])
+
 def campaign(rpc,registry,ranked,*,start=0,count=8,pace=0.5):
     if not 0<=start<len(ranked) or not 1<=count<=100:
         raise ValueError("invalid target slice")
+    from arb.pool_registry import refresh
+    from arb.rpc import call
     existing={(x["venue"],x["address"]):x for x in registry}
     known_mints={m for row in registry for m in row.get("mints",[])}
     targets=ranked[start:start+count]
     pools=[];errors=[];target_records=[]
+    programs={program:venue for venue,(program,*_) in VENUES.items()}
+    exhausted=False
     for token in targets:
         mint=token["mint"]
-        pairs=[(mint,MINTS[h]) for h in HUBS if mint!=MINTS[h]]
-        discovered=discover(rpc,pairs,limit=32,pace_seconds=pace)
-        for row in discovered["pools"]:
-            identity=(row["venue"],row["address"])
-            if identity not in existing:
-                existing[identity]={"venue":row["venue"],"address":row["address"],
-                                    "mints":row["mints"]}
-                pools.append({**row,"target_mint":mint})
-        errors.extend({"target_mint":mint,**e} for e in discovered["errors"])
+        if exhausted:break
+        try:
+            indexed=indexed_candidates(mint,set(MINTS[h] for h in HUBS))
+        except Exception as exc:
+            errors.append({"target_mint":mint,"stage":"INDEX_LOOKUP",
+                           "error":type(exc).__name__+": "+str(exc)[:200]})
+            target_records.append({**token,"discovery_status":"INDEX_FAILED"})
+            continue
+        new_count=0;verified_count=0
+        # Index data is never trusted for pool type, mint identity, or balances.
+        for candidate in indexed[:32]:
+            address=candidate["address"]
+            if any(key[1]==address for key in existing):continue
+            try:
+                response=call(rpc,"getAccountInfo",[address,{"encoding":"base64","commitment":"confirmed"}])
+                info=response.get("value")
+                venue=programs.get(info.get("owner")) if isinstance(info,dict) else None
+                if not venue:continue
+                verification=refresh(rpc,[{"venue":venue,"address":address,
+                                            "mints":candidate["indexed_mints"]}])
+                if not verification["verified_pools"]:
+                    raise ValueError(verification["rejected"][0]["reason"])
+                row=verification["verified_pools"][0]
+                if mint not in row["mints"] or not set(row["mints"]).intersection(
+                        MINTS[h] for h in HUBS):
+                    raise ValueError("verified token/hub mismatch")
+                identity=(venue,address)
+                existing[identity]={"venue":venue,"address":address,"mints":row["mints"]}
+                pools.append({**row,"target_mint":mint,
+                    "index_source":"DEXSCREENER_CANDIDATE_ONLY"})
+                new_count+=1;verified_count+=1
+            except Exception as exc:
+                message=type(exc).__name__+": "+str(exc)[:200]
+                errors.append({"target_mint":mint,"address":address,
+                               "stage":"ONCHAIN_AUTHENTICATION","error":message})
+                if "429" in message or "too many requests" in message.lower():
+                    exhausted=True
+                    break
+            if pace:time.sleep(pace)
         target_records.append({**token,"already_in_registry":mint in known_mints,
-           "new_verified_pool_count":sum(p["target_mint"]==mint for p in pools),
-           "discovery_status":discovered["status"]})
-        if discovered["status"]=="UPSTREAM_RATE_LIMITED":break
+            "indexed_candidate_count":len(indexed),"new_verified_pool_count":new_count,
+            "discovery_status":"RATE_LIMITED" if exhausted else "COMPLETE"})
     all_candidates=list(existing.values())
     return {"status":"PARTIAL" if errors or len(target_records)<len(targets) else "COMPLETE",
         "ranking_source":"JUPITER_TOKEN_API_METADATA_ONLY",
+        "candidate_index":"DEXSCREENER_NOT_TRUSTED_FOR_AUTHENTICATION",
         "pool_authentication_source":"DIRECT_SOLANA_RPC",
         "targets":target_records,"new_verified_pools":pools,"errors":errors,
         "candidate_registry":{"pools":all_candidates},
