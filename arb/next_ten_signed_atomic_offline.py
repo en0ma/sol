@@ -132,8 +132,8 @@ def clmm_direction_evidence(state,mint_in,directional,source_accounts):
     else:
         raise ValueError("CLMM signed input mint mismatches pool")
     arrays=directional.get(key) if isinstance(directional,dict) else None
-    if not isinstance(arrays,list) or len(arrays)!=3 or len(set(arrays))!=3:
-        raise ValueError("CLMM directional authenticated tick array triplet missing")
+    if not isinstance(arrays,list) or not 1<=len(arrays)<=5 or len(set(arrays))!=len(arrays):
+        raise ValueError("CLMM directional authenticated contiguous tick arrays missing")
     if not isinstance(source_accounts,dict) or any(x not in source_accounts for x in arrays):
         raise ValueError("CLMM directional arrays absent from authenticated source fixture")
     return {"tick_arrays":arrays,"tick_arrays_authenticated":True}
