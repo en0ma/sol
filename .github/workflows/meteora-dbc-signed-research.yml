@@ -1,29 +1,6 @@
 name: Meteora DBC Original Signed Offline Research
 on:
-  pull_request:
-    paths:
-      - ".github/workflows/meteora-dbc-signed-research.yml"
-      - "arb/meteora_dbc_signed_fork_research.py"
-      - "arb/meteora_dbc_swap.py"
-      - "tests/test_meteora_dbc_swap.py"
-      - "tests/test_meteora_dbc_signed_fork_research.py"
-      - "arb/meteora_dbc_signed_audit.py"
-      - "tests/test_meteora_dbc_signed_audit.py"
-      - "arb/meteora_dbc_signed_registry_merge.py"
-      - "tests/test_meteora_dbc_signed_registry_merge.py"
-      - "arb/meteora_dbc_native_fee.py"
-      - "arb/meteora_dbc_native_fee_parity.py"
-      - "tests/test_meteora_dbc_native_fee.py"
   workflow_dispatch:
-    inputs:
-      pool_count:
-        description: "Independently sourced original SPL DBC pools: 1 or 6"
-        required: false
-        type: choice
-        options:
-          - "1"
-          - "6"
-        default: "1"
 concurrency:
   group: dbc-signed-offline-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
