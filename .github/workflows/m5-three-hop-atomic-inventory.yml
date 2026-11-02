@@ -13,15 +13,10 @@ concurrency:
   group: m5-three-hop-inventory-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 jobs:
-  source-to-offline:
+  source-preparation:
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 55
-    strategy:
-      fail-fast: false
-      max-parallel: 1
-      matrix:
-        shard: [0, 1, 2, 3]
     env:
       SURFPOOL_DATASOURCE_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
       SOLANA_RPC_MIN_INTERVAL_SECONDS: "0.5"
@@ -69,23 +64,47 @@ jobs:
           print(json.dumps({"three_hop_discovered":sum(r["hops"]==3 for r in graph["routes"]),
                             "three_hop_truncated":graph["cycle_coverage_by_hops"]["3"]["truncated"]}))
           PY
-          python3 -m arb.m5_three_hop_atomic_inventory --phase source --graph "$RUNNER_TEMP/triangles/graph.json" --directory "$RUNNER_TEMP/triangles" --shard-index ${{ matrix.shard }} --shard-count 4
-      - name: Terminate source fork before offline account mutation
+          python3 -m arb.m5_three_hop_atomic_inventory --phase source --graph "$RUNNER_TEMP/triangles/graph.json" --directory "$RUNNER_TEMP/triangles"
+      - name: Shut down read-only source fork
         if: always()
         run: |
           if test -f "$RUNNER_TEMP/triangle-source.pid"; then kill "$(cat "$RUNNER_TEMP/triangle-source.pid")" || true; fi
-          python3 - <<'PY'
-          import socket,time
-          for _ in range(60):
-              s=socket.socket();s.settimeout(.2)
-              dead=s.connect_ex(("127.0.0.1",8899))!=0
-              s.close()
-              if dead:break
-              time.sleep(1)
-          else:raise SystemExit("source fork still available; signing prohibited")
-          PY
-      - name: Start disconnected Surfpool
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: m5-three-hop-source-fixtures
+          path: |
+            ${{ runner.temp }}/triangles/
+            ${{ runner.temp }}/triangle-source.log
+          if-no-files-found: error
+
+  offline-simulation:
+    needs: source-preparation
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        shard: [0, 1, 2, 3]
+    env:
+      SURFPOOL_EXPLICITLY_OFFLINE: "1"
+      SURFPOOL_DATASOURCE_RPC_URL: ""
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install offline Surfpool and signer dependencies
         run: |
+          bash ci/install_surfpool.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          python3 -m pip install --disable-pip-version-check solders==0.26.0
+          python3 -m py_compile arb/m5_three_hop_atomic_inventory.py arb/next_ten_signed_atomic_offline.py arb/venue_swap_adapter.py
+      - uses: actions/download-artifact@v4
+        with:
+          name: m5-three-hop-source-fixtures
+          path: ${{ runner.temp }}/source-artifact
+      - name: Start isolated offline Surfpool
+        run: |
+          test -z "$SURFPOOL_DATASOURCE_RPC_URL"
           nohup "$HOME/.local/bin/surfpool" start --ci --offline --no-deploy > "$RUNNER_TEMP/triangle-offline.log" 2>&1 < /dev/null &
           python3 - <<'PY'
           import time
@@ -98,25 +117,22 @@ jobs:
                   time.sleep(1)
           else:raise SystemExit("offline fork unavailable")
           PY
-      - name: Build, sign and simulate each authenticated three-hop route
-        env:
-          SURFPOOL_EXPLICITLY_OFFLINE: "1"
-          SURFPOOL_DATASOURCE_RPC_URL: ""
+      - name: Sign and simulate assigned five routes
         run: |
-          python3 -m arb.m5_three_hop_atomic_inventory --phase offline --directory "$RUNNER_TEMP/triangles" --amount 100000
+          python3 -m arb.m5_three_hop_atomic_inventory --phase offline --directory "$RUNNER_TEMP/source-artifact/triangles" --amount 100000 --shard-index ${{ matrix.shard }} --shard-count 4
           python3 - <<'PY'
           import json,os
           from pathlib import Path
-          r=json.loads((Path(os.environ["RUNNER_TEMP"])/"triangles/three-hop-inventory.json").read_text())
+          r=json.loads((Path(os.environ["RUNNER_TEMP"])/"source-artifact/triangles/three-hop-inventory.json").read_text())
+          assert len(r["routes"])==5, "expected exactly five route receipts in shard"
           with open(os.environ["GITHUB_STEP_SUMMARY"],"a") as f:
-              f.write(f"Three-hop cycles: {r['cycle_count']}; actual signed builds: {r.get('build_confirmed',0)}; signed simulations + rollback: {r.get('simulations_verified',0)}. Every route recorded in artifact.\n")
+              f.write(f"Shard {r['shard_index']}: {r.get('build_confirmed',0)}/5 signed builds; {r.get('simulations_verified',0)}/5 verified simulations.\n")
           PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: m5-three-hop-atomic-inventory-shard-${{ matrix.shard }}
+          name: m5-three-hop-offline-shard-${{ matrix.shard }}
           path: |
-            ${{ runner.temp }}/triangles/
-            ${{ runner.temp }}/triangle-source.log
+            ${{ runner.temp }}/source-artifact/triangles/
             ${{ runner.temp }}/triangle-offline.log
           if-no-files-found: warn
