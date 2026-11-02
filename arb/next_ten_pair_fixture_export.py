@@ -88,10 +88,18 @@ def venue_accounts(rpc, venue, pool, mints):
         directions={}
         for zero_for_one in (True,False):
             result=inspect(rpc,pool,zero_for_one=zero_for_one)
-            if result["all_arrays_valid"]:
-                directions["0_to_1" if zero_for_one else "1_to_0"]=[
-                    item["address"] for item in result["tick_arrays"]]
-                extras.extend(directions["0_to_1" if zero_for_one else "1_to_0"])
+            # Raydium accepts one to five authenticated tick arrays. Do not
+            # require three when the source pool only has a shorter contiguous
+            # initialized prefix. The signed fork still proves swap execution.
+            contiguous=[]
+            for item in result["tick_arrays"]:
+                if not item["validated"]:
+                    break
+                contiguous.append(item["address"])
+            if contiguous:
+                direction="0_to_1" if zero_for_one else "1_to_0"
+                directions[direction]=contiguous
+                extras.extend(contiguous)
         if not directions:
             raise ValueError("no authenticated CLMM tick array direction")
         evidence={"tick_arrays_by_direction":directions}
