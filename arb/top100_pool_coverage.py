@@ -74,7 +74,7 @@ def campaign(rpc,registry,ranked,*,start=0,count=8,pace=0.5):
     from arb.rpc import call
     existing={(x["venue"],x["address"]):x for x in registry}
     known_mints={m for row in registry for m in row.get("mints",[])}
-    # Spend discovery budget on top-ranked tokens absent from the existing graph.\n    missing=[token for token in ranked if token["mint"] not in known_mints]\n    targets=missing[start:start+count]\n    if not targets:\n        raise ValueError("no missing ranked tokens in the requested slice")
+    # Spend discovery budget on top-ranked tokens absent from the existing graph.\n    missing=[token for token in ranked if token["mint"] not in known_mints]\n    # First expand mint coverage, then add distinct pool addresses for already\n    # covered liquid tokens until the registry reaches its 400-pool target.\n    covered=[token for token in ranked if token["mint"] in known_mints]\n    targets=(missing+covered)[start:start+count]\n    if not targets:\n        raise ValueError("no missing ranked tokens in the requested slice")
     pools=[];errors=[];target_records=[]
     programs={program:venue for venue,(program,*_) in VENUES.items()}
     exhausted=False
@@ -88,9 +88,9 @@ def campaign(rpc,registry,ranked,*,start=0,count=8,pace=0.5):
                            "error":type(exc).__name__+": "+str(exc)[:200]})
             target_records.append({**token,"discovery_status":"INDEX_FAILED"})
             continue
-        new_count=0;verified_count=0\n        # Prefer missing token/hub pairs; never spend verification budget on a\n        # pair already represented in the persistent registry.\n        indexed=[c for c in indexed if frozenset(c["indexed_mints"]) not in known_pairs]\n        indexed.sort(key=lambda c:-c["indexed_liquidity_usd"])
+        new_count=0;verified_count=0\n        # Genuine pool-address diversity is allowed even for existing pairs.\n        # Existing pool addresses are never re-admitted.\n        indexed.sort(key=lambda c:-c["indexed_liquidity_usd"])
         # Index data is never trusted for pool type, mint identity, or balances.
-        for candidate in indexed[:12]:\n            if new_count>=3:\n                break
+        for candidate in indexed[:12]:\n            if new_count>=3 or len(existing)>=400:\n                break
             address=candidate["address"]
             if any(key[1]==address for key in existing):continue
             try:
@@ -127,7 +127,7 @@ def campaign(rpc,registry,ranked,*,start=0,count=8,pace=0.5):
         "ranking_source":"JUPITER_TOKEN_API_METADATA_ONLY",
         "candidate_index":"DEXSCREENER_NOT_TRUSTED_FOR_AUTHENTICATION",
         "pool_authentication_source":"DIRECT_SOLANA_RPC",
-        "selection_policy":"MISSING_TOP_RANKED_MINTS_FIRST_MISSING_PAIRS_MAX_3_POOLS_PER_TOKEN",\n        "already_covered_ranked_tokens_skipped":sum(t["mint"] in known_mints for t in ranked),\n        "missing_ranked_tokens_remaining":len(missing)-len(target_records),\n        "targets":target_records,"new_verified_pools":pools,"errors":errors,
+        "selection_policy":"MISSING_RANKED_MINTS_FIRST_THEN_DISTINCT_POOL_ADDRESSES_MAX_400",\n        "already_covered_ranked_tokens_skipped":sum(t["mint"] in known_mints for t in ranked),\n        "missing_ranked_tokens_remaining":sum(t["mint"] not in {r["mint"] for r in target_records} for t in missing),\n        "targets":target_records,"new_verified_pools":pools,"errors":errors,
         "candidate_registry":{"pools":all_candidates},
         "mutated_repository_registry":False,"broadcast":False,
         "pool_registry_target_token_count":len({m for p in all_candidates for m in p.get("mints",[])})}
