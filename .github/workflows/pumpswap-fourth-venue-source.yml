@@ -1,18 +1,7 @@
 name: PumpSwap Fourth-Venue Signed Parity Research
 
 on:
-  pull_request:
-    paths:
-      - "arb/pumpswap_*.py"
-      - "tools/pumpswap_sdk_oracle.js"
-      - ".github/workflows/pumpswap-fourth-venue-source.yml"
   workflow_dispatch:
-    inputs:
-      pool_count:
-        description: "Distinct PumpSwap pools to fully authenticate, quote, sign and audit (1–7)"
-        required: false
-        default: "7"
-
 concurrency:
   group: pumpswap-real-signed-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
