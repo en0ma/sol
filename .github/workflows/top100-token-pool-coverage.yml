@@ -1,5 +1,9 @@
 name: Top 100 Token Authenticated Pool Coverage
 on:
+  push:
+    branches: [feat/surfpool-ci-validation]
+    paths:
+      - ".github/workflows/top100-token-pool-coverage.yml"
   workflow_dispatch:
     inputs:
       target:
@@ -51,7 +55,7 @@ jobs:
           PY
       - name: Paginate top Solana pools until authenticated target or exhaustion
         run: |
-          python3 -m arb.paginated_top_pool_discovery --target "${{ inputs.target || 150 }}" --max-pages "${{ inputs.max_pages || 10 }}" --output "$RUNNER_TEMP/top100-coverage.json"
+          python3 -m arb.paginated_top_pool_discovery --target "${{ inputs.target || 164 }}" --max-pages "${{ inputs.max_pages || 50 }}" --output "$RUNNER_TEMP/top100-coverage.json"
       - name: Stop source fork
         if: always()
         run: |
