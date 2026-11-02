@@ -1,14 +1,6 @@
 name: Raydium CLMM Six Additional Genuine Signed Pools
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - "arb/raydium_clmm_six_signed_source.py"
-      - "arb/raydium_clmm_bitmap_extension_source.py"
-      - "arb/raydium_clmm_sixth_signed_fork.py"
-      - "arb/raydium_clmm_sixth_signed_audit.py"
-      - "tests/test_raydium_clmm_bitmap_extension_source.py"
-      - ".github/workflows/raydium-clmm-six-signed.yml"
 permissions:
   contents: read
 concurrency:
