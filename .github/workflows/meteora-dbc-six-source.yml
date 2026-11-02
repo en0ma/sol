@@ -1,24 +1,5 @@
 name: Meteora DBC Six-Pool Source Acceptance Research
 on:
-  pull_request:
-    paths:
-      - ".github/workflows/meteora-dbc-six-source.yml"
-      - "arb/meteora_dbc_six_source_qualification.py"
-      - "arb/meteora_dbc_seventh_recent_tx_discovery.py"
-      - "arb/meteora_dbc_seventh_candidate_capture.py"
-      - "tests/test_meteora_dbc_six_source_qualification.py"
-      - "arb/meteora_dbc_native_segment.py"
-      - "tests/test_meteora_dbc_native_segment.py"
-      - "tests/test_meteora_dbc_real_curve_vectors.py"
-      - "tools/meteora_dbc_official_sdk_oracle.js"
-      - "arb/meteora_dbc_native_curve_audit.py"
-      - "arb/meteora_dbc_native_curve_walk.py"
-      - "tests/test_meteora_dbc_two_point_real_vectors.py"
-      - "arb/meteora_dbc_native_fee.py"
-      - "arb/meteora_dbc_native_fee_parity.py"
-      - "tests/test_meteora_dbc_native_fee.py"
-      - "arb/meteora_dbc_swap.py"
-      - "tests/test_meteora_dbc_swap.py"
   workflow_dispatch:
 concurrency:
   group: dbc-six-source-${{ github.event.pull_request.head.ref || github.ref_name }}
