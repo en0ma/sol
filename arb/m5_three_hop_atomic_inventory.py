@@ -51,7 +51,7 @@ def source_capture(rpc, graph, directory, *, shard_index=0, shard_count=1):
              "routes":rows,**SAFE},indent=2)+"\n")
     return rows
 
-def offline_simulate(rpc,directory,*,amount=100000):
+def offline_simulate(rpc,directory,*,amount=100000,shard_index=0,shard_count=1):
     from arb.pumpswap_local_simulation import local_rpc_only
     from arb.next_ten_signed_atomic_offline import run_four_to_six_venue
     import os
@@ -62,6 +62,14 @@ def offline_simulate(rpc,directory,*,amount=100000):
         raise ValueError("positive u64 exact input required")
     root=Path(directory)
     report=json.loads((root/"three-hop-inventory.json").read_text())
+    if (type(shard_index)is not int or type(shard_count)is not int
+            or shard_count<1 or not 0<=shard_index<shard_count):
+        raise ValueError("invalid offline route shard")
+    report["routes"]=[row for j,row in enumerate(report["routes"])
+                      if j % shard_count == shard_index]
+    report["shard_index"]=shard_index
+    report["shard_count"]=shard_count
+    report["shard_cycle_count"]=len(report["routes"])
     for row in report["routes"]:
         if row["source_status"]!="CAPTURED":
             continue
@@ -112,7 +120,8 @@ def main():
         print(json.dumps({"three_hop_capture_attempts":len(result),
                           "source_captured":sum(r["source_status"]=="CAPTURED" for r in result)}))
     else:
-        r=offline_simulate(args.rpc,args.directory,amount=args.amount)
+        r=offline_simulate(args.rpc,args.directory,amount=args.amount,
+                           shard_index=args.shard_index,shard_count=args.shard_count)
         print(json.dumps({"cycle_count":r["cycle_count"],
                           "signed_builds":r.get("build_confirmed",0),
                           "verified_simulations":r.get("simulations_verified",0)}))
