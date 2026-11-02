@@ -47,17 +47,18 @@ jobs:
           else:
               raise SystemExit("source fork unavailable")
           PY
-      - name: Discover and capture all 20 bounded three-hop cycles
+      - name: Discover and capture 40 diverse authenticated three-hop cycles
         run: |
           python3 - <<'PY'
           import json,os
           from pathlib import Path
           from arb.next_ten_fork_pool_probe import probe
-          from arb.m5_seven_venue_route_scan import ORDER,analyze
+          from arb.m5_seven_venue_route_scan import ORDER
+          from arb.m5_three_hop_atomic_inventory import diversified_three_hop_graph
           registry=json.loads(Path("arb/pool_registry.json").read_text())
-          graph=analyze(probe("http://127.0.0.1:8899",registry,
+          graph=diversified_three_hop_graph(probe("http://127.0.0.1:8899",registry,
                         batch=tuple((a,b) for a in ORDER for b in ORDER if a!=b)),
-                        max_cycles=100)
+                        maximum=40)
           root=Path(os.environ["RUNNER_TEMP"])/"triangles"
           root.mkdir(parents=True,exist_ok=True)
           (root/"graph.json").write_text(json.dumps(graph,indent=2)+"\n")
@@ -84,9 +85,9 @@ jobs:
     timeout-minutes: 55
     strategy:
       fail-fast: false
-      max-parallel: 4
+      max-parallel: 8
       matrix:
-        shard: [0, 1, 2, 3]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
     env:
       SURFPOOL_EXPLICITLY_OFFLINE: "1"
       SURFPOOL_DATASOURCE_RPC_URL: ""
@@ -119,7 +120,7 @@ jobs:
           PY
       - name: Sign and simulate assigned five routes
         run: |
-          python3 -m arb.m5_three_hop_atomic_inventory --phase offline --directory "$RUNNER_TEMP/source-artifact/triangles" --amount 100000 --shard-index ${{ matrix.shard }} --shard-count 4
+          python3 -m arb.m5_three_hop_atomic_inventory --phase offline --directory "$RUNNER_TEMP/source-artifact/triangles" --amount 100000 --shard-index ${{ matrix.shard }} --shard-count 8
           python3 - <<'PY'
           import json,os
           from pathlib import Path
