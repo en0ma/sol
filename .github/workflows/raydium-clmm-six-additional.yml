@@ -1,10 +1,5 @@
 name: Raydium CLMM Six Additional Pool Discovery And Authentication
 on:
-  pull_request:
-    paths:
-      - "arb/raydium_clmm_six_additional_discovery.py"
-      - "arb/raydium_clmm_six_additional_capture.py"
-      - ".github/workflows/raydium-clmm-six-additional.yml"
   workflow_dispatch:
 permissions:
   contents: read
