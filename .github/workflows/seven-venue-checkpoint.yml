@@ -1,12 +1,5 @@
 name: Seven Venue Acceptance Checkpoint
 on:
-  pull_request:
-    paths:
-      - ".github/workflows/seven-venue-checkpoint.yml"
-      - "tests/test_meteora_dbc_seventh_source.py"
-      - "arb/meteora_dbc_seventh_venue_source.py"
-      - "arb/pool_registry.json"
-      - "docs/seven_venue_ci_checkpoint_2026-10-29.md"
   workflow_dispatch:
 permissions:
   contents: read
