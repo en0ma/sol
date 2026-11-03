@@ -71,6 +71,35 @@ class StartMintExpansionTests(unittest.TestCase):
         self.assertGreaterEqual(sample["selected_three_hop_start_mint_count"],40)
         self.assertTrue(all(len(addresses)<=24 for addresses in sample["addresses"].values()))
         self.assertFalse(sample["signed_simulation_verified"])
+    def test_nonhub_neighbor_can_support_new_authenticated_bridge_hint(self):
+        rows=self.rows()+[
+            {"venue":"pumpswap","address":"xy","mints":["x","y"]},
+            {"venue":"orca","address":"y-usdc","mints":["y",USDC]}]
+        self.assertNotIn("x",topology(rows)["three_hop_start_mints"])
+        proposals=bridge_targets(rows,maximum=100)
+        self.assertTrue(any(p["mint"]=="x" and p["missing_hub"]==USDC
+                            and p["connected_hub"]=="y" for p in proposals["targets"]))
+        self.assertTrue(proposals["targets_are_unverified_hints"])
+        self.assertFalse(proposals["actionable"])
+
+    def test_sampler_keeps_alternative_venue_when_first_six_exhaust_quota(self):
+        # An Orca-only slice would fail to cover this triangle with an
+        # Orca venue budget of one, despite a valid PumpSwap alternative.
+        rows=[
+            {"venue":"raydium_cpmm","address":"hub","mints":[SOL,USDC]},
+            {"venue":"orca","address":"unique","mints":["new",USDC]},
+            {"venue":"pumpswap","address":"alternative","mints":["new",SOL]},
+        ]+[
+            {"venue":"orca","address":f"duplicate-{i}","mints":["new",SOL]}
+            for i in range(8)]
+        selected=starting_mint_coverage_pool_subset(
+            rows,maximum_per_venue=1,target_start_mints=3)
+        self.assertEqual(selected["selected_three_hop_start_mint_count"],3)
+        self.assertIn("alternative",selected["addresses"]["pumpswap"])
+        self.assertLessEqual(selected["selected_pool_identity_count"],200)
+        self.assertFalse(selected["source_authenticated"])
+        self.assertFalse(selected["signed_simulation_verified"])
+
     def test_duplicate_pool_and_invalid_budget_rejected(self):
         with self.assertRaisesRegex(ValueError,"duplicate pool"):
             topology(self.rows()+[self.rows()[0]])
