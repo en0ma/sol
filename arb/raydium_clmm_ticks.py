@@ -23,19 +23,53 @@ def tick_array_pda(pool,start):
         [b"tick_array",bytes(Pubkey.from_string(pool)),start.to_bytes(4,"big",signed=True)],
         Pubkey.from_string(PROGRAM))[0])
 
+# PoolState: 904 bytes through reward_infos; then 16 packed u64 bitmap words.
+# Offset derived from Raydium CLMM PoolState repr(C,packed) source layout.
+POOL_BITMAP_OFFSET=904
+POOL_BITMAP_BYTES=128
+
+def initialized_tick_starts(raw, tick, spacing, zero_for_one, *, arrays=3):
+    """Choose first and subsequent initialized tick arrays from source PoolState.
+
+    Only the default 1024-bit bitmap is supported here. Extension-dependent
+    directions fail closed, never substitute merely existing tick-array PDAs.
+    """
+    if (not isinstance(raw,(bytes,bytearray)) or len(raw)!=1544
+            or type(zero_for_one)is not bool or type(arrays)is not int
+            or not 1<=arrays<=5):
+        raise ValueError("authenticated CLMM PoolState bytes required")
+    first=start_tick(tick,spacing)
+    span=60*spacing
+    bitmap=int.from_bytes(raw[POOL_BITMAP_OFFSET:POOL_BITMAP_OFFSET+POOL_BITMAP_BYTES],"little")
+    offset=first//span+512
+    if not 0<=offset<1024:
+        raise ValueError("CLMM tick bitmap extension required")
+    delta=-1 if zero_for_one else 1
+    selected=[]
+    for k in range(offset, -1 if zero_for_one else 1024,delta):
+        if (bitmap>>k)&1:
+            selected.append((k-512)*span)
+            if len(selected)>=arrays:
+                break
+    if not selected:
+        raise ValueError("no initialized CLMM tick array in default bitmap direction")
+    # A traversal crossing the default bitmap boundary may need an authenticated
+    # extension. Do not imply this bounded prefix is the complete swap quote.
+    return selected
+
 def inspect(rpc,pool,zero_for_one=True,arrays=3):
     if type(zero_for_one)is not bool or type(arrays)is not int or not 1<=arrays<=5:
         raise ValueError("invalid preflight options")
     result=call(rpc,"getAccountInfo",[pool,{"encoding":"base64","commitment":"confirmed"}]).get("value")
     if not result or result.get("owner")!=PROGRAM:raise ValueError("missing CLMM pool")
-    state=decode(base64.b64decode(result["data"][0],validate=True))
-    first=start_tick(state["tick_current"],state["tick_spacing"])
-    step=60*state["tick_spacing"]*(-1 if zero_for_one else 1)
-    starts=[first+i*step for i in range(arrays)]
+    raw_pool=base64.b64decode(result["data"][0],validate=True)
+    state=decode(raw_pool)
+    starts=initialized_tick_starts(raw_pool,state["tick_current"],
+                                    state["tick_spacing"],zero_for_one,arrays=arrays)
     addresses=[tick_array_pda(pool,s) for s in starts]
     values=call(rpc,"getMultipleAccounts",[addresses,{"encoding":"base64",
                                                       "commitment":"confirmed"}]).get("value")
-    if not isinstance(values,list) or len(values)!=arrays:raise ValueError("missing tick array response")
+    if not isinstance(values,list) or len(values)!=len(starts):raise ValueError("missing tick array response")
     reports=[]
     for start,address,info in zip(starts,addresses,values):
         valid=False
@@ -46,6 +80,8 @@ def inspect(rpc,pool,zero_for_one=True,arrays=3):
         reports.append({"address":address,"start_tick":start,"validated":valid})
     return {"pool":pool,"direction":"zero_for_one" if zero_for_one else "one_for_zero",
             "tick_arrays":reports,"all_arrays_valid":all(a["validated"] for a in reports),
+            "first_initialized_tick_start":starts[0],
+            "bitmap_authenticated":True,
             "swap_executed":False}
 
 def main():
