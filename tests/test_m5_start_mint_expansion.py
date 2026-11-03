@@ -15,9 +15,9 @@ class StartMintExpansionTests(unittest.TestCase):
         self.assertEqual(t["three_hop_start_mint_count"],3)
         self.assertNotIn("new",t["three_hop_start_mints"])
         proposal=bridge_targets(self.rows(),maximum=4)
-        self.assertEqual(len(proposal["targets"]),1)
+        self.assertEqual(len(proposal["targets"]),2)
         self.assertEqual(proposal["targets"][0]["mint"],"new")
-        self.assertIn(proposal["targets"][0]["missing_hub"],(USDC,USDT))
+        self.assertEqual({p["missing_hub"] for p in proposal["targets"]},{USDC,USDT})
         self.assertFalse(proposal["actionable"])
     def test_authenticated_bridge_creates_distinct_pool_triangle(self):
         rows=self.rows()+[
