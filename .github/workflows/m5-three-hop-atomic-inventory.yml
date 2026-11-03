@@ -4,6 +4,7 @@ on:
     paths:
       - ".github/workflows/m5-three-hop-atomic-inventory.yml"
       - "arb/m5_three_hop_atomic_inventory.py"
+      - "arb/m5_start_mint_expansion.py"
       - "arb/next_ten_fork_pool_probe.py"
       - "arb/raydium_clmm_ticks.py"
       - "arb/meteora_dlmm.py"
@@ -65,14 +66,18 @@ jobs:
           graph=diversified_three_hop_graph(probe("http://127.0.0.1:8899",registry,
                         batch=tuple((a,b) for a in ORDER for b in ORDER if a!=b),
                         maximum_per_venue=24,
-                        require_dlmm_swap_eligible=True),
-                        maximum=200)
+                        require_dlmm_swap_eligible=True,
+                        prefer_start_mint_coverage=True),
+                        maximum=200,allow_start_rotations=True)
+          assert graph["three_hop_distinct_start_mints"]>=40, (
+              f"source candidate graph has only {graph['three_hop_distinct_start_mints']}/40 distinct starts")
           root=Path(os.environ["RUNNER_TEMP"])/"triangles"
           root.mkdir(parents=True,exist_ok=True)
           (root/"graph.json").write_text(json.dumps(graph,indent=2)+"\n")
           print(json.dumps({"three_hop_discovered":sum(r["hops"]==3 for r in graph["routes"]),
                             "three_hop_truncated":graph["cycle_coverage_by_hops"]["3"]["truncated"],
                             "selected_distinct_start_mints":graph["three_hop_distinct_start_mints"],
+                            "required_verified_start_mints":40,
                             "selected_distinct_pools":graph["three_hop_distinct_selected_pools"],
                             "dlmm_swap_activation_rejections":graph["source_swap_eligibility_rejection_count"],
                             "selection_policy":graph["three_hop_sample_policy"]}))
