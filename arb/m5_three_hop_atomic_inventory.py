@@ -128,6 +128,36 @@ def diversified_three_hop_graph(readiness, maximum=100, *,
             "budget":maximum,"truncated":len(unique_identities)>len(result)}})
     return graph
 
+def capture_priority_indices(routes, *, retries_per_start=3):
+    """Schedule scarce mint starts before route-volume fill.
+
+    Order one distinct candidate for each mint, then retry up to two
+    alternatives for still-uncaptured mints before assigning remaining
+    source capture budget. This is only ordering, never authentication.
+    """
+    from collections import defaultdict
+    by_start=defaultdict(list)
+    for index,route in enumerate(routes):
+        if route.get("hops")==3:
+            by_start[route["start_mint"]].append(index)
+    # Keep deterministic source graph order and preserve graph indices.
+    starts=sorted(by_start,key=lambda mint:by_start[mint][0])
+    return by_start,starts
+
+
+def capture_attempt_order(routes, by_start, starts, captured_starts, attempted, *,
+                          retries_per_start=3):
+    """Return a next untried route; reserve fresh starts before duplicates."""
+    for mint in starts:
+        if mint not in captured_starts:
+            for index in by_start[mint][:retries_per_start]:
+                if index not in attempted:
+                    return index
+    for index,route in enumerate(routes):
+        if route.get("hops")==3 and index not in attempted:
+            return index
+    return None
+
 def source_capture(rpc, graph, directory, *, shard_index=0, shard_count=1, target=None):
     from arb.m5_four_to_six_source_capture import capture
     root=Path(directory)
@@ -141,9 +171,30 @@ def source_capture(rpc, graph, directory, *, shard_index=0, shard_count=1, targe
     if (type(shard_index)is not int or type(shard_count)is not int
             or shard_count<1 or not 0<=shard_index<shard_count):
         raise ValueError("invalid three-hop route shard")
-    for j,(index,route) in enumerate(selected):
-        if j % shard_count != shard_index:
-            continue
+    if target is not None and (type(target)is not int or not 1<=target<=len(selected)):
+        raise ValueError("invalid bounded source capture target")
+    by_start,starts=capture_priority_indices(graph["routes"])
+    captured_starts=set()
+    attempted=set()
+    # For unsharded CI, try unserved mint starts first. Legacy shard paths
+    # retain their original route modulo assignment.
+    while True:
+        if shard_count==1 and target is not None and len(rows)>=target:
+            break
+        if shard_count==1 and target is not None:
+            index=capture_attempt_order(graph["routes"],by_start,starts,
+                                        captured_starts,attempted)
+            if index is None:
+                break
+            route=graph["routes"][index]
+            j=next(j for j,(i,_) in enumerate(selected) if i==index)
+        else:
+            next_row=next(((j,i,r) for j,(i,r) in enumerate(selected)
+                          if j%shard_count==shard_index and i not in attempted),None)
+            if next_row is None:
+                break
+            j,index,route=next_row
+        attempted.add(index)
         entry={"id":"3H-%02d"%(j+1),"graph_route_index":index,
                "mints":[route["start_mint"]]+[x["output"] for x in route["legs"]],
                "venues":[x["venue"] for x in route["legs"]],
@@ -162,6 +213,7 @@ def source_capture(rpc, graph, directory, *, shard_index=0, shard_count=1, targe
             entry["diagnostic"]=str(exc)[:300]
         if entry["source_status"]=="CAPTURED":
             rows.append(entry)
+            captured_starts.add(route["start_mint"])
         else:
             blocked.append(entry)
         (root/"three-hop-inventory.json").write_text(json.dumps(
@@ -169,12 +221,14 @@ def source_capture(rpc, graph, directory, *, shard_index=0, shard_count=1, targe
              "cycle_count":len(selected),"shard_index":shard_index,
              "shard_count":shard_count,"shard_cycle_count":len(rows),
              "attempted_source_captures":len(rows)+len(blocked),
+             "selected_graph_start_mints":len(starts),
+             "source_captured_start_mints":len(captured_starts),
+             "uncaptured_graph_start_mints":sorted(set(starts)-captured_starts),
+             "source_capture_policy":"FIRST_SUCCESS_PER_MINT_RETRY_THREE_THEN_FILL",
              "blocked_source_routes":blocked,
              "cached_distinct_pool_directions":len(venue_cache),
             "three_hop_truncated":graph.get("cycle_coverage_by_hops",{}).get("3",{}).get("truncated"),
              "routes":rows,**SAFE},indent=2)+"\n")
-        if shard_count==1 and target is not None and len(rows)>=target:
-            break
     if shard_count==1 and target is not None and len(rows)<target:
         raise RuntimeError(f"only {len(rows)}/{target} source-capturable routes; {len(blocked)} blocked")
     return rows
