@@ -311,9 +311,9 @@ def probe(rpc, registry, *, batch=BATCH_10, maximum_per_venue=12,
                     # but the source-disconnected offline Surfpool does not
                     # attest that its Clock matches that source snapshot.
                     # Never infer offline execution readiness from source time.
-                    if permissioned_dlmm_clock_parity_unverified(activation):
+                    if permissioned_dlmm_clock_parity_unverified(activation) and activation["activation_type"]!=0:
                         rejected_swap_pools.append({"venue":venue,"pool":pool,
-                            "reason":"PERMISSIONED_DLMM_OFFLINE_CLOCK_PARITY_UNVERIFIED",
+                            "reason":"PERMISSIONED_DLMM_TIMESTAMP_CLOCK_PARITY_UNVERIFIED",
                             "source_swap_activation":result})
                         continue
                     if not result["swap_eligible"]:
@@ -322,6 +322,8 @@ def probe(rpc, registry, *, batch=BATCH_10, maximum_per_venue=12,
                             "source_swap_activation":result})
                         continue
                     authenticated["source_swap_eligibility"]=result
+                    if activation["pair_type"]==1:
+                        authenticated["offline_slot_alignment_required"]=True
                 pools[venue].append(authenticated)
             except (ValueError,KeyError,TypeError) as exc:
                 failures.append({"venue":venue,"pool":pool,
