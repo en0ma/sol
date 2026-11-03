@@ -6,7 +6,7 @@ on:
         description: "Desired newly authenticated distinct pools (1-200)"
         type: number
         required: true
-        default: 117
+        default: 68
       max_pages:
         description: "Maximum indexed top-pool pages to scan"
         type: number
@@ -51,7 +51,7 @@ jobs:
           PY
       - name: Paginate top Solana pools until authenticated target or exhaustion
         run: |
-          python3 -m arb.paginated_top_pool_discovery --target "${{ inputs.target || 164 }}" --max-pages "${{ inputs.max_pages || 50 }}" --output "$RUNNER_TEMP/top100-coverage.json"
+          python3 -m arb.paginated_top_pool_discovery --target "${{ inputs.target || 68 }}" --max-pages "${{ inputs.max_pages || 50 }}" --output "$RUNNER_TEMP/top100-coverage.json"
       - name: Stop source fork
         if: always()
         run: |
