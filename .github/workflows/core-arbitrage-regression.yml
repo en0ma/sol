@@ -36,6 +36,7 @@ jobs:
             test_m5_graph_prepared_signed_bridge.py \
             test_pumpswap_signed_instruction_binding.py \
             test_raydium_clmm_native_single_tick.py \
-            test_pool_registry.py; do
+            test_pool_registry.py \
+            test_m5_start_mint_expansion.py; do
             python3 -m unittest discover -s tests -p "$pattern" -v
           done
