@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import patch
-from arb.next_ten_fork_pool_probe import candidates,probe,prioritized_probe_addresses
+from arb.next_ten_fork_pool_probe import candidates,probe,prioritized_probe_addresses,permissioned_dlmm_clock_parity_unverified
 from arb.next_ten_atomic_routes import BATCH_10
 class ForkCandidateTests(unittest.TestCase):
     def test_untrusted_mainnet_rpc_blocked_without_reads(self):
@@ -47,6 +47,19 @@ class ForkCandidateTests(unittest.TestCase):
         self.assertEqual(len(set(selected["orca"])),24)
         with self.assertRaises(ValueError):
             probe("http://localhost:8899",registry,maximum_per_venue=25)
+    def test_permissioned_dlmm_requires_offline_clock_parity(self):
+        permissioned={"pair_type":1}
+        self.assertTrue(permissioned_dlmm_clock_parity_unverified(permissioned))
+        self.assertFalse(permissioned_dlmm_clock_parity_unverified(
+            permissioned,offline_clock_attested=True))
+        for pair_type in (0,2,3):
+            self.assertFalse(permissioned_dlmm_clock_parity_unverified(
+                {"pair_type":pair_type}))
+        with self.assertRaises(ValueError):
+            permissioned_dlmm_clock_parity_unverified({})
+        with self.assertRaises(ValueError):
+            permissioned_dlmm_clock_parity_unverified(
+                {"pair_type":1},offline_clock_attested="yes")
     def test_invalid_registry_rejected(self):
         with self.assertRaises(ValueError):
             candidates({})
