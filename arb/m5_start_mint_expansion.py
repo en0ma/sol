@@ -200,7 +200,7 @@ def starting_mint_coverage_pool_subset(entries, *, maximum_per_venue=24,
             "signed_simulation_verified":False,
             **SAFE}
 
-def derive_orca_bridge_addresses(rpc,entries,targets,*,spacings=(1,2,4,8,16,32,64,128)):
+def derive_orca_bridge_addresses(rpc,entries,targets,*,spacings=(1,2,4,8,16,32,64,128,256)):
     """Derive Whirlpool PDAs using source-fetched config keys; no GPA scans.
 
     Unoccupied PDA addresses are not pools. Each non-null candidate must
@@ -266,7 +266,7 @@ def derive_orca_bridge_addresses(rpc,entries,targets,*,spacings=(1,2,4,8,16,32,6
             except (ValueError,TypeError,KeyError,RuntimeError) as exc:
                 errors.append({"address":address,"error":str(exc)[:160]})
     return {"source_verified_pools":verified,"candidate_pd_as_checked":len(keys),
-            "source_whirlpool_config_count":len(configs),"authentication_errors":errors}
+            "source_whirlpool_config_count":len(configs),"candidate_tick_spacings":list(spacings),"authentication_errors":errors}
 
 def scout(rpc,entries,*,maximum=360,venues=DEFAULT_VENUES):
     suggestions=bridge_targets(entries,maximum=maximum)
@@ -295,6 +295,7 @@ def scout(rpc,entries,*,maximum=360,venues=DEFAULT_VENUES):
             "searched_bridge_pairs":pairs,"source_search_venues":["orca"],
             "derived_orca_pd_as_checked":discovery["candidate_pd_as_checked"],
             "source_whirlpool_config_count":discovery["source_whirlpool_config_count"],
+            "candidate_tick_spacings":discovery["candidate_tick_spacings"],
             "discovery_status":"DIRECT_PDA_SOURCE_AUTHENTICATED",
             "discovery_errors":discovery["authentication_errors"],
             "suggested_registry_pool_count":len(merged),
