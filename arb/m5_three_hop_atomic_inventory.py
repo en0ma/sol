@@ -211,7 +211,7 @@ def source_capture(rpc, graph, directory, *, shard_index=0, shard_count=1, targe
             entry["fixture"]=fixture.name
         except (ValueError,KeyError,TypeError,RuntimeError,OSError) as exc:
             entry["source_status"]="CAPTURE_BLOCKED"
-            entry["diagnostic"]=str(exc)[:300]
+            entry["diagnostic"]=str(exc)[:1000]
         if entry["source_status"]=="CAPTURED":
             rows.append(entry)
             captured_starts.add(route["start_mint"])
