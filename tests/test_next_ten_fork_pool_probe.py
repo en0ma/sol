@@ -36,6 +36,17 @@ class ForkCandidateTests(unittest.TestCase):
         self.assertIn("target-pump",prioritized["pumpswap"])
         self.assertEqual(len(prioritized["orca"]),12)
         self.assertFalse(any("source_slot" in x for x in registry["pools"]))
+    def test_expanded_probe_budget_preserves_authentication_and_bounds(self):
+        from arb.orca_whirlpool import SOL,USDC
+        records=[{"venue":"orca","address":"a"+str(i).zfill(43),
+                  "mints":[SOL,USDC]} for i in range(30)]
+        registry={"pools":records}
+        selected=prioritized_probe_addresses(registry,candidates(registry),
+            (("orca","pumpswap"),),maximum=24)
+        self.assertEqual(len(selected["orca"]),24)
+        self.assertEqual(len(set(selected["orca"])),24)
+        with self.assertRaises(ValueError):
+            probe("http://localhost:8899",registry,maximum_per_venue=25)
     def test_invalid_registry_rejected(self):
         with self.assertRaises(ValueError):
             candidates({})
