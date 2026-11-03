@@ -40,6 +40,7 @@ jobs:
             test_m5_start_mint_expansion.py \
             test_m5_three_hop_capture_coverage.py \
             test_m5_directional_cache_provenance.py \
-            test_m5_directional_source_capture.py; do
+            test_m5_directional_source_capture.py \
+            test_m5_start_pool_diversity.py; do
             python3 -m unittest discover -s tests -p "$pattern" -v
           done
