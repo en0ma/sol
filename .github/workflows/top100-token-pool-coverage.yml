@@ -6,12 +6,12 @@ on:
         description: "Desired newly authenticated distinct pools (1-200)"
         type: number
         required: true
-        default: 150
+        default: 117
       max_pages:
         description: "Maximum indexed top-pool pages to scan"
         type: number
         required: true
-        default: 10
+        default: 50
 permissions:
   contents: read
 concurrency:
