@@ -73,6 +73,7 @@ jobs:
                             "three_hop_truncated":graph["cycle_coverage_by_hops"]["3"]["truncated"],
                             "selected_distinct_start_mints":graph["three_hop_distinct_start_mints"],
                             "selected_distinct_pools":graph["three_hop_distinct_selected_pools"],
+                            "dlmm_swap_activation_rejections":graph["source_swap_eligibility_rejection_count"],
                             "selection_policy":graph["three_hop_sample_policy"]}))
           PY
           python3 -m arb.m5_three_hop_atomic_inventory --phase source --graph "$RUNNER_TEMP/triangles/graph.json" --directory "$RUNNER_TEMP/triangles" --source-target 140
