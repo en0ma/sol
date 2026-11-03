@@ -148,9 +148,10 @@ def capture_priority_indices(routes, *, retries_per_start=3):
 def capture_attempt_order(routes, by_start, starts, captured_starts, attempted, *,
                           retries_per_start=3):
     """Return a next untried route; reserve fresh starts before duplicates."""
-    for mint in starts:
-        if mint not in captured_starts:
-            for index in by_start[mint][:retries_per_start]:
+    for depth in range(retries_per_start):
+        for mint in starts:
+            if mint not in captured_starts and len(by_start[mint])>depth:
+                index=by_start[mint][depth]
                 if index not in attempted:
                     return index
     for index,route in enumerate(routes):
