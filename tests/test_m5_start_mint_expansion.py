@@ -37,6 +37,17 @@ class StartMintExpansionTests(unittest.TestCase):
         sample=starting_mint_coverage_pool_subset(self.rows(),target_start_mints=40)
         self.assertEqual(sample["selected_three_hop_start_mint_count"],3)
         self.assertEqual(sample["three_hop_mint_topology_ceiling"],3)
+    def test_registered_candidate_selection_can_cover_40_under_probe_caps(self):
+        import json
+        from pathlib import Path
+        registry=Path(__file__).resolve().parents[1]/"arb"/"pool_registry.json"
+        entries=json.loads(registry.read_text())["pools"]
+        sample=starting_mint_coverage_pool_subset(entries,
+            maximum_per_venue=24,target_start_mints=40)
+        self.assertGreaterEqual(sample["three_hop_mint_topology_ceiling"],40)
+        self.assertGreaterEqual(sample["selected_three_hop_start_mint_count"],40)
+        self.assertTrue(all(len(addresses)<=24 for addresses in sample["addresses"].values()))
+        self.assertFalse(sample["signed_simulation_verified"])
     def test_duplicate_pool_and_invalid_budget_rejected(self):
         with self.assertRaisesRegex(ValueError,"duplicate pool"):
             topology(self.rows()+[self.rows()[0]])
