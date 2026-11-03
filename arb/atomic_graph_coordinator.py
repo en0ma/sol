@@ -340,7 +340,12 @@ def signed_prefix_observer(rpc,legs,tokens,states,evidence,owner,accounts,signer
             tx,_=sign_v0_offline(rpc,candidate,signer,blockhash)
         simulated,_=_simulate(rpc,tx,accounts)
         if simulated.get("err") is not None:
-            raise ValueError("signed prefix simulation failed: "+str(simulated["err"])[:160])
+            # Retain bounded native program logs for diagnosis; an error still
+            # fails closed and never becomes an executable signed route.
+            log_tail=[str(line)[:180] for line in (simulated.get("logs") or [])[-6:]]
+            raise ValueError("signed prefix simulation failed: "+
+                             str(simulated["err"])[:160]+
+                             ("; program_log_tail="+repr(log_tail)[:600] if log_tail else ""))
         units=verify_signed_compute_budget(simulated,stage="prefix")
         output=verify_signed_prefix_balances(
             simulated,tokens,owner,initial_amount,planned_inputs+[amount],i)
