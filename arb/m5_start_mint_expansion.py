@@ -87,15 +87,86 @@ def bridge_targets(entries, *, maximum=36):
     return {"topology":graph,"targets":result,
             "targets_are_unverified_hints":True,**SAFE}
 
+def derive_orca_bridge_addresses(rpc,entries,targets,*,spacings=(1,2,4,8,16,32,64,128)):
+    """Derive Whirlpool PDAs using source-fetched config keys; no GPA scans.
+
+    Unoccupied PDA addresses are not pools. Each non-null candidate must
+    re-authenticate program ownership, mint identity, and vault state.
+    """
+    import base64
+    from solders.pubkey import Pubkey
+    from arb.rpc import call
+    from arb.orca_whirlpool import PROGRAM as ORCA,SIZE as ORCA_SIZE,DISCRIMINATOR
+    from arb.onchain_pool_discovery import verify as verify_pool
+    from arb.orca_whirlpool import decode as decode_orca
+    if (not isinstance(targets,list) or len(targets)>120 or
+            any(type(t.get("mint"))is not str or type(t.get("missing_hub"))is not str
+                for t in targets)):
+        raise ValueError("bounded trusted bridge target hints required")
+    if (not isinstance(spacings,tuple) or not spacings or
+            any(type(x)is not int or not 1<=x<=32767 for x in spacings)):
+        raise ValueError("invalid bounded Whirlpool spacing candidates")
+    sources=[p["address"] for p in entries if p["venue"]=="orca"][:24]
+    if not sources:
+        raise ValueError("no existing Orca pool config sources")
+    response=call(rpc,"getMultipleAccounts",[sources,{"encoding":"base64","commitment":"confirmed"}])
+    configs=set()
+    for address,info in zip(sources,response.get("value") or []):
+        if not info or info.get("owner")!=ORCA:
+            continue
+        raw=base64.b64decode(info["data"][0],validate=True)
+        if len(raw)!=ORCA_SIZE or raw[:8]!=DISCRIMINATOR:continue
+        configs.add(raw[8:40])
+    if not configs:raise ValueError("no authenticated Whirlpool config candidates")
+    if len(configs)>8:raise ValueError("too many Whirlpool source configurations")
+    program=Pubkey.from_string(ORCA)
+    candidates={}
+    for target in targets:
+        a,b=sorted((Pubkey.from_string(target["mint"]),Pubkey.from_string(target["missing_hub"])),key=bytes)
+        for config in sorted(configs):
+            for spacing in spacings:
+                address=str(Pubkey.find_program_address(
+                    [b"whirlpool",config,bytes(a),bytes(b),spacing.to_bytes(2,"little")],program)[0])
+                candidates[address]={"target":target,"spacing":spacing}
+    verified=[]
+    errors=[]
+    keys=list(candidates)
+    for start in range(0,len(keys),100):
+        batch=keys[start:start+100]
+        data=call(rpc,"getMultipleAccounts",[batch,{"encoding":"base64","commitment":"confirmed"}])
+        values=data.get("value")
+        if not isinstance(values,list) or len(values)!=len(batch):
+            raise ValueError("missing direct Whirlpool PDA account read")
+        for address,info in zip(batch,values):
+            if info is None:continue
+            try:
+                if info.get("owner")!=ORCA or info.get("executable"):
+                    raise ValueError("derived Whirlpool PDA owner mismatch")
+                raw=base64.b64decode(info["data"][0],validate=True)
+                state=decode_orca(raw)
+                pair=set((candidates[address]["target"]["mint"],
+                          candidates[address]["target"]["missing_hub"]))
+                if {state["token_mint_a"],state["token_mint_b"]}!=pair:
+                    raise ValueError("derived Whirlpool mint identity mismatch")
+                pool=verify_pool(rpc,"orca",address,state)
+                verified.append(pool)
+            except (ValueError,TypeError,KeyError,RuntimeError) as exc:
+                errors.append({"address":address,"error":str(exc)[:160]})
+    return {"source_verified_pools":verified,"candidate_pd_as_checked":len(keys),
+            "source_whirlpool_config_count":len(configs),"authentication_errors":errors}
+
 def scout(rpc,entries,*,maximum=36,venues=DEFAULT_VENUES):
     suggestions=bridge_targets(entries,maximum=maximum)
     pairs=[tuple(x["pair"]) for x in suggestions["targets"]]
     if not pairs:raise ValueError("no topology bridge suggestions")
-    discovery=discover(rpc,pairs,venues=venues,limit=8)
+    if tuple(venues)!=("orca",):
+        raise ValueError("direct PDA source scout supports Orca only")
+    discovery=derive_orca_bridge_addresses(rpc,entries,suggestions["targets"])
     existing={(p["venue"],p["address"]) for p in entries}
     new=[{"venue":p["venue"],"address":p["address"],"mints":p["mints"],
           "source_verified_slot":p.get("slot"),"source_verified_only":True}
-         for p in discovery["pools"] if (p["venue"],p["address"]) not in existing]
+         for p in discovery["source_verified_pools"]
+         if (p["venue"],p["address"]) not in existing]
     merged=entries+new
     before=suggestions["topology"]
     after=topology(merged)
@@ -107,8 +178,11 @@ def scout(rpc,entries,*,maximum=36,venues=DEFAULT_VENUES):
                 set(before["three_hop_start_mints"])),
             "target_start_mints":40,"target_met_on_source_topology":after["three_hop_start_mint_count"]>=40,
             "target_met_on_signed_simulations":False,
-            "searched_bridge_pairs":pairs,"source_search_venues":list(venues),
-            "discovery_status":discovery["status"],"discovery_errors":discovery["errors"],
+            "searched_bridge_pairs":pairs,"source_search_venues":["orca"],
+            "derived_orca_pd_as_checked":discovery["candidate_pd_as_checked"],
+            "source_whirlpool_config_count":discovery["source_whirlpool_config_count"],
+            "discovery_status":"DIRECT_PDA_SOURCE_AUTHENTICATED",
+            "discovery_errors":discovery["authentication_errors"],
             "suggested_registry_pool_count":len(merged),
             **SAFE}
 
@@ -117,8 +191,8 @@ def main():
     p.add_argument("--registry",default="arb/pool_registry.json")
     p.add_argument("--output",required=True)
     p.add_argument("--rpc",default="http://127.0.0.1:8899")
-    p.add_argument("--maximum",type=int,default=36)
-    p.add_argument("--venues",default=",".join(DEFAULT_VENUES))
+    p.add_argument("--maximum",type=int,default=80)
+    p.add_argument("--venues",default="orca")
     a=p.parse_args()
     entries=json.loads(Path(a.registry).read_text())["pools"]
     result=scout(a.rpc,entries,maximum=a.maximum,venues=tuple(a.venues.split(",")))
