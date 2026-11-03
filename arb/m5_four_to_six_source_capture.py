@@ -42,7 +42,7 @@ def capture(rpc,graph,route_index,output,*,venue_cache=None):
         cached=venue_cache.get(cache_key) if venue_cache is not None else None
         if cached is None:
             proof=snapshot(rpc,pool,venue)
-            extra,aux=venue_accounts(rpc,venue,pool,[current,leg["output"]])
+            extra,aux=venue_accounts(rpc,venue,pool,[current,leg["output"]],directional_only=True)
             if venue_cache is not None:
                 venue_cache[cache_key]=(proof,tuple(extra),aux)
         else:
@@ -63,8 +63,27 @@ def capture(rpc,graph,route_index,output,*,venue_cache=None):
     slot=response.get("context",{}).get("slot")
     values=response.get("value")
     if (type(slot)is not int or slot<0 or not isinstance(values,list) or
-            len(values)!=len(addresses) or any(not isinstance(v,dict) for v in values)):
-        raise ValueError("single-slot multi-hop source account capture incomplete")
+            len(values)!=len(addresses)):
+        raise ValueError("single-slot multi-hop source response malformed")
+    missing=[address for address,value in zip(addresses,values) if value is None]
+    if missing:
+        # An absent source account is not an offline permission to fabricate
+        # it. Preserve bounded identities and roles for reproducible triage.
+        roles={}
+        for leg,proof in zip(legs,evidence):
+            identity=(leg["venue"],leg["pool"])
+            roles.setdefault(leg["pool"],[]).append(identity+("pool",))
+            aux=proof["auxiliary"]
+            for key in ("tick_arrays","bin_arrays"):
+                for address in aux.get(key,[]) if isinstance(aux,dict) else []:
+                    roles.setdefault(address,[]).append(identity+(key,))
+        detail=[{"address":address,"roles":roles.get(address,[])[:3]}
+                for address in missing[:6]]
+        raise ValueError("single-slot missing required source accounts: "+
+                         json.dumps({"total":len(missing),"first":detail},
+                                    separators=(",",":")))
+    if any(not isinstance(value,dict) for value in values):
+        raise ValueError("single-slot multi-hop source account data invalid")
     accounts=dict(zip(addresses,values))
     for i,leg in enumerate(legs):
         account=accounts[leg["pool"]]
