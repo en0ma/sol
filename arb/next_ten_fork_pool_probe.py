@@ -250,15 +250,18 @@ def authenticated_distinct_venue_triangles(authenticated_pools, *, limit=30):
                     return output
     return output
 
-def probe(rpc, registry, *, batch=BATCH_10):
+def probe(rpc, registry, *, batch=BATCH_10, maximum_per_venue=12):
     local_rpc_only(rpc)
-    entries=prioritized_probe_addresses(registry,candidates(registry),batch)
+    if type(maximum_per_venue) is not int or not 1<=maximum_per_venue<=24:
+        raise ValueError("invalid source probe venue budget")
+    entries=prioritized_probe_addresses(registry,candidates(registry),batch,
+                                         maximum=maximum_per_venue)
     relevant={v for pair in batch for v in pair}
     pools={}
     failures=[]
     for venue in sorted(relevant):
         pools[venue]=[]
-        for pool in entries[venue][:12]:
+        for pool in entries[venue][:maximum_per_venue]:
             try:
                 pools[venue].append(snapshot(rpc,pool,venue))
             except (ValueError,KeyError,TypeError) as exc:
