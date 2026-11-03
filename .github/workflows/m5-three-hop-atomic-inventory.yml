@@ -5,6 +5,8 @@ on:
       - ".github/workflows/m5-three-hop-atomic-inventory.yml"
       - "arb/m5_three_hop_atomic_inventory.py"
       - "arb/next_ten_fork_pool_probe.py"
+      - "arb/raydium_clmm_ticks.py"
+      - "arb/atomic_graph_coordinator.py"
       - "arb/pool_registry.json"
       - "arb/m5_four_to_six_source_capture.py"
       - "arb/next_ten_signed_atomic_offline.py"
