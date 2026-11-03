@@ -2,7 +2,8 @@
 
 External indexed data is untrusted. Never broadcasts or edits the registry.
 """
-import argparse,json,os,time,urllib.request
+import argparse,json,os,time,urllib.request,urllib.error
+from collections import Counter
 from pathlib import Path
 
 from arb.onchain_pool_discovery import VENUES
@@ -17,14 +18,46 @@ FEEDS=(("volume","/pools",{"sort":"h24_volume_usd_desc"}),
        ("new","/new_pools",{}))
 PUBLIC_MAX_PAGE=10
 
+def indexed_json(url):
+    """Retry bounded public-index throttling; never relax on-chain checks."""
+    for attempt in range(3):
+        try:
+            request=urllib.request.Request(url,headers={
+                "Accept":"application/json","User-Agent":"sol-pool-coverage/1"})
+            with urllib.request.urlopen(request,timeout=30) as response:
+                return json.load(response)
+        except urllib.error.HTTPError as exc:
+            if exc.code!=429 or attempt==2:
+                raise
+            time.sleep(min(8,2**attempt))
+
+def token_pairs(mint,known_mints):
+    """Discover additional liquidity for existing connected tokens via DEX Screener."""
+    from urllib.parse import quote
+    url="https://api.dexscreener.com/token-pairs/v1/solana/"+quote(mint,safe="")
+    data=indexed_json(url)
+    if not isinstance(data,list):
+        raise ValueError("unexpected indexed token-pairs payload")
+    result=[]
+    for item in data:
+        address=item.get("pairAddress")
+        liquidity=(item.get("liquidity") or {}).get("usd") or 0
+        if (item.get("chainId")!="solana" or not isinstance(address,str)
+                or not 32<=len(address)<=44 or not isinstance(liquidity,(float,int))
+                or liquidity<10000):
+            continue
+        base=(item.get("baseToken") or {}).get("address")
+        quote_mint=(item.get("quoteToken") or {}).get("address")
+        result.append({"address":address,"liquidity_usd":liquidity,
+                       "both_known":base in known_mints and quote_mint in known_mints})
+    result.sort(key=lambda row:(row["both_known"],row["liquidity_usd"]),reverse=True)
+    return result[:30]
+
 def top_page(page,feed="volume"):
     from urllib.parse import urlencode
     _,endpoint,query=next(item for item in FEEDS if item[0]==feed)
     url=INDEX+endpoint+"?"+urlencode({"page":page,**query})
-    req=urllib.request.Request(url,headers={"Accept":"application/json",
-                                             "User-Agent":"sol-pool-coverage/1"})
-    with urllib.request.urlopen(req,timeout=30) as response:
-        payload=json.load(response)
+    payload=indexed_json(url)
     items=payload.get("data")
     if not isinstance(items,list):
         raise ValueError("invalid indexed top-pools page")
@@ -46,9 +79,12 @@ def campaign(rpc,entries,*,target=150,max_add=200,max_pages=10,pace=0.5):
     programs={entry[0]:venue for venue,entry in VENUES.items()}
     new=[];errors=[];pages=[];seen_index=set()
     stop="PAGE_LIMIT"
+    blocked_feeds=set()
     for index in range(min(max_pages,len(FEEDS)*PUBLIC_MAX_PAGE)):
         feed,_,_=FEEDS[index//PUBLIC_MAX_PAGE]
         page=index%PUBLIC_MAX_PAGE+1
+        if feed in blocked_feeds:
+            continue
         if len(new)>=target or len(old)>=400:
             stop="TARGET_REACHED" if len(new)>=target else "REGISTRY_CAP"
             break
@@ -56,7 +92,8 @@ def campaign(rpc,entries,*,target=150,max_add=200,max_pages=10,pace=0.5):
             candidates=top_page(page,feed)
         except Exception as exc:
             errors.append({"feed":feed,"page":page,"stage":"INDEX","error":repr(exc)[:220]})
-            # Continue with the next feed, but do not request a blocked page again.
+            if isinstance(exc,urllib.error.HTTPError) and exc.code in (401,403,429):
+                blocked_feeds.add(feed)
             continue
         if not candidates:
             continue
@@ -98,6 +135,71 @@ def campaign(rpc,entries,*,target=150,max_add=200,max_pages=10,pace=0.5):
                       "total_authenticated_new":len(new)})
         if stop!="PAGE_LIMIT":
             break
+
+    # Secondary discovery: additional pools for already-connected, active mints.
+    # A mint's venue diversity is a useful proxy for potential arbitrage cycles.
+    if stop=="PAGE_LIMIT" and len(new)<target and len(old)<400:
+        hub_mints={"So11111111111111111111111111111111111111112",
+                   "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"}
+        mint_venues={}
+        mint_degree=Counter()
+        for entry in entries:
+            for mint in entry.get("mints",[]):
+                mint_venues.setdefault(mint,set()).add(entry["venue"])
+                mint_degree[mint]+=1
+        prioritized=sorted((mint for mint in known_mints if mint not in hub_mints),
+            key=lambda m:(len(mint_venues.get(m,())),mint_degree[m],m),reverse=True)
+        # Cap API usage; untrusted indexed rankings are never verification evidence.
+        for position,mint in enumerate(prioritized[:100]):
+            if len(new)>=target or len(old)>=400 or stop!="PAGE_LIMIT":
+                break
+            try:
+                candidates=token_pairs(mint,known_mints)
+            except Exception as exc:
+                errors.append({"feed":"dexscreener_token_pairs","mint":mint,
+                               "stage":"INDEX","error":repr(exc)[:220]})
+                if isinstance(exc,urllib.error.HTTPError) and exc.code==429:
+                    stop="SECONDARY_INDEX_RATE_LIMITED"
+                    break
+                continue
+            attempted=0
+            for candidate in candidates:
+                address=candidate["address"]
+                if address in seen_addresses or address in seen_index:
+                    continue
+                seen_index.add(address)
+                attempted+=1
+                try:
+                    info=call(rpc,"getAccountInfo",[address,{"encoding":"base64","commitment":"confirmed"}]).get("value")
+                    venue=programs.get(info.get("owner")) if isinstance(info,dict) else None
+                    if venue is None:
+                        continue
+                    verdict=refresh(rpc,[{"venue":venue,"address":address}])
+                    if not verdict["verified_pools"]:
+                        raise ValueError(verdict["rejected"][0]["reason"])
+                    p=verdict["verified_pools"][0]
+                    record={"venue":venue,"address":address,"mints":p["mints"],
+                            "source_slot":p["slot"],"index_feed":"dexscreener_token_pairs",
+                            "indexed_mint":mint}
+                    new.append(record)
+                    old[(venue,address)]=record
+                    seen_addresses.add(address)
+                except Exception as exc:
+                    error=type(exc).__name__+": "+str(exc)[:200]
+                    errors.append({"feed":"dexscreener_token_pairs","mint":mint,
+                                   "address":address,"error":error})
+                    if "429" in error or "too many requests" in error.lower():
+                        stop="SOURCE_RATE_LIMITED"
+                        break
+                if pace:time.sleep(pace)
+                if len(new)>=target or len(old)>=400:
+                    stop="TARGET_REACHED" if len(new)>=target else "REGISTRY_CAP"
+                    break
+            pages.append({"feed":"dexscreener_token_pairs","mint":mint,"page":position+1,
+                          "listed":len(candidates),"new_candidates_checked":attempted,
+                          "total_authenticated_new":len(new)})
+            if pace:time.sleep(pace)
+
     if stop=="PAGE_LIMIT":stop="INDEX_FEEDS_EXHAUSTED"
     all_pools=list(old.values())
     after_mints={m for p in all_pools for m in p.get("mints",[])}
@@ -108,7 +210,7 @@ def campaign(rpc,entries,*,target=150,max_add=200,max_pages=10,pace=0.5):
             "new_token_mints":sorted(after_mints-known_mints),
             "pages":pages,"errors":errors,"new_verified_pools":new,
             "candidate_registry":{"pools":all_pools},
-            "index_source":"GECKOTERMINAL_VOLUME_TRANSACTIONS_TRENDING_NEW_FEEDS_CANDIDATES_ONLY",
+            "index_source":"GECKOTERMINAL_FEEDS_AND_DEXSCREENER_TOKEN_PAIRS_CANDIDATES_ONLY",
             "authentication":"DIRECT_SOLANA_RPC_REFRESH",
             "registry_mutated":False,"broadcast":False}
 
