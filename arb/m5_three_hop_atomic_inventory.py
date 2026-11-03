@@ -51,13 +51,16 @@ def failed_instruction_context(row, error):
         result["diagnostic_class"]="CLMM_FIRST_INITIALIZED_TICK_ARRAY_MISMATCH"
     return result
 
-def diversified_three_hop_graph(readiness, maximum=100):
+def diversified_three_hop_graph(readiness, maximum=100, *,
+                                allow_start_rotations=False):
     """Bounded round-robin across authenticated token cycles and pool identities."""
     from collections import defaultdict, deque
     from arb.m5_seven_venue_route_scan import analyze, ORDER, SAFE
     from arb.opportunity_graph import cycles
     if type(maximum)is not int or not 1<=maximum<=200:
         raise ValueError("invalid cycle budget")
+    if type(allow_start_rotations) is not bool:
+        raise ValueError("invalid start-token rotation policy")
     pools=[{"venue":v,"address":p["pool"],"mints":p["mints"],"verified":True}
            for v in ORDER for p in readiness["authenticated_pools"][v]]
     graph=analyze(readiness,max_cycles=100)
@@ -85,16 +88,24 @@ def diversified_three_hop_graph(readiness, maximum=100):
         next_starts=[]
         for start in starts:
             q=candidates[start]
-            choice=choose_pool_diverse_candidate(q,selected_identities,used_pools)
+            # Distinct token starting balances make a rotation an independent
+            # signed route, even when underlying pool cycle is shared. Keep
+            # canonical pool-cycle de-dup within each anchor, but allow
+            # alternate source mints to prove their own signed execution.
+            scoped_seen=({identity for anchor,identity in selected_identities
+                          if anchor==start} if allow_start_rotations
+                          else selected_identities)
+            choice=choose_pool_diverse_candidate(q,scoped_seen,used_pools)
             if choice is not None:
                 identity,r=choice
-                selected_identities.add(identity)
+                selected_identities.add((start,identity) if allow_start_rotations else identity)
                 used_pools.update((leg["venue"],leg["pool"]) for leg in r["legs"])
                 result.append({"start_mint":r["start_mint"],"hops":3,
                     "legs":r["legs"],"venue_count":len(r["venues"]),
                     "quote_status":"NOT_QUOTED",
                     "signed_simulation_status":"NOT_ATTEMPTED",**SAFE})
-            if any(identity not in selected_identities for identity,_ in q):
+            if any(((start,identity) if allow_start_rotations else identity)
+                   not in selected_identities for identity,_ in q):
                 next_starts.append(start)
             if len(result)>=maximum:
                 break
@@ -111,7 +122,8 @@ def diversified_three_hop_graph(readiness, maximum=100):
         three_hop_distinct_start_mints=len({r["start_mint"] for r in result}),
         three_hop_distinct_selected_pools=len(used_pools),
         three_hop_distinct_selected_venues=len({v for v,_ in used_pools}),
-        three_hop_sample_policy="START_MINT_ROUND_ROBIN_POOL_COVERAGE_GREEDY_256_ROTATION_DEDUP",
+        three_hop_sample_policy=("START_MINT_ROUND_ROBIN_POOL_COVERAGE_GREEDY_256_PER_START_ROTATIONS" if allow_start_rotations else
+                                 "START_MINT_ROUND_ROBIN_POOL_COVERAGE_GREEDY_256_ROTATION_DEDUP"),
         cycle_coverage_by_hops={"3":{"returned":len(result),
             "budget":maximum,"truncated":len(unique_identities)>len(result)}})
     return graph
