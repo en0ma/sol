@@ -193,6 +193,8 @@ def offline_simulate(rpc,directory,*,amount=100000,shard_index=0,shard_count=1):
         row["simulation_status"]="NOT_ATTEMPTED"
         try:
             fixture=json.loads((root/row["fixture"]).read_text())
+            from arb.dlmm_offline_clock import align_permissioned_dlmm_clock
+            row["offline_clock_alignment"]=align_permissioned_dlmm_clock(rpc,fixture)
             receipt=run_four_to_six_venue(rpc,fixture,amount_in=amount,
                                           ephemeral_source_registry=True)
             (root/("receipt-"+row["id"]+".json")).write_text(json.dumps(receipt,indent=2)+"\n")
