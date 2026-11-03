@@ -46,7 +46,7 @@ class ForkCandidateTests(unittest.TestCase):
         self.assertEqual(len(selected["orca"]),24)
         self.assertEqual(len(set(selected["orca"])),24)
         with self.assertRaises(ValueError):
-            probe("http://localhost:8899",registry,maximum_per_venue=25)
+            probe("http://localhost:8899",registry,maximum_per_venue=49)
     def test_permissioned_dlmm_requires_offline_clock_parity(self):
         permissioned={"pair_type":1}
         self.assertTrue(permissioned_dlmm_clock_parity_unverified(permissioned))
