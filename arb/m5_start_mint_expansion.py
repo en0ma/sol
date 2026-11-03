@@ -86,7 +86,7 @@ def bridge_targets(entries, *, maximum=360):
             candidates.append({"mint":mint,"connected_hub":old,"missing_hub":target,
                                "pair":[mint,target],"current_pools":count[mint]})
     # Prefer established tokens with multiple authenticated pool identity hints.
-    # Keep both missing-hub options adjacent; avoid 36 requests for one mint.
+    # Keep alternative missing-hub options together and balance per token.
     candidates.sort(key=lambda x:(-x["current_pools"],x["mint"],x["missing_hub"]))
     # Search both missing liquid hubs when possible. The first may have no
     # Whirlpool while the second does; do not artificially cap discovery at
@@ -157,8 +157,12 @@ def starting_mint_coverage_pool_subset(entries, *, maximum_per_venue=24,
                         counts[p["venue"]],p["venue"],p["address"])):
                     if len(by_venue[p["venue"]])<2:
                         by_venue[p["venue"]].append(p)
-                options.append([p for venue in sorted(by_venue)
-                                for p in by_venue[venue]][:14])
+                # Round-robin venues before taking second identities, so
+                # the bounded combinatorial search stays cheap and diverse.
+                options.append([p for offset in range(2)
+                                for venue in sorted(by_venue)
+                                if len(by_venue[venue])>offset
+                                for p in by_venue[venue][offset:offset+1]][:8])
             for candidate in product(*options):
                 identities={(p["venue"],p["address"]) for p in candidate}
                 if len(identities)!=3:continue
