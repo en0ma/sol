@@ -38,6 +38,12 @@ class PoolCoverageSelectionTests(unittest.TestCase):
             "{'InstructionError': [2, {'Custom': 6042}]}"),
             {"failed_instruction_index":2,"program_error_code":6042,
              "failed_venue":"raydium_clmm","failed_pool":"pool2"})
+        self.assertEqual(failed_instruction_context(row,
+            "ValueError: signed prefix simulation failed: {'InstructionError': [2, {'Custom': 6024}]}; program_log_tail=['invalid first tick array']"),
+            {"failed_instruction_index":2,"program_error_code":6024,
+             "failed_venue":"raydium_clmm","failed_pool":"pool2",
+             "program_error_name":"InvalidFirstTickArrayAccount",
+             "diagnostic_class":"CLMM_FIRST_INITIALIZED_TICK_ARRAY_MISMATCH"})
         self.assertEqual(failed_instruction_context(row,"other error"),{})
 
 
