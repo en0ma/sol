@@ -274,6 +274,14 @@ def authenticated_distinct_venue_triangles(authenticated_pools, *, limit=30):
                     return output
     return output
 
+def permissioned_dlmm_clock_parity_unverified(activation, *, offline_clock_attested=False):
+    """Conservative research-fork gate, not an assertion of mainnet pool status."""
+    if not isinstance(activation,dict) or type(activation.get("pair_type")) is not int:
+        raise ValueError("authenticated DLMM pair type required")
+    if type(offline_clock_attested) is not bool:
+        raise ValueError("offline Clock attestation flag must be boolean")
+    return activation["pair_type"]==1 and not offline_clock_attested
+
 def probe(rpc, registry, *, batch=BATCH_10, maximum_per_venue=12,
           require_dlmm_swap_eligible=False):
     local_rpc_only(rpc)
@@ -303,7 +311,7 @@ def probe(rpc, registry, *, batch=BATCH_10, maximum_per_venue=12,
                     # but the source-disconnected offline Surfpool does not
                     # attest that its Clock matches that source snapshot.
                     # Never infer offline execution readiness from source time.
-                    if activation["pair_type"]==1:
+                    if permissioned_dlmm_clock_parity_unverified(activation):
                         rejected_swap_pools.append({"venue":venue,"pool":pool,
                             "reason":"PERMISSIONED_DLMM_OFFLINE_CLOCK_PARITY_UNVERIFIED",
                             "source_swap_activation":result})
