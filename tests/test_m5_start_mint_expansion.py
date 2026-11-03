@@ -1,6 +1,6 @@
 """Regress genuine three-hop topology ceilings and bounded bridge suggestions."""
 import unittest
-from arb.m5_start_mint_expansion import topology,bridge_targets,SOL,USDC,USDT
+from arb.m5_start_mint_expansion import topology,bridge_targets,starting_mint_coverage_pool_subset,SOL,USDC,USDT
 
 class StartMintExpansionTests(unittest.TestCase):
     def rows(self):
@@ -24,6 +24,19 @@ class StartMintExpansionTests(unittest.TestCase):
             {"venue":"orca","address":"e","mints":["new",USDC]}]
         self.assertEqual(topology(rows)["three_hop_start_mint_count"],4)
         self.assertNotIn("new",[p["mint"] for p in bridge_targets(rows)["targets"]])
+    def test_coverage_sampler_prefers_new_start_tokens(self):
+        rows=self.rows()+[
+            {"venue":"orca","address":"e","mints":["new",USDC]}]
+        sample=starting_mint_coverage_pool_subset(rows,
+            maximum_per_venue=3,target_start_mints=4)
+        self.assertEqual(sample["selected_three_hop_start_mint_count"],4)
+        self.assertIn("new",sample["selected_three_hop_start_mints"])
+        self.assertFalse(sample["source_authenticated"])
+        self.assertFalse(sample["signed_simulation_verified"])
+    def test_coverage_sampler_never_invents_missing_pool_topology(self):
+        sample=starting_mint_coverage_pool_subset(self.rows(),target_start_mints=40)
+        self.assertEqual(sample["selected_three_hop_start_mint_count"],3)
+        self.assertEqual(sample["three_hop_mint_topology_ceiling"],3)
     def test_duplicate_pool_and_invalid_budget_rejected(self):
         with self.assertRaisesRegex(ValueError,"duplicate pool"):
             topology(self.rows()+[self.rows()[0]])
