@@ -169,7 +169,7 @@ def prioritized_probe_addresses(registry, addresses, batch, *, maximum=12,
     if prefer_start_mint_coverage:
         from arb.m5_start_mint_expansion import starting_mint_coverage_pool_subset
         covered=starting_mint_coverage_pool_subset(entries,
-            maximum_per_venue=maximum,target_start_mints=40)["addresses"]
+            maximum_per_venue=maximum,target_start_mints=100)["addresses"]
     result={}
     for venue in relevant:
         options=addresses.get(venue,[])
