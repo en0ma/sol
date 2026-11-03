@@ -1,5 +1,5 @@
 {
-  "note": "Authenticated pool identity hints, one per venue and canonical token pair. Indexed discovery run 41518830633 contributed two previously unrepresented venue/pairs; candidate identities are revalidated before route use. No price/profit claims.",
+  "note": "Authenticated pool identity hints, one per venue and canonical token pair. Indexed discovery run 41518830633 contributed two previously unrepresented venue/pairs; candidate identities are revalidated before route use. No price/profit claims. Added 11 independent RPC-authenticated Orca Whirlpool bridge pools (2026-11-03); mint-prefix labels are not token ticker assertions.",
   "latest_source_verified_workflow_run": 41571950067,
   "unique_pair_policy": "Unique pool account addresses; multiple independently verified pools may share the same venue and token pair.",
   "pools": [
@@ -4007,6 +4007,116 @@
         "So11111111111111111111111111111111111111112"
       ],
       "pair": "98sM/SOL"
+    },
+    {
+      "venue": "orca",
+      "address": "GJVAmXp5AVheWUDCJfJocMXPwBQuyvVZnN63ayU8qD2X",
+      "mints": [
+        "2zMMhcVQEXDtdE6vsFS7S7D5oUodfJHE8vd1gnBouauv",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "pair": "2zMM/USDC",
+      "pair_label_source": "SOURCE_VERIFIED_DIRECT_WHIRLPOOL_PDA_UNLABELED"
+    },
+    {
+      "venue": "orca",
+      "address": "8VZPhZfqcwaH5pZ5vuWmf3TPfHG6bGyTXdNg6gxSVHsV",
+      "mints": [
+        "4G86CMxGsMdLETrYnavMFKPhQzKTvDBYGMRAdVtr72nu",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "pair": "4G86/USDC",
+      "pair_label_source": "SOURCE_VERIFIED_DIRECT_WHIRLPOOL_PDA_UNLABELED"
+    },
+    {
+      "venue": "orca",
+      "address": "CsJTG4mospaCYvwQghmL5SAqh8YUkBw6YyzBrbfvTDSN",
+      "mints": [
+        "5z3EqYQo9HiCEs3R84RCDMu2n7anpDMxRhdK8PSWmrRC",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "pair": "5z3E/USDC",
+      "pair_label_source": "SOURCE_VERIFIED_DIRECT_WHIRLPOOL_PDA_UNLABELED"
+    },
+    {
+      "venue": "orca",
+      "address": "9B5g1rcCw7anvu8uqV7tBazeridindu2zsiKbwcioCJh",
+      "mints": [
+        "61V8vBaqAGMpgDQi4JcAwo1dmBGHsyhzodcPqnEVpump",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "pair": "61V8/USDC",
+      "pair_label_source": "SOURCE_VERIFIED_DIRECT_WHIRLPOOL_PDA_UNLABELED"
+    },
+    {
+      "venue": "orca",
+      "address": "B4uCRELBJ9ntodU2dfRHqq93WDAFpYSv9NkCKJB18NTm",
+      "mints": [
+        "63LfDmNb3MQ8mw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "pair": "63Lf/USDC",
+      "pair_label_source": "SOURCE_VERIFIED_DIRECT_WHIRLPOOL_PDA_UNLABELED"
+    },
+    {
+      "venue": "orca",
+      "address": "B4fRPpDxNTMVgi7hvCgqufXyJUQubmCbh7KrEUmNaxzP",
+      "mints": [
+        "7BgBvyjrZX1YKz4oh9mjb8ZScatkkwb8DzFx7LoiVkM3",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "pair": "7BgB/USDC",
+      "pair_label_source": "SOURCE_VERIFIED_DIRECT_WHIRLPOOL_PDA_UNLABELED"
+    },
+    {
+      "venue": "orca",
+      "address": "DHS1stdJT1RJxCpsRPh1MLhcaayP8x37tGrqi4yhr6Wn",
+      "mints": [
+        "7BgBvyjrZX1YKz4oh9mjb8ZScatkkwb8DzFx7LoiVkM3",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "pair": "7BgB/USDC",
+      "pair_label_source": "SOURCE_VERIFIED_DIRECT_WHIRLPOOL_PDA_UNLABELED"
+    },
+    {
+      "venue": "orca",
+      "address": "4aixh3WuYCvu3eGpf7eo67gWSeemzzBxSkavubdzLjwP",
+      "mints": [
+        "7JA5eZdCzztSfQbJvS8aVVxMFfd81Rs9VvwnocV1mKHu",
+        "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
+      ],
+      "pair": "7JA5/USDT",
+      "pair_label_source": "SOURCE_VERIFIED_DIRECT_WHIRLPOOL_PDA_UNLABELED"
+    },
+    {
+      "venue": "orca",
+      "address": "AQehsdkbvcvFtmh3CCHTTanQJ1FnX2D2Ms7HGgZyRjb4",
+      "mints": [
+        "8wXtPeU6557ETkp9WHFY1n1EcU6NxDvbAggHGsMYiHsB",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "pair": "8wXt/USDC",
+      "pair_label_source": "SOURCE_VERIFIED_DIRECT_WHIRLPOOL_PDA_UNLABELED"
+    },
+    {
+      "venue": "orca",
+      "address": "42fgxuzmAAeM8LpL7jXSUQFtefuBkd1Aiy4La9AizD4w",
+      "mints": [
+        "9Ttyez3xiruyj6cqaR495hbBkJU6SUWdV6AmQ9MvbyyS",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "pair": "9Tty/USDC",
+      "pair_label_source": "SOURCE_VERIFIED_DIRECT_WHIRLPOOL_PDA_UNLABELED"
+    },
+    {
+      "venue": "orca",
+      "address": "6ReyLHjzxhzhoi643ERkebkSYyoxyLfhrEYmd8kncx64",
+      "mints": [
+        "9Ttyez3xiruyj6cqaR495hbBkJU6SUWdV6AmQ9MvbyyS",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "pair": "9Tty/USDC",
+      "pair_label_source": "SOURCE_VERIFIED_DIRECT_WHIRLPOOL_PDA_UNLABELED"
     }
   ]
 }
