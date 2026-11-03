@@ -36,6 +36,23 @@ MINT_KEYS={"orca":("token_mint_a","token_mint_b"),
            "raydium_amm_v4":("base_mint","quote_mint")}
 SAFETY={"actionable":False,"live_execution_approved":False,"broadcast":False}
 
+CLOCK_SYSVAR="SysvarC1ock11111111111111111111111111111111"
+
+def source_clock(rpc):
+    """Read source-fork Clock sysvar; never use wall clock as protocol evidence."""
+    info=call(rpc,"getAccountInfo",[CLOCK_SYSVAR,
+        {"encoding":"base64","commitment":"confirmed"}]).get("value")
+    if not isinstance(info,dict) or info.get("owner")!="Sysvar1111111111111111111111111111111111111":
+        raise ValueError("source Clock sysvar absent or owner mismatch")
+    raw=base64.b64decode(info["data"][0],validate=True)
+    if len(raw)!=40:
+        raise ValueError("source Clock sysvar length mismatch")
+    slot=int.from_bytes(raw[0:8],"little")
+    unix_timestamp=int.from_bytes(raw[32:40],"little",signed=True)
+    if unix_timestamp<0:
+        raise ValueError("negative source Clock timestamp")
+    return {"slot":slot,"unix_timestamp":unix_timestamp}
+
 def snapshot(rpc, pool, venue):
     local_rpc_only(rpc)
     if venue not in PROGRAMS:
@@ -84,8 +101,15 @@ def snapshot(rpc, pool, venue):
     a,b=(state[key] for key in MINT_KEYS[venue])
     if a==b:
         raise ValueError("duplicate pool mint")
-    return {"venue":venue,"pool":pool,"mints":[a,b],
+    result={"venue":venue,"pool":pool,"mints":[a,b],
             "slot":slot,"authenticated":True,**SAFETY}
+    if venue=="meteora_dlmm":
+        # Status==enabled does not imply that a permissioned pool is live.
+        result["source_swap_activation"]={
+            name:state[name] for name in
+            ("status","pair_type","activation_type","activation_point",
+             "pre_activation_duration","pre_activation_swap_address")}
+    return result
 
 def candidates(registry):
     entries=registry.get("pools")
@@ -250,20 +274,37 @@ def authenticated_distinct_venue_triangles(authenticated_pools, *, limit=30):
                     return output
     return output
 
-def probe(rpc, registry, *, batch=BATCH_10, maximum_per_venue=12):
+def probe(rpc, registry, *, batch=BATCH_10, maximum_per_venue=12,
+          require_dlmm_swap_eligible=False):
     local_rpc_only(rpc)
     if type(maximum_per_venue) is not int or not 1<=maximum_per_venue<=24:
         raise ValueError("invalid source probe venue budget")
+    if type(require_dlmm_swap_eligible) is not bool:
+        raise ValueError("invalid DLMM eligibility option")
     entries=prioritized_probe_addresses(registry,candidates(registry),batch,
                                          maximum=maximum_per_venue)
     relevant={v for pair in batch for v in pair}
     pools={}
     failures=[]
+    clock=source_clock(rpc) if require_dlmm_swap_eligible else None
+    rejected_swap_pools=[]
     for venue in sorted(relevant):
         pools[venue]=[]
         for pool in entries[venue][:maximum_per_venue]:
             try:
-                pools[venue].append(snapshot(rpc,pool,venue))
+                authenticated=snapshot(rpc,pool,venue)
+                if require_dlmm_swap_eligible and venue=="meteora_dlmm":
+                    from arb.meteora_dlmm import swap_activation_evidence
+                    activation=authenticated.get("source_swap_activation")
+                    result=swap_activation_evidence(activation,slot=clock["slot"],
+                        unix_timestamp=clock["unix_timestamp"])
+                    if not result["swap_eligible"]:
+                        rejected_swap_pools.append({"venue":venue,"pool":pool,
+                            "reason":result["reason"],
+                            "source_swap_activation":result})
+                        continue
+                    authenticated["source_swap_eligibility"]=result
+                pools[venue].append(authenticated)
             except (ValueError,KeyError,TypeError) as exc:
                 failures.append({"venue":venue,"pool":pool,
                                  "error_class":type(exc).__name__,
@@ -291,6 +332,8 @@ def probe(rpc, registry, *, batch=BATCH_10, maximum_per_venue=12):
             "source":"READ_ONLY_MAINNET_BACKED_SURFPOOL",
             "route_count":len(routes),"authenticated_pools":pools,
             "route_candidates":routes,"failed_pool_checks":failures,
+            "source_swap_eligibility_rejections":rejected_swap_pools,
+            "source_clock_for_swap_gate":clock,
             "signed_atomic_simulation_verified":False,**SAFETY}
 
 def main():
