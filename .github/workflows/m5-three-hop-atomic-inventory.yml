@@ -65,7 +65,7 @@ jobs:
           registry=json.loads(Path("arb/pool_registry.json").read_text())
           graph=diversified_three_hop_graph(probe("http://127.0.0.1:8899",registry,
                         batch=tuple((a,b) for a in ORDER for b in ORDER if a!=b),
-                        maximum_per_venue=24,
+                        maximum_per_venue=48,
                         require_dlmm_swap_eligible=True,
                         prefer_start_mint_coverage=True),
                         maximum=200,allow_start_rotations=True)
