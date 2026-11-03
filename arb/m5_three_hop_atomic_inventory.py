@@ -69,7 +69,7 @@ def diversified_three_hop_graph(readiness, maximum=100):
             "budget":maximum,"truncated":len(unique_identities)>len(result)}})
     return graph
 
-def source_capture(rpc, graph, directory, *, shard_index=0, shard_count=1, target=100):
+def source_capture(rpc, graph, directory, *, shard_index=0, shard_count=1, target=None):
     from arb.m5_four_to_six_source_capture import capture
     root=Path(directory)
     root.mkdir(parents=True,exist_ok=True)
@@ -114,9 +114,9 @@ def source_capture(rpc, graph, directory, *, shard_index=0, shard_count=1, targe
              "cached_distinct_pool_directions":len(venue_cache),
             "three_hop_truncated":graph.get("cycle_coverage_by_hops",{}).get("3",{}).get("truncated"),
              "routes":rows,**SAFE},indent=2)+"\n")
-        if shard_count==1 and len(rows)>=target:
+        if shard_count==1 and target is not None and len(rows)>=target:
             break
-    if shard_count==1 and len(rows)<target:
+    if shard_count==1 and target is not None and len(rows)<target:
         raise RuntimeError(f"only {len(rows)}/{target} source-capturable routes; {len(blocked)} blocked")
     return rows
 
@@ -179,13 +179,14 @@ def main():
     p.add_argument("--graph")
     p.add_argument("--directory",required=True)
     p.add_argument("--amount",type=int,default=100000)
+    p.add_argument("--source-target",type=int,default=None)
     p.add_argument("--shard-index",type=int,default=0)
     p.add_argument("--shard-count",type=int,default=1)
     args=p.parse_args()
     if args.phase=="source":
         if not args.graph: p.error("--graph required for source")
         result=source_capture(args.rpc,json.loads(Path(args.graph).read_text()),args.directory,
-                              shard_index=args.shard_index,shard_count=args.shard_count)
+                              shard_index=args.shard_index,shard_count=args.shard_count,target=args.source_target)
         print(json.dumps({"three_hop_capture_attempts":len(result),
                           "source_captured":sum(r["source_status"]=="CAPTURED" for r in result)}))
     else:
