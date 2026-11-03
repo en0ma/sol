@@ -30,10 +30,10 @@ def choose_pool_diverse_candidate(queue, selected_identities, used_pools, *, win
 
 def failed_instruction_context(row, error):
     """Identify the failed top-level swap leg without guessing a DEX error meaning."""
-    import ast,re
+    import re
     if not isinstance(error,str):
         return {}
-    match=re.search(r"InstructionError['\\\"]?\\s*:\\s*\\[\\s*(\\d+)\\s*,\\s*\\{['\\\"]Custom['\\\"]\\s*:\\s*(\\d+)\\}",error)
+    match=re.search(r"InstructionError.*?\[\s*(\d+)\s*,\s*\{.*?Custom.*?:\s*(\d+)\s*\}",error)
     if not match:
         return {}
     index,code=map(int,match.groups())
