@@ -2954,6 +2954,447 @@
         "8B4qYkaMSGLAkaWjPXYxe6gjPf99BCotqwHmeRmSEtJ"
       ],
       "pair": "8B4q/SOL"
+    },
+    {
+      "venue": "orca",
+      "address": "83v8iPyZihDEjDdY8RdZddyZNyUtXngz69Lgo9Kt5d6d",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "pair": "SOL/USDC"
+    },
+    {
+      "venue": "raydium_clmm",
+      "address": "8sLbNZoA1cfnvMJLPfp98ZLAnFSYCFApfJKMbiXNLwxj",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "pair": "SOL/USDC"
+    },
+    {
+      "venue": "meteora_dlmm",
+      "address": "HTvjzsfX3yU6BUodCjZ5vZkUrAxMDTrBs3CJaq43ashR",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "pair": "SOL/USDC"
+    },
+    {
+      "venue": "orca",
+      "address": "5BQCndqT4ZHv4PDqVX4kXD2rZNLfDb64akKd1ATrVwsz",
+      "mints": [
+        "6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "pair": "6GmA/USDC"
+    },
+    {
+      "venue": "raydium_clmm",
+      "address": "CYbD9RaToYMtWKA7QZyoLahnHdWq553Vm62Lh6qWtuxq",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "pair": "SOL/USDC"
+    },
+    {
+      "venue": "meteora_dlmm",
+      "address": "GE6QEGU9cwvVQzLjtzQVKDLAUZKyaKRTGFzWAtF893Xh",
+      "mints": [
+        "6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "pair": "6GmA/USDC"
+    },
+    {
+      "venue": "meteora_dlmm",
+      "address": "GMgh4NtWrGaUf1RR2kcXD7LY1jou1qFAuSsQeKp5ow4a",
+      "mints": [
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "USDC/SOL"
+    },
+    {
+      "venue": "orca",
+      "address": "FpCMFDFGYotvufJ7HrFHsWEiiQCGbkLCtwHiDnh7o28Q",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "pair": "SOL/USDC"
+    },
+    {
+      "venue": "raydium_cpmm",
+      "address": "ishEsmyWEtrSksuaFP9xC16zy1w3ujV3idWACsNyriC",
+      "mints": [
+        "wDSAqt4tEZpDAwB9XY6ejkZvMFuT1zUMjUh67txeYhf",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "pair": "wDSA/USDC"
+    },
+    {
+      "venue": "meteora_dlmm",
+      "address": "BFKBQT4yFZPtzyttHQayNmjDJYduvFaPXuytMgnaqexV",
+      "mints": [
+        "WXMRyRZhsa19ety5erZhHg4N3xj3EVN92u94422teJp",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "WXMR/SOL"
+    },
+    {
+      "venue": "meteora_dlmm",
+      "address": "3msVd34R5KxonDzyNSV5nT19UtUeJ2RF1NaQhvVPNLxL",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "pair": "SOL/USDC"
+    },
+    {
+      "venue": "raydium_cpmm",
+      "address": "G8kgi7aUpeX8EVR8VMkrth9SKEv5BietWC33UjAiiMGh",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "ApZuxdpzMrbEYTGEzeY9afh5pj9d6qPRJCTgQYiipbKg"
+      ],
+      "pair": "SOL/ApZu"
+    },
+    {
+      "venue": "meteora_dlmm",
+      "address": "xg71xrhn7MEj5akrZGteuYeiTLbBzyNCpBn69bRYd5a",
+      "mints": [
+        "4kjruqGHDsSqkMdFfCjV7Vb62HPFhtXyWc2t6JpQzDnz",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "4kjr/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "4w2cysotX6czaUGmmWg13hDpY4QEMG2CzeKYEQyK9Ama",
+      "mints": [
+        "5UUH9RTDiSpq6HKS6bp4NdU9PNJpXRXuiw6ShBTBhgH2",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "5UUH/SOL"
+    },
+    {
+      "venue": "raydium_cpmm",
+      "address": "H4sb6cH4bJ4G9vJG3cDA2h3gYAMgCfuzXu8h56RhkVnC",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "APLPiTjBWzwfZ5U1TBeqLF9XJ7dV7XKGe7j4BZhkDray"
+      ],
+      "pair": "SOL/APLP"
+    },
+    {
+      "venue": "raydium_cpmm",
+      "address": "ETTUbzdvpgVrudLKUeMzs8XNpPbF71Wd2KYAhiqzMHtD",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "2724239D1JhWQGV5WZ7tdBTN5Jz4FZ3pdmvj3iD4LsVE"
+      ],
+      "pair": "SOL/2724"
+    },
+    {
+      "venue": "meteora_dlmm",
+      "address": "9d9mb8kooFfaD3SctgZtkxQypkshx6ezhbKio89ixyy2",
+      "mints": [
+        "6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "pair": "6p6x/USDC"
+    },
+    {
+      "venue": "orca",
+      "address": "5zpyutJu9ee6jFymDGoK7F6S5Kczqtc9FomP3ueKuyA9",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"
+      ],
+      "pair": "SOL/DezX"
+    },
+    {
+      "venue": "meteora_dlmm",
+      "address": "6Mo8W6b67brHWokLNeXPdfwH7B1ir3xYCGd4EcBen6eM",
+      "mints": [
+        "ZBCNpuD7YMXzTHB2fhGkGi78MNsHGLRXUhRewNRm9RU",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "pair": "ZBCN/USDC"
+    },
+    {
+      "venue": "meteora_damm_v2",
+      "address": "7j13CapqLC4dGaGYFCxgL8t31R7B1Gt93uBh8EdoRp9H",
+      "mints": [
+        "Pmfm2RprxQRKZH1XWVsBUc2KgCTyzeDTSFbT1vJmogz",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "Pmfm/SOL"
+    },
+    {
+      "venue": "meteora_dlmm",
+      "address": "CFC6n181TdaxSZWNxYH5MmoLsVAf2V94bzWSbdhu8TgH",
+      "mints": [
+        "SKRbvo6Gf7GondiT3BbTfuRDPqLWei4j2Qy2NPGZhW3",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "SKRb/SOL"
+    },
+    {
+      "venue": "raydium_cpmm",
+      "address": "2HSDj1k6zkwwZvdGiZikLRBAqsj6SZZX4e9ha15knvSh",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "8Jz7NgcjEMsWNPAXF3AvUHuHfN1bJ9nYZFHKiKkZUBeV"
+      ],
+      "pair": "SOL/8Jz7"
+    },
+    {
+      "venue": "meteora_damm_v2",
+      "address": "3Uq381E8SfUit1AG5zXMQC9VmjJJJDMzenPm26DkvLeK",
+      "mints": [
+        "FjPKUGnF5zBpdEv18gT8FJCtxh3MKrFkoeYekgYr1win",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "FjPK/SOL"
+    },
+    {
+      "venue": "meteora_dlmm",
+      "address": "8ztFxjFPfVUtEf4SLSapcFj8GW2dxyUA9no2bLPq7H7V",
+      "mints": [
+        "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "Dz9m/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "31ZmTzEufRDBGKsJ7NicCkEKxtPQgAEMQvdbCuUfE6GX",
+      "mints": [
+        "4nV5gNwwP68zUDat26ySChREqVaQaLudfJBkSgEzpump",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "4nV5/SOL"
+    },
+    {
+      "venue": "raydium_clmm",
+      "address": "697oAPKpfeDCRSJLGwr1zfMtfBukfmjX1UENCANWPwVv",
+      "mints": [
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "Hg8bKz4mvs8KNj9zew1cEF9tDw1x2GViB4RFZjVEmfrD"
+      ],
+      "pair": "USDC/Hg8b"
+    },
+    {
+      "venue": "raydium_clmm",
+      "address": "9n3dSLrERZQp95dHXywft7xV8D8xnGFLaUHtEhQVaXaC",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3RKwX8eACQBCt3"
+      ],
+      "pair": "SOL/HZ1J"
+    },
+    {
+      "venue": "raydium_cpmm",
+      "address": "5KXE8RMF7iW9Ptn665AHfzsMFjYb4LV2Ta8eZEtsTwWC",
+      "mints": [
+        "DvjbEsdca43oQcw2h3HW1CT7N3x5vRcr3QrvTUHnXvgV",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "pair": "Dvjb/USDC"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "6M7Jf1h22ZgSeCSSk3YLJKeAkWRfy6LJv1HFfUPqa3PS",
+      "mints": [
+        "DQnkBM4eYYMnVE8Qy2K3BB7uts1fh2EwBVktEz6jpump",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "DQnk/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "FKfRK3WdaGXokysR1fPGgCDEeGkV1b1YYnX9ykVpG3JG",
+      "mints": [
+        "Eg2ymQ2aQqjMcibnmTt8erC6Tvk9PVpJZCxvVPJz2agu",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "Eg2y/SOL"
+    },
+    {
+      "venue": "orca",
+      "address": "FaoZEZFsRS2jJAzg5PXwNjDdA1hDAjDGAkDf4xRfY79w",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "ZBCNpuD7YMXzTHB2fhGkGi78MNsHGLRXUhRewNRm9RU"
+      ],
+      "pair": "SOL/ZBCN"
+    },
+    {
+      "venue": "raydium_amm_v4",
+      "address": "HzLxx6SoViXoqB2KYDGT1gWEckZ9ooRnv8n3xN6uvfez",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "GHichsGq8aPnqJyz6Jp1ASTK4PNLpB5KrD6XrfDjpump"
+      ],
+      "pair": "SOL/GHic"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "DMAFL613XTipuA3jFNYczavWT7XsiYf9cR3qmRMZQhB6",
+      "mints": [
+        "9AvytnUKsLxPxFHFqS6VLxaxt5p6BhYNr53SD2Chpump",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "9Avy/SOL"
+    },
+    {
+      "venue": "meteora_damm_v2",
+      "address": "HbZ73YQ7UV3AQf2ZzhZrJYtzM937gJiCV2hFUmKxsKqz",
+      "mints": [
+        "96egraTCizRpzNx4WvMMhPJf7TKS7W5kUHeenmd1XfuN",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "96eg/SOL"
+    },
+    {
+      "venue": "meteora_dlmm",
+      "address": "i25zRFwGmudZx6fs4xTBvTkUFKxy9nELyKnmraB4KQT",
+      "mints": [
+        "dog1viwbb2vWDpER5FrJ4YFG6gq6XuyFohUe9TXN65u",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "dog1/SOL"
+    },
+    {
+      "venue": "meteora_dlmm",
+      "address": "5tb9fNLKr2wdJRSTNYRu39kGTjnYVseWo2bGyNgxnLHS",
+      "mints": [
+        "5dvXTZ5qwgafnHtwu3Ls3QrWx1U4LQsFeCuJgkk4QEC6",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "5dvX/SOL"
+    },
+    {
+      "venue": "raydium_clmm",
+      "address": "FZ8MJvdTPbp8juhtFCCzb7LsKunhexgzShGQ59SUJkNL",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "rndrizKT3MK1iimdxRdWabcF7Zg7AR5T4nud4EkHBof"
+      ],
+      "pair": "SOL/rndr"
+    },
+    {
+      "venue": "raydium_clmm",
+      "address": "G4G5SzkbLFMhoSgHiQNeyJFt75sSDsL1rD8LVyT5xZbU",
+      "mints": [
+        "6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "pair": "6GmA/USDC"
+    },
+    {
+      "venue": "meteora_damm_v2",
+      "address": "4pBedygxZVUVR94sgTJC6C5CX7nMGBdnv1x8ac9oPJ7o",
+      "mints": [
+        "XtogpWjiAgvkemc5gr1auxkh77w3vKgSQN1nxJeJfHt",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "pair": "Xtog/USDC"
+    },
+    {
+      "venue": "meteora_dlmm",
+      "address": "6qz7THwQvcjF3HyDGLuKaLBUk6EyJKeZXZMWLAeiwfjd",
+      "mints": [
+        "BPxxfRCXkUVhig4HS1Lh7kZqV6SPJhzfEk4x6fVBjPCy",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "pair": "BPxx/USDC"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "35TqQMeiRwEbK6FR5qiPwastuAAvo32VjnULJpxVSxUK",
+      "mints": [
+        "GkyPYa7NnCFbduLknCfBfP7p8564X1VZhwZYJ6CZpump",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "GkyP/SOL"
+    },
+    {
+      "venue": "meteora_damm_v2",
+      "address": "8kXZr2BikmKCgzhP4SrLGyhBpSqQWZK2eCHQhxqRD589",
+      "mints": [
+        "1226TMaWZiZYWdP7CBZBqfJGXoWXaKXJJiKf45e5xfun",
+        "96egraTCizRpzNx4WvMMhPJf7TKS7W5kUHeenmd1XfuN"
+      ],
+      "pair": "1226/96eg"
+    },
+    {
+      "venue": "raydium_cpmm",
+      "address": "68vHUSKj8LZSWnvvjtSmgNMoiNwR7vS8t8t1DTaA1f53",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "AUdUEc98MGfEHJiJfCgMaW8gKdcfNDio8BFzGKBwjztC"
+      ],
+      "pair": "SOL/AUdU"
+    },
+    {
+      "venue": "meteora_damm_v2",
+      "address": "4xKtoPrp7gEjw7sM3goagSL5j5CvyjRhCjVX4Qusz49Q",
+      "mints": [
+        "GnsjGzaJAGH2kwpwdh7S7DQzne22937Xi58ZHsYEN4uK",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "Gnsj/SOL"
+    },
+    {
+      "venue": "meteora_dlmm",
+      "address": "Bsf4J2aqQ5iBbBfbW6RKyxhFMt1PynHm2hhFgVdP6rcu",
+      "mints": [
+        "dfxQsZjikuu5DGXPgX7yEpRog74HT5cJgytT3i5iLtw",
+        "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
+      ],
+      "pair": "dfxQ/Es9v"
+    },
+    {
+      "venue": "raydium_cpmm",
+      "address": "EkHWcjpNiu8N368E9f4Hkzab3nVdAAg6BLWtVmZGL2t8",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "7gCND4jhgJ8Mq1XxNhRdercinXh7fcCDPjA9uEQLk3f2"
+      ],
+      "pair": "SOL/7gCN"
+    },
+    {
+      "venue": "raydium_amm_v4",
+      "address": "412Mr1t8g1xSzW4wBaCV8J8KDFrhff46aNqGMSoK1asL",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "FV56CmR7fhEyPkymKfmviKV48uPo51ti9kAxssQqTDLu"
+      ],
+      "pair": "SOL/FV56"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "8HoNpnvXqGTpWYwP6ek3bKySCneK1FYK1upCXveB2HP6",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "EJH9AXTPE8xv9TMTfyreLCogUr4naZtuZG2aYBLHPbRP"
+      ],
+      "pair": "SOL/EJH9"
+    },
+    {
+      "venue": "raydium_clmm",
+      "address": "F3DAAusn8mob9swWaX4ehaRrhi2Q3XJScKkuUpXdvn2i",
+      "mints": [
+        "CARDSccUMFKoPRZxt5vt3ksUbxEFEcnZ3H2pd3dKxYjp",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "pair": "CARD/USDC"
     }
   ]
 }
