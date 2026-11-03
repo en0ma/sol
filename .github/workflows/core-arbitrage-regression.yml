@@ -38,6 +38,8 @@ jobs:
             test_raydium_clmm_native_single_tick.py \
             test_pool_registry.py \
             test_m5_start_mint_expansion.py \
-            test_m5_three_hop_capture_coverage.py; do
+            test_m5_three_hop_capture_coverage.py \
+            test_m5_directional_cache_provenance.py \
+            test_m5_directional_source_capture.py; do
             python3 -m unittest discover -s tests -p "$pattern" -v
           done
