@@ -19,6 +19,30 @@ class StartMintExpansionTests(unittest.TestCase):
         self.assertEqual(proposal["targets"][0]["mint"],"new")
         self.assertEqual({p["missing_hub"] for p in proposal["targets"]},{USDC,USDT})
         self.assertFalse(proposal["actionable"])
+    def test_non_leaf_without_triangle_still_receives_missing_hub_target(self):
+        # The old one-neighbor restriction silently excluded this legitimate
+        # discovery candidate even though a source-verified second hub pool
+        # could close new -> SOL -> USDC -> new.
+        rows=self.rows()+[
+            {"venue":"pumpswap","address":"extra","mints":["new","other"]}]
+        self.assertNotIn("new",topology(rows)["three_hop_start_mints"])
+        proposal=bridge_targets(rows,maximum=10)
+        self.assertEqual(
+            {p["missing_hub"] for p in proposal["targets"] if p["mint"]=="new"},
+            {USDC,USDT})
+        self.assertFalse(proposal["target_met_on_signed_simulations"] if
+                         "target_met_on_signed_simulations" in proposal else
+                         proposal["actionable"])
+        # Discovery alone cannot count as authenticated execution.
+        self.assertTrue(proposal["targets_are_unverified_hints"])
+
+    def test_non_leaf_without_hub_cannot_invent_bridge(self):
+        rows=self.rows()+[
+            {"venue":"pumpswap","address":"other1","mints":["x","y"]},
+            {"venue":"orca","address":"other2","mints":["x","z"]}]
+        self.assertFalse(any(p["mint"]=="x" for p in
+                             bridge_targets(rows)["targets"]))
+
     def test_authenticated_bridge_creates_distinct_pool_triangle(self):
         rows=self.rows()+[
             {"venue":"orca","address":"e","mints":["new",USDC]}]
