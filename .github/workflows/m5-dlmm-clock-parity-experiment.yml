@@ -1,0 +1,75 @@
+name: M5 Permissioned DLMM Clock Parity Experiment
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/m5-dlmm-clock-parity-experiment.yml"
+      - "arb/m5_dlmm_clock_parity_experiment.py"
+      - "arb/next_ten_signed_atomic_offline.py"
+      - "arb/meteora_dlmm.py"
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  signed-clock-parity-experiment:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      SURFPOOL_EXPLICITLY_OFFLINE: "1"
+      SURFPOOL_DATASOURCE_RPC_URL: ""
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install offline Surfpool and signer dependencies
+        run: |
+          bash ci/install_surfpool.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          python3 -m pip install --disable-pip-version-check solders==0.26.0
+          python3 -m py_compile arb/m5_dlmm_clock_parity_experiment.py
+      - name: Download pinned authenticated failing-route source snapshot
+        uses: actions/download-artifact@v4
+        with:
+          name: m5-three-hop-source-fixtures
+          run-id: 41630269289
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          path: ${{ runner.temp }}/clock-source
+      - name: Start disconnected offline Surfpool
+        run: |
+          test -z "$SURFPOOL_DATASOURCE_RPC_URL"
+          nohup "$HOME/.local/bin/surfpool" start --ci --offline --no-deploy > "$RUNNER_TEMP/clock-offline.log" 2>&1 < /dev/null &
+          python3 - <<'PY'
+          import time
+          from arb.rpc import call
+          for _ in range(80):
+              try:
+                  assert call("http://127.0.0.1:8899","getLatestBlockhash")["value"]["blockhash"]
+                  break
+              except (ValueError,RuntimeError,OSError,KeyError):
+                  time.sleep(1)
+          else:
+              raise SystemExit("offline fork unavailable")
+          PY
+      - name: Compare signed route before and after source-slot Clock alignment
+        run: |
+          python3 -m arb.m5_dlmm_clock_parity_experiment --fixture "$RUNNER_TEMP/clock-source/triangles/source-65.json" --output "$RUNNER_TEMP/dlmm-clock-comparison.json"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          r=json.loads((Path(os.environ["RUNNER_TEMP"])/"dlmm-clock-comparison.json").read_text())
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a") as f:
+              f.write("## Permissioned DLMM Clock parity experiment\n")
+              f.write(f"Source slot: {r['source_slot']}; offline before: {r['offline_clock_before']['slot']}; offline after: {r['offline_clock_after']['slot']}.\n")
+              f.write(f"Clock alignment: {r['clock_alignment']}.\n")
+              for label in ("before_clock_alignment","after_clock_alignment"):
+                  result=r[label]
+                  f.write(f"{label}: signed_verified={result.get('signed_atomic_simulation_verified')}, rollback_verified={result.get('rollback_failure_case_verified')}, error={result.get('positive_error') or result.get('diagnostic')}.\n")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: m5-dlmm-clock-parity-evidence
+          path: |
+            ${{ runner.temp }}/dlmm-clock-comparison.json
+            ${{ runner.temp }}/clock-offline.log
+          if-no-files-found: warn
