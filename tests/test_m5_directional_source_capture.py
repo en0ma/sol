@@ -24,7 +24,7 @@ class DirectionalOrcaCaptureTests(unittest.TestCase):
             return ["forward1", "forward2", "forward3"] if forward else [
                 "backward1", "backward2", "backward3"]
 
-        with patch("arb.next_ten_pair_fixture_export.snapshot",
+        with patch("arb.next_ten_fork_pool_probe.snapshot",
                    return_value=snapshot), patch(
                    "arb.next_ten_pair_fixture_export._fetch",
                    return_value={pool: {"data": [base64.b64encode(b"state").decode()]}}), patch(
