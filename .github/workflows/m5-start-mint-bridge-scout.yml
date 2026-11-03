@@ -46,9 +46,9 @@ jobs:
           else:
               raise SystemExit("source fork unavailable")
           PY
-      - name: Scout up to 36 one-hub token bridges on four venues
+      - name: Derive and verify up to 80 Orca one-hub bridges using direct PDA accounts
         run: |
-          python3 -m arb.m5_start_mint_expansion --maximum 36 --output "$RUNNER_TEMP/m5-forty-start-bridge-report.json"
+          python3 -m arb.m5_start_mint_expansion --maximum 80 --venues orca --output "$RUNNER_TEMP/m5-forty-start-bridge-report.json"
           python3 - <<'PY'
           import os,json
           from pathlib import Path
