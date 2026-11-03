@@ -38,7 +38,9 @@ def capture(rpc,graph,route_index,output,*,venue_cache=None):
         if (venue not in PROGRAMS or not isinstance(pool,str) or not pool or
                 leg.get("input")!=current or not isinstance(leg.get("output"),str)):
             raise ValueError("source graph mint/venue continuity absent")
-        cache_key=(venue,pool,tuple(sorted((current,leg["output"]))))
+        # Account evidence can be direction-specific (notably Orca tick arrays).
+        # Never reuse a pool's forward evidence for its reverse swap.
+        cache_key=(venue,pool,current,leg["output"])
         cached=venue_cache.get(cache_key) if venue_cache is not None else None
         if cached is None:
             proof=snapshot(rpc,pool,venue)
