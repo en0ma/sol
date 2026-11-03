@@ -41,8 +41,12 @@ def failed_instruction_context(row, error):
     pools=row.get("pools",[])
     if index>=len(venues) or index>=len(pools):
         return {"failed_instruction_index":index,"program_error_code":code}
-    return {"failed_instruction_index":index,"program_error_code":code,
+    result={"failed_instruction_index":index,"program_error_code":code,
             "failed_venue":venues[index],"failed_pool":pools[index]}
+    if venues[index]=="meteora_dlmm" and code==6042:
+        result["program_error_name"]="PoolDisabled"
+        result["diagnostic_class"]="DLMM_SWAP_BLOCKED_BY_POOL_STATUS_OR_ACTIVATION"
+    return result
 
 def diversified_three_hop_graph(readiness, maximum=100):
     """Bounded round-robin across authenticated token cycles and pool identities."""
