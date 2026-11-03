@@ -104,6 +104,8 @@ def diversified_three_hop_graph(readiness, maximum=100):
     graph.update(routes=result,connected_cycles=len(result),
         cycle_budget=maximum,cycle_inventory_truncated=True,
         cycle_count_is_exhaustive=False,
+        source_swap_eligibility_rejections=readiness.get("source_swap_eligibility_rejections",[]),
+        source_swap_eligibility_rejection_count=len(readiness.get("source_swap_eligibility_rejections",[])),
         three_hop_candidate_identities_considered=len(unique_identities),
         three_hop_distinct_token_paths=len({tuple([r["start_mint"]]+[leg["output"] for leg in r["legs"][:2]]) for r in result}),
         three_hop_distinct_start_mints=len({r["start_mint"] for r in result}),
