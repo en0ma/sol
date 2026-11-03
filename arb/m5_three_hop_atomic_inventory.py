@@ -14,7 +14,7 @@ def diversified_three_hop_graph(readiness, maximum=100):
     from collections import defaultdict, deque
     from arb.m5_seven_venue_route_scan import analyze, ORDER, SAFE
     from arb.opportunity_graph import cycles
-    if type(maximum)is not int or not 1<=maximum<=100:
+    if type(maximum)is not int or not 1<=maximum<=200:
         raise ValueError("invalid cycle budget")
     pools=[{"venue":v,"address":p["pool"],"mints":p["mints"],"verified":True}
            for v in ORDER for p in readiness["authenticated_pools"][v]]
@@ -69,13 +69,14 @@ def diversified_three_hop_graph(readiness, maximum=100):
             "budget":maximum,"truncated":len(unique_identities)>len(result)}})
     return graph
 
-def source_capture(rpc, graph, directory, *, shard_index=0, shard_count=1):
+def source_capture(rpc, graph, directory, *, shard_index=0, shard_count=1, target=100):
     from arb.m5_four_to_six_source_capture import capture
     root=Path(directory)
     root.mkdir(parents=True,exist_ok=True)
     if graph.get("status")!="SOURCE_AUTHENTICATED_ROUTE_DISCOVERY_ONLY":
         raise ValueError("authenticated graph required")
     rows=[]
+    blocked=[]
     venue_cache={}
     selected=[(i,r) for i,r in enumerate(graph["routes"]) if r.get("hops")==3]
     if (type(shard_index)is not int or type(shard_count)is not int
@@ -100,15 +101,23 @@ def source_capture(rpc, graph, directory, *, shard_index=0, shard_count=1):
         except (ValueError,KeyError,TypeError,RuntimeError,OSError) as exc:
             entry["source_status"]="CAPTURE_BLOCKED"
             entry["diagnostic"]=str(exc)[:300]
-        rows.append(entry)
+        if entry["source_status"]=="CAPTURED":
+            rows.append(entry)
+        else:
+            blocked.append(entry)
         (root/"three-hop-inventory.json").write_text(json.dumps(
             {"status":"SOURCE_THREE_HOP_INVENTORY",
              "cycle_count":len(selected),"shard_index":shard_index,
              "shard_count":shard_count,"shard_cycle_count":len(rows),
-             "attempted_source_captures":len(rows),
+             "attempted_source_captures":len(rows)+len(blocked),
+             "blocked_source_routes":blocked,
              "cached_distinct_pool_directions":len(venue_cache),
             "three_hop_truncated":graph.get("cycle_coverage_by_hops",{}).get("3",{}).get("truncated"),
              "routes":rows,**SAFE},indent=2)+"\n")
+        if shard_count==1 and len(rows)>=target:
+            break
+    if shard_count==1 and len(rows)<target:
+        raise RuntimeError(f"only {len(rows)}/{target} source-capturable routes; {len(blocked)} blocked")
     return rows
 
 def offline_simulate(rpc,directory,*,amount=100000,shard_index=0,shard_count=1):
