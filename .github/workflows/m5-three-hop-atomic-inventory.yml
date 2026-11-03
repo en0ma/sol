@@ -7,6 +7,7 @@ on:
       - "arb/next_ten_fork_pool_probe.py"
       - "arb/raydium_clmm_ticks.py"
       - "arb/meteora_dlmm.py"
+      - "arb/dlmm_offline_clock.py"
       - "arb/atomic_graph_coordinator.py"
       - "arb/pool_registry.json"
       - "arb/m5_four_to_six_source_capture.py"
