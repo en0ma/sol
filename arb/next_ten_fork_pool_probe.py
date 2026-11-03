@@ -298,6 +298,16 @@ def probe(rpc, registry, *, batch=BATCH_10, maximum_per_venue=12,
                     activation=authenticated.get("source_swap_activation")
                     result=swap_activation_evidence(activation,slot=clock["slot"],
                         unix_timestamp=clock["unix_timestamp"])
+                    # Permissioned pools enforce Clock-based activation inside
+                    # the deployed swap. Source Clock is authenticated here,
+                    # but the source-disconnected offline Surfpool does not
+                    # attest that its Clock matches that source snapshot.
+                    # Never infer offline execution readiness from source time.
+                    if activation["pair_type"]==1:
+                        rejected_swap_pools.append({"venue":venue,"pool":pool,
+                            "reason":"PERMISSIONED_DLMM_OFFLINE_CLOCK_PARITY_UNVERIFIED",
+                            "source_swap_activation":result})
+                        continue
                     if not result["swap_eligible"]:
                         rejected_swap_pools.append({"venue":venue,"pool":pool,
                             "reason":result["reason"],
