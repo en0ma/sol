@@ -138,7 +138,7 @@ def prioritized_probe_addresses(registry, addresses, batch, *, maximum=12,
     pool, and snapshot() still independently checks the actual program owner,
     decoder, mint identity and reserves before route consideration.
     """
-    if type(maximum) is not int or not 1<=maximum<=24:
+    if type(maximum) is not int or not 1<=maximum<=48:
         raise ValueError("bounded paired source pool probes required")
     if type(prefer_start_mint_coverage) is not bool:
         raise ValueError("invalid three-hop token coverage policy")
@@ -178,6 +178,11 @@ def prioritized_probe_addresses(registry, addresses, batch, *, maximum=12,
         chosen=[p for p in covered.get(venue,[]) if p in options]
         if len(chosen)<maximum and venue in legacy and legacy[venue] in options and legacy[venue] not in chosen:
             chosen.append(legacy[venue])
+        if prefer_start_mint_coverage:
+            # Spend source RPC only on pools needed for distinct triangle
+            # coverage. Existing addresses still require snapshot() readback.
+            result[venue]=chosen
+            continue
         ranked=[]
         for position,address in enumerate(options):
             if not isinstance(address,str) or address in chosen:
@@ -295,7 +300,7 @@ def permissioned_dlmm_clock_parity_unverified(activation, *, offline_clock_attes
 def probe(rpc, registry, *, batch=BATCH_10, maximum_per_venue=12,
           require_dlmm_swap_eligible=False,prefer_start_mint_coverage=False):
     local_rpc_only(rpc)
-    if type(maximum_per_venue) is not int or not 1<=maximum_per_venue<=24:
+    if type(maximum_per_venue) is not int or not 1<=maximum_per_venue<=48:
         raise ValueError("invalid source probe venue budget")
     if type(require_dlmm_swap_eligible) is not bool:
         raise ValueError("invalid DLMM eligibility option")
@@ -304,6 +309,8 @@ def probe(rpc, registry, *, batch=BATCH_10, maximum_per_venue=12,
     entries=prioritized_probe_addresses(registry,candidates(registry),batch,
                                          maximum=maximum_per_venue,
                                          prefer_start_mint_coverage=prefer_start_mint_coverage)
+    if sum(map(len,entries.values()))>200:
+        raise ValueError("source pool graph exceeds 200 identities; tighten token-diverse selection")
     relevant={v for pair in batch for v in pair}
     pools={}
     failures=[]
