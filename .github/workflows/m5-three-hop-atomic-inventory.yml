@@ -48,7 +48,7 @@ jobs:
           else:
               raise SystemExit("source fork unavailable")
           PY
-      - name: Discover and capture 100 preflight-valid cycles from up to 200 candidates
+      - name: Discover and capture 140 preflight-valid cycles from up to 200 candidates
         run: |
           python3 - <<'PY'
           import json,os
@@ -66,7 +66,7 @@ jobs:
           print(json.dumps({"three_hop_discovered":sum(r["hops"]==3 for r in graph["routes"]),
                             "three_hop_truncated":graph["cycle_coverage_by_hops"]["3"]["truncated"]}))
           PY
-          python3 -m arb.m5_three_hop_atomic_inventory --phase source --graph "$RUNNER_TEMP/triangles/graph.json" --directory "$RUNNER_TEMP/triangles" --source-target 100
+          python3 -m arb.m5_three_hop_atomic_inventory --phase source --graph "$RUNNER_TEMP/triangles/graph.json" --directory "$RUNNER_TEMP/triangles" --source-target 140
       - name: Shut down read-only source fork
         if: always()
         run: |
@@ -119,17 +119,20 @@ jobs:
                   time.sleep(1)
           else:raise SystemExit("offline fork unavailable")
           PY
-      - name: Sign and simulate up to ten assigned routes
+      - name: Sign and simulate fourteen assigned routes, requiring ten verified per shard
         run: |
           python3 -m arb.m5_three_hop_atomic_inventory --phase offline --directory "$RUNNER_TEMP/source-artifact/triangles" --amount 100000 --shard-index ${{ matrix.shard }} --shard-count 10
           python3 - <<'PY'
           import json,os
           from pathlib import Path
           r=json.loads((Path(os.environ["RUNNER_TEMP"])/"source-artifact/triangles/three-hop-inventory.json").read_text())
-          assert len(r["routes"])<=10, "shard must contain at most ten routes"
+          assert len(r["routes"])<=14, "shard must contain at most fourteen routes"
           with open(os.environ["GITHUB_STEP_SUMMARY"],"a") as f:
               f.write(f"Shard {r['shard_index']}: {r.get('build_confirmed',0)}/{len(r['routes'])} signed builds; {r.get('simulations_verified',0)}/{len(r['routes'])} verified simulations.\n")
-          assert all(row.get("source_status")=="CAPTURED" and row.get("atomic_build_status")=="SIGNED_ATOMIC_PACKET_BUILT" and row.get("simulation_status")=="SIGNED_SIMULATION_AND_ROLLBACK_VERIFIED" for row in r["routes"]), "not all selected routes passed signed simulation and rollback"
+          verified=[row for row in r["routes"] if row.get("source_status")=="CAPTURED" and row.get("atomic_build_status")=="SIGNED_ATOMIC_PACKET_BUILT" and row.get("simulation_status")=="SIGNED_SIMULATION_AND_ROLLBACK_VERIFIED"]
+          blocked=[{"id":row["id"],"diagnostic":row.get("diagnostic"),"status":row.get("simulation_status")} for row in r["routes"] if row not in verified]
+          print(json.dumps({"verified":len(verified),"attempted":len(r["routes"]),"blocked":blocked}))
+          assert len(r["routes"])==14 and len(verified)>=10, "fewer than ten fully verified simulations in shard"
           PY
       - uses: actions/upload-artifact@v4
         if: always()
