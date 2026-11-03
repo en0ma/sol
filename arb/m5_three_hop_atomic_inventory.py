@@ -158,6 +158,13 @@ def offline_simulate(rpc,directory,*,amount=100000,shard_index=0,shard_count=1):
                     else "SIGNED_SIMULATION_NOT_VERIFIED")
                 row["simulation_detail"]=receipt.get("status")
                 row["positive_error"]=receipt.get("positive_error")
+                if row["simulation_status"]=="SIGNED_SIMULATION_NOT_VERIFIED":
+                    row["diagnostic"]=json.dumps({
+                        "receipt_status":receipt.get("status"),
+                        "positive_error":receipt.get("positive_error"),
+                        "signed_atomic_simulation_verified":receipt.get("signed_atomic_simulation_verified"),
+                        "rollback_failure_case_verified":receipt.get("rollback_failure_case_verified"),
+                    },sort_keys=True)[:500]
                 row["compute_units"]=receipt.get("positive_units_consumed")
             else:
                 row["atomic_build_status"]="NO_VERIFIABLE_SIGNED_PACKET"
