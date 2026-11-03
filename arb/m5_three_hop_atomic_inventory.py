@@ -9,7 +9,8 @@ from pathlib import Path
 
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
 
-def choose_pool_diverse_candidate(queue, selected_identities, used_pools, *, window=256):
+def choose_pool_diverse_candidate(queue, selected_identities, used_pools, *,
+                                  start_used_pools=None, window=256):
     """Pick a fresh route maximizing pool coverage within a bounded queue window.
 
     Retain start-token round robin; do not treat candidate discovery as execution.
@@ -20,10 +21,16 @@ def choose_pool_diverse_candidate(queue, selected_identities, used_pools, *, win
         return None
     # Look past the lexicographically earliest 3-hop combinations, which can
     # repeatedly sample the same large pool cluster.
+    if start_used_pools is None:
+        start_used_pools=set()
     def score(item):
         index,identity,route=item
         pools={(leg["venue"],leg["pool"]) for leg in route["legs"]}
-        return (len(pools-used_pools),len(pools),-index)
+        # A distinct starting mint needs independently capturable pool
+        # alternatives. Global novelty alone can repeatedly choose the same
+        # unusable pool for a mint's second and third route rotations.
+        return (len(pools-start_used_pools),len(pools-used_pools),
+                len(pools),-index)
     position,identity,route=max(eligible[:window],key=score)
     del queue[position]
     return identity,route
@@ -83,6 +90,7 @@ def diversified_three_hop_graph(readiness, maximum=100, *,
     result=[]
     selected_identities=set()
     used_pools=set()
+    used_pools_by_start=defaultdict(set)
     starts=sorted(candidates)
     while starts and len(result)<maximum:
         next_starts=[]
@@ -95,11 +103,15 @@ def diversified_three_hop_graph(readiness, maximum=100, *,
             scoped_seen=({identity for anchor,identity in selected_identities
                           if anchor==start} if allow_start_rotations
                           else selected_identities)
-            choice=choose_pool_diverse_candidate(q,scoped_seen,used_pools)
+            choice=choose_pool_diverse_candidate(
+                q,scoped_seen,used_pools,
+                start_used_pools=used_pools_by_start[start])
             if choice is not None:
                 identity,r=choice
                 selected_identities.add((start,identity) if allow_start_rotations else identity)
-                used_pools.update((leg["venue"],leg["pool"]) for leg in r["legs"])
+                selected_route_pools={(leg["venue"],leg["pool"]) for leg in r["legs"]}
+                used_pools.update(selected_route_pools)
+                used_pools_by_start[start].update(selected_route_pools)
                 result.append({"start_mint":r["start_mint"],"hops":3,
                     "legs":r["legs"],"venue_count":len(r["venues"]),
                     "quote_status":"NOT_QUOTED",
@@ -122,8 +134,8 @@ def diversified_three_hop_graph(readiness, maximum=100, *,
         three_hop_distinct_start_mints=len({r["start_mint"] for r in result}),
         three_hop_distinct_selected_pools=len(used_pools),
         three_hop_distinct_selected_venues=len({v for v,_ in used_pools}),
-        three_hop_sample_policy=("START_MINT_ROUND_ROBIN_POOL_COVERAGE_GREEDY_256_PER_START_ROTATIONS" if allow_start_rotations else
-                                 "START_MINT_ROUND_ROBIN_POOL_COVERAGE_GREEDY_256_ROTATION_DEDUP"),
+        three_hop_sample_policy=("START_MINT_ROUND_ROBIN_PER_START_POOL_NOVELTY_256_ROTATIONS" if allow_start_rotations else
+                                 "START_MINT_ROUND_ROBIN_PER_START_POOL_NOVELTY_256_ROTATION_DEDUP"),
         cycle_coverage_by_hops={"3":{"returned":len(result),
             "budget":maximum,"truncated":len(unique_identities)>len(result)}})
     return graph
