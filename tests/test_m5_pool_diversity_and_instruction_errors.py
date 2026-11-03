@@ -31,7 +31,9 @@ class PoolCoverageSelectionTests(unittest.TestCase):
         self.assertEqual(failed_instruction_context(row,
             "ValueError: signed prefix simulation failed: {'InstructionError': [1, {'Custom': 6042}]}"),
             {"failed_instruction_index":1,"program_error_code":6042,
-             "failed_venue":"meteora_dlmm","failed_pool":"pool1"})
+             "failed_venue":"meteora_dlmm","failed_pool":"pool1",
+             "program_error_name":"PoolDisabled",
+             "diagnostic_class":"DLMM_SWAP_BLOCKED_BY_POOL_STATUS_OR_ACTIVATION"})
         self.assertEqual(failed_instruction_context(row,
             "{'InstructionError': [2, {'Custom': 6042}]}"),
             {"failed_instruction_index":2,"program_error_code":6042,
