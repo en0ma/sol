@@ -87,6 +87,79 @@ def bridge_targets(entries, *, maximum=36):
     return {"topology":graph,"targets":result,
             "targets_are_unverified_hints":True,**SAFE}
 
+def starting_mint_coverage_pool_subset(entries, *, maximum_per_venue=24,
+                                       target_start_mints=40):
+    """Choose registry HINT addresses covering true 3-hop token triangles.
+
+    Never authenticates these hints. The caller MUST revalidate each selected
+    source account before route construction, and signed simulation still gates
+    the final starting-token count.
+    """
+    from itertools import product
+    if (type(maximum_per_venue)is not int or not 1<=maximum_per_venue<=48 or
+            type(target_start_mints)is not int or not 1<=target_start_mints<=100):
+        raise ValueError("bounded triangle coverage targets required")
+    graph=topology(entries)
+    pool_by_pair=defaultdict(list)
+    adjacency=defaultdict(set)
+    for row in entries:
+        a,b=row["mints"]
+        pool_by_pair[tuple(sorted((a,b)))].append(row)
+        adjacency[a].add(b)
+        adjacency[b].add(a)
+    triples=[]
+    for a in sorted(adjacency):
+        for b in sorted(n for n in adjacency[a] if n>a):
+            for c in sorted(n for n in adjacency[b] if n>b and n in adjacency[a]):
+                edges=[pool_by_pair[tuple(sorted(edge))] for edge in
+                       ((a,b),(b,c),(c,a))]
+                triples.append(((a,b,c),edges))
+    chosen={}
+    counts=defaultdict(int)
+    covered=set()
+    while len(covered)<target_start_mints:
+        best=None
+        best_score=None
+        for tokens,edges in triples:
+            new_mints=sum(t not in covered for t in tokens)
+            if not new_mints:continue
+            # Prefer reuse of already scheduled identities, with a bounded
+            # six-option search per pair to avoid dense hub combinatorics.
+            options=[sorted(poolset,key=lambda p:(
+                p["address"] not in chosen,counts[p["venue"]],
+                p["venue"],p["address"]))[:6] for poolset in edges]
+            for candidate in product(*options):
+                identities={(p["venue"],p["address"]) for p in candidate}
+                if len(identities)!=3:continue
+                additions=[p for p in candidate if (p["venue"],p["address"]) not in chosen]
+                increments=defaultdict(int)
+                for row in additions:increments[row["venue"]]+=1
+                if any(counts[v]+inc>maximum_per_venue for v,inc in increments.items()):
+                    continue
+                # New start mints take precedence over pool density.
+                score=(new_mints,-len(additions),
+                       -sum(counts[p["venue"]] for p in candidate),
+                       tuple(tokens))
+                if best_score is None or score[:3]>best_score[:3]:
+                    best_score=score
+                    best=(tokens,candidate,additions)
+        if best is None:break
+        tokens,candidate,additions=best
+        for row in additions:
+            chosen[(row["venue"],row["address"])]=row
+            counts[row["venue"]]+=1
+        covered.update(tokens)
+    selected=defaultdict(list)
+    for (venue,address),row in chosen.items():
+        selected[venue].append(address)
+    return {"addresses":{venue:sorted(addresses) for venue,addresses in selected.items()},
+            "three_hop_mint_topology_ceiling":graph["three_hop_start_mint_count"],
+            "selected_three_hop_start_mint_count":len(covered),
+            "selected_three_hop_start_mints":sorted(covered),
+            "source_authenticated":False,
+            "signed_simulation_verified":False,
+            **SAFE}
+
 def derive_orca_bridge_addresses(rpc,entries,targets,*,spacings=(1,2,4,8,16,32,64,128)):
     """Derive Whirlpool PDAs using source-fetched config keys; no GPA scans.
 
