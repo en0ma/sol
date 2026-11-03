@@ -71,14 +71,16 @@ def bridge_targets(entries, *, maximum=360):
         # triangle. Do not discard it just because its graph degree exceeds 1.
         # A missing second hub connection is a *candidate* bridge only when
         # an existing edge joins that hub to one of its connected hubs.
-        connected_hubs=sorted(set(neighbors)&set(HUBS))
-        if not connected_hubs:
-            continue
+        # Hub-backed triangles are a discovery scaffold, not a requirement
+        # that the existing second leg also be a hub. Any authenticated
+        # neighbor with an existing connection to the target hub can close
+        # mint -> neighbor -> hub -> mint. This captures non-leaf tokens
+        # that would otherwise be stranded by hub-only bridge scheduling.
         for target in HUBS:
             if target in neighbors or tuple(sorted((mint,target))) in current_pairs:
                 continue
-            old=next((hub for hub in connected_hubs
-                      if tuple(sorted((hub,target))) in current_pairs),None)
+            old=next((neighbor for neighbor in neighbors
+                      if tuple(sorted((neighbor,target))) in current_pairs),None)
             if old is None:
                 continue
             candidates.append({"mint":mint,"connected_hub":old,"missing_hub":target,
@@ -129,6 +131,12 @@ def starting_mint_coverage_pool_subset(entries, *, maximum_per_venue=24,
                 edges=[pool_by_pair[tuple(sorted(edge))] for edge in
                        ((a,b),(b,c),(c,a))]
                 triples.append(((a,b,c),edges))
+    # Rare starting tokens are easier to lose under venue/pool budgets.
+    # Prefer triangles containing fewer alternative paths before spending
+    # scarce source-probe slots on hubs with hundreds of alternatives.
+    frequency=defaultdict(int)
+    for tokens,_ in triples:
+        for mint in tokens:frequency[mint]+=1
     chosen={}
     counts=defaultdict(int)
     covered=set()
@@ -138,24 +146,34 @@ def starting_mint_coverage_pool_subset(entries, *, maximum_per_venue=24,
         for tokens,edges in triples:
             new_mints=sum(t not in covered for t in tokens)
             if not new_mints:continue
-            # Prefer reuse of already scheduled identities, with a bounded
-            # six-option search per pair to avoid dense hub combinatorics.
-            options=[sorted(poolset,key=lambda p:(
-                p["address"] not in chosen,counts[p["venue"]],
-                p["venue"],p["address"]))[:6] for poolset in edges]
+            # Preserve alternative venues in each pair's candidate budget:
+            # a straight first-six pool slice can all belong to an exhausted
+            # venue and hide a valid triangle in another authenticated venue.
+            options=[]
+            for poolset in edges:
+                by_venue=defaultdict(list)
+                for p in sorted(poolset,key=lambda p:(
+                        (p["venue"],p["address"]) not in chosen,
+                        counts[p["venue"]],p["venue"],p["address"])):
+                    if len(by_venue[p["venue"]])<2:
+                        by_venue[p["venue"]].append(p)
+                options.append([p for venue in sorted(by_venue)
+                                for p in by_venue[venue]][:14])
             for candidate in product(*options):
                 identities={(p["venue"],p["address"]) for p in candidate}
                 if len(identities)!=3:continue
                 additions=[p for p in candidate if (p["venue"],p["address"]) not in chosen]
                 increments=defaultdict(int)
                 for row in additions:increments[row["venue"]]+=1
-                if any(counts[v]+inc>maximum_per_venue for v,inc in increments.items()):
+                if (any(counts[v]+inc>maximum_per_venue for v,inc in increments.items())
+                        or sum(counts.values())+len(additions)>200):
                     continue
-                # New start mints take precedence over pool density.
-                score=(new_mints,-len(additions),
-                       -sum(counts[p["venue"]] for p in candidate),
-                       tuple(tokens))
-                if best_score is None or score[:3]>best_score[:3]:
+                # First maximize distinct reachable starts, then protect
+                # scarce starts with few remaining triangle alternatives.
+                rarity=sum(1/frequency[t] for t in tokens if t not in covered)
+                score=(new_mints,rarity,-len(additions),
+                       -sum(counts[p["venue"]] for p in candidate))
+                if best_score is None or score>best_score:
                     best_score=score
                     best=(tokens,candidate,additions)
         if best is None:break
@@ -171,6 +189,9 @@ def starting_mint_coverage_pool_subset(entries, *, maximum_per_venue=24,
             "three_hop_mint_topology_ceiling":graph["three_hop_start_mint_count"],
             "selected_three_hop_start_mint_count":len(covered),
             "selected_three_hop_start_mints":sorted(covered),
+            "unselected_topology_start_mints":sorted(set(graph["three_hop_start_mints"])-covered),
+            "selected_pool_identity_count":len(chosen),
+            "selection_policy":"SCARCITY_WEIGHTED_DISTINCT_START_TRIANGLES_VENUE_DIVERSE_200_POOL_CAP",
             "source_authenticated":False,
             "signed_simulation_verified":False,
             **SAFE}
