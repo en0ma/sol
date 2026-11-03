@@ -1,4 +1,4 @@
-"""Topology-driven, read-only bridge-pool scouting for 40 distinct start mints.
+"""Topology-driven, read-only pool discovery to maximize distinct three-hop start mints.
 
 The registry is a source hint, not proof of executable liquidity. Suggestions
 become candidate edges only after source-RPC program and reserve verification.
@@ -53,8 +53,8 @@ def topology(entries):
             "mint_neighbors":{m:sorted({p["mints"][0] if p["mints"][1]==m else p["mints"][1]
                 for p in edges}) for m,edges in by_mint.items()}}
 
-def bridge_targets(entries, *, maximum=36):
-    if type(maximum)is not int or not 1<=maximum<=120:
+def bridge_targets(entries, *, maximum=360):
+    if type(maximum)is not int or not 1<=maximum<=360:
         raise ValueError("bounded discovery target budget required")
     graph=topology(entries)
     existing=graph["three_hop_start_mints"]
@@ -78,17 +78,24 @@ def bridge_targets(entries, *, maximum=36):
     # Prefer established tokens with multiple authenticated pool identity hints.
     # Keep both missing-hub options adjacent; avoid 36 requests for one mint.
     candidates.sort(key=lambda x:(-x["current_pools"],x["mint"],x["missing_hub"]))
-    result=[];selected=set()
-    for row in candidates:
-        if row["mint"] in selected:continue
-        result.append(row)
-        selected.add(row["mint"])
+    # Search both missing liquid hubs when possible. The first may have no
+    # Whirlpool while the second does; do not artificially cap discovery at
+    # one hub per mint. Keep deterministic priority and per-mint balance.
+    by_token=defaultdict(list)
+    for row in candidates:by_token[row["mint"]].append(row)
+    result=[]
+    for pass_index in range(2):
+        for mint in sorted(by_token,key=lambda m:(-count[m],m)):
+            possibilities=by_token[mint]
+            if pass_index<len(possibilities):
+                result.append(possibilities[pass_index])
+                if len(result)>=maximum:break
         if len(result)>=maximum:break
     return {"topology":graph,"targets":result,
             "targets_are_unverified_hints":True,**SAFE}
 
 def starting_mint_coverage_pool_subset(entries, *, maximum_per_venue=24,
-                                       target_start_mints=40):
+                                       target_start_mints=100):
     """Choose registry HINT addresses covering true 3-hop token triangles.
 
     Never authenticates these hints. The caller MUST revalidate each selected
@@ -172,7 +179,7 @@ def derive_orca_bridge_addresses(rpc,entries,targets,*,spacings=(1,2,4,8,16,32,6
     from arb.orca_whirlpool import PROGRAM as ORCA,SIZE as ORCA_SIZE,DISCRIMINATOR
     from arb.onchain_pool_discovery import verify as verify_pool
     from arb.orca_whirlpool import decode as decode_orca
-    if (not isinstance(targets,list) or len(targets)>120 or
+    if (not isinstance(targets,list) or len(targets)>360 or
             any(type(t.get("mint"))is not str or type(t.get("missing_hub"))is not str
                 for t in targets)):
         raise ValueError("bounded trusted bridge target hints required")
@@ -228,7 +235,7 @@ def derive_orca_bridge_addresses(rpc,entries,targets,*,spacings=(1,2,4,8,16,32,6
     return {"source_verified_pools":verified,"candidate_pd_as_checked":len(keys),
             "source_whirlpool_config_count":len(configs),"authentication_errors":errors}
 
-def scout(rpc,entries,*,maximum=36,venues=DEFAULT_VENUES):
+def scout(rpc,entries,*,maximum=360,venues=DEFAULT_VENUES):
     suggestions=bridge_targets(entries,maximum=maximum)
     pairs=[tuple(x["pair"]) for x in suggestions["targets"]]
     if not pairs:raise ValueError("no topology bridge suggestions")
@@ -249,7 +256,8 @@ def scout(rpc,entries,*,maximum=36,venues=DEFAULT_VENUES):
             "after_source_verified_topology_start_mints":after["three_hop_start_mint_count"],
             "additional_candidate_start_mints":sorted(set(after["three_hop_start_mints"])-
                 set(before["three_hop_start_mints"])),
-            "target_start_mints":40,"target_met_on_source_topology":after["three_hop_start_mint_count"]>=40,
+            "minimum_target_start_mints":40,"target_met_on_source_topology":after["three_hop_start_mint_count"]>=40,
+            "exploration_policy":"ALL_LEAF_TOKENS_BOTH_REMAINING_LIQUID_HUBS",
             "target_met_on_signed_simulations":False,
             "searched_bridge_pairs":pairs,"source_search_venues":["orca"],
             "derived_orca_pd_as_checked":discovery["candidate_pd_as_checked"],
@@ -264,7 +272,7 @@ def main():
     p.add_argument("--registry",default="arb/pool_registry.json")
     p.add_argument("--output",required=True)
     p.add_argument("--rpc",default="http://127.0.0.1:8899")
-    p.add_argument("--maximum",type=int,default=80)
+    p.add_argument("--maximum",type=int,default=360)
     p.add_argument("--venues",default="orca")
     a=p.parse_args()
     entries=json.loads(Path(a.registry).read_text())["pools"]
