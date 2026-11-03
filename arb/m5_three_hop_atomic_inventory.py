@@ -9,6 +9,41 @@ from pathlib import Path
 
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
 
+def choose_pool_diverse_candidate(queue, selected_identities, used_pools, *, window=256):
+    """Pick a fresh route maximizing pool coverage within a bounded queue window.
+
+    Retain start-token round robin; do not treat candidate discovery as execution.
+    """
+    eligible=[(i,identity,route) for i,(identity,route) in enumerate(queue)
+              if identity not in selected_identities]
+    if not eligible:
+        return None
+    # Look past the lexicographically earliest 3-hop combinations, which can
+    # repeatedly sample the same large pool cluster.
+    def score(item):
+        index,identity,route=item
+        pools={(leg["venue"],leg["pool"]) for leg in route["legs"]}
+        return (len(pools-used_pools),len(pools),-index)
+    position,identity,route=max(eligible[:window],key=score)
+    del queue[position]
+    return identity,route
+
+def failed_instruction_context(row, error):
+    """Identify the failed top-level swap leg without guessing a DEX error meaning."""
+    import ast,re
+    if not isinstance(error,str):
+        return {}
+    match=re.search(r"InstructionError['\\\"]?\\s*:\\s*\\[\\s*(\\d+)\\s*,\\s*\\{['\\\"]Custom['\\\"]\\s*:\\s*(\\d+)\\}",error)
+    if not match:
+        return {}
+    index,code=map(int,match.groups())
+    venues=row.get("venues",[])
+    pools=row.get("pools",[])
+    if index>=len(venues) or index>=len(pools):
+        return {"failed_instruction_index":index,"program_error_code":code}
+    return {"failed_instruction_index":index,"program_error_code":code,
+            "failed_venue":venues[index],"failed_pool":pools[index]}
+
 def diversified_three_hop_graph(readiness, maximum=100):
     """Bounded round-robin across authenticated token cycles and pool identities."""
     from collections import defaultdict, deque
@@ -37,21 +72,22 @@ def diversified_three_hop_graph(readiness, maximum=100):
             candidates[anchor].append((identity,route))
     result=[]
     selected_identities=set()
+    used_pools=set()
     starts=sorted(candidates)
     while starts and len(result)<maximum:
         next_starts=[]
         for start in starts:
             q=candidates[start]
-            while q and q[0][0] in selected_identities:
-                q.popleft()
-            if q:
-                identity,r=q.popleft()
+            choice=choose_pool_diverse_candidate(q,selected_identities,used_pools)
+            if choice is not None:
+                identity,r=choice
                 selected_identities.add(identity)
+                used_pools.update((leg["venue"],leg["pool"]) for leg in r["legs"])
                 result.append({"start_mint":r["start_mint"],"hops":3,
                     "legs":r["legs"],"venue_count":len(r["venues"]),
                     "quote_status":"NOT_QUOTED",
                     "signed_simulation_status":"NOT_ATTEMPTED",**SAFE})
-            if q:
+            if any(identity not in selected_identities for identity,_ in q):
                 next_starts.append(start)
             if len(result)>=maximum:
                 break
@@ -64,7 +100,9 @@ def diversified_three_hop_graph(readiness, maximum=100):
         three_hop_candidate_identities_considered=len(unique_identities),
         three_hop_distinct_token_paths=len({tuple([r["start_mint"]]+[leg["output"] for leg in r["legs"][:2]]) for r in result}),
         three_hop_distinct_start_mints=len({r["start_mint"] for r in result}),
-        three_hop_sample_policy="START_MINT_ROUND_ROBIN_ROTATION_DEDUP",
+        three_hop_distinct_selected_pools=len(used_pools),
+        three_hop_distinct_selected_venues=len({v for v,_ in used_pools}),
+        three_hop_sample_policy="START_MINT_ROUND_ROBIN_POOL_COVERAGE_GREEDY_256_ROTATION_DEDUP",
         cycle_coverage_by_hops={"3":{"returned":len(result),
             "budget":maximum,"truncated":len(unique_identities)>len(result)}})
     return graph
@@ -158,6 +196,7 @@ def offline_simulate(rpc,directory,*,amount=100000,shard_index=0,shard_count=1):
                     else "SIGNED_SIMULATION_NOT_VERIFIED")
                 row["simulation_detail"]=receipt.get("status")
                 row["positive_error"]=receipt.get("positive_error")
+                row.update(failed_instruction_context(row,str(receipt.get("positive_error"))))
                 if row["simulation_status"]=="SIGNED_SIMULATION_NOT_VERIFIED":
                     row["diagnostic"]=json.dumps({
                         "receipt_status":receipt.get("status"),
@@ -172,6 +211,7 @@ def offline_simulate(rpc,directory,*,amount=100000,shard_index=0,shard_count=1):
                 row["diagnostic"]=receipt.get("status")
         except (ValueError,KeyError,TypeError,RuntimeError,OSError) as exc:
             row["diagnostic"]=type(exc).__name__+": "+str(exc)[:300]
+            row.update(failed_instruction_context(row,str(exc)))
             row["simulation_status"]="NOT_ATTEMPTED_OR_ABORTED_DURING_PREPARATION"
         report["status"]="OFFLINE_THREE_HOP_ATOMIC_BUILD_AND_SIMULATION_INVENTORY"
         report["build_confirmed"]=sum(r["atomic_build_status"]=="SIGNED_ATOMIC_PACKET_BUILT" for r in report["routes"])
