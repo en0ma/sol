@@ -214,7 +214,10 @@ jobs:
               f.write(f"Failure venue counts: {dict(failed_venues)}.\\n")
           print(json.dumps({"attempted":len(attempts),"fully_verified":len(verified),"required":100,
                             "selected_start_mints":len(selected_starts),"selected_pools":len(selected_pools),
-                            "verified_start_mints":len(verified_starts),"verified_pools":len(verified_pools),
+                            "verified_start_mints":len(verified_starts),"required_verified_start_mints":40,
+                            "verified_pools":len(verified_pools),
                             "failed_venue_counts":dict(failed_venues)}))
           assert len(verified)>=100, "fewer than 100 distinct signed simulations verified"
+          assert len(selected_starts)>=40, "fewer than 40 distinct source-selected start mints"
+          assert len(verified_starts)>=40, "fewer than 40 distinct SIGNED AND ROLLBACK VERIFIED start mints"
           PY
