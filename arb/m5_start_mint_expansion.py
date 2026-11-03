@@ -65,14 +65,22 @@ def bridge_targets(entries, *, maximum=360):
         for m in p["mints"]:count[m]+=1
     candidates=[]
     for mint,neighbors in graph["mint_neighbors"].items():
-        if mint in existing or mint in HUBS or len(neighbors)!=1 or neighbors[0] not in HUBS:
+        if mint in existing or mint in HUBS:
             continue
-        old=neighbors[0]
+        # A token can already have non-hub neighbors and still lack a closed
+        # triangle. Do not discard it just because its graph degree exceeds 1.
+        # A missing second hub connection is a *candidate* bridge only when
+        # an existing edge joins that hub to one of its connected hubs.
+        connected_hubs=sorted(set(neighbors)&set(HUBS))
+        if not connected_hubs:
+            continue
         for target in HUBS:
-            if target==old or tuple(sorted((mint,target))) in current_pairs:
+            if target in neighbors or tuple(sorted((mint,target))) in current_pairs:
                 continue
-            # Hubs are already interconnected in the source registry.
-            if tuple(sorted((old,target))) not in current_pairs:continue
+            old=next((hub for hub in connected_hubs
+                      if tuple(sorted((hub,target))) in current_pairs),None)
+            if old is None:
+                continue
             candidates.append({"mint":mint,"connected_hub":old,"missing_hub":target,
                                "pair":[mint,target],"current_pools":count[mint]})
     # Prefer established tokens with multiple authenticated pool identity hints.
