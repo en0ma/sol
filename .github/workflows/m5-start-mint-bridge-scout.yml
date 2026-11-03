@@ -1,0 +1,75 @@
+name: M5 Forty Start Mint Source Bridge Scout
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/m5-start-mint-bridge-scout.yml"
+      - "arb/m5_start_mint_expansion.py"
+      - "arb/pool_registry.json"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: m5-forty-start-scout-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  read-only-bridge-scout:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      SURFPOOL_DATASOURCE_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
+      SOLANA_RPC_MIN_INTERVAL_SECONDS: "0.5"
+      SOLANA_RPC_ALCHEMY_FREE_TIER: "1"
+      SOLANA_RPC_PACING_FILE: /tmp/m5-forty-start-scout-pacing
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install source-only dependencies and test topology
+        run: |
+          test -n "$SURFPOOL_DATASOURCE_RPC_URL"
+          bash ci/install_surfpool.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          python3 -m pip install --disable-pip-version-check solders==0.26.0
+          python3 -m unittest tests.test_m5_start_mint_expansion -v
+      - name: Start read-only upstream-backed local Surfpool
+        run: |
+          nohup "$HOME/.local/bin/surfpool" start --ci --rpc-url "$SURFPOOL_DATASOURCE_RPC_URL" --no-deploy > "$RUNNER_TEMP/bridge-source.log" 2>&1 < /dev/null &
+          echo $! > "$RUNNER_TEMP/bridge-source.pid"
+          python3 - <<'PY'
+          import time
+          from arb.rpc import call
+          for _ in range(80):
+              try:
+                  assert call("http://127.0.0.1:8899","getLatestBlockhash")["value"]["blockhash"]
+                  break
+              except (ValueError,RuntimeError,OSError,KeyError):
+                  time.sleep(1)
+          else:
+              raise SystemExit("source fork unavailable")
+          PY
+      - name: Scout up to 36 one-hub token bridges on four venues
+        run: |
+          python3 -m arb.m5_start_mint_expansion --maximum 36 --output "$RUNNER_TEMP/m5-forty-start-bridge-report.json"
+          python3 - <<'PY'
+          import os,json
+          from pathlib import Path
+          r=json.loads((Path(os.environ["RUNNER_TEMP"])/"m5-forty-start-bridge-report.json").read_text())
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a") as f:
+              f.write("## Forty verified start mint expansion — discovery stage\n")
+              f.write(f"Existing registered three-hop topology: {r['before_three_hop_start_mints']} starting mints.\n")
+              f.write(f"After adding independently source-verified bridge pool candidates: {r['after_source_verified_topology_start_mints']} possible starting mints.\n")
+              f.write(f"New source-verified pool identities: {r['source_verified_new_pool_count']}.\n")
+              f.write(f"Source topology meets 40: {r['target_met_on_source_topology']}. Signed execution remains UNVERIFIED for all new routes.\n")
+              f.write(f"Discovery status: {r['discovery_status']}; diagnostic errors: {len(r['discovery_errors'])}.\n")
+          PY
+      - name: Stop source fork
+        if: always()
+        run: |
+          if test -f "$RUNNER_TEMP/bridge-source.pid"; then kill "$(cat "$RUNNER_TEMP/bridge-source.pid")" || true; fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: m5-forty-start-mint-bridge-scout
+          path: |
+            ${{ runner.temp }}/m5-forty-start-bridge-report.json
+            ${{ runner.temp }}/bridge-source.log
+          if-no-files-found: warn
