@@ -100,6 +100,36 @@ class StartMintExpansionTests(unittest.TestCase):
         self.assertFalse(selected["source_authenticated"])
         self.assertFalse(selected["signed_simulation_verified"])
 
+    def test_256_spacing_scanned_without_accepting_unoccupied_pdas(self):
+        import base64
+        from unittest.mock import patch
+        from arb.m5_start_mint_expansion import derive_orca_bridge_addresses
+        from arb.orca_whirlpool import PROGRAM,DISCRIMINATOR,SIZE
+        raw=bytearray(SIZE)
+        raw[:8]=DISCRIMINATOR
+        raw[8:40]=bytes(range(32))
+        batches=[]
+        def source_rpc(rpc,method,params):
+            self.assertEqual(method,"getMultipleAccounts")
+            addresses=params[0]
+            batches.append(addresses)
+            if len(batches)==1:
+                self.assertEqual(addresses,["source-pool"])
+                return {"value":[{"owner":PROGRAM,"data":[
+                    base64.b64encode(raw).decode(),"base64"]}]}
+            return {"value":[None]*len(addresses)}
+        targets=[{"mint":SOL,"missing_hub":USDC}]
+        with patch("arb.rpc.call",side_effect=source_rpc):
+            result=derive_orca_bridge_addresses(
+                "http://127.0.0.1:8899",
+                [{"venue":"orca","address":"source-pool","mints":[SOL,USDC]}],
+                targets)
+        self.assertEqual(result["candidate_pd_as_checked"],9)
+        self.assertEqual(result["candidate_tick_spacings"][-1],256)
+        self.assertEqual(result["source_verified_pools"],[])
+        self.assertEqual(result["source_whirlpool_config_count"],1)
+        self.assertEqual(len(set(batches[1])),9)
+
     def test_duplicate_pool_and_invalid_budget_rejected(self):
         with self.assertRaisesRegex(ValueError,"duplicate pool"):
             topology(self.rows()+[self.rows()[0]])
