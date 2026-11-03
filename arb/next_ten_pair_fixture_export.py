@@ -33,7 +33,7 @@ def program_data_accounts(rpc, programs):
         found[pd_address]=pd
     return found
 
-def venue_accounts(rpc, venue, pool, mints):
+def venue_accounts(rpc, venue, pool, mints, *, directional_only=False):
     from arb.next_ten_fork_pool_probe import snapshot, MINT_KEYS
     from arb.orca_whirlpool import fetch_pool as fetch_orca
     from arb.whirlpool_swap import select_tick_arrays
@@ -53,9 +53,22 @@ def venue_accounts(rpc, venue, pool, mints):
     if venue=="orca":
         state=fetch_orca(rpc,pool)
         oracle=verify_oracle(rpc,pool,adaptive_fee=state["tick_spacing"]!=state["fee_tier_index_seed"])
-        arrays=set()
-        for forward in (True,False):
-            arrays.update(select_tick_arrays(pool,state["tick_current_index"],state["tick_spacing"],forward))
+        if type(directional_only)is not bool:
+            raise ValueError("invalid directional source fixture policy")
+        if directional_only:
+            # The source-bound multi-hop leg has an exact input mint.
+            # Request only the three accounts its signed Whirlpool
+            # instruction will actually use. An absent *required*
+            # directional array remains a hard capture failure.
+            a_to_b=mints[0]==state["token_mint_a"]
+            arrays=set(select_tick_arrays(pool,state["tick_current_index"],
+                                          state["tick_spacing"],a_to_b))
+        else:
+            # Paired historical fixtures can exercise both route directions.
+            arrays=set()
+            for forward in (True,False):
+                arrays.update(select_tick_arrays(pool,state["tick_current_index"],
+                                                  state["tick_spacing"],forward))
         extras += [state["token_vault_a"],state["token_vault_b"],*sorted(arrays)]
         # Non-adaptive Whirlpool oracles may not exist on chain.
         # getAccountInfo permits a null optional oracle; strict _fetch does not.
