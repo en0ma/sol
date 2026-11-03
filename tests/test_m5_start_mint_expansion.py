@@ -30,9 +30,8 @@ class StartMintExpansionTests(unittest.TestCase):
         self.assertEqual(
             {p["missing_hub"] for p in proposal["targets"] if p["mint"]=="new"},
             {USDC,USDT})
-        self.assertFalse(proposal["target_met_on_signed_simulations"] if
-                         "target_met_on_signed_simulations" in proposal else
-                         proposal["actionable"])
+        self.assertFalse(proposal["actionable"])
+        self.assertFalse(proposal["broadcast"])
         # Discovery alone cannot count as authenticated execution.
         self.assertTrue(proposal["targets_are_unverified_hints"])
 
