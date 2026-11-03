@@ -46,6 +46,9 @@ def failed_instruction_context(row, error):
     if venues[index]=="meteora_dlmm" and code==6042:
         result["program_error_name"]="PoolDisabled"
         result["diagnostic_class"]="DLMM_SWAP_BLOCKED_BY_POOL_STATUS_OR_ACTIVATION"
+    elif venues[index]=="raydium_clmm" and code==6024:
+        result["program_error_name"]="InvalidFirstTickArrayAccount"
+        result["diagnostic_class"]="CLMM_FIRST_INITIALIZED_TICK_ARRAY_MISMATCH"
     return result
 
 def diversified_three_hop_graph(readiness, maximum=100):
@@ -200,6 +203,9 @@ def offline_simulate(rpc,directory,*,amount=100000,shard_index=0,shard_count=1):
                     else "SIGNED_SIMULATION_NOT_VERIFIED")
                 row["simulation_detail"]=receipt.get("status")
                 row["positive_error"]=receipt.get("positive_error")
+                if receipt.get("positive_error") is not None:
+                    row["positive_program_log_tail"]=[str(x)[:180] for x in
+                        (receipt.get("positive_logs") or [])[-8:]]
                 row.update(failed_instruction_context(row,str(receipt.get("positive_error"))))
                 if row["simulation_status"]=="SIGNED_SIMULATION_NOT_VERIFIED":
                     row["diagnostic"]=json.dumps({
@@ -214,7 +220,7 @@ def offline_simulate(rpc,directory,*,amount=100000,shard_index=0,shard_count=1):
                 row["simulation_status"]="NOT_ATTEMPTED"
                 row["diagnostic"]=receipt.get("status")
         except (ValueError,KeyError,TypeError,RuntimeError,OSError) as exc:
-            row["diagnostic"]=type(exc).__name__+": "+str(exc)[:300]
+            row["diagnostic"]=type(exc).__name__+": "+str(exc)[:950]
             row.update(failed_instruction_context(row,str(exc)))
             row["simulation_status"]="NOT_ATTEMPTED_OR_ABORTED_DURING_PREPARATION"
         report["status"]="OFFLINE_THREE_HOP_ATOMIC_BUILD_AND_SIMULATION_INVENTORY"
