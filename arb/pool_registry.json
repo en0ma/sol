@@ -2531,6 +2531,429 @@
       ],
       "pair": "cbBTC/SOL",
       "pair_label_source": "MINT_PREFIX_NOT_VERIFIED_SYMBOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "3KZbpFg3ofXRy2sbdKugaQV3M7hWW5zJZt87GauqZqtL",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "5UZP7XpYD26AU4fPeE3PLd9cQZCfkjxXv8frvn9iuxN8"
+      ],
+      "pair": "5UZP/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "EZdUr7QVnY2tXh4uHVR6aDMCTW4GB9S3XKCa8dEA8tsG",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "9RppZfxRspVANnFCaAgXfhUNU9BobqHkdyPLZTgiDJwy"
+      ],
+      "pair": "9Rpp/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "5r2XgCbdr3CWe8GmYBPcfKDBPf698bRGogwt9PqTwgGN",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "4bbAvDENvXXZaqUQiFay41M7qLd1znNnaUfSZV2XxAR8"
+      ],
+      "pair": "4bbA/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "3PtsqJBa8CV96f9kvcUw8CWXX3bXEkUeUJvQgx6qePzQ",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "2vNsyKe8pJGQHCk3SLFvhv1KmDjoQNJSPthMkhyqBKrq"
+      ],
+      "pair": "2vNs/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "8z4dZc6WaFeAzf1CKrSU5drKgbBsBaSADTzmJpQMfbxw",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "BE586nEBtFsejK68FndopZd5Rk5FutjundoFf2N1eeu9"
+      ],
+      "pair": "BE58/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "3v2cQ2PopEP1zfSBFcKCRRV2EKX3hBfYQ72imwuNzV4N",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "9xTUwkyZ3SZGVgmdSQPqbBEeq8oZKfqczmyzv4PknKjg"
+      ],
+      "pair": "9xTU/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "BTGjR736yJKMMeL1gCVEakUWEsFm5nV6iQ7LgQ4SwsV6",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "EFAd2wbqPZR37EwPs1hoNvUzPFRNaLWi2gaBMgUh63r"
+      ],
+      "pair": "EFAd/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "2Zongny2ytJ1aA1PyLQRJ46xAbE9ckVSv9CWrGcSTH4N",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "FhMmoNyrzspLi6yPsYVigjaneLjfhydmh2xwbVBPcT4b"
+      ],
+      "pair": "FhMm/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "69D9HK8FJ9dQPi9ZeHWP1sYumhs3iXaNaHFFJ2fdohaH",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "Hzf2wHRMNX8iR8P2yxfFyf2WKTwktnWjpHTLf2d6ShsU"
+      ],
+      "pair": "Hzf2/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "Fm68Zv4hVNkr1RvdnbUQBeAKCCy5Q4dtG83CeEGD3ZkJ",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "CmPRms46UQrqE4VWhqQDzqAwynezrTRmnYzs2QqnYuy"
+      ],
+      "pair": "CmPR/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "G4PbNUCQpWUAJftqFfyXNtCDoS6JRnMoN9ySo51Wo68B",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "SUmQCHxi8H4UDYXQTbFHpmQQKCx6sYqozjfmGmEfDoh"
+      ],
+      "pair": "SUmQ/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "G3ZQG7tHGtCSK3gHWMhn1VMa8umxiFuyiKCcmakxjKS4",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "3kvyy6i1Rn8iAAjKbBE38m5zRfuPnVGUME3VpcrunzcR"
+      ],
+      "pair": "3kvy/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "9Ym6g5qkAWL9MedMfH6x6YEXPxBJMLd6ECGeBBy8hwuV",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "Eou8pQiWwL6PfPbYFdLYHapr13cjmido9fUj9fjP5pW"
+      ],
+      "pair": "Eou8/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "6L37nt7dZTxmk156XgWP5VWFusgLVTDt8vgYDKs2boEC",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "J6ggRnWXKXYxUWaUdoDANDjBwv5yihrUBEWZcz6DNz6d"
+      ],
+      "pair": "J6gg/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "77jwaiaxEZAgWSJtuDooGQoA1wxiArdbwPifoKyzcMfY",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "FQPtBkQKceAaF8pMi8ZNKEVb9U5vicWj19ksNvWwGo8"
+      ],
+      "pair": "FQPt/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "HhBAx7SpZuxGoE18VMwtn5ZeabZSNejyGoQE1bg5gB4s",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "13U5GdkypgW5DRp9EYY6ckyBZuC5wgAPbm9dMQEzfbpg"
+      ],
+      "pair": "13U5/SOL"
+    },
+    {
+      "venue": "meteora_dlmm",
+      "address": "6oQ9wVex4mKZti2GsGCfD8FWTMMC9PLQkztRU5cd6MK8",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "98sMhvDwXj1RQi5c5Mndm3vPe9cBqPrbLaufMXFNMh5g"
+      ],
+      "pair": "98sM/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "5Ld2fCAgWG2cW9G81gg3jfbvJQphrVACkgZZ9GNB7rWT",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "D9UMFP8jqGHcCenXncb7XkKyG7p6EooihZisJjUAV7FA"
+      ],
+      "pair": "D9UM/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "2A83bbi95HSxDfqPbJXBSzXfdqaS7Cakf8aCakzwQGeY",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "14LCiSb7CKDjvxcsbLfzyAA4EobVJwSBLNNzEuGUP8w8"
+      ],
+      "pair": "14LC/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "4LpRTkt9R7cSinGQBnvEX1czybvMCV7LEvD6zaeAW5Zu",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "6Bnzrru3tnSFtpr6MwvFZXrGSn6HRTB4ZBpESVMcZ14"
+      ],
+      "pair": "6Bnz/SOL"
+    },
+    {
+      "venue": "meteora_dlmm",
+      "address": "BGm1tav58oGcsQJehL9WXBFXF7D27vZsKefj4xJKD5Y",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "pair": "EPjF/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "dZKgqkuQQV6nJM4rh7KvXAhK362cty5Ts1BWfdrJY8X",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "DMbVsFYixK2FZwwB1bgBKeDxyXPHx4juM7TAGBK4d7XW"
+      ],
+      "pair": "DMbV/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "ADPkTJV6mJZwRJSNz9RhmnEmkzb9toBtTwN2Zmuejtim",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "zm9Y14PubGm7zcP9pXmv1odCnLNRwBDuPU1sy9saqaG"
+      ],
+      "pair": "zm9Y/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "7sxi8NJN7wGL3K5fUj7WnBdYcxsEwqccdziNhmmePTeT",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "BbobRKeKaXmz7U24But71WHcqEMwmF2CoKyuhsmPQTeV"
+      ],
+      "pair": "Bbob/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "2wMX1GFELwUPynx8sdrtX2wFEtNXa3GMN1DzFf9dd7rx",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "FAvUimz72NqVNAbNmqCK4YociVrWSZMk6suj38hGMXK"
+      ],
+      "pair": "FAvU/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "D5itF6DRyw7hbYFCgxaGs6weqQqD64HXM6VRUKBpbnCm",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "KFnNQmuK3stbJQygrH6LaShP92x9MVFXLEBbmgKVHP8"
+      ],
+      "pair": "KFnN/SOL"
+    },
+    {
+      "venue": "meteora_dlmm",
+      "address": "zxTpi4BtaWX3mgdAPoezkMD1hxx8CdeCfrqXMWvSCLX",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx"
+      ],
+      "pair": "6GmA/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "FxoJtmFzxLxiGaBsqqhLJBWYjkk8pncGUV7eX3pDXY52",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "RaodEzRwN5ZLm98a6sPToiK3HzV7KmjaChENCogdTfu"
+      ],
+      "pair": "Raod/SOL"
+    },
+    {
+      "venue": "raydium_clmm",
+      "address": "BxRhW4q1wTRwJkJ1C4NR4yJCRL2uusoju4g1bVenspZK",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "METAewgxyPbgwsseH8T16a39CQ5VyVxZi9zXiDPY18m"
+      ],
+      "pair": "META/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "3ckhKzh3JJicY7dMQj2xvz4k88geDV787X1E5cxHhFXH",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "E7UE7RohoqbPFkA4XLpsLoV7Xuv4KpsdEyRfEfvWELN9"
+      ],
+      "pair": "E7UE/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "EupisKcq2usmGUxqbt3cdnBK2f6AeKYwe6h62Aa5f9QT",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "J6BMZE3XxUzWrxQ2CwkNxPpVx76mdJ4HPU62JZEQ8e4"
+      ],
+      "pair": "J6BM/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "5ciDAitrEF45gZgSS877A7EdaRpxe5ZHBnCu6ZPt8ueu",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "Cvw4WChC4Vkbo7qMWqEFuk6vPTCyVpF1cqUDPzfHeYf"
+      ],
+      "pair": "Cvw4/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "14sJQvzTSTSf17MJVHsRZoMgt87smS5SYiVFiuoak8AL",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "5nDCGemYE1gn3MV75pa9pBNBbBGzxoLiw8NVnsTWrDB"
+      ],
+      "pair": "5nDC/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "5T4YVKTHmjmx3YHN3GXcR1TbwiTBMKnNTkGdZ5ohM9dr",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "BXoU3NL3Anspm6JGMq14QYn5SpUxUKxfyF3VCq2G1XzN"
+      ],
+      "pair": "BXoU/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "2Y1UoyjW9dtnUHSmcMKP4G1d4HLFGTUKcgLBkZVcBrqm",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "MRcdGV1tnmp8FCg4Yper6CtAhfVrVYuk84JAn9Giqba"
+      ],
+      "pair": "MRcd/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "DKdFmecoZMVrpggTLppdehya8fzHtGeQTQeP4m7wjK4g",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "6i6dTfQjKwk7UWXfcjyyzkk7GbbH3eybFW2ByT8iu8Q"
+      ],
+      "pair": "6i6d/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "B3KxhQUEBXJ7JFBt3vMYqcxWBFLsFGywQWYGeB44hPnJ",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "Ab4rXamqfdjv9kDyKc3qZxhtNbcgBCW4sweeeSg3eAP"
+      ],
+      "pair": "Ab4r/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "7AfX4eJcJFK2iHffaPWUo55W7AiodLkmzxtK8Aeu32Gj",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "PVvapHGB2rCgiCRmvLtGGovkzuvUpMBqNTUXgkHV53E"
+      ],
+      "pair": "PVva/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "DWzU4LaGyYf9dVG5UnPQHi3YU8r5K2EgYLwEtqDA8WAL",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "B4AD6zhUYYgeb4NYLk9fpZp1583wjY4atr7JhyQMchH"
+      ],
+      "pair": "B4AD/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "54bFvwkF6iXFarS6rT6LJZihbbbF5KS8Dpb91emkkUS1",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "DQ5SKUmeK2ZTuYKPnY3qSjym8fo5Uo8Gai4d48yvsGu"
+      ],
+      "pair": "DQ5S/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "CUn8LdQqCJQSJvYp9wLocxoxc74mGxXcAHBkhLabth4r",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "4y1ZVRfY3iUDBtvxj3qvD92uLpemR5DsAHAKf26rRaq6"
+      ],
+      "pair": "4y1Z/SOL"
+    },
+    {
+      "venue": "raydium_cpmm",
+      "address": "FJk9sajdc2Q4heRPPu3yLzkmf2ZByZkpiHQLv9e2bn5A",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "Bv1a7cEj5aRnJQhMw4kRQqAFesMSd5LwcDnUzq52BMmr"
+      ],
+      "pair": "Bv1a/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "s6vqLLvEp31dbzN8zkaoVSSjUicfaP3uBQypVM2KnDE",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "DUG8quW2CBoNPLBdyC4K3MQt68j8qCMXYgtCzuDEnoP"
+      ],
+      "pair": "DUG8/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "9vwVZg2dVhFiU6Jd9c8e2MdgaB66GS8CJcovwmhX4rnk",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "DNWjRewJhFHYrinL4BJedzkJTSV1hbruhZRj7h3edMF"
+      ],
+      "pair": "DNWj/SOL"
+    },
+    {
+      "venue": "meteora_dlmm",
+      "address": "5AFbwVSQPJf4cgEjq4TajZYyPYUvYktrRN3SahNrPnmv",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "4kjruqGHDsSqkMdFfCjV7Vb62HPFhtXyWc2t6JpQzDnz"
+      ],
+      "pair": "4kjr/SOL"
+    },
+    {
+      "venue": "raydium_cpmm",
+      "address": "4WutFjFujupWJm5UUidXouMgUPauXG4sAEjVaYqjrMBW",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "DBPTU2oKLDHXQjAEJ3rZi8bUGmt2uxUbipgg6xmXoMqr"
+      ],
+      "pair": "DBPT/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "Hy8jcV13syeaTjAJrKvbR3mxdRM1pWRhWcUWJbxoDkR3",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "8B4qYkaMSGLAkaWjPXYxe6gjPf99BCotqwHmeRmSEtJ"
+      ],
+      "pair": "8B4q/SOL"
     }
   ]
 }
