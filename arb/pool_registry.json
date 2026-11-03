@@ -3395,6 +3395,51 @@
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       ],
       "pair": "CARD/USDC"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "8Z326TaJ9yfcaN6xQ32xF88iEPCfvSJXWcRs9Agm6xha",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "LUtkMezN166eFqjbC88RowQzR4epjKsh5gmrScFUqM1"
+      ],
+      "pair": "SOL/LUtk"
+    },
+    {
+      "venue": "meteora_dlmm",
+      "address": "4n9rkpKkPUGFquBh6UXqNYbaCNyBcFq9VwNbutwGX5d6",
+      "mints": [
+        "DoGEV7LASBkQbibMc5k5vKnTZoMg423GpJ5QtJEGfm7R",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "DoGE/SOL"
+    },
+    {
+      "venue": "pumpswap",
+      "address": "DPzKoJVewaH1wpchD3gWKeeGm7G2mXkBW48uRniAgbVx",
+      "mints": [
+        "6NwarBvDkXhByqVp2Qkq5i9XbtA2B3Bwe8SWGu9vpump",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "6Nwa/SOL"
+    },
+    {
+      "venue": "meteora_damm_v2",
+      "address": "5Diq3hfJ6QTcJXhAG1XVBiSLUQJHNue24YkkzLKmJooH",
+      "mints": [
+        "22rWiyDiY9GgxSrFiWC2vX1GxNxjkvrRPmZJDzv9pq6X",
+        "So11111111111111111111111111111111111111112"
+      ],
+      "pair": "22rW/SOL"
+    },
+    {
+      "venue": "meteora_dlmm",
+      "address": "GgoFghiA6Ca7YNmG6dRxwKQWkZhRK8ND47EREz46arot",
+      "mints": [
+        "WXMRyRZhsa19ety5erZhHg4N3xj3EVN92u94422teJp",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "pair": "WXMR/USDC"
     }
   ]
 }
