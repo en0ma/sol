@@ -101,6 +101,24 @@ jobs:
                             "selection_policy":graph["three_hop_sample_policy"]}))
           PY
           python3 -m arb.m5_three_hop_atomic_inventory --phase source --graph "$RUNNER_TEMP/triangles/graph.json" --directory "$RUNNER_TEMP/triangles" --source-target 140
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          report=json.loads((Path(os.environ["RUNNER_TEMP"])/"triangles/three-hop-inventory.json").read_text())
+          selected=report["selected_graph_start_mints"]
+          captured=report["source_captured_start_mints"]
+          missing=report["uncaptured_graph_start_mints"]
+          print(json.dumps({"source_graph_start_mints":selected,
+                            "source_captured_start_mints":captured,
+                            "source_uncaptured_start_mints":missing,
+                            "source_capture_attempts":report["attempted_source_captures"],
+                            "source_capture_policy":report["source_capture_policy"]}))
+          assert len(report["routes"])==140, "did not capture 140 authenticated source routes"
+          assert captured>=40, "fewer than 40 independently source-captured start mints"
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a") as summary:
+              summary.write(f"Source graph starts {selected}, source-captured starts {captured}; "
+                            f"uncaptured starts {len(missing)} (see job log).\\n")
+          PY
       - name: Shut down read-only source fork
         if: always()
         run: |
