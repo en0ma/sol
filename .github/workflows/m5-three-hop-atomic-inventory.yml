@@ -119,7 +119,7 @@ jobs:
                   time.sleep(1)
           else:raise SystemExit("offline fork unavailable")
           PY
-      - name: Sign and simulate fourteen assigned routes, requiring ten verified per shard
+      - name: Sign and simulate fourteen assigned routes and record verified receipts
         run: |
           python3 -m arb.m5_three_hop_atomic_inventory --phase offline --directory "$RUNNER_TEMP/source-artifact/triangles" --amount 100000 --shard-index ${{ matrix.shard }} --shard-count 10
           python3 - <<'PY'
@@ -132,8 +132,19 @@ jobs:
           verified=[row for row in r["routes"] if row.get("source_status")=="CAPTURED" and row.get("atomic_build_status")=="SIGNED_ATOMIC_PACKET_BUILT" and row.get("simulation_status")=="SIGNED_SIMULATION_AND_ROLLBACK_VERIFIED"]
           blocked=[{"id":row["id"],"diagnostic":row.get("diagnostic"),"status":row.get("simulation_status")} for row in r["routes"] if row not in verified]
           print(json.dumps({"verified":len(verified),"attempted":len(r["routes"]),"blocked":blocked}))
-          assert len(r["routes"])==14 and len(verified)>=10, "fewer than ten fully verified simulations in shard"
+          assert len(r["routes"])==14, "expected fourteen attempted routes per shard"
+          assert len(verified)==r.get("simulations_verified"), "receipt count disagrees with simulation inventory"
+          summary={"shard":r["shard_index"],"attempted":len(r["routes"]),
+                   "verified":len(verified),
+                   "route_ids":[row["id"] for row in r["routes"]],
+                   "verified_route_ids":[row["id"] for row in verified]}
+          (Path(os.environ["RUNNER_TEMP"])/"three-hop-shard-metrics.json").write_text(json.dumps(summary)+"\n")
           PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m5-three-hop-metrics-${{ matrix.shard }}
+          path: ${{ runner.temp }}/three-hop-shard-metrics.json
+          if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -142,3 +153,32 @@ jobs:
             ${{ runner.temp }}/source-artifact/triangles/
             ${{ runner.temp }}/triangle-offline.log
           if-no-files-found: warn
+
+  verify-global-simulation-coverage:
+    needs: offline-simulation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: m5-three-hop-metrics-*
+          path: ${{ runner.temp }}/shard-metrics
+          merge-multiple: false
+      - name: Enforce at least 100 uniquely verified signed simulations
+        run: |
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          root=Path(os.environ["RUNNER_TEMP"])/"shard-metrics"
+          reports=[json.loads(p.read_text()) for p in root.glob("*/three-hop-shard-metrics.json")]
+          assert len(reports)==10, f"missing shard metrics: found {len(reports)}/10"
+          assert {r["shard"] for r in reports}==set(range(10)), "duplicate or missing shard"
+          attempts=[route_id for r in reports for route_id in r["route_ids"]]
+          verified=[route_id for r in reports for route_id in r["verified_route_ids"]]
+          assert all(r["attempted"]==14 and r["verified"]==len(r["verified_route_ids"]) for r in reports)
+          assert len(attempts)==140 and len(set(attempts))==140, "duplicate or missing attempted routes"
+          assert len(verified)==len(set(verified)) and set(verified)<=set(attempts), "invalid verified route identities"
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a") as f:
+              f.write(f"Verified {len(verified)}/140 distinct signed simulations across ten shards.\n")
+          print(json.dumps({"attempted":len(attempts),"fully_verified":len(verified),"required":100}))
+          assert len(verified)>=100, "fewer than 100 distinct signed simulations verified"
+          PY
