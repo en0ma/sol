@@ -10,6 +10,43 @@ from arb.token_vaults import TOKEN_PROGRAM,decode_token_account
 PROGRAM="LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo"
 SIZE=904
 DISC=bytes([33,11,49,98,181,101,177,13])
+# LbPair repr(C) offsets from MeteoraAg/dlmm-sdk idls/dlmm.json,
+# after the eight-byte Anchor discriminator. Activation checks are independent
+# of ordinary pool authentication and never authorize live execution.
+def swap_activation_evidence(state, *, slot, unix_timestamp, swap_initiator=None):
+    if (not isinstance(state,dict) or type(slot)is not int or slot<0
+            or type(unix_timestamp)is not int or unix_timestamp<0):
+        raise ValueError("authenticated DLMM state and source clock required")
+    pair_type=state.get("pair_type")
+    activation_type=state.get("activation_type")
+    point=state.get("activation_point")
+    if (type(pair_type)is not int or pair_type not in (0,1,2,3)
+            or type(activation_type)is not int or activation_type not in (0,1)
+            or type(point)is not int or point<0):
+        raise ValueError("unsupported DLMM activation fields")
+    if state.get("status")!=0:
+        return {"swap_eligible":False,"reason":"POOL_STATUS_DISABLED",
+                "source_slot":slot,"source_unix_timestamp":unix_timestamp}
+    if pair_type in (0,3):
+        return {"swap_eligible":True,"reason":"PERMISSIONLESS_STATUS_ENABLED",
+                "source_slot":slot,"source_unix_timestamp":unix_timestamp}
+    now=slot if activation_type==0 else unix_timestamp
+    if now>=point:
+        return {"swap_eligible":True,"reason":"ACTIVATION_POINT_REACHED",
+                "source_slot":slot,"source_unix_timestamp":unix_timestamp,
+                "activation_type":activation_type,"activation_point":point}
+    early=state.get("pre_activation_swap_address")
+    duration=state.get("pre_activation_duration")
+    if (swap_initiator is not None and isinstance(early,str)
+            and swap_initiator==early and type(duration)is int
+            and duration>=0 and now>=max(0,point-duration)):
+        return {"swap_eligible":True,"reason":"SOURCE_AUTHENTICATED_PRE_ACTIVATION_SIGNER",
+                "source_slot":slot,"source_unix_timestamp":unix_timestamp,
+                "activation_type":activation_type,"activation_point":point}
+    return {"swap_eligible":False,"reason":"ACTIVATION_PENDING_UNAUTHORIZED_SIGNER",
+            "source_slot":slot,"source_unix_timestamp":unix_timestamp,
+            "activation_type":activation_type,"activation_point":point}
+
 def decode(raw):
     if len(raw)!=SIZE or raw[:8]!=DISC:raise ValueError("invalid Meteora LbPair account")
     key=lambda off:b58(raw[off:off+32])
@@ -19,6 +56,10 @@ def decode(raw):
       "active_id":int.from_bytes(raw[76:80],"little",signed=True),
       "bin_step":int.from_bytes(raw[80:82],"little"),
       "status":raw[82],"version":raw[882],
+      "pair_type":raw[75],"activation_type":raw[86],
+      "pre_activation_swap_address":key(752),
+      "activation_point":int.from_bytes(raw[816:824],"little"),
+      "pre_activation_duration":int.from_bytes(raw[824:832],"little"),
       "token_mint_x_program_flag":raw[880],
       "token_mint_y_program_flag":raw[881]}
     if not result["bin_step"] or len(set((result["token_x_mint"],result["token_y_mint"],
