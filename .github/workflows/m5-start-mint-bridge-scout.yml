@@ -1,4 +1,4 @@
-name: M5 Forty Start Mint Source Bridge Scout
+name: M5 Maximum Unique Start Mint Source Bridge Scout
 on:
   pull_request:
     paths:
@@ -46,15 +46,15 @@ jobs:
           else:
               raise SystemExit("source fork unavailable")
           PY
-      - name: Derive and verify up to 80 Orca one-hub bridges using direct PDA accounts
+      - name: Derive and verify all eligible Orca hub bridges using direct PDA accounts
         run: |
-          python3 -m arb.m5_start_mint_expansion --maximum 80 --venues orca --output "$RUNNER_TEMP/m5-forty-start-bridge-report.json"
+          python3 -m arb.m5_start_mint_expansion --maximum 360 --venues orca --output "$RUNNER_TEMP/m5-forty-start-bridge-report.json"
           python3 - <<'PY'
           import os,json
           from pathlib import Path
           r=json.loads((Path(os.environ["RUNNER_TEMP"])/"m5-forty-start-bridge-report.json").read_text())
           with open(os.environ["GITHUB_STEP_SUMMARY"],"a") as f:
-              f.write("## Forty verified start mint expansion — discovery stage\n")
+              f.write("## Maximum starting mint exploration — discovery stage\n")
               f.write(f"Existing registered three-hop topology: {r['before_three_hop_start_mints']} starting mints.\n")
               f.write(f"After adding independently source-verified bridge pool candidates: {r['after_source_verified_topology_start_mints']} possible starting mints.\n")
               f.write(f"New source-verified pool identities: {r['source_verified_new_pool_count']}.\n")
