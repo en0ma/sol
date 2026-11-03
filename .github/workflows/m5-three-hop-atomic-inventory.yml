@@ -4,6 +4,7 @@ on:
     paths:
       - ".github/workflows/m5-three-hop-atomic-inventory.yml"
       - "arb/m5_three_hop_atomic_inventory.py"
+      - "arb/next_ten_fork_pool_probe.py"
       - "arb/pool_registry.json"
       - "arb/m5_four_to_six_source_capture.py"
       - "arb/next_ten_signed_atomic_offline.py"
@@ -58,7 +59,8 @@ jobs:
           from arb.m5_three_hop_atomic_inventory import diversified_three_hop_graph
           registry=json.loads(Path("arb/pool_registry.json").read_text())
           graph=diversified_three_hop_graph(probe("http://127.0.0.1:8899",registry,
-                        batch=tuple((a,b) for a in ORDER for b in ORDER if a!=b)),
+                        batch=tuple((a,b) for a in ORDER for b in ORDER if a!=b),
+                        maximum_per_venue=24),
                         maximum=200)
           root=Path(os.environ["RUNNER_TEMP"])/"triangles"
           root.mkdir(parents=True,exist_ok=True)
