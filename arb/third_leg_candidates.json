@@ -1,0 +1,16 @@
+{
+  "candidates": [
+    {
+      "address": "4c8jpn6sLMrZHMYNq6idFfMdLBWEqn1r1wFNtgsPqTwE",
+      "source": "GeckoTerminal RAY/SOL pool listing; untrusted until decoded from Solana RPC"
+    },
+    {
+      "address": "27ZbVdmoUhG639CfqG6kW8a4VXZeGBi8Dd4HUXjVDxeS",
+      "source": "GeckoTerminal RAY/SOL Orca listing; untrusted until owner/mints verified via Solana RPC"
+    },
+    {
+      "address": "5sgXhG1c9VBceg6aVQguK3NnbPfHinERZj86As6zW5Be",
+      "source": "GeckoTerminal RAY/SOL Orca listing; untrusted until owner/mints verified via Solana RPC"
+    }
+  ]
+}

@@ -1,0 +1,259 @@
+name: M5 Three Hop Atomic Build And Surfpool Simulation Inventory
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/m5-three-hop-atomic-inventory.yml"
+      - "arb/m5_three_hop_atomic_inventory.py"
+      - "arb/m5_start_mint_expansion.py"
+      - "arb/next_ten_fork_pool_probe.py"
+      - "arb/raydium_clmm_ticks.py"
+      - "arb/meteora_dlmm.py"
+      - "arb/dlmm_offline_clock.py"
+      - "arb/atomic_graph_coordinator.py"
+      - "arb/pool_registry.json"
+      - "arb/m5_four_to_six_source_capture.py"
+      - "arb/next_ten_signed_atomic_offline.py"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: m5-three-hop-inventory-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  source-preparation:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      SURFPOOL_DATASOURCE_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
+      SOLANA_RPC_MIN_INTERVAL_SECONDS: "0.5"
+      SOLANA_RPC_ALCHEMY_FREE_TIER: "1"
+      SOLANA_RPC_PACING_FILE: /tmp/m5-three-hop-pacing
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Surfpool
+        run: |
+          test -n "$SURFPOOL_DATASOURCE_RPC_URL"
+          bash ci/install_surfpool.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          python3 -m pip install --disable-pip-version-check solders==0.26.0
+          python3 -m py_compile arb/m5_three_hop_atomic_inventory.py arb/m5_four_to_six_source_capture.py arb/next_ten_signed_atomic_offline.py
+      - name: Start upstream-backed read-only source fork
+        run: |
+          nohup "$HOME/.local/bin/surfpool" start --ci --rpc-url "$SURFPOOL_DATASOURCE_RPC_URL" --no-deploy > "$RUNNER_TEMP/triangle-source.log" 2>&1 < /dev/null &
+          echo $! > "$RUNNER_TEMP/triangle-source.pid"
+          python3 - <<'PY'
+          import time
+          from arb.rpc import call
+          for _ in range(80):
+              try:
+                  assert call("http://127.0.0.1:8899","getLatestBlockhash")["value"]["blockhash"]
+                  break
+              except (ValueError,RuntimeError,OSError,KeyError):
+                  time.sleep(1)
+          else:
+              raise SystemExit("source fork unavailable")
+          PY
+      - name: Discover and capture 140 preflight-valid cycles from up to 200 candidates
+        run: |
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          from arb.next_ten_fork_pool_probe import probe
+          from arb.m5_seven_venue_route_scan import ORDER
+          from arb.m5_three_hop_atomic_inventory import diversified_three_hop_graph
+          from arb.m5_start_mint_expansion import scout,topology
+          registry=json.loads(Path("arb/pool_registry.json").read_text())
+          root=Path(os.environ["RUNNER_TEMP"])/"triangles"
+          root.mkdir(parents=True,exist_ok=True)
+          rpc="http://127.0.0.1:8899"
+          # Authenticate new bridge candidates on the read-only source fork.
+          # Only ephemeral registry hints are added; probe() independently
+          # authenticates every chosen pool again before constructing cycles.
+          expansion=scout(rpc,registry["pools"],maximum=360,venues=("orca",))
+          (root/"source-bridge-discovery.json").write_text(json.dumps(expansion,indent=2)+"\n")
+          new=[{"venue":p["venue"],"address":p["address"],"mints":p["mints"]}
+               for p in expansion["source_verified_new_pools"]]
+          if len(registry["pools"])+len(new)>512:
+              raise ValueError("source-discovered pool identities exceed bounded 512 registry limit")
+          registry["pools"].extend(new)
+          graph=diversified_three_hop_graph(probe(rpc,registry,
+                        batch=tuple((a,b) for a in ORDER for b in ORDER if a!=b),
+                        maximum_per_venue=48,
+                        require_dlmm_swap_eligible=True,
+                        prefer_start_mint_coverage=True),
+                        maximum=200,allow_start_rotations=True)
+          graph["source_bridge_discovery"]={
+              "new_verified_pool_identities":len(new),
+              "expanded_registry_pool_hints":len(registry["pools"]),
+              "source_topology_start_mints":topology(registry["pools"])["three_hop_start_mint_count"],
+              "source_discovery_status":expansion["discovery_status"]}
+          assert graph["three_hop_distinct_start_mints"]>=40, (
+              f"source candidate graph has only {graph['three_hop_distinct_start_mints']}/40 distinct starts")
+          (root/"graph.json").write_text(json.dumps(graph,indent=2)+"\n")
+          print(json.dumps({"three_hop_discovered":sum(r["hops"]==3 for r in graph["routes"]),
+                            "three_hop_truncated":graph["cycle_coverage_by_hops"]["3"]["truncated"],
+                            "selected_distinct_start_mints":graph["three_hop_distinct_start_mints"],
+                            "required_verified_start_mints":40,
+                            "source_bridge_discovery":graph["source_bridge_discovery"],
+                            "selected_distinct_pools":graph["three_hop_distinct_selected_pools"],
+                            "dlmm_swap_activation_rejections":graph["source_swap_eligibility_rejection_count"],
+                            "selection_policy":graph["three_hop_sample_policy"]}))
+          PY
+          python3 -m arb.m5_three_hop_atomic_inventory --phase source --graph "$RUNNER_TEMP/triangles/graph.json" --directory "$RUNNER_TEMP/triangles" --source-target 140
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          report=json.loads((Path(os.environ["RUNNER_TEMP"])/"triangles/three-hop-inventory.json").read_text())
+          selected=report["selected_graph_start_mints"]
+          captured=report["source_captured_start_mints"]
+          missing=report["uncaptured_graph_start_mints"]
+          print(json.dumps({"source_graph_start_mints":selected,
+                            "source_captured_start_mints":captured,
+                            "source_uncaptured_start_mints":missing,
+                            "source_capture_attempts":report["attempted_source_captures"],
+                            "source_capture_policy":report["source_capture_policy"]}))
+          assert len(report["routes"])==140, "did not capture 140 authenticated source routes"
+          assert captured>=40, "fewer than 40 independently source-captured start mints"
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a") as summary:
+              summary.write(f"Source graph starts {selected}, source-captured starts {captured}; "
+                            f"uncaptured starts {len(missing)} (see job log).\\n")
+          PY
+      - name: Shut down read-only source fork
+        if: always()
+        run: |
+          if test -f "$RUNNER_TEMP/triangle-source.pid"; then kill "$(cat "$RUNNER_TEMP/triangle-source.pid")" || true; fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: m5-three-hop-source-fixtures
+          path: |
+            ${{ runner.temp }}/triangles/
+            ${{ runner.temp }}/triangle-source.log
+          if-no-files-found: error
+
+  offline-simulation:
+    needs: source-preparation
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      max-parallel: 10
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    env:
+      SURFPOOL_EXPLICITLY_OFFLINE: "1"
+      SURFPOOL_DATASOURCE_RPC_URL: ""
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install offline Surfpool and signer dependencies
+        run: |
+          bash ci/install_surfpool.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          python3 -m pip install --disable-pip-version-check solders==0.26.0
+          python3 -m py_compile arb/m5_three_hop_atomic_inventory.py arb/next_ten_signed_atomic_offline.py arb/venue_swap_adapter.py
+      - uses: actions/download-artifact@v4
+        with:
+          name: m5-three-hop-source-fixtures
+          path: ${{ runner.temp }}/source-artifact
+      - name: Start isolated offline Surfpool
+        run: |
+          test -z "$SURFPOOL_DATASOURCE_RPC_URL"
+          nohup "$HOME/.local/bin/surfpool" start --ci --offline --no-deploy > "$RUNNER_TEMP/triangle-offline.log" 2>&1 < /dev/null &
+          python3 - <<'PY'
+          import time
+          from arb.rpc import call
+          for _ in range(80):
+              try:
+                  assert call("http://127.0.0.1:8899","getLatestBlockhash")["value"]["blockhash"]
+                  break
+              except (ValueError,RuntimeError,OSError,KeyError):
+                  time.sleep(1)
+          else:raise SystemExit("offline fork unavailable")
+          PY
+      - name: Sign and simulate fourteen assigned routes and record verified receipts
+        run: |
+          python3 -m arb.m5_three_hop_atomic_inventory --phase offline --directory "$RUNNER_TEMP/source-artifact/triangles" --amount 100000 --shard-index ${{ matrix.shard }} --shard-count 10
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          r=json.loads((Path(os.environ["RUNNER_TEMP"])/"source-artifact/triangles/three-hop-inventory.json").read_text())
+          assert len(r["routes"])<=14, "shard must contain at most fourteen routes"
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a") as f:
+              f.write(f"Shard {r['shard_index']}: {r.get('build_confirmed',0)}/{len(r['routes'])} signed builds; {r.get('simulations_verified',0)}/{len(r['routes'])} verified simulations.\n")
+          verified=[row for row in r["routes"] if row.get("source_status")=="CAPTURED" and row.get("atomic_build_status")=="SIGNED_ATOMIC_PACKET_BUILT" and row.get("simulation_status")=="SIGNED_SIMULATION_AND_ROLLBACK_VERIFIED"]
+          blocked=[{"id":row["id"],"diagnostic":row.get("diagnostic"),"status":row.get("simulation_status")} for row in r["routes"] if row not in verified]
+          print(json.dumps({"verified":len(verified),"attempted":len(r["routes"]),"blocked":blocked}))
+          assert len(r["routes"])==14, "expected fourteen attempted routes per shard"
+          assert len(verified)==r.get("simulations_verified"), "receipt count disagrees with simulation inventory"
+          summary={"shard":r["shard_index"],"attempted":len(r["routes"]),
+                   "verified":len(verified),
+                   "route_ids":[row["id"] for row in r["routes"]],
+                   "verified_route_ids":[row["id"] for row in verified],
+                   "selected_start_mints":sorted({row["mints"][0] for row in r["routes"]}),
+                   "selected_pools":sorted({pool for row in r["routes"] for pool in row["pools"]}),
+                   "verified_start_mints":sorted({row["mints"][0] for row in verified}),
+                   "verified_pools":sorted({pool for row in verified for pool in row["pools"]}),
+                   "failures":[{"id":row["id"],"venue":row.get("failed_venue"),
+                                "pool":row.get("failed_pool"),"instruction_index":row.get("failed_instruction_index"),
+                                "error_code":row.get("program_error_code"),
+                                "status":row["simulation_status"]} for row in r["routes"] if row not in verified]}
+          (Path(os.environ["RUNNER_TEMP"])/"three-hop-shard-metrics.json").write_text(json.dumps(summary)+"\n")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m5-three-hop-metrics-${{ matrix.shard }}
+          path: ${{ runner.temp }}/three-hop-shard-metrics.json
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: m5-three-hop-offline-shard-${{ matrix.shard }}
+          path: |
+            ${{ runner.temp }}/source-artifact/triangles/
+            ${{ runner.temp }}/triangle-offline.log
+          if-no-files-found: warn
+
+  verify-global-simulation-coverage:
+    needs: offline-simulation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: m5-three-hop-metrics-*
+          path: ${{ runner.temp }}/shard-metrics
+          merge-multiple: false
+      - name: Enforce at least 100 uniquely verified signed simulations
+        run: |
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          root=Path(os.environ["RUNNER_TEMP"])/"shard-metrics"
+          reports=[json.loads(p.read_text()) for p in root.glob("*/three-hop-shard-metrics.json")]
+          assert len(reports)==10, f"missing shard metrics: found {len(reports)}/10"
+          assert {r["shard"] for r in reports}==set(range(10)), "duplicate or missing shard"
+          attempts=[route_id for r in reports for route_id in r["route_ids"]]
+          verified=[route_id for r in reports for route_id in r["verified_route_ids"]]
+          assert all(r["attempted"]==14 and r["verified"]==len(r["verified_route_ids"]) for r in reports)
+          assert len(attempts)==140 and len(set(attempts))==140, "duplicate or missing attempted routes"
+          assert len(verified)==len(set(verified)) and set(verified)<=set(attempts), "invalid verified route identities"
+          selected_starts={mint for r in reports for mint in r["selected_start_mints"]}
+          selected_pools={pool for r in reports for pool in r["selected_pools"]}
+          verified_starts={mint for r in reports for mint in r["verified_start_mints"]}
+          verified_pools={pool for r in reports for pool in r["verified_pools"]}
+          failures=[failure for r in reports for failure in r["failures"]]
+          from collections import Counter
+          failed_venues=Counter(f["venue"] or "UNATTRIBUTED" for f in failures)
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a") as f:
+              f.write(f"Verified {len(verified)}/140 distinct signed simulations across ten shards.\\n")
+              f.write(f"Coverage: {len(selected_starts)} selected start mints, {len(selected_pools)} selected pools; {len(verified_starts)} verified start mints, {len(verified_pools)} verified pools.\\n")
+              f.write(f"Failure venue counts: {dict(failed_venues)}.\\n")
+          print(json.dumps({"attempted":len(attempts),"fully_verified":len(verified),"required":100,
+                            "selected_start_mints":len(selected_starts),"selected_pools":len(selected_pools),
+                            "verified_start_mints":len(verified_starts),"required_verified_start_mints":40,
+                            "verified_pools":len(verified_pools),
+                            "failed_venue_counts":dict(failed_venues)}))
+          assert len(verified)>=100, "fewer than 100 distinct signed simulations verified"
+          assert len(selected_starts)>=40, "fewer than 40 distinct source-selected start mints"
+          assert len(verified_starts)>=40, "fewer than 40 distinct SIGNED AND ROLLBACK VERIFIED start mints"
+          PY

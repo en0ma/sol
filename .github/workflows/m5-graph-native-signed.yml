@@ -1,0 +1,203 @@
+name: M5 Graph Selected Native Quote To Signed Offline Evidence
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/m5-graph-native-signed.yml"
+      - "arb/m5_four_to_six_signed_handoff.py"
+      - "arb/m5_four_to_six_source_capture.py"
+      - "arb/m5_seven_venue_route_scan.py"
+      - "arb/m5_source_indicative_route_chain.py"
+      - "arb/next_ten_signed_atomic_offline.py"
+      - "arb/atomic_graph_coordinator.py"
+      - "tests/test_m5_graph_prepared_signed_bridge.py"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: m5-graph-native-signed-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  actual-source-graph-to-offline:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      SURFPOOL_DATASOURCE_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
+      SOLANA_RPC_MIN_INTERVAL_SECONDS: "0.5"
+      SOLANA_RPC_ALCHEMY_FREE_TIER: "1"
+      SOLANA_RPC_PACING_FILE: /tmp/m5-graph-native-pacing
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install isolated Surfpool and pinned Solana client
+        run: |
+          test -n "$SURFPOOL_DATASOURCE_RPC_URL"
+          bash ci/install_surfpool.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Validate actual native graph signed handoff contract
+        run: |
+          python3 -m py_compile arb/m5_four_to_six_signed_handoff.py arb/m5_four_to_six_source_capture.py
+          python3 -m unittest discover -s tests -p test_m5_graph_prepared_signed_bridge.py -v
+      - name: Start read-only upstream-backed source fork
+        run: |
+          nohup "$HOME/.local/bin/surfpool" start --ci --rpc-url "$SURFPOOL_DATASOURCE_RPC_URL" --no-deploy > "$RUNNER_TEMP/graph-source.log" 2>&1 < /dev/null &
+          echo $! > "$RUNNER_TEMP/graph-source.pid"
+          python3 - <<'PY'
+          import time
+          from arb.rpc import call
+          for _ in range(80):
+              try:
+                  assert call("http://127.0.0.1:8899","getLatestBlockhash")["value"]["blockhash"]
+                  break
+              except (ValueError,RuntimeError,OSError,KeyError):
+                  time.sleep(1)
+          else:
+              raise SystemExit("read-only source fork unavailable")
+          PY
+      - name: Discover graph, capture source and chain actual native quotes
+        run: |
+          python3 - <<'PY'
+          import json,os,time
+          from pathlib import Path
+          from arb.m5_seven_venue_route_scan import analyze,ORDER
+          from arb.next_ten_fork_pool_probe import probe
+          from arb.m5_four_to_six_source_capture import capture
+          from arb.m5_source_indicative_route_chain import research_chain
+          root=Path(os.environ["RUNNER_TEMP"])
+          summary={"status":"NO_AUTHENTICATED_COMPLETE_NATIVE_GRAPH_ROUTE",
+                   "graph_cycles":0,"capture_attempts":0,"quoted_routes":0,
+                   "signed_attempts":0,"signed_accepted":0,
+                   "blockers":[],"actionable":False,"broadcast":False,
+                   "live_execution_approved":False}
+          try:
+              registry=json.loads(Path("arb/pool_registry.json").read_text())
+              pairs=tuple((a,b) for a in ORDER for b in ORDER if a!=b)
+              discovered=probe("http://127.0.0.1:8899",registry,batch=pairs)
+              graph=analyze(discovered,max_cycles=100)
+              (root/"graph-selected-discovery.json").write_text(json.dumps(graph,indent=2)+"\n")
+              choices=[i for i,r in enumerate(graph["routes"]) if 4<=r["hops"]<=6]
+              summary["graph_cycles"]=len(choices)
+              # The graph's native enumeration order groups near-identical
+              # routes. Prefer candidates with fewer known missing fee/bin
+              # source prerequisites, while retaining ALL source identities.
+              # This is discovery ordering, never synthetic quote admission.
+              deferred={"meteora_dlmm":8,"meteora_damm_v2":4,
+                        "pumpswap":4,"raydium_clmm":2,"orca":1}
+              choices.sort(key=lambda index: (
+                  sum(deferred.get(leg["venue"],0)
+                      for leg in graph["routes"][index]["legs"]),
+                  -len(set(leg["venue"] for leg in graph["routes"][index]["legs"])),
+                  index))
+              summary["selection_order"]="LOWEST_UNVERIFIED_AUXILIARY_MODEL_BURDEN_FIRST"
+              summary["selected_graph_indices"]=choices[:16]
+              for index in choices[:16]:
+                  summary["capture_attempts"]+=1
+                  try:
+                      capture("http://127.0.0.1:8899",graph,index,root/"graph-native-source.json")
+                      source=json.loads((root/"graph-native-source.json").read_text())
+                      quote=research_chain(source,amount_in=100000,observed_unix=int(time.time()))
+                      (root/"graph-native-quote.json").write_text(json.dumps(quote,indent=2)+"\n")
+                      if quote.get("status")!="SOURCE_BOUND_INDICATIVE_CHAIN_NOT_EXECUTION_VERIFIED":
+                          summary["blockers"].append({"route_index":index,
+                              "reason":quote.get("reason","native source quote unavailable")})
+                          continue
+                      summary["status"]="SOURCE_NATIVE_GRAPH_READY_FOR_OFFLINE"
+                      summary["quoted_routes"]=1
+                      summary["graph_route_index"]=index
+                      (root/"graph-native-ready").write_text("1\n")
+                      break
+                  except (ValueError,KeyError,TypeError,RuntimeError,OSError) as exc:
+                      summary["blockers"].append({"route_index":index,
+                          "reason":str(exc)[:240]})
+          except (ValueError,KeyError,TypeError,RuntimeError,OSError) as exc:
+              summary["blockers"].append({"stage":"source","reason":str(exc)[:240]})
+          (root/"graph-native-source-summary.json").write_text(json.dumps(summary,indent=2)+"\n")
+          print(json.dumps(summary))
+          PY
+      - name: Destroy source-backed fork before any local account writes
+        if: always()
+        run: |
+          if test -f "$RUNNER_TEMP/graph-source.pid"; then kill "$(cat "$RUNNER_TEMP/graph-source.pid")" || true; fi
+          python3 - <<'PY'
+          import socket,time
+          for _ in range(60):
+              sock=socket.socket();sock.settimeout(.2)
+              available=sock.connect_ex(("127.0.0.1",8899))!=0
+              sock.close()
+              if available:break
+              time.sleep(1)
+          else:raise SystemExit("source fork still serving RPC; isolated signing prohibited")
+          PY
+      - name: Start separate fork without any upstream datasource
+        run: |
+          nohup "$HOME/.local/bin/surfpool" start --ci --offline --no-deploy > "$RUNNER_TEMP/graph-offline.log" 2>&1 < /dev/null &
+          python3 - <<'PY'
+          import time
+          from arb.rpc import call
+          for _ in range(80):
+              try:
+                  assert call("http://127.0.0.1:8899","getLatestBlockhash")["value"]["blockhash"]
+                  break
+              except (ValueError,RuntimeError,OSError,KeyError):
+                  time.sleep(1)
+          else:raise SystemExit("disconnected offline fork unavailable")
+          PY
+      - name: Automatically hydrate, fund ephemeral SPL, sign and audit selected graph
+        env:
+          SURFPOOL_EXPLICITLY_OFFLINE: "1"
+          SURFPOOL_DATASOURCE_RPC_URL: ""
+        run: |
+          if test -f "$RUNNER_TEMP/graph-native-ready"; then
+            set +e
+            python3 -m arb.m5_four_to_six_signed_handoff \
+              --rpc http://127.0.0.1:8899 \
+              --source "$RUNNER_TEMP/graph-native-source.json" \
+              --native-quotes "$RUNNER_TEMP/graph-native-quote.json" \
+              --output "$RUNNER_TEMP/graph-native-signed.json"
+            result=$?
+            set -e
+            echo "Graph-selected signed exit status: $result" >> "$GITHUB_STEP_SUMMARY"
+            if test -s "$RUNNER_TEMP/graph-native-signed.json"; then
+              python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          root=Path(os.environ["RUNNER_TEMP"])
+          report=json.loads((root/"graph-native-signed.json").read_text())
+          accepted=report["signed_atomic_simulation_verified"] is True
+          print(json.dumps({"genuine_signed_accepted":accepted,
+              "status":report["status"],"broadcast":False}))
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a") as out:
+              out.write(f"Graph-selected genuine signed acceptance: {int(accepted)}\n")
+          PY
+            else
+              echo "No independently accepted signed graph receipt; see offline logs." >> "$GITHUB_STEP_SUMMARY"
+            fi
+          elif test -s "$RUNNER_TEMP/graph-native-source.json"; then
+            # Source-coverage mode is explicitly NOT a native-priced candidate.
+            # It still produces genuine isolated signed evidence when eligible.
+            set +e
+            python3 -m arb.m5_four_to_six_signed_handoff \
+              --rpc http://127.0.0.1:8899 \
+              --source "$RUNNER_TEMP/graph-native-source.json" \
+              --source-coverage-only --amount 100000 \
+              --output "$RUNNER_TEMP/graph-native-source-coverage-signed.json"
+            result=$?
+            set -e
+            echo "No complete native quote; separate source-coverage signed trial exit: $result" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No authenticated 4–6-leg source fixture; zero signed attempts (not a simulated loss)." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: m5-graph-selected-native-to-signed-evidence
+          path: |
+            ${{ runner.temp }}/graph-selected-discovery.json
+            ${{ runner.temp }}/graph-native-source.json
+            ${{ runner.temp }}/graph-native-quote.json
+            ${{ runner.temp }}/graph-native-source-summary.json
+            ${{ runner.temp }}/graph-native-signed.json
+            ${{ runner.temp }}/graph-native-source-coverage-signed.json
+            ${{ runner.temp }}/graph-source.log
+            ${{ runner.temp }}/graph-offline.log
+          if-no-files-found: warn
