@@ -246,6 +246,24 @@ def source_capture(rpc, graph, directory, *, shard_index=0, shard_count=1, targe
         raise RuntimeError(f"only {len(rows)}/{target} source-capturable routes; {len(blocked)} blocked")
     return rows
 
+def orca_tick_array_input_retries(error, venues, amount):
+    """Bounded smaller-input hypotheses for isolated Orca prefix error 6038.
+
+    A range-exhaustion hypothesis is not proof of route success. Every retry
+    still requires the same independently signed and rollback-verified receipt.
+    """
+    context=failed_instruction_context({"venues":venues,
+                                        "pools":[""]*len(venues)},str(error))
+    if (not isinstance(error,ValueError) or
+            "signed prefix simulation failed" not in str(error) or
+            context.get("failed_venue")!="orca" or
+            context.get("program_error_code")!=6038):
+        return []
+    values=[amount//10,amount//100]
+    return [a for i,a in enumerate(values) if a>0 and a<amount and
+            a not in values[:i]]
+
+
 def offline_simulate(rpc,directory,*,amount=100000,shard_index=0,shard_count=1):
     from arb.pumpswap_local_simulation import local_rpc_only
     from arb.next_ten_signed_atomic_offline import run_four_to_six_venue
@@ -274,9 +292,29 @@ def offline_simulate(rpc,directory,*,amount=100000,shard_index=0,shard_count=1):
             fixture=json.loads((root/row["fixture"]).read_text())
             from arb.dlmm_offline_clock import align_permissioned_dlmm_clock
             row["offline_clock_alignment"]=align_permissioned_dlmm_clock(rpc,fixture)
-            receipt=run_four_to_six_venue(rpc,fixture,amount_in=amount,
-                                          ephemeral_source_registry=True)
-            (root/("receipt-"+row["id"]+".json")).write_text(json.dumps(receipt,indent=2)+"\n")
+            row["signed_exact_input_attempts"]=[]
+            retry_amounts=[amount]
+            receipt=None
+            for amount_index,exact_input in enumerate(retry_amounts):
+                try:
+                    attempt={"amount_base_units":exact_input,"status":"RUNNING"}
+                    row["signed_exact_input_attempts"].append(attempt)
+                    receipt=run_four_to_six_venue(
+                        rpc,fixture,amount_in=exact_input,
+                        ephemeral_source_registry=True)
+                    attempt["status"]="RECEIPT_RETURNED"
+                    row["signed_exact_input_base_units"]=exact_input
+                    break
+                except ValueError as error:
+                    attempt["status"]="PREFIX_OR_PREPARATION_REJECTED"
+                    attempt["diagnostic"]=str(error)[:450]
+                    if amount_index==0:
+                        retry_amounts.extend(orca_tick_array_input_retries(
+                            error,row["venues"],amount))
+                    if amount_index==len(retry_amounts)-1:
+                        raise
+            (root/("receipt-"+row["id"]+".json")).write_text(
+                json.dumps(receipt,indent=2)+"\\n")
             if receipt.get("signed_packet_crypto_bound") is True and receipt.get("signed_transaction_signature"):
                 row["atomic_build_status"]="SIGNED_ATOMIC_PACKET_BUILT"
                 row["signed_transaction_signature"]=receipt["signed_transaction_signature"]
