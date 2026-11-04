@@ -50,7 +50,7 @@ class BoundedOfflineOrcaInputTests(unittest.TestCase):
             "positive_error": None,
         }
 
-    def run(self, fail, receipt):
+    def simulate_mocked_route(self, fail, receipt):
         with tempfile.TemporaryDirectory() as directory:
             root = self.report(directory)
             with patch.dict(os.environ, {
@@ -89,7 +89,7 @@ class BoundedOfflineOrcaInputTests(unittest.TestCase):
             [])
 
     def test_reduced_signed_receipt_is_auditable(self):
-        result, calls = self.run(ORCA_6038, self.signed_receipt())
+        result, calls = self.simulate_mocked_route(ORCA_6038, self.signed_receipt())
         row = result["routes"][0]
         self.assertEqual([c.kwargs["amount_in"] for c in calls], [100000, 10000])
         self.assertEqual(row["signed_exact_input_base_units"], 10000)
