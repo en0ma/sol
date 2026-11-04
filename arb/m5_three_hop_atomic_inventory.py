@@ -314,7 +314,7 @@ def offline_simulate(rpc,directory,*,amount=100000,shard_index=0,shard_count=1):
                     if amount_index==len(retry_amounts)-1:
                         raise
             (root/("receipt-"+row["id"]+".json")).write_text(
-                json.dumps(receipt,indent=2)+"\\n")
+                json.dumps(receipt,indent=2)+"\n")
             if receipt.get("signed_packet_crypto_bound") is True and receipt.get("signed_transaction_signature"):
                 row["atomic_build_status"]="SIGNED_ATOMIC_PACKET_BUILT"
                 row["signed_transaction_signature"]=receipt["signed_transaction_signature"]
