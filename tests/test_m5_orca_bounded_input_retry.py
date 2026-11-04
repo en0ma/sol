@@ -103,7 +103,7 @@ class BoundedOfflineOrcaInputTests(unittest.TestCase):
     def test_unverified_retry_receipt_not_accepted(self):
         receipt = self.signed_receipt()
         receipt["rollback_failure_case_verified"] = False
-        result, _ = self.run(ORCA_6038, receipt)
+        result, _ = self.simulate_mocked_route(ORCA_6038, receipt)
         self.assertEqual(result["simulations_verified"], 0)
         self.assertEqual(result["routes"][0]["simulation_status"],
                          "SIGNED_SIMULATION_NOT_VERIFIED")
