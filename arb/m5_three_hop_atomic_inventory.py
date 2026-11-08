@@ -184,7 +184,8 @@ def capture_attempt_order(routes, by_start, starts, captured_starts, attempted, 
                 route=routes[index]
                 direction=(route["legs"][0]["venue"],
                            route["legs"][-1]["venue"])
-                if direction not in seen:
+                if (direction not in seen and direction[1]=="orca"
+                        and ("orca",direction[0]) in seen):
                     return index
     for index,route in enumerate(routes):
         if route.get("hops")==3 and index not in attempted:
