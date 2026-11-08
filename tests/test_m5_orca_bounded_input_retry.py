@@ -108,6 +108,42 @@ class BoundedOfflineOrcaInputTests(unittest.TestCase):
         self.assertEqual(result["routes"][0]["simulation_status"],
                          "SIGNED_SIMULATION_NOT_VERIFIED")
 
+    def test_zero_output_large_input_retry_is_venue_and_code_bound(self):
+        from arb.m5_three_hop_atomic_inventory import zero_output_input_retries
+        orca = ("signed prefix simulation failed: "
+                "{'InstructionError': [0, {'Custom': 6036}]}")
+        cpmm = ("signed prefix simulation failed: "
+                "{'InstructionError': [0, {'Custom': 2505}]}; "
+                "program_log_tail=['Left: 0','Right: 0']")
+        self.assertEqual(zero_output_input_retries(
+            ValueError(orca), ["orca"], 100000), [1000000, 10000000])
+        self.assertEqual(zero_output_input_retries(
+            ValueError(cpmm), ["raydium_cpmm"], 100000), [1000000, 10000000])
+        self.assertEqual(zero_output_input_retries(
+            ValueError(cpmm), ["orca"], 100000), [])
+        self.assertEqual(zero_output_input_retries(
+            ValueError(cpmm.replace("Left: 0", "Left: 1")),
+            ["raydium_cpmm"], 100000), [])
+        self.assertEqual(zero_output_input_retries(
+            ValueError(ORCA_6038), ["orca"], 100000), [])
+        self.assertEqual(zero_output_input_retries(
+            ValueError(orca), ["orca"], 2**63), [])
+
+    def test_recovered_zero_output_still_requires_signed_rollback(self):
+        orca = ("signed prefix simulation failed: "
+                "{'InstructionError': [0, {'Custom': 6036}]}")
+        result,calls=self.simulate_mocked_route(orca,self.signed_receipt())
+        self.assertEqual([c.kwargs["amount_in"] for c in calls],
+                         [100000, 1000000])
+        row=result["routes"][0]
+        self.assertEqual(row["signed_exact_input_base_units"],1000000)
+        self.assertEqual(row["simulation_status"],
+                         "SIGNED_SIMULATION_AND_ROLLBACK_VERIFIED")
+        self.assertFalse(row["broadcast"])
+        result,_=self.simulate_mocked_route(
+            orca,dict(self.signed_receipt(),rollback_failure_case_verified=False))
+        self.assertEqual(result["simulations_verified"],0)
+
     def test_other_venue_failure_does_not_trigger_retry(self):
         with tempfile.TemporaryDirectory() as directory:
             root = self.report(directory)
