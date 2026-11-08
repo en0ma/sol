@@ -41,7 +41,8 @@ def venue_accounts(rpc, venue, pool, mints, *, directional_only=False):
     from arb.meteora_damm_v2 import decode as decode_damm
     from arb.raydium_cpmm import decode as decode_cpmm
     from arb.meteora_dlmm import decode as decode_dlmm
-    from arb.meteora_dlmm_bin_preflight import check_active_bin_array
+    from arb.meteora_dlmm_bin_preflight import (
+        check_active_bin_array,inspect_directional_bin_arrays)
     from arb.pumpswap_pool import decode as decode_pump
     authenticated=snapshot(rpc,pool,venue)
     if set(authenticated["mints"])!=set(mints):
@@ -88,10 +89,21 @@ def venue_accounts(rpc, venue, pool, mints, *, directional_only=False):
         preflight=check_active_bin_array(rpc,pool)
         if preflight.get("status")!="ACTIVE_BIN_ARRAY_AUTHENTICATED":
             raise ValueError("DLMM bins not authenticated")
-        bins=[v["pda"] for v in preflight["neighboring_bin_arrays"]
-              if v.get("authenticated")]
+        if directional_only:
+            # DLMM's remaining-account iterator may walk past immediate
+            # neighbors even for an exact-input swap. Read only the source-
+            # authenticated actual traversal direction, never invent PDAs.
+            source_direction=inspect_directional_bin_arrays(
+                rpc,pool,preflight["active_bin_array_index"],
+                input_is_x=mints[0]==state["token_x_mint"])
+            bins=source_direction["bin_arrays"]
+        else:
+            source_direction=None
+            bins=[v["pda"] for v in preflight["neighboring_bin_arrays"]
+                  if v.get("authenticated")]
         extras += [state["reserve_x"],state["reserve_y"],state["oracle"],*bins]
         evidence={"bin_preflight":preflight,"bin_arrays":bins,
+                  "directional_bin_source":source_direction,
                   "active_bin_array_index":preflight["active_bin_array_index"]}
     elif venue=="raydium_clmm":
         from arb.raydium_clmm_ticks import inspect
