@@ -98,6 +98,11 @@ def capture(rpc,graph,route_index,output,*,venue_cache=None):
         state=DECODERS[venue](base64.b64decode(raw[0],validate=True))
         if set(state[k] for k in MINT_KEYS[venue])!={mints[i],mints[i+1]}:
             raise ValueError("source pool changed mint identity")
+        if venue=="meteora_dlmm":
+            directional=evidence[i]["auxiliary"].get("directional_bin_source")
+            if directional is not None:
+                from arb.meteora_dlmm_bin_preflight import verify_directional_bin_snapshot
+                verify_directional_bin_snapshot(leg["pool"],directional,accounts)
     programs={PROGRAMS[l["venue"]] for l in legs}
     if any(l["venue"]=="pumpswap" for l in legs):
         from arb.pumpswap_fee_account import PROGRAM as FEE
