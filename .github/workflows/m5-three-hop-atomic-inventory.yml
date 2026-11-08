@@ -194,7 +194,10 @@ jobs:
                    "selected_pools":sorted({pool for row in r["routes"] for pool in row["pools"]}),
                    "verified_start_mints":sorted({row["mints"][0] for row in verified}),
                    "verified_pools":sorted({pool for row in verified for pool in row["pools"]}),
-                   "failures":[{"id":row["id"],"venue":row.get("failed_venue"),
+                   "failures":[{"id":row["id"],"start_mint":row["mints"][0],
+                                "attempted_exact_input_base_units":[a["amount_base_units"]
+                                    for a in row.get("signed_exact_input_attempts",[])],
+                                "venue":row.get("failed_venue"),
                                 "pool":row.get("failed_pool"),"instruction_index":row.get("failed_instruction_index"),
                                 "error_code":row.get("program_error_code"),
                                 "status":row["simulation_status"]} for row in r["routes"] if row not in verified]}
@@ -218,6 +221,7 @@ jobs:
     needs: offline-simulation
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           pattern: m5-three-hop-metrics-*
@@ -257,3 +261,22 @@ jobs:
           assert len(selected_starts)>=40, "fewer than 40 distinct source-selected start mints"
           assert len(verified_starts)>=40, "fewer than 40 distinct SIGNED AND ROLLBACK VERIFIED start mints"
           PY
+      - name: Report every source-captured mint still lacking signed rollback evidence
+        run: |
+          python3 -m arb.m5_three_hop_mint_diagnostics \
+            --metrics "$RUNNER_TEMP/shard-metrics" \
+            --output "$RUNNER_TEMP/three-hop-mint-gaps.json"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          report=json.loads((Path(os.environ["RUNNER_TEMP"])/"three-hop-mint-gaps.json").read_text())
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a") as summary:
+              summary.write(f"Captured but not signed-verified start mints: {report['source_captured_but_not_signed_verified_start_mints']}.\\n")
+              for row in report["unverified_start_mints"]:
+                  summary.write(f"- {row['start_mint']}: {row['failure_reason_counts']}\\n")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m5-three-hop-start-mint-gap-diagnostics
+          path: ${{ runner.temp }}/three-hop-mint-gaps.json
+          if-no-files-found: error
