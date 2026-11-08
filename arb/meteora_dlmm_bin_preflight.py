@@ -72,9 +72,9 @@ def inspect_directional_bin_arrays(rpc,pool,active_index,*,input_is_x,
     """
     require_loopback_rpc(rpc)
     if (type(active_index)is not int or
-            not -(1<<63)+max_arrays<active_index<(1<<63)-max_arrays or
             type(input_is_x)is not bool or
-            type(max_arrays)is not int or not 1<=max_arrays<=8):
+            type(max_arrays)is not int or not 1<=max_arrays<=8 or
+            not -(1<<63)+max_arrays<active_index<(1<<63)-max_arrays):
         raise ValueError("invalid bounded DLMM directional source window")
     direction=-1 if input_is_x else 1
     indexes=[active_index+direction*i for i in range(max_arrays)]
@@ -83,7 +83,8 @@ def inspect_directional_bin_arrays(rpc,pool,active_index,*,input_is_x,
         addresses,{"encoding":"base64","commitment":"confirmed"}])
     values=response.get("value")
     if (not isinstance(values,list) or len(values)!=len(addresses) or
-            type(response.get("context",{}).get("slot")) is not int):
+            type(response.get("context",{}).get("slot")) is not int or
+            response["context"]["slot"]<0):
         raise ValueError("incomplete contextual DLMM directional source read")
     verified=[]
     observations=[]
