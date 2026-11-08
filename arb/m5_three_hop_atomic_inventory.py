@@ -166,6 +166,26 @@ def capture_attempt_order(routes, by_start, starts, captured_starts, attempted, 
                 index=by_start[mint][depth]
                 if index not in attempted:
                     return index
+    # After giving every mint three attempts, promote a genuine reverse
+    # orientation before third/fourth copies of the same directed cycle.
+    # A pool with exhausted A->B liquidity can still have source-verifiable
+    # B->A tick arrays. The alternative must pass its OWN capture and later
+    # signed simulation; topology alone never counts as proof.
+    if captured_starts:
+        for mint in starts:
+            if mint not in captured_starts:
+                continue
+            seen={(routes[i]["legs"][0]["venue"],
+                   routes[i]["legs"][-1]["venue"])
+                  for i in attempted if routes[i].get("start_mint")==mint}
+            for index in by_start[mint]:
+                if index in attempted:
+                    continue
+                route=routes[index]
+                direction=(route["legs"][0]["venue"],
+                           route["legs"][-1]["venue"])
+                if direction not in seen:
+                    return index
     for index,route in enumerate(routes):
         if route.get("hops")==3 and index not in attempted:
             return index
@@ -237,7 +257,7 @@ def source_capture(rpc, graph, directory, *, shard_index=0, shard_count=1, targe
              "selected_graph_start_mints":len(starts),
              "source_captured_start_mints":len(captured_starts),
              "uncaptured_graph_start_mints":sorted(set(starts)-captured_starts),
-             "source_capture_policy":"FIRST_SUCCESS_PER_MINT_RETRY_THREE_THEN_FILL",
+             "source_capture_policy":"FIRST_SUCCESS_PER_MINT_RETRY_THREE_REVERSE_ORIENTATION_THEN_FILL",
              "blocked_source_routes":blocked,
              "cached_distinct_pool_directions":len(venue_cache),
             "three_hop_truncated":graph.get("cycle_coverage_by_hops",{}).get("3",{}).get("truncated"),
