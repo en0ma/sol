@@ -60,6 +60,67 @@ def inspect_adjacent_bin_arrays(rpc, pool, active_index):
         evidence.append(row)
     return evidence
 
+
+def inspect_directional_bin_arrays(rpc,pool,active_index,*,input_is_x,
+                                   max_arrays=8):
+    """Read-only, source-authenticated DLMM directional bin-array window.
+
+    The legacy swap walks initialized arrays beyond the active neighborhood.
+    Candidate addresses are PDAs, but only present accounts with matching
+    program owner, discriminator, signed array index and pool are accepted.
+    Absent accounts never become fixture records or executable proof.
+    """
+    require_loopback_rpc(rpc)
+    if (type(active_index)is not int or
+            not -(1<<63)+max_arrays<active_index<(1<<63)-max_arrays or
+            type(input_is_x)is not bool or
+            type(max_arrays)is not int or not 1<=max_arrays<=8):
+        raise ValueError("invalid bounded DLMM directional source window")
+    direction=-1 if input_is_x else 1
+    indexes=[active_index+direction*i for i in range(max_arrays)]
+    addresses=[bin_array_pda(pool,i) for i in indexes]
+    response=call(rpc,"getMultipleAccounts",[
+        addresses,{"encoding":"base64","commitment":"confirmed"}])
+    values=response.get("value")
+    if (not isinstance(values,list) or len(values)!=len(addresses) or
+            type(response.get("context",{}).get("slot")) is not int):
+        raise ValueError("incomplete contextual DLMM directional source read")
+    verified=[]
+    observations=[]
+    for index,address,account in zip(indexes,addresses,values):
+        if account is None:
+            observations.append({"index":index,"address":address,
+                                 "present":False})
+            continue
+        if (not isinstance(account,dict) or
+                account.get("owner")!=PROGRAM or
+                account.get("executable") is not False):
+            raise ValueError("directional DLMM bin array owner mismatch")
+        data=account.get("data")
+        if not isinstance(data,list) or len(data)!=2 or data[1]!="base64":
+            raise ValueError("directional DLMM bin array encoding invalid")
+        raw=base64.b64decode(data[0],validate=True)
+        if (len(raw)<56 or raw[:8]!=BIN_ARRAY_DISC or
+                int.from_bytes(raw[8:16],"little",signed=True)!=index or
+                str(Pubkey.from_bytes(raw[24:56]))!=pool or
+                raw[16] not in (0,1,2)):
+            raise ValueError("directional DLMM bin array identity mismatch")
+        verified.append(address)
+        observations.append({"index":index,"address":address,
+                             "present":True,"authenticated":True,
+                             "byte_length":len(raw)})
+    if not observations[0].get("authenticated"):
+        raise ValueError("DLMM active directional bin array absent")
+    return {"pool":pool,"active_bin_array_index":active_index,
+            "input_is_x":input_is_x,
+            "max_arrays_checked":max_arrays,
+            "source_context_slot":response["context"]["slot"],
+            "bin_arrays":verified,"observations":observations,
+            "source_authenticated":True,
+            "executable_liquidity_or_quote_verified":False,
+            "actionable":False,"broadcast":False}
+
+
 def verify_pool_oracle(rpc, oracle):
     """Authenticate the oracle account linked by an on-chain DLMM LbPair."""
     require_loopback_rpc(rpc)
