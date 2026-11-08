@@ -44,6 +44,7 @@ jobs:
             test_m5_start_pool_diversity.py \
             test_m5_orca_bounded_input_retry.py \
             test_m5_three_hop_mint_diagnostics.py \
-            test_m5_orca_liquidity_cliff.py; do
+            test_m5_orca_liquidity_cliff.py \
+            test_m5_dlmm_directional_bin_window.py; do
             python3 -m unittest discover -s tests -p "$pattern" -v
           done
