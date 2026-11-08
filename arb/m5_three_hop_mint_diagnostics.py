@@ -74,6 +74,8 @@ def build_report(reports):
                 "venue":f.get("venue"),
                 "pool":f.get("pool"),
                 "error_code":f.get("error_code"),
+                "orca_liquidity_cliff":f.get("orca_liquidity_cliff"),
+                "orca_liquidity_audit_error":f.get("orca_liquidity_audit_error"),
                 "attempted_exact_input_base_units":f.get("attempted_exact_input_base_units",[]),
             } for f in sorted(failures,key=lambda f:f["id"])],
             "signed_and_rollback_verified":False,
