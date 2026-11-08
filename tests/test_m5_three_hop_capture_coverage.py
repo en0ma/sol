@@ -67,6 +67,46 @@ class ThreeHopSourceCoverageTests(unittest.TestCase):
         self.assertTrue(all(not r["actionable"] and not r["broadcast"]
                             for r in accepted))
 
+    def test_reverse_orca_cycle_precedes_redundant_forward_captures(self):
+        # Pool-identical reverse cycles were near the end of the 200-route
+        # candidate graph. They should receive a source-capture attempt
+        # before another same-direction route spends the 140-route budget.
+        def cycle(first,last,tag):
+            return {"start_mint":"A","hops":3,"legs":[
+                {"venue":first,"pool":"first-"+tag,"output":"B"},
+                {"venue":"raydium_cpmm","pool":"middle-"+tag,"output":"C"},
+                {"venue":last,"pool":"last-"+tag,"output":"A"}]}
+        routes=[
+            cycle("orca","raydium_amm_v4","forward1"),
+            cycle("orca","raydium_amm_v4","forward2"),
+            cycle("orca","raydium_amm_v4","forward3"),
+            cycle("raydium_amm_v4","orca","reverse"),
+            route("B","pool-b"),
+        ]
+        by_start,starts=capture_priority_indices(routes)
+        index=capture_attempt_order(routes,by_start,starts,
+                                    {"A","B"},{0,4})
+        self.assertEqual(index,3)
+        self.assertEqual(routes[index]["legs"][-1]["venue"],"orca")
+        # Once the reversed direction has been attempted, normal fill may
+        # select the remaining forward route. No successful claim is made.
+        followup=capture_attempt_order(routes,by_start,starts,
+                                       {"A","B"},{0,3,4})
+        self.assertEqual(followup,1)
+
+    def test_unseen_reverse_route_does_not_skip_unserved_mint(self):
+        def cycle(first,last,tag):
+            return {"start_mint":"A","hops":3,"legs":[
+                {"venue":first,"pool":tag,"output":"B"},
+                {"venue":"raydium_cpmm","pool":tag+"middle","output":"C"},
+                {"venue":last,"pool":tag+"last","output":"A"}]}
+        rows=[cycle("orca","raydium_amm_v4","forward"),
+              cycle("raydium_amm_v4","orca","reverse"),
+              route("B","b")]
+        by_start,starts=capture_priority_indices(rows)
+        self.assertEqual(capture_attempt_order(
+            rows,by_start,starts,{"A"},{0}),2)
+
     def test_source_target_fails_if_no_authenticated_capture(self):
         graph = {"status": "SOURCE_AUTHENTICATED_ROUTE_DISCOVERY_ONLY",
                  "routes": [route("A", "a1"), route("B", "b1")]}
