@@ -27,8 +27,11 @@ def build_swap(pool,state,authority,user_input,user_output,oracle,
         raise ValueError("DLMM input/output mint direction not verified")
     if len({state["token_x_mint"],state["token_y_mint"],state["reserve_x"],state["reserve_y"]})!=4:
         raise ValueError("DLMM pool mint or reserve duplicates")
-    if not isinstance(bin_arrays,(tuple,list)) or not 1<=len(bin_arrays)<=3:
-        raise ValueError("one to three authenticated DLMM bin arrays required")
+    directional=state.get("directional_bin_source")
+    max_count=8 if directional is not None else 3
+    if (not isinstance(bin_arrays,(tuple,list)) or
+            not 1<=len(bin_arrays)<=max_count):
+        raise ValueError("one to eight authenticated directional DLMM bin arrays required")
     if len(set(bin_arrays))!=len(bin_arrays):
         raise ValueError("DLMM bin array reuse")
     p=Pubkey.from_string(PROGRAM)
@@ -47,17 +50,34 @@ def build_swap(pool,state,authority,user_input,user_output,oracle,
     active_index=state.get("active_bin_array_index")
     if type(active_index) is not int:
         raise ValueError("authenticated DLMM active bin index required")
-    allowed={bin_array_pda(pool,active_index+i) for i in (-1,0,1)}
-    if bin_array_pda(pool,active_index) not in bin_arrays or any(x not in allowed for x in bin_arrays):
-        raise ValueError("bin array path not within authenticated active neighborhood")
-    # Remaining bin arrays must follow directional traversal from active bin.
-    # The source preflight returns ascending neighbors, not swap order.
     active=bin_array_pda(pool,active_index)
-    forward=bin_array_pda(pool,active_index-1 if input_is_x else active_index+1)
-    reverse=bin_array_pda(pool,active_index+1 if input_is_x else active_index-1)
-    ordered=[active]+[x for x in (forward,reverse) if x in bin_arrays]
-    if len(ordered)!=len(bin_arrays):
-        raise ValueError("DLMM source bin arrays cannot be ordered")
+    if directional is not None:
+        if (not isinstance(directional,dict) or
+                directional.get("source_authenticated") is not True or
+                directional.get("pool")!=pool or
+                directional.get("active_bin_array_index")!=active_index or
+                directional.get("input_is_x") is not input_is_x or
+                directional.get("bin_arrays")!=list(bin_arrays) or
+                directional.get("max_arrays_checked")!=8):
+            raise ValueError("unbound directional DLMM source evidence")
+        # The bitmap can legitimately skip absent neighboring bin-array PDAs.
+        # Only already-captured, owner-authenticated accounts may be included;
+        # they must be ordered by distance along this exact swap direction.
+        step=-1 if input_is_x else 1
+        expected=[bin_array_pda(pool,active_index+step*i) for i in range(8)]
+        ordered=[address for address in expected if address in bin_arrays]
+        if not ordered or ordered[0]!=active or ordered!=list(bin_arrays):
+            raise ValueError("DLMM directional source bin arrays out of order")
+    else:
+        allowed={bin_array_pda(pool,active_index+i) for i in (-1,0,1)}
+        if active not in bin_arrays or any(x not in allowed for x in bin_arrays):
+            raise ValueError("bin array path not within authenticated active neighborhood")
+        # Legacy paired fixtures retain their original 3-array behavior.
+        forward=bin_array_pda(pool,active_index-1 if input_is_x else active_index+1)
+        reverse=bin_array_pda(pool,active_index+1 if input_is_x else active_index-1)
+        ordered=[active]+[x for x in (forward,reverse) if x in bin_arrays]
+        if len(ordered)!=len(bin_arrays):
+            raise ValueError("DLMM source bin arrays cannot be ordered")
     metas.extend(AccountMeta(Pubkey.from_string(x),False,True) for x in ordered)
     data=SWAP_DISCRIMINATOR+amount_in.to_bytes(8,"little")+min_amount_out.to_bytes(8,"little")
     return Instruction(p,data,metas)
