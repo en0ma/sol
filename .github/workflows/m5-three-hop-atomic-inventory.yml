@@ -200,6 +200,8 @@ jobs:
                                 "venue":row.get("failed_venue"),
                                 "pool":row.get("failed_pool"),"instruction_index":row.get("failed_instruction_index"),
                                 "error_code":row.get("program_error_code"),
+                                "orca_liquidity_cliff":row.get("orca_source_liquidity_cliff"),
+                                "orca_liquidity_audit_error":row.get("orca_source_liquidity_audit_error"),
                                 "status":row["simulation_status"]} for row in r["routes"] if row not in verified]}
           (Path(os.environ["RUNNER_TEMP"])/"three-hop-shard-metrics.json").write_text(json.dumps(summary)+"\n")
           PY
