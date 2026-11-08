@@ -101,7 +101,14 @@ def capture(rpc,graph,route_index,output,*,venue_cache=None):
         if venue=="meteora_dlmm":
             directional=evidence[i]["auxiliary"].get("directional_bin_source")
             if directional is not None:
-                from arb.meteora_dlmm_bin_preflight import verify_directional_bin_snapshot
+                from arb.meteora_dlmm_bin_preflight import (
+                    active_bin_array_index,verify_directional_bin_snapshot)
+                # Reject clock drift between the preliminary authenticated
+                # pool bytes and this ONE-SLOT account snapshot, even if the
+                # PDA at the old index still exists.
+                if (active_bin_array_index(state["active_id"])!=
+                        directional["active_bin_array_index"]):
+                    raise ValueError("DLMM active bin shifted across source snapshot")
                 verify_directional_bin_snapshot(leg["pool"],directional,accounts)
     programs={PROGRAMS[l["venue"]] for l in legs}
     if any(l["venue"]=="pumpswap" for l in legs):
