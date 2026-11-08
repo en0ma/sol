@@ -86,36 +86,37 @@ def venue_accounts(rpc, venue, pool, mints, *, directional_only=False):
                    state["amm_config"],state["observation"]]
     elif venue=="meteora_dlmm":
         state=decode_dlmm(raw)
-        # A source-backed fork may advance the pair's active bin while the
-        # separate pool and active-array reads are being made. A null active
-        # PDA is not permission to synthesize its account. Re-read the pair
-        # and its derived active PDA at most twice more, accepting ONLY a
-        # fully independently authenticated preflight.
-        preflight=None
-        for _ in range(3):
+        if directional_only:
+            # Derive direction and active index from the SAME authenticated
+            # pair bytes as the chosen route. Preflight's separate pair/PDA
+            # reads can observe different pool clocks and falsely reject
+            # the real active array. Here the contextual fixture rechecks
+            # all array identities AND the pair's active index before use.
+            from arb.meteora_dlmm_bin_preflight import (
+                active_bin_array_index,verify_pool_oracle)
+            active=active_bin_array_index(state["active_id"])
+            source_direction=inspect_directional_bin_arrays(
+                rpc,pool,active,
+                input_is_x=mints[0]==state["token_x_mint"])
+            oracle_proof=verify_pool_oracle(rpc,state["oracle"])
+            bins=source_direction["bin_arrays"]
+            preflight={"status":"DIRECTIONAL_SOURCE_ACTIVE_ARRAY_AUTHENTICATED",
+                       "active_bin_id":state["active_id"],
+                       "active_bin_array_index":active,
+                       "active_bin_array_pda":bins[0],
+                       "oracle_evidence":oracle_proof,
+                       "source_context_slot":source_direction["source_context_slot"],
+                       "swap_instruction_supported":False,
+                       "atomic_simulation_verified":False}
+        else:
             preflight=check_active_bin_array(rpc,pool)
-            if preflight.get("status")=="ACTIVE_BIN_ARRAY_AUTHENTICATED":
-                break
-            if preflight.get("status")!="ACTIVE_BIN_ARRAY_ABSENT":
-                break
-        if preflight.get("status")!="ACTIVE_BIN_ARRAY_AUTHENTICATED":
-            raise ValueError(
-                "DLMM bins not authenticated: "+str({
+            if preflight.get("status")!="ACTIVE_BIN_ARRAY_AUTHENTICATED":
+                raise ValueError("DLMM bins not authenticated: "+str({
                     "pool":pool,
                     "status":preflight.get("status"),
                     "active_bin_array_index":preflight.get("active_bin_array_index"),
                     "active_bin_array_pda":preflight.get("active_bin_array_pda"),
-                    "bounded_source_checks":3,
                 }))
-        if directional_only:
-            # DLMM's remaining-account iterator may walk past immediate
-            # neighbors even for an exact-input swap. Read only the source-
-            # authenticated actual traversal direction, never invent PDAs.
-            source_direction=inspect_directional_bin_arrays(
-                rpc,pool,preflight["active_bin_array_index"],
-                input_is_x=mints[0]==state["token_x_mint"])
-            bins=source_direction["bin_arrays"]
-        else:
             source_direction=None
             bins=[v["pda"] for v in preflight["neighboring_bin_arrays"]
                   if v.get("authenticated")]
