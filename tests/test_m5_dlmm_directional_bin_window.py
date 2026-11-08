@@ -5,7 +5,8 @@ from unittest.mock import patch
 from solders.pubkey import Pubkey
 from arb.meteora_dlmm import PROGRAM
 from arb.meteora_dlmm_bin_preflight import (
-    BIN_ARRAY_DISC,bin_array_pda,inspect_directional_bin_arrays)
+    BIN_ARRAY_DISC,bin_array_pda,inspect_directional_bin_arrays,
+    verify_directional_bin_snapshot)
 from arb.meteora_dlmm_swap import build_swap
 
 
@@ -72,6 +73,36 @@ class DlmmDirectionalWindows(unittest.TestCase):
                 inspect_directional_bin_arrays(
                     "http://127.0.0.1:8899",self.pool,self.active,
                     input_is_x=True)
+
+    def test_contextual_account_identity_is_reauthenticated(self):
+        def rpc(rpc,method,params):
+            return {"context":{"slot":123},"value":[
+                self.source(self.active-i) if i in (0,2) else None
+                for i in range(8)]}
+        with patch("arb.meteora_dlmm_bin_preflight.call",side_effect=rpc):
+            report=inspect_directional_bin_arrays(
+                "http://127.0.0.1:8899",self.pool,self.active,
+                input_is_x=True)
+        captured={self.index_to_key[self.active-i]:self.source(self.active-i)
+                  for i in (0,2)}
+        self.assertTrue(verify_directional_bin_snapshot(
+            self.pool,report,captured))
+        bad={**captured}
+        bad[self.index_to_key[self.active-2]]=self.source(
+            self.active-2,owner=str(Pubkey.new_unique()))
+        with self.assertRaisesRegex(ValueError,"owner"):
+            verify_directional_bin_snapshot(self.pool,report,bad)
+        bad={**captured}
+        bad[self.index_to_key[self.active-2]]=self.source(
+            self.active-2,parent=str(Pubkey.new_unique()))
+        with self.assertRaisesRegex(ValueError,"identity"):
+            verify_directional_bin_snapshot(self.pool,report,bad)
+        # An array that was absent at preflight cannot quietly appear
+        # as an allowed source array without a new authenticated read.
+        bad={**captured,self.index_to_key[self.active-1]:
+             self.source(self.active-1)}
+        with self.assertRaisesRegex(ValueError,"unverified"):
+            verify_directional_bin_snapshot(self.pool,report,bad)
 
     def test_builder_binds_exact_directional_order_and_rejects_reversal(self):
         keys=[str(Pubkey.new_unique()) for _ in range(7)]
