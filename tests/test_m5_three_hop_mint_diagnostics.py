@@ -53,6 +53,7 @@ class MintGapReportTests(unittest.TestCase):
     def test_duplicate_route_identity_rejected(self):
         reports=shards()
         reports[1]["route_ids"][0]=reports[0]["route_ids"][0]
+        reports[1]["verified_route_ids"][0]=reports[0]["verified_route_ids"][0]
         with self.assertRaisesRegex(ValueError,"duplicate"):
             build_report(reports)
 
