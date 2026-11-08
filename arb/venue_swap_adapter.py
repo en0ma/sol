@@ -57,8 +57,18 @@ def build_leg(venue,pool,state,evidence,owner,src,dst,
         from arb.meteora_dlmm_bin_preflight import bin_array_pda
         if bin_array_pda(pool,index) not in bins:
             raise ValueError("authenticated active DLMM bin array missing")
+        directional=evidence.get("directional_bin_source")
+        if directional is not None and (
+                not isinstance(directional,dict) or
+                directional.get("source_authenticated") is not True or
+                directional.get("pool")!=pool or
+                directional.get("active_bin_array_index")!=index or
+                directional.get("input_is_x")!=(mint_in==x) or
+                directional.get("bin_arrays")!=bins):
+            raise ValueError("DLMM directional bin evidence does not match source route")
         enriched=dict(state,input_mint=mint_in,output_mint=mint_out,
-                      active_bin_array_index=index)
+                      active_bin_array_index=index,
+                      directional_bin_source=directional)
         return build_swap(pool,enriched,owner,src,dst,state["oracle"],bins,
                           amount,floor,input_is_x=mint_in==x,
                           bitmap_extension=state.get("bitmap_extension"))
