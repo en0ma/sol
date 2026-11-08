@@ -244,6 +244,85 @@ def inspect(rpc, pool_address):
             "slot":resp.get("context",{}).get("slot"),"arrays":out,
             "swap_ready":False}
 
+
+def authenticated_downward_liquidity_cliff(fixture, leg_index):
+    """Inspect signed-route source bytes for a depleted A-to-B tick path.
+
+    This is a diagnostic, not a swap quote or permission to skip a signature.
+    Each tick array must be source-captured, program-owned, identity-checked
+    and equal to the builder's expected ordered directional array set.
+    """
+    from arb.orca_whirlpool import decode as decode_pool
+    from arb.whirlpool_swap import select_tick_arrays
+    if (not isinstance(fixture,dict) or
+            type(leg_index) is not int or
+            not 0<=leg_index<len(fixture.get("route_venues",[])) or
+            fixture["route_venues"][leg_index]!="orca"):
+        raise ValueError("source-bound Orca leg required")
+    pool=fixture["route_pool_addresses"][leg_index]
+    mint_in=fixture["route_mints"][leg_index]
+    evidence=fixture["leg_evidence_by_index"][leg_index]
+    if evidence.get("pool")!=pool or evidence.get("venue")!="orca":
+        raise ValueError("source leg evidence identity mismatch")
+    accounts=fixture["accounts"]
+    def source_bytes(address):
+        account=accounts[address]
+        if (account.get("owner")!=PROGRAM or
+                account.get("executable") is not False or
+                not isinstance(account.get("data"),list) or
+                len(account["data"])!=2 or account["data"][1]!="base64"):
+            raise ValueError("unauthenticated Orca source bytes")
+        return base64.b64decode(account["data"][0],validate=True)
+    state=decode_pool(source_bytes(pool))
+    if mint_in!=state["token_mint_a"]:
+        return None
+    tick=state["tick_current_index"]
+    spacing=state["tick_spacing"]
+    expected=select_tick_arrays(pool,tick,spacing,True)
+    supplied=evidence.get("auxiliary",{}).get("tick_arrays")
+    if (not isinstance(supplied,list) or len(supplied)!=3 or
+            len(set(supplied))!=3 or set(supplied)!=set(expected)):
+        raise ValueError("directional source tick evidence does not match instruction")
+    starts=[start_tick(tick,spacing)-i*ARRAY_TICKS*spacing
+            for i in range(3)]
+    initialized=[]
+    for address,start in zip(expected,starts):
+        raw=source_bytes(address)
+        if len(raw)==FIXED_LEN and raw[:8]==DISC:
+            ticks=decode_fixed_ticks(raw,pool,start,spacing)
+        elif raw[:8]==DYNAMIC_DISC:
+            ticks=decode_dynamic_ticks(raw,pool,start,spacing)
+        else:
+            raise ValueError("unsupported source-authenticated tick layout")
+        initialized.extend(t for t in ticks if t["tick_index"]<=tick)
+    if not initialized:
+        return None
+    first=max(initialized,key=lambda item:item["tick_index"])
+    lower=[t for t in initialized if t["tick_index"]<first["tick_index"]]
+    liquidity=int(state["liquidity"])
+    net=int(first["liquidity_net"])
+    after=liquidity-net
+    if after!=0 or lower:
+        return None
+    return {
+        "status":"SOURCE_AUTHENTICATED_FIRST_DOWNWARD_TICK_DEPLETES_LIQUIDITY",
+        "venue":"orca",
+        "pool":pool,
+        "direction":"a_to_b",
+        "current_tick":tick,
+        "first_downward_initialized_tick":first["tick_index"],
+        "current_liquidity":str(liquidity),
+        "first_tick_liquidity_net":str(net),
+        "liquidity_after_first_crossing":"0",
+        "additional_initialized_ticks_below_in_three_arrays":0,
+        "causes_6038_proven":False,
+        "executable_quote_verified":False,
+        "actionable":False,
+        "live_execution_approved":False,
+        "broadcast":False,
+    }
+
+
 def main():
     import sys
     manifest=os.environ.get("WHIRLPOOL_MANIFEST","arb/whirlpool_pools.json")
