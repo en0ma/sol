@@ -93,7 +93,7 @@ class DlmmDirectionalWindows(unittest.TestCase):
         ix=build_swap(self.pool,state,keys[4],keys[5],keys[6],
                       str(Pubkey.new_unique()),bins,100000,1,input_is_x=True)
         self.assertEqual([str(m.pubkey) for m in ix.accounts[-2:]],bins)
-        with self.assertRaisesRegex(ValueError,"out of order"):
+        with self.assertRaisesRegex(ValueError,"unbound directional"):
             build_swap(self.pool,state,keys[4],keys[5],keys[6],
                        str(Pubkey.new_unique()),bins[::-1],100000,1,
                        input_is_x=True)
