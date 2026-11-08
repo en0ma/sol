@@ -369,6 +369,18 @@ def offline_simulate(rpc,directory,*,amount=100000,shard_index=0,shard_count=1):
         except (ValueError,KeyError,TypeError,RuntimeError,OSError) as exc:
             row["diagnostic"]=type(exc).__name__+": "+str(exc)[:950]
             row.update(failed_instruction_context(row,str(exc)))
+            if (row.get("failed_venue")=="orca" and
+                    row.get("program_error_code")==6038 and
+                    "fixture" in locals() and isinstance(fixture,dict)):
+                # Explain a source-verified zero-liquidity cliff when present.
+                # This is diagnostic only: preserve the signed failure.
+                from arb.whirlpool_ticks import authenticated_downward_liquidity_cliff
+                try:
+                    row["orca_source_liquidity_cliff"]=authenticated_downward_liquidity_cliff(
+                        fixture,row["failed_instruction_index"])
+                except (ValueError,KeyError,TypeError,RuntimeError,OSError) as audit_error:
+                    row["orca_source_liquidity_audit_error"]=(
+                        type(audit_error).__name__+": "+str(audit_error)[:240])
             row["simulation_status"]="NOT_ATTEMPTED_OR_ABORTED_DURING_PREPARATION"
         report["status"]="OFFLINE_THREE_HOP_ATOMIC_BUILD_AND_SIMULATION_INVENTORY"
         report["build_confirmed"]=sum(r["atomic_build_status"]=="SIGNED_ATOMIC_PACKET_BUILT" for r in report["routes"])
