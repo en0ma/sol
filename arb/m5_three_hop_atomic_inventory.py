@@ -309,6 +309,29 @@ def zero_output_input_retries(error, venues, amount):
             if amount*factor<2**64]
 
 
+def dlmm_bin_array_input_retries(error, venues, amount):
+    """Test bounded smaller exact inputs only for proven DLMM bin-array 3005.
+
+    Anchor 3005 is generic AccountNotEnoughKeys; never use it as a retry
+    signal without both the signed-prefix failure and bin_array log identity.
+    No missing bin array is created, and retries require full signed rollback
+    evidence just like every original route.
+    """
+    context=failed_instruction_context(
+        {"venues":venues,"pools":[""]*len(venues)},str(error))
+    message=str(error)
+    if (not isinstance(error,ValueError) or
+            "signed prefix simulation failed" not in message or
+            context.get("failed_venue")!="meteora_dlmm" or
+            context.get("program_error_code")!=3005 or
+            "account: bin_array" not in message or
+            "AccountNotEnoughKeys" not in message):
+        return []
+    values=[amount//10,amount//100]
+    return [a for i,a in enumerate(values) if a>0 and a<amount and
+            a not in values[:i]]
+
+
 def offline_simulate(rpc,directory,*,amount=100000,shard_index=0,shard_count=1):
     from arb.pumpswap_local_simulation import local_rpc_only
     from arb.next_ten_signed_atomic_offline import run_four_to_six_venue
@@ -358,6 +381,8 @@ def offline_simulate(rpc,directory,*,amount=100000,shard_index=0,shard_count=1):
                         retry_amounts.extend(orca_tick_array_input_retries(
                             error,row["venues"],amount))
                         retry_amounts.extend(zero_output_input_retries(
+                            error,row["venues"],amount))
+                        retry_amounts.extend(dlmm_bin_array_input_retries(
                             error,row["venues"],amount))
                     if amount_index==len(retry_amounts)-1:
                         raise
