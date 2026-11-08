@@ -264,6 +264,30 @@ def orca_tick_array_input_retries(error, venues, amount):
             a not in values[:i]]
 
 
+def zero_output_input_retries(error, venues, amount):
+    """Bounded higher-input hypotheses for signed prefix zero-output errors.
+
+    Orca 6036 (AmountOutBelowMinimum) and Raydium CPMM 2505 (RequireGt)
+    sometimes arise from amount quantization. Neither error establishes
+    profitability, and only newly signed, rollback-verified receipts count.
+    Keep trials bounded and avoid overflowing the signed u64 domain.
+    """
+    context=failed_instruction_context({"venues":venues,
+                                        "pools":[""]*len(venues)},str(error))
+    if not isinstance(error,ValueError) or "signed prefix simulation failed" not in str(error):
+        return []
+    venue,code=context.get("failed_venue"),context.get("program_error_code")
+    if (venue,code) not in (("orca",6036),("raydium_cpmm",2505)):
+        return []
+    # Treat a CPMM 2505 as a potential amount-quantization issue only
+    # when the program log explicitly reports a zero-side comparison.
+    if venue=="raydium_cpmm" and not ("Left: 0" in str(error) and
+                                    "Right: 0" in str(error)):
+        return []
+    return [amount*factor for factor in (10,100)
+            if amount*factor<2**64]
+
+
 def offline_simulate(rpc,directory,*,amount=100000,shard_index=0,shard_count=1):
     from arb.pumpswap_local_simulation import local_rpc_only
     from arb.next_ten_signed_atomic_offline import run_four_to_six_venue
@@ -310,6 +334,8 @@ def offline_simulate(rpc,directory,*,amount=100000,shard_index=0,shard_count=1):
                     attempt["diagnostic"]=str(error)[:450]
                     if amount_index==0:
                         retry_amounts.extend(orca_tick_array_input_retries(
+                            error,row["venues"],amount))
+                        retry_amounts.extend(zero_output_input_retries(
                             error,row["venues"],amount))
                     if amount_index==len(retry_amounts)-1:
                         raise
