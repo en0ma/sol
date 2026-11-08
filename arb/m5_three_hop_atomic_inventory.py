@@ -312,6 +312,7 @@ def offline_simulate(rpc,directory,*,amount=100000,shard_index=0,shard_count=1):
             continue
         row["atomic_build_status"]="BUILD_ATTEMPTED_NO_SIGNED_PACKET"
         row["simulation_status"]="NOT_ATTEMPTED"
+        fixture=None
         try:
             fixture=json.loads((root/row["fixture"]).read_text())
             from arb.dlmm_offline_clock import align_permissioned_dlmm_clock
@@ -371,7 +372,7 @@ def offline_simulate(rpc,directory,*,amount=100000,shard_index=0,shard_count=1):
             row.update(failed_instruction_context(row,str(exc)))
             if (row.get("failed_venue")=="orca" and
                     row.get("program_error_code")==6038 and
-                    "fixture" in locals() and isinstance(fixture,dict)):
+                    isinstance(fixture,dict)):
                 # Explain a source-verified zero-liquidity cliff when present.
                 # This is diagnostic only: preserve the signed failure.
                 from arb.whirlpool_ticks import authenticated_downward_liquidity_cliff
