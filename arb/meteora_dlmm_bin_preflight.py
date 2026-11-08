@@ -122,6 +122,54 @@ def inspect_directional_bin_arrays(rpc,pool,active_index,*,input_is_x,
             "actionable":False,"broadcast":False}
 
 
+
+def verify_directional_bin_snapshot(pool,source,accounts):
+    """Recheck directional arrays from one source-context account inventory."""
+    if (not isinstance(source,dict) or
+            source.get("source_authenticated") is not True or
+            source.get("pool")!=pool or
+            type(source.get("active_bin_array_index")) is not int or
+            type(source.get("input_is_x")) is not bool or
+            source.get("max_arrays_checked")!=8 or
+            not isinstance(accounts,dict)):
+        raise ValueError("invalid contextual DLMM source claim")
+    active=source["active_bin_array_index"]
+    step=-1 if source["input_is_x"] else 1
+    indexes=[active+step*i for i in range(8)]
+    entries=source.get("observations")
+    if (not isinstance(entries,list) or len(entries)!=8 or
+            not isinstance(source.get("bin_arrays"),list)):
+        raise ValueError("incomplete directional DLMM source observations")
+    captured=[]
+    for index,item in zip(indexes,entries):
+        address=bin_array_pda(pool,index)
+        if (not isinstance(item,dict) or item.get("index")!=index or
+                item.get("address")!=address):
+            raise ValueError("DLMM directional source index mismatch")
+        if not item.get("authenticated"):
+            if item.get("present") is not False or address in accounts:
+                raise ValueError("DLMM unverified directional bin array in snapshot")
+            continue
+        account=accounts.get(address)
+        if (not isinstance(account,dict) or
+                account.get("owner")!=PROGRAM or
+                account.get("executable") is not False):
+            raise ValueError("DLMM contextual directional bin array owner mismatch")
+        data=account.get("data")
+        if not isinstance(data,list) or len(data)!=2 or data[1]!="base64":
+            raise ValueError("DLMM contextual directional bin array encoding invalid")
+        raw=base64.b64decode(data[0],validate=True)
+        if (len(raw)<56 or raw[:8]!=BIN_ARRAY_DISC or
+                int.from_bytes(raw[8:16],"little",signed=True)!=index or
+                str(Pubkey.from_bytes(raw[24:56]))!=pool or
+                raw[16] not in (0,1,2)):
+            raise ValueError("DLMM contextual directional bin array identity mismatch")
+        captured.append(address)
+    if captured!=source["bin_arrays"] or not captured or captured[0]!=bin_array_pda(pool,active):
+        raise ValueError("DLMM contextual bin array path diverged from preflight")
+    return True
+
+
 def verify_pool_oracle(rpc, oracle):
     """Authenticate the oracle account linked by an on-chain DLMM LbPair."""
     require_loopback_rpc(rpc)
