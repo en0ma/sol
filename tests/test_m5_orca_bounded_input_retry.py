@@ -144,6 +144,33 @@ class BoundedOfflineOrcaInputTests(unittest.TestCase):
             orca,dict(self.signed_receipt(),rollback_failure_case_verified=False))
         self.assertEqual(result["simulations_verified"],0)
 
+    def test_liquidity_cliff_diagnostic_never_upgrades_6038(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=self.report(directory)
+            observed={"status":"SOURCE_AUTHENTICATED_FIRST_DOWNWARD_TICK_DEPLETES_LIQUIDITY",
+                      "causes_6038_proven":False,"actionable":False,
+                      "broadcast":False}
+            with patch.dict(os.environ, {
+                "SURFPOOL_EXPLICITLY_OFFLINE":"1",
+                "SURFPOOL_DATASOURCE_RPC_URL":"",
+            }), patch("arb.pumpswap_local_simulation.local_rpc_only"), patch(
+                "arb.dlmm_offline_clock.align_permissioned_dlmm_clock",
+                return_value={}), patch(
+                "arb.next_ten_signed_atomic_offline.run_four_to_six_venue",
+                side_effect=ValueError(ORCA_6038)) as sign, patch(
+                "arb.whirlpool_ticks.authenticated_downward_liquidity_cliff",
+                return_value=observed) as audit:
+                result=offline_simulate(
+                    "http://127.0.0.1:8899",root,amount=100000)
+        row=result["routes"][0]
+        self.assertEqual(sign.call_count,3)
+        audit.assert_called_once()
+        self.assertEqual(row["orca_source_liquidity_cliff"],observed)
+        self.assertEqual(result["simulations_verified"],0)
+        self.assertEqual(row["simulation_status"],
+                         "NOT_ATTEMPTED_OR_ABORTED_DURING_PREPARATION")
+        self.assertFalse(row["broadcast"])
+
     def test_other_venue_failure_does_not_trigger_retry(self):
         with tempfile.TemporaryDirectory() as directory:
             root = self.report(directory)
