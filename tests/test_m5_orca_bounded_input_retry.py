@@ -171,6 +171,79 @@ class BoundedOfflineOrcaInputTests(unittest.TestCase):
                          "NOT_ATTEMPTED_OR_ABORTED_DURING_PREPARATION")
         self.assertFalse(row["broadcast"])
 
+    def test_dlmm_3005_retry_requires_exact_bin_array_anchor_log(self):
+        from arb.m5_three_hop_atomic_inventory import dlmm_bin_array_input_retries
+        observed=("signed prefix simulation failed: "
+                  "{'InstructionError': [1, {'Custom': 3005}]}; "
+                  "program_log_tail=['AnchorError caused by account: bin_array. "
+                  "Error Code: AccountNotEnoughKeys. Error Number: 3005']")
+        self.assertEqual(
+            dlmm_bin_array_input_retries(
+                ValueError(observed), ["orca", "meteora_dlmm"], 100000),
+            [10000,1000])
+        self.assertEqual(dlmm_bin_array_input_retries(
+            ValueError(observed),["meteora_dlmm","orca"],100000),[])
+        self.assertEqual(dlmm_bin_array_input_retries(
+            ValueError(observed.replace("bin_array","oracle")),
+            ["orca","meteora_dlmm"],100000),[])
+        self.assertEqual(dlmm_bin_array_input_retries(
+            ValueError(observed.replace("AccountNotEnoughKeys","ConstraintSeeds")),
+            ["orca","meteora_dlmm"],100000),[])
+        self.assertEqual(dlmm_bin_array_input_retries(
+            ValueError(observed.replace("signed prefix simulation failed",
+                                       "unsourced claim")),
+            ["orca","meteora_dlmm"],100000),[])
+        self.assertEqual(dlmm_bin_array_input_retries(
+            ValueError(observed),["orca","meteora_dlmm"],1),[])
+
+    def test_dlmm_retry_still_requires_signed_and_rollback_verified(self):
+        observed=("signed prefix simulation failed: "
+                  "{'InstructionError': [1, {'Custom': 3005}]}; "
+                  "program_log_tail=['AnchorError caused by account: bin_array. "
+                  "Error Code: AccountNotEnoughKeys. Error Number: 3005']")
+        with tempfile.TemporaryDirectory() as directory:
+            root=self.report(directory)
+            report=json.loads((root/"three-hop-inventory.json").read_text())
+            report["routes"][0]["venues"]=["orca","meteora_dlmm","meteora_dlmm"]
+            (root/"three-hop-inventory.json").write_text(json.dumps(report))
+            with patch.dict(os.environ,{
+                "SURFPOOL_EXPLICITLY_OFFLINE":"1",
+                "SURFPOOL_DATASOURCE_RPC_URL":"",
+            }), patch("arb.pumpswap_local_simulation.local_rpc_only"), patch(
+                "arb.dlmm_offline_clock.align_permissioned_dlmm_clock",
+                return_value={}), patch(
+                "arb.next_ten_signed_atomic_offline.run_four_to_six_venue",
+                side_effect=[ValueError(observed),self.signed_receipt()]) as run:
+                output=offline_simulate("http://127.0.0.1:8899",
+                                        root,amount=100000)
+            self.assertEqual([c.kwargs["amount_in"] for c in run.call_args_list],
+                             [100000,10000])
+            self.assertEqual(output["simulations_verified"],1)
+            self.assertEqual(output["routes"][0]["signed_exact_input_base_units"],
+                             10000)
+            self.assertFalse(output["routes"][0]["broadcast"])
+
+        with tempfile.TemporaryDirectory() as directory:
+            root=self.report(directory)
+            report=json.loads((root/"three-hop-inventory.json").read_text())
+            report["routes"][0]["venues"]=["orca","meteora_dlmm","meteora_dlmm"]
+            (root/"three-hop-inventory.json").write_text(json.dumps(report))
+            incomplete=dict(self.signed_receipt(),
+                            rollback_failure_case_verified=False)
+            with patch.dict(os.environ,{
+                "SURFPOOL_EXPLICITLY_OFFLINE":"1",
+                "SURFPOOL_DATASOURCE_RPC_URL":"",
+            }), patch("arb.pumpswap_local_simulation.local_rpc_only"), patch(
+                "arb.dlmm_offline_clock.align_permissioned_dlmm_clock",
+                return_value={}), patch(
+                "arb.next_ten_signed_atomic_offline.run_four_to_six_venue",
+                side_effect=[ValueError(observed),incomplete]):
+                output=offline_simulate("http://127.0.0.1:8899",
+                                        root,amount=100000)
+            self.assertEqual(output["simulations_verified"],0)
+            self.assertEqual(output["routes"][0]["simulation_status"],
+                             "SIGNED_SIMULATION_NOT_VERIFIED")
+
     def test_other_venue_failure_does_not_trigger_retry(self):
         with tempfile.TemporaryDirectory() as directory:
             root = self.report(directory)
