@@ -253,12 +253,14 @@ def authenticated_downward_liquidity_cliff(fixture, leg_index):
     and equal to the builder's expected ordered directional array set.
     """
     from arb.orca_whirlpool import decode as decode_pool
+    from arb.source_snapshot_manifest import verify as verify_source_manifest
     from arb.whirlpool_swap import select_tick_arrays
     if (not isinstance(fixture,dict) or
             type(leg_index) is not int or
             not 0<=leg_index<len(fixture.get("route_venues",[])) or
             fixture["route_venues"][leg_index]!="orca"):
         raise ValueError("source-bound Orca leg required")
+    verify_source_manifest(fixture)
     pool=fixture["route_pool_addresses"][leg_index]
     mint_in=fixture["route_mints"][leg_index]
     evidence=fixture["leg_evidence_by_index"][leg_index]
