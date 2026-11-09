@@ -166,8 +166,30 @@ def capture_attempt_order(routes, by_start, starts, captured_starts, attempted, 
                 index=by_start[mint][depth]
                 if index not in attempted:
                     return index
-    # After giving every mint three attempts, promote a genuine reverse
-    # orientation before third/fourth copies of the same directed cycle.
+    # Preserve a fourth (or later) independent pool-path attempt for
+    # still-uncaptured starting mints before assigning any remaining capacity
+    # to starts already captured. Routes that merely permute the same pool
+    # set (e.g. the two blocked all-DLMM triangles) do not become a new
+    # source-liquidity hypothesis: they were already attempted in the first
+    # three mint-priority rounds.
+    for mint in starts:
+        if mint in captured_starts:
+            continue
+        earlier=[routes[i] for i in by_start[mint] if i in attempted]
+        previously_seen={(leg["venue"],leg["pool"])
+                         for route in earlier for leg in route["legs"]}
+        for index in by_start[mint]:
+            if index in attempted:
+                continue
+            identities={(leg["venue"],leg["pool"])
+                        for leg in routes[index]["legs"]}
+            if identities-previously_seen:
+                return index
+    # After giving every mint three attempts and fresh unserved pool paths,
+    # promote a genuine reverse orientation before redundant fill.
+    # A pool with exhausted A->B liquidity can still have source-verifiable
+    # B->A tick arrays. The alternative must pass its OWN capture and later
+    # signed simulation; topology alone never counts as proof.
     # A pool with exhausted A->B liquidity can still have source-verifiable
     # B->A tick arrays. The alternative must pass its OWN capture and later
     # signed simulation; topology alone never counts as proof.
@@ -258,7 +280,7 @@ def source_capture(rpc, graph, directory, *, shard_index=0, shard_count=1, targe
              "selected_graph_start_mints":len(starts),
              "source_captured_start_mints":len(captured_starts),
              "uncaptured_graph_start_mints":sorted(set(starts)-captured_starts),
-             "source_capture_policy":"FIRST_SUCCESS_PER_MINT_RETRY_THREE_REVERSE_ORIENTATION_THEN_FILL",
+             "source_capture_policy":"FIRST_SUCCESS_PER_MINT_RETRY_THREE_UNSERVED_POOL_NOVELTY_REVERSE_ORIENTATION_THEN_FILL",
              "blocked_source_routes":blocked,
              "cached_distinct_pool_directions":len(venue_cache),
             "three_hop_truncated":graph.get("cycle_coverage_by_hops",{}).get("3",{}).get("truncated"),
