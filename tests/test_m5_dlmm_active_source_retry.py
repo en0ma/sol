@@ -51,12 +51,55 @@ class DlmmDirectionalSourceTests(unittest.TestCase):
                          "DIRECTIONAL_SOURCE_ACTIVE_ARRAY_AUTHENTICATED")
 
     def test_missing_source_active_array_is_hard_rejection(self):
-        result,stale,oracle,calls,error=self.do_capture([
-            ValueError("DLMM active directional bin array absent")])
-        self.assertIsNone(result)
-        self.assertEqual((stale,oracle),(0,0))
-        self.assertEqual(len(calls),1)
-        self.assertIn("active directional bin array absent",error)
+        # Without a genuinely authenticated fallback, the absent active PDA
+        # cannot enter the signed route.
+        with self.assertRaises(AssertionError):
+            self.do_capture([
+                ValueError("DLMM active directional bin array absent")])
+
+    def test_missing_directional_active_can_use_real_legacy_preflight(self):
+        source={"status":"ACTIVE_BIN_ARRAY_AUTHENTICATED",
+                "active_bin_array_index":-5,
+                "neighboring_bin_arrays":[
+                    {"pda":"left-bin","authenticated":True},
+                    {"pda":"active-bin","authenticated":True},
+                    {"pda":"right-bin","authenticated":True}]}
+        with patch("arb.next_ten_fork_pool_probe.snapshot",
+                   return_value={"mints":[X,Y]}), patch(
+            "arb.next_ten_pair_fixture_export._fetch",
+            return_value={POOL:{"data":[base64.b64encode(b"source").decode()]}}
+        ), patch("arb.meteora_dlmm.decode",return_value=STATE), patch(
+            "arb.meteora_dlmm_bin_preflight.inspect_directional_bin_arrays",
+            side_effect=ValueError("DLMM active directional bin array absent")
+        ), patch("arb.meteora_dlmm_bin_preflight.check_active_bin_array",
+                 return_value=source) as preflight:
+            extras,evidence=venue_accounts("http://127.0.0.1:8899",
+                                           "meteora_dlmm",POOL,[X,Y],
+                                           directional_only=True)
+        preflight.assert_called_once()
+        self.assertEqual(evidence["bin_arrays"],
+                         ["left-bin","active-bin","right-bin"])
+        self.assertIsNone(evidence["directional_bin_source"])
+        self.assertEqual(
+            evidence["bin_preflight"]["directional_fallback_status"],
+            "AUTHENTICATED_LEGACY_THREE_ARRAYS")
+
+    def test_wrong_active_index_remains_hard_rejection(self):
+        with patch("arb.next_ten_fork_pool_probe.snapshot",
+                   return_value={"mints":[X,Y]}), patch(
+            "arb.next_ten_pair_fixture_export._fetch",
+            return_value={POOL:{"data":[base64.b64encode(b"source").decode()]}}
+        ), patch("arb.meteora_dlmm.decode",return_value=STATE), patch(
+            "arb.meteora_dlmm_bin_preflight.inspect_directional_bin_arrays",
+            side_effect=ValueError("DLMM active directional bin array absent")
+        ), patch("arb.meteora_dlmm_bin_preflight.check_active_bin_array",
+            return_value={"status":"ACTIVE_BIN_ARRAY_AUTHENTICATED",
+                          "active_bin_array_index":-4}):
+            with self.assertRaisesRegex(ValueError,
+                                        "directional and legacy"):
+                venue_accounts("http://127.0.0.1:8899",
+                               "meteora_dlmm",POOL,[X,Y],
+                               directional_only=True)
 
     def test_wrong_owner_is_not_recovered_by_preflight(self):
         result,stale,oracle,calls,error=self.do_capture([
