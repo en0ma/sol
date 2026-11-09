@@ -95,19 +95,41 @@ def venue_accounts(rpc, venue, pool, mints, *, directional_only=False):
             from arb.meteora_dlmm_bin_preflight import (
                 active_bin_array_index,verify_pool_oracle)
             active=active_bin_array_index(state["active_id"])
-            source_direction=inspect_directional_bin_arrays(
-                rpc,pool,active,
-                input_is_x=mints[0]==state["token_x_mint"])
-            oracle_proof=verify_pool_oracle(rpc,state["oracle"])
-            bins=source_direction["bin_arrays"]
-            preflight={"status":"DIRECTIONAL_SOURCE_ACTIVE_ARRAY_AUTHENTICATED",
-                       "active_bin_id":state["active_id"],
-                       "active_bin_array_index":active,
-                       "active_bin_array_pda":bins[0],
-                       "oracle_evidence":oracle_proof,
-                       "source_context_slot":source_direction["source_context_slot"],
-                       "swap_instruction_supported":False,
-                       "atomic_simulation_verified":False}
+            try:
+                source_direction=inspect_directional_bin_arrays(
+                    rpc,pool,active,
+                    input_is_x=mints[0]==state["token_x_mint"])
+            except ValueError as exc:
+                if str(exc)!="DLMM active directional bin array absent":
+                    raise
+                # The source fork may disagree between an eight-PDA batch
+                # and an independently queried active PDA. Never substitute
+                # an absent array: fall back ONLY to the old read-only,
+                # owner/index/parent/oracle-authenticated three-array check.
+                # A signed 3005 remains a failed route, not recovered proof.
+                legacy=check_active_bin_array(rpc,pool)
+                if (legacy.get("status")!="ACTIVE_BIN_ARRAY_AUTHENTICATED"
+                        or legacy.get("active_bin_array_index")!=active):
+                    raise ValueError(
+                        "DLMM active array absent in directional and legacy "
+                        "source reads") from exc
+                source_direction=None
+                bins=[v["pda"] for v in legacy["neighboring_bin_arrays"]
+                      if v.get("authenticated")]
+                preflight=dict(legacy,
+                    directional_fallback_status="AUTHENTICATED_LEGACY_THREE_ARRAYS",
+                    signed_simulation_verified=False)
+            else:
+                oracle_proof=verify_pool_oracle(rpc,state["oracle"])
+                bins=source_direction["bin_arrays"]
+                preflight={"status":"DIRECTIONAL_SOURCE_ACTIVE_ARRAY_AUTHENTICATED",
+                           "active_bin_id":state["active_id"],
+                           "active_bin_array_index":active,
+                           "active_bin_array_pda":bins[0],
+                           "oracle_evidence":oracle_proof,
+                           "source_context_slot":source_direction["source_context_slot"],
+                           "swap_instruction_supported":False,
+                           "atomic_simulation_verified":False}
         else:
             preflight=check_active_bin_array(rpc,pool)
             if preflight.get("status")!="ACTIVE_BIN_ARRAY_AUTHENTICATED":
