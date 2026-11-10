@@ -244,6 +244,71 @@ class BoundedOfflineOrcaInputTests(unittest.TestCase):
             self.assertEqual(output["routes"][0]["simulation_status"],
                              "SIGNED_SIMULATION_NOT_VERIFIED")
 
+    def test_amm_v4_slippage_retry_needs_exact_signed_program_log(self):
+        from arb.m5_three_hop_atomic_inventory import (
+            raydium_amm_v4_slippage_input_retries)
+        observed=("signed prefix simulation failed: "
+                  "{'InstructionError': [1, {'Custom': 30}]}; "
+                  "program_log_tail=['AMM error: Exceeded desired slippage limit.']")
+        self.assertEqual(raydium_amm_v4_slippage_input_retries(
+            ValueError(observed),["orca","raydium_amm_v4"],100000),
+            [1000000,10000000])
+        self.assertEqual(raydium_amm_v4_slippage_input_retries(
+            ValueError(observed),["raydium_amm_v4","orca"],100000),[])
+        self.assertEqual(raydium_amm_v4_slippage_input_retries(
+            ValueError(observed.replace("Exceeded desired slippage limit.",
+                                        "invalid account")),
+            ["orca","raydium_amm_v4"],100000),[])
+        self.assertEqual(raydium_amm_v4_slippage_input_retries(
+            ValueError(observed.replace("signed prefix simulation failed",
+                                        "untrusted program error")),
+            ["orca","raydium_amm_v4"],100000),[])
+        self.assertEqual(raydium_amm_v4_slippage_input_retries(
+            ValueError(observed),["orca","raydium_amm_v4"],2**63),[])
+
+    def test_amm_v4_signed_recovery_still_requires_rollback(self):
+        observed=("signed prefix simulation failed: "
+                  "{'InstructionError': [1, {'Custom': 30}]}; "
+                  "program_log_tail=['AMM error: Exceeded desired slippage limit.']")
+        with tempfile.TemporaryDirectory() as directory:
+            root=self.report(directory)
+            report=json.loads((root/"three-hop-inventory.json").read_text())
+            report["routes"][0]["venues"]=["orca","raydium_amm_v4","meteora_damm_v2"]
+            (root/"three-hop-inventory.json").write_text(json.dumps(report))
+            with patch.dict(os.environ,{"SURFPOOL_EXPLICITLY_OFFLINE":"1",
+                                        "SURFPOOL_DATASOURCE_RPC_URL":""}),patch(
+                "arb.pumpswap_local_simulation.local_rpc_only"),patch(
+                "arb.dlmm_offline_clock.align_permissioned_dlmm_clock",
+                return_value={}),patch(
+                "arb.next_ten_signed_atomic_offline.run_four_to_six_venue",
+                side_effect=[ValueError(observed),self.signed_receipt()]) as sign:
+                output=offline_simulate("http://127.0.0.1:8899",
+                                        root,amount=100000)
+            self.assertEqual([c.kwargs["amount_in"] for c in sign.call_args_list],
+                             [100000,1000000])
+            self.assertEqual(output["simulations_verified"],1)
+            self.assertEqual(output["routes"][0]["signed_exact_input_base_units"],
+                             1000000)
+        with tempfile.TemporaryDirectory() as directory:
+            root=self.report(directory)
+            report=json.loads((root/"three-hop-inventory.json").read_text())
+            report["routes"][0]["venues"]=["orca","raydium_amm_v4","meteora_damm_v2"]
+            (root/"three-hop-inventory.json").write_text(json.dumps(report))
+            incomplete=dict(self.signed_receipt(),
+                            rollback_failure_case_verified=False)
+            with patch.dict(os.environ,{"SURFPOOL_EXPLICITLY_OFFLINE":"1",
+                                        "SURFPOOL_DATASOURCE_RPC_URL":""}),patch(
+                "arb.pumpswap_local_simulation.local_rpc_only"),patch(
+                "arb.dlmm_offline_clock.align_permissioned_dlmm_clock",
+                return_value={}),patch(
+                "arb.next_ten_signed_atomic_offline.run_four_to_six_venue",
+                side_effect=[ValueError(observed),incomplete]):
+                output=offline_simulate("http://127.0.0.1:8899",
+                                        root,amount=100000)
+            self.assertEqual(output["simulations_verified"],0)
+            self.assertEqual(output["routes"][0]["simulation_status"],
+                             "SIGNED_SIMULATION_NOT_VERIFIED")
+
     def test_other_venue_failure_does_not_trigger_retry(self):
         with tempfile.TemporaryDirectory() as directory:
             root = self.report(directory)
