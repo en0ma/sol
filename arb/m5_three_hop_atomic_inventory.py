@@ -354,6 +354,29 @@ def dlmm_bin_array_input_retries(error, venues, amount):
             a not in values[:i]]
 
 
+
+def raydium_amm_v4_slippage_input_retries(error, venues, amount):
+    """Bounded larger signed inputs for AMM v4's explicit error 30.
+
+    This is a quantization/liquidity hypothesis, NOT an assertion that
+    slippage is acceptable or that any route is executable. The signed
+    builder retains a nonzero minimum output; every attempt requires its
+    own signed-prefix simulation plus atomic/rollback verification.
+    """
+    message=str(error)
+    context=failed_instruction_context(
+        {"venues":venues,"pools":[""]*len(venues)},message)
+    if (not isinstance(error,ValueError) or
+            "signed prefix simulation failed" not in message or
+            context.get("failed_venue")!="raydium_amm_v4" or
+            context.get("program_error_code")!=30 or
+            "AMM error: Exceeded desired slippage limit." not in message):
+        return []
+    return [amount*factor for factor in (10,100) if
+            amount*factor<2**64]
+
+
+
 def offline_simulate(rpc,directory,*,amount=100000,shard_index=0,shard_count=1):
     from arb.pumpswap_local_simulation import local_rpc_only
     from arb.next_ten_signed_atomic_offline import run_four_to_six_venue
@@ -405,6 +428,8 @@ def offline_simulate(rpc,directory,*,amount=100000,shard_index=0,shard_count=1):
                         retry_amounts.extend(zero_output_input_retries(
                             error,row["venues"],amount))
                         retry_amounts.extend(dlmm_bin_array_input_retries(
+                            error,row["venues"],amount))
+                        retry_amounts.extend(raydium_amm_v4_slippage_input_retries(
                             error,row["venues"],amount))
                     if amount_index==len(retry_amounts)-1:
                         raise
