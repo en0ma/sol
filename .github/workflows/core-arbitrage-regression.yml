@@ -1,0 +1,52 @@
+name: Core Arbitrage Regression
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/core-arbitrage-regression.yml"
+      - "arb/**"
+      - "tests/**"
+      - "ci/**"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/core-arbitrage-regression.yml"
+      - "arb/**"
+      - "tests/**"
+      - "ci/**"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  fast-native-primitives:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned lightweight instruction dependencies
+        run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Compile graph, swap adapters, quote, and atomic coordinator
+        run: |
+          python3 -m py_compile arb/opportunity_graph.py arb/m5_seven_venue_route_scan.py arb/m5_three_hop_atomic_inventory.py arb/venue_swap_adapter.py arb/atomic_graph_coordinator.py arb/next_ten_signed_atomic_offline.py arb/venue_quote_contract.py arb/continuous_source_scanner.py
+      - name: Run fast graph, pricing, builder and safety regressions
+        run: |
+          set -e
+          for pattern in \
+            test_venue_quote_contract_boundaries.py \
+            test_m5_graph_native_handoff_integration.py \
+            test_m5_graph_prepared_signed_bridge.py \
+            test_pumpswap_signed_instruction_binding.py \
+            test_raydium_clmm_native_single_tick.py \
+            test_pool_registry.py \
+            test_m5_start_mint_expansion.py \
+            test_m5_three_hop_capture_coverage.py \
+            test_m5_directional_cache_provenance.py \
+            test_m5_directional_source_capture.py \
+            test_m5_start_pool_diversity.py \
+            test_m5_orca_bounded_input_retry.py \
+            test_m5_three_hop_mint_diagnostics.py \
+            test_m5_orca_liquidity_cliff.py \
+            test_m5_dlmm_directional_bin_window.py \
+            test_m5_dlmm_active_source_retry.py \
+            test_continuous_source_scanner.py; do
+            python3 -m unittest discover -s tests -p "$pattern" -v
+          done

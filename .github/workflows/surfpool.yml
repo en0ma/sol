@@ -1,14 +1,153 @@
-name: Surfpool CI
+name: Surfpool Full 42 Manual Regression
 
 on:
-  push:
-  pull_request:
   workflow_dispatch:
+
+# Avoid competing Surfpool forks against the same free-tier Alchemy account.
+concurrency:
+  group: surfpool-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
+  ci-runtime-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit prior CI job durations and obsolete diagnostic candidates without RPC
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_RUNTIME_AUDIT_OUTPUT: ${{ runner.temp }}/ci-runtime-audit.json
+        run: python3 -m arb.ci_job_runtime_audit
+      - name: Publish retrospective CI performance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-runtime-audit
+          path: ${{ runner.temp }}/ci-runtime-audit.json
+          if-no-files-found: warn
+  pairwise-capability-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install solders for real builder serialization tests
+        run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Unit-test pairwise execution evidence
+        run: python3 -m unittest discover -s tests -p test_atomic_pair_evidence_matrix.py -v
+      - name: Test Raydium AMM v4 market owner authentication
+        run: python3 -m unittest discover -s tests -p test_raydium_v4_market_preflight.py -v
+      - name: Test public Raydium pool discovery and onchain authentication boundary
+        run: python3 -m unittest discover -s tests -p test_raydium_public_pool_discovery.py -v
+      - name: Test bounded legacy pool discovery
+        run: python3 -m unittest discover -s tests -p test_legacy_pool_discovery.py -v
+      - name: Test seven-venue evidence validation contract
+        run: python3 -m unittest discover -s tests -p test_validate_eight_venue_probe.py -v
+      - name: Test seven-venue onchain validation probe
+        run: python3 -m unittest discover -s tests -p test_eight_venue_onchain_probe.py -v
+      - name: Test DAMM v2 fresh onchain authentication before signing
+        run: python3 -m unittest discover -s tests -p test_damm_v2_signed_preflight.py -v
+      - name: Test authenticated DAMM v2 signed standalone simulation runner
+        run: python3 -m unittest discover -s tests -p test_meteora_damm_v2_signed_runner.py -v
+      - name: Test opt-in DAMM v2 real-fork signed execution harness
+        run: python3 -m unittest discover -s tests -p test_damm_v2_fork_execution.py -v
+      - name: Test DAMM v2 source export and isolated hydration safety
+        run: python3 -m unittest discover -s tests -p test_damm_v2_isolated_execution.py -v
+      - name: Test signed DAMM v2 evidence acceptance and negative controls
+        run: python3 -m unittest discover -s tests -p test_damm_v2_execution_evidence_audit.py -v
+      - name: Test DAMM to CPMM atomic fork integration safety
+        run: python3 -m unittest discover -s tests -p test_damm_cpmm_atomic_offline.py -v
+      - name: Test remaining 24-pair full signed integration and fail-closed matrix
+        run: python3 -m unittest discover -s tests -p test_remaining_twenty_four_pipeline.py -v
+      - name: Verify PumpSwap V2 exact-input 17-account builder and authenticated buyback gate
+        run: python3 -m unittest discover -s tests -p test_pumpswap_trade_v2.py -v
+      - name: Test offline source bundle structural audit and fail-closed accounting
+        run: python3 -m unittest discover -s tests -p test_source_evidence_audit.py -v
+      - name: Test bounded AMM v4 candidate mint intersection ranking
+        run: python3 -m unittest discover -s tests -p test_amm_v4_matching_candidates.py -v
+      - name: Test CLMM candidate discovery and matching mint preference
+        run: python3 -m unittest discover -s tests -p test_clmm_candidate_coverage.py -v
+      - name: Test bounded missing venue source candidate enrichment
+        run: python3 -m unittest discover -s tests -p test_atomic_missing_venue_candidates.py -v
+      - name: Test real source-stage blocker classifications
+        run: python3 -m unittest discover -s tests -p test_atomic_source_blocker_report.py -v
+      - name: Test authenticated CLMM tick array direction binding in signed runner
+        run: python3 -m unittest discover -s tests -p test_clmm_atomic_direction_evidence.py -v
+      - name: Test AMM v4 Serum market role authentication rejects forged snapshots
+        run: python3 -m unittest discover -s tests -p test_amm_v4_market_roles.py -v
+      - name: Test AMM v4 OpenOrders market ownership against source snapshot
+        run: python3 -m unittest discover -s tests -p test_amm_v4_open_orders_market_owner.py -v
+      - name: Test retrospective CI job audit without upstream RPC
+        run: python3 -m unittest discover -s tests -p test_ci_job_runtime_audit.py -v
+      - name: Test missing Raydium venue builders and mandatory account authentication
+        run: python3 -m unittest discover -s tests -p test_remaining_venue_adapters.py -v
+      - name: Test complete 42-pair inventory and incremental read-only state graph
+        run: python3 -m unittest discover -s tests -p test_forty_two_live_registry.py -v
+      - name: Test independent offline atomic shard partitioning
+        run: python3 -m unittest discover -s tests -p test_offline_atomic_sharding.py -v
+      - name: Test following ten authenticated signed atomic integrations
+        run: python3 -m unittest discover -s tests -p test_following_ten_atomic_integration.py -v
+      - name: Test authenticated pool-level graph enumeration up to six legs
+        run: python3 -m unittest discover -s tests -p test_authenticated_pool_graph.py -v
+      - name: Test venue-agnostic atomic graph routing and existing PumpSwap builder
+        run: python3 -m unittest discover -s tests -p test_atomic_graph_coordinator.py -v
+      - name: Test next ten real signed atomic runner and offline safeguards
+        run: python3 -m unittest discover -s tests -p test_next_ten_signed_atomic_offline.py -v
+      - name: Test next ten authenticated paired source fixture boundaries
+        run: python3 -m unittest discover -s tests -p test_next_ten_pair_fixture_export.py -v
+      - name: Test real-fork next-ten pool authentication probe safety
+        run: python3 -m unittest discover -s tests -p test_next_ten_fork_pool_probe.py -v
+      - name: Test next ten directional Surfpool evidence gates
+        run: python3 -m unittest discover -s tests -p test_next_ten_atomic_evidence.py -v
+      - name: Test reverse CPMM to DAMM signed atomic runner safety
+        run: python3 -m unittest discover -s tests -p test_cpmm_damm_reverse_atomic.py -v
+      - name: Test independent reverse atomic evidence acceptance safety
+        run: python3 -m unittest discover -s tests -p test_cpmm_damm_reverse_evidence_audit.py -v
+      - name: Test independent DAMM to CPMM signed evidence acceptance
+        run: python3 -m unittest discover -s tests -p test_damm_cpmm_atomic_evidence_audit.py -v
+      - name: Test current-run 42 ordered-pair evidence reconciliation
+        run: python3 -m unittest discover -s tests -p test_current_run_atomic_matrix.py -v
+      - name: Test cryptographically signed standalone swap post-state verifier
+        run: python3 -m unittest discover -s tests -p test_signed_standalone_swap_verifier.py -v
+      - name: Test signed atomic instruction order and intermediate account preflight
+        run: python3 -m unittest discover -s tests -p test_signed_atomic_instruction_preflight.py -v
+      - name: Test local-only signed cross-venue atomic verifier
+        run: python3 -m unittest discover -s tests -p test_cross_venue_atomic_simulation.py -v
+      - name: Test PumpSwap signed local runner transaction and output-bound wiring
+        run: python3 -m unittest discover -s tests -p test_pumpswap_signed_runner.py -v
+      - name: Test PumpSwap signed simulation post-state and slippage floor
+        run: python3 -m unittest discover -s tests -p test_pumpswap_local_simulation.py -v
+      - name: Test PumpSwap v2 swap instruction encoding
+        run: python3 -m unittest discover -s tests -p test_pumpswap_swap.py -v
+      - name: Test Meteora DAMM v2 swap2 instruction encoding
+        run: python3 -m unittest discover -s tests -p test_meteora_damm_v2_swap.py -v
+      - name: Test legacy venue decoders and swap instruction encoding
+        run: python3 -m unittest discover -s tests -p test_legacy_venue_adapters.py -v
+      - name: Test seven-venue execution target
+        run: python3 -m unittest discover -s tests -p test_execution_target_matrix.py -v
+      - name: Generate 7-venue 42-order atomic execution gap report
+        run: python3 -m arb.execution_target_matrix --output "$RUNNER_TEMP/execution-target-matrix.json"
+      - name: Upload complete execution target matrix
+        uses: actions/upload-artifact@v4
+        with:
+          name: seven-venue-execution-target-matrix
+          path: ${{ runner.temp }}/execution-target-matrix.json
+      - name: Test verified missing-pair route prioritization
+        run: python3 -m unittest discover -s tests -p test_missing_pair_route_inventory.py -v
+      - name: Generate all historical pairwise venue evidence
+        run: python3 -m arb.venue_capabilities --output "$RUNNER_TEMP/atomic-venue-pair-matrix.json"
+      - name: Upload independently generated pairwise evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: independent-atomic-pairwise-matrix
+          path: ${{ runner.temp }}/atomic-venue-pair-matrix.json
   surfpool-smoke-test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -22,8 +161,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl --fail --show-error --silent --location https://run.surfpool.run/ -o /tmp/install-surfpool.sh
-          bash /tmp/install-surfpool.sh
+          bash ci/install_surfpool.sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
@@ -56,6 +194,198 @@ jobs:
           cat "$RUNNER_TEMP/surfpool.log" >&2
           exit 1
 
+      - name: Install Python Solana PDA dependency for offline tests
+        run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+
+      - name: Test authenticated token-cycle venue canonicalization
+        run: python3 -m unittest discover -s tests -p test_token_cycle_verify.py -v
+
+      - name: Probe ephemeral signer token accounts on offline Surfpool (read-only)
+        run: python3 -m arb.orca_swap_v2_offline_probe
+
+      - name: Provision and verify ephemeral token accounts on offline Surfpool
+        env:
+          SURFPOOL_EXPLICITLY_OFFLINE: "1"
+        run: python3 -m arb.orca_swap_v2_offline_provision
+
+      - name: Exercise historical Token-2022 fixture synthetic account readback offline
+        env:
+          SURFPOOL_EXPLICITLY_OFFLINE: "1"
+        run: python3 -m arb.orca_swap_v2_fixture_offline_integration
+
+      - name: Probe signed Token-2022 runtime on explicitly offline Surfpool
+        continue-on-error: true
+        env:
+          SURFPOOL_EXPLICITLY_OFFLINE: "1"
+        run: python3 -m arb.orca_swap_v2_offline_token_runtime_probe > "$RUNNER_TEMP/orca-token-runtime.json"
+      - name: Upload signed Token-2022 runtime diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orca-token-runtime
+          path: ${{ runner.temp }}/orca-token-runtime.json
+          if-no-files-found: ignore
+
+      - name: Probe signed Token-2022 transfer with initialized synthetic mint offline
+        env:
+          SURFPOOL_EXPLICITLY_OFFLINE: "1"
+        run: python3 -m arb.orca_swap_v2_offline_initialized_mint_probe > "$RUNNER_TEMP/orca-initialized-mint-runtime.json"
+      - name: Upload initialized offline Token-2022 runtime diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orca-initialized-mint-runtime
+          path: ${{ runner.temp }}/orca-initialized-mint-runtime.json
+          if-no-files-found: ignore
+
+      - name: Exercise DAMM v2 authenticated signed fork path (fail-closed diagnostic)
+        continue-on-error: true
+        env:
+          SURFPOOL_EXPLICITLY_OFFLINE: "1"
+        run: |
+          python3 -m arb.damm_v2_fork_execution \
+            --rpc http://127.0.0.1:8899 \
+            --pool 8Pm2kZpnxD3hoMmt4bjStX2Pw2Z9abpbHzZxMPqxPmie \
+            --provision-offline-user --input-is-a \
+            --amount-in 1000 --min-amount-out 1 \
+            --output "$RUNNER_TEMP/damm-v2-fork-execution.json"
+      - name: Upload DAMM v2 signed execution and negative-control evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: damm-v2-signed-fork-execution
+          path: ${{ runner.temp }}/damm-v2-fork-execution.json
+          if-no-files-found: error
+
+      - name: Validate signed transaction simulation transport on offline Surfpool
+        env:
+          SURFPOOL_EXPLICITLY_OFFLINE: "1"
+        run: python3 -m arb.orca_swap_v2_offline_signed_transport
+
+      - name: Verify signed Orca SwapV2 rejects unverified pool on offline Surfpool
+        env:
+          SURFPOOL_EXPLICITLY_OFFLINE: "1"
+        run: python3 -m arb.orca_swap_v2_offline_negative_control
+
+      - name: Enforce arbitrage mission and development priorities
+        run: python3 -m arb.arbitrage_mission
+      - name: Generate historical pairwise atomic execution evidence matrix
+        run: python3 -m arb.venue_capabilities --output "$RUNNER_TEMP/atomic-venue-pair-matrix.json"
+      - name: Upload pairwise atomic evidence matrix
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atomic-venue-pair-evidence-matrix
+          path: ${{ runner.temp }}/atomic-venue-pair-matrix.json
+          if-no-files-found: ignore
+      - name: Test honest venue-coverage capability accounting
+        run: python3 -m unittest discover -s tests -p test_venue_coverage.py -v
+      - name: Test missing-quote venue prioritization across discovered routes
+        run: python3 -m unittest discover -s tests -p test_quote_gap_priorities.py -v
+      - name: Test fail-closed multi-pool route quote screening
+        run: python3 -m unittest discover -s tests -p test_cycle_screen.py -v
+      - name: Test indicative Orca single-tick quote arithmetic
+        run: python3 -m unittest discover -s tests -p test_orca_spot_quote.py -v
+      - name: Test fee-aware CPMM candidate screening
+        run: python3 -m unittest discover -s tests -p test_cpmm_screen.py -v
+      - name: Test verified on-chain CPMM fee config decoding
+        run: python3 -m unittest discover -s tests -p test_cpmm_config.py -v
+      - name: Test integer CPMM amount-aware quote safety
+        run: python3 -m unittest discover -s tests -p test_cpmm_quote.py -v
+      - name: Test conservative residual-token valuation
+        run: python3 -m unittest discover -s tests -p test_whirlpool_accounting.py -v
+      - name: Test Raydium to Orca reverse route wiring
+        run: python3 -m unittest discover -s tests -p test_reverse_sweep.py -v
+      - name: Test jittered RPC rate-limit retries
+        run: python3 -m unittest discover -s tests -p test_rpc_retries.py -v
+      - name: Test on-chain transaction-history discovery
+        run: python3 -m unittest discover -s tests -p test_onchain_history_discovery.py -v
+      - name: Test incremental pool registry ingestion
+        run: python3 -m unittest discover -s tests -p test_pool_registry_ingest.py -v
+      - name: Test persistent pool registry safety checks
+        run: python3 -m unittest discover -s tests -p test_pool_registry.py -v
+      - name: Test Meteora DAMM v2 pool decoder and mint filters
+        run: python3 -m unittest discover -s tests -p test_meteora_damm_v2.py -v
+      - name: Test Meteora DLMM pool layout and mint filters
+        run: python3 -m unittest discover -s tests -p test_meteora_dlmm.py -v
+      - name: Test local-only lookup table guard
+        run: python3 -m unittest discover -s tests -p test_clmm_local_alt.py -v
+      - name: Test versioned transaction lookup-table safety
+        run: python3 -m unittest discover -s tests -p test_clmm_v0.py -v
+      - name: Test new recognized DEX program watchlist safety
+        run: python3 -m unittest discover -s tests -p test_venue_watchlist.py -v
+      - name: Test third-leg owner-aware discovery
+        run: python3 -m unittest discover -s tests -p test_third_leg_owner.py -v
+      - name: Test fail-closed RAY-to-WSOL third-leg readiness
+        run: python3 -m unittest discover -s tests -p test_third_leg_readiness.py -v
+      - name: Test fine-grained exact-output sweep
+        run: python3 -m unittest discover -s tests -p test_three_hop_fine_sweep.py -v
+      - name: Test bounded three-hop output sweep and unknown-fee safety
+        run: python3 -m unittest discover -s tests -p test_three_hop_sweep.py -v
+      - name: Test Orca exact-output return leg serialization
+        run: python3 -m unittest discover -s tests -p test_orca_exact_output_return.py -v
+      - name: Test CLMM simulation post-balance assertions
+        run: python3 -m unittest discover -s tests -p test_raydium_clmm_execution.py -v
+      - name: Test CLMM candidate fixture safety gates
+        run: python3 -m unittest discover -s tests -p test_raydium_clmm_candidates.py -v
+      - name: Test CLMM fork readiness reporting
+        run: python3 -m unittest discover -s tests -p test_clmm_pool_readiness.py -v
+      - name: Test CLMM tick-array PDA start and packed account layout
+        run: python3 -m unittest discover -s tests -p test_raydium_clmm_ticks.py -v
+      - name: Test Raydium CLMM swap v2 instruction serialization
+        run: python3 -m unittest discover -s tests -p test_raydium_clmm_swap.py -v
+      - name: Test signed CLMM swap simulation post-state verifier
+        run: python3 -m unittest discover -s tests -p test_raydium_clmm_signed_simulation.py -v
+      - name: Test fail-closed authenticated CLMM live quote
+        run: python3 -m unittest discover -s tests -p test_raydium_clmm_live_quote.py -v
+      - name: Test Raydium CLMM initialized tick boundaries
+        run: python3 -m unittest discover -s tests -p test_raydium_clmm_tick_decode.py -v
+      - name: Test authenticated Raydium CLMM quote preflight
+        run: python3 -m unittest discover -s tests -p test_raydium_clmm_quote_preflight.py -v
+      - name: Test synchronized Raydium CLMM fee configuration snapshot
+        run: python3 -m unittest discover -s tests -p test_raydium_clmm_fee_snapshot.py -v
+      - name: Test conservative Raydium CLMM within-tick amount quote
+        run: python3 -m unittest discover -s tests -p test_raydium_clmm_within_tick_quote.py -v
+      - name: Test Raydium CLMM packed pool decoder
+        run: python3 -m unittest discover -s tests -p test_raydium_clmm.py -v
+      - name: Test Raydium CLMM discovery filters
+        run: python3 -m unittest discover -s tests -p test_raydium_clmm_filters.py -v
+      - name: Test expanded DEX venue registry
+        run: python3 -m unittest discover -s tests -p test_dex_registry.py -v
+      - name: Test zero-prefixed pubkey decoding
+        run: python3 -m unittest discover -s tests -p test_base58_pubkeys.py -v
+      - name: Test multi-venue arbitrage graph and cycle discovery
+        run: python3 -m unittest discover -s tests -p test_opportunity_graph.py -v
+      - name: Test multi-token on-chain discovery filters
+        run: python3 -m unittest discover -s tests -p test_onchain_pool_discovery.py -v
+      - name: Test bounded route sweep and profit filter
+        run: python3 -m unittest discover -s tests -p test_cross_venue_sweep.py -v
+      - name: Test cross-venue safety gates
+        run: python3 -m unittest discover -s tests -p test_cross_venue.py -v
+      - name: Test Raydium CPMM swap instruction encoding
+        run: python3 -m unittest discover -s tests -p test_raydium_swap.py -v
+      - name: Test Raydium published-pool diagnostic
+        run: python3 -m unittest discover -s tests -p test_raydium_candidate.py -v
+      - name: Test Raydium CPMM on-chain decoder and restricted search
+        run: python3 -m unittest discover -s tests -p test_raydium_cpmm.py -v
+      - name: Test exact-output atomic swap instruction semantics
+        run: python3 -m unittest discover -s tests -p test_whirlpool_exact_output.py -v
+      - name: Test atomic Whirlpool round-trip accounting
+        run: python3 -m unittest discover -s tests -p test_whirlpool_roundtrip.py -v
+      - name: Test actual simulated token balance assertions
+        run: python3 -m unittest discover -s tests -p test_simulated_balances.py -v
+      - name: Test atomic Whirlpool simulation guardrails
+        run: python3 -m unittest discover -s tests -p test_whirlpool_simulation.py -v
+      - name: Test swap preflight safety gates
+        run: python3 -m unittest discover -s tests -p test_whirlpool_preflight.py -v
+      - name: Test Orca swap instruction payload
+        run: python3 -m unittest discover -s tests -p test_whirlpool_swap.py -v
+      - name: Run Whirlpool tick-array math tests
+        run: python3 -m unittest discover -s tests -p test_whirlpool_ticks.py -v
+      - name: Run serialized transaction replay contract tests
+        run: python3 -m unittest arb.transaction_replay.ReplayTests -v
+      - name: Run Whirlpool spot mathematics and market gate tests
+        run: python3 -m unittest arb.whirlpool_market.MarketTests -v
       - name: Run arbitrage arithmetic tests
         env:
           RUN_SURFPOOL_INTEGRATION: '1'
@@ -71,56 +401,449 @@ jobs:
           path: ${{ runner.temp }}/surfpool.log
           if-no-files-found: ignore
 
-  mainnet-fork-probe:
-    if: ${{ github.event_name == 'workflow_dispatch' }}
+  authenticated-source-fork:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 35
     env:
       SOLANA_RPC_URL: http://127.0.0.1:8899
       SURFPOOL_DATASOURCE_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
+      SOLANA_RPC_MIN_INTERVAL_SECONDS: "0.5"
+      SOLANA_RPC_ALCHEMY_FREE_TIER: "1"
+      SOLANA_RPC_PACING_FILE: /tmp/solana-rpc-isolated-last-request
     steps:
       - uses: actions/checkout@v4
-      - name: Check datasource is configured
-        run: |
-          if [ -z "$SURFPOOL_DATASOURCE_RPC_URL" ]; then
-            echo "Configure repository secret SOLANA_MAINNET_RPC_URL to enable fork verification." >&2
-            exit 1
-          fi
+      - name: Require upstream RPC secret
+        run: test -n "$SURFPOOL_DATASOURCE_RPC_URL"
       - name: Install Surfpool
         run: |
           set -euo pipefail
-          curl --fail --show-error --silent --location https://run.surfpool.run/ -o /tmp/install-surfpool.sh
-          bash /tmp/install-surfpool.sh
+          bash ci/install_surfpool.sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-      - name: Start Surfpool mainnet fork
+      - name: Install transaction dependency
+        run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Launch read-only source fork
         run: |
           nohup surfpool start --ci --rpc-url "$SURFPOOL_DATASOURCE_RPC_URL" --no-deploy > "$RUNNER_TEMP/fork.log" 2>&1 < /dev/null &
           echo $! > "$RUNNER_TEMP/fork.pid"
-      - name: Wait for RPC
+      - name: Wait for source fork RPC
         run: |
           python3 - <<'PY'
           import time
           from arb.rpc import call
-          for i in range(60):
+          for _ in range(60):
               try:
                   assert call("http://127.0.0.1:8899", "getLatestBlockhash")["value"]["blockhash"]
                   break
               except Exception:
                   time.sleep(2)
           else:
-              raise SystemExit("Surfpool fork RPC unavailable")
+              raise SystemExit("source fork RPC unavailable")
           PY
-      - name: Discover and validate Raydium SOL/USDC pools
-        run: python3 -m arb.discover_raydium --output "$RUNNER_TEMP/discovered-pools.json"
-      - name: Probe DEX program and pool accounts
-        env:
-          POOL_MANIFEST: ${{ runner.temp }}/discovered-pools.json
-        run: python3 -m arb.fork_probe
-      - name: Upload fork logs on failure
-        if: failure()
+
+      # The upstream-backed process is stopped BEFORE any surfnet_setAccount call.
+      - name: Authenticate next ten atomic pool-pair candidates on upstream-backed read-only fork
+        run: |
+          python3 -m arb.next_ten_fork_pool_probe \
+            --output "$RUNNER_TEMP/next-ten-authenticated-pool-pairs.json"
+      - name: Publish authenticated next ten fork pool candidates
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: surfpool-mainnet-fork-log
-          path: ${{ runner.temp }}/fork.log
-          if-no-files-found: ignore
+          name: next-ten-authenticated-readonly-fork-pools
+          path: ${{ runner.temp }}/next-ten-authenticated-pool-pairs.json
+          if-no-files-found: error
+      - name: Export ten authenticated dual-program fixtures from read-only Surfpool
+        run: |
+          python3 -m arb.next_ten_pair_fixture_export \
+            --readiness "$RUNNER_TEMP/next-ten-authenticated-pool-pairs.json" \
+            --output-dir "$RUNNER_TEMP/next-ten-dual-program-fixtures"
+      - name: Upload ten genuine source-fork dual-program fixtures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: next-ten-dual-program-readonly-fixtures
+          path: ${{ runner.temp }}/next-ten-dual-program-fixtures/
+          if-no-files-found: error
+      - name: Discover following ten authenticated pool pair candidates
+        run: |
+          python3 -m arb.next_ten_fork_pool_probe --batch next \
+            --output "$RUNNER_TEMP/following-ten-pool-pairs.json"
+      - name: Export following ten authenticated source fixtures
+        run: |
+          python3 -m arb.next_ten_pair_fixture_export --batch next \
+            --readiness "$RUNNER_TEMP/following-ten-pool-pairs.json" \
+            --output-dir "$RUNNER_TEMP/following-ten-fixtures"
+      - name: Upload following ten source fork fixtures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: following-ten-authenticated-dual-program-fixtures
+          path: ${{ runner.temp }}/following-ten-fixtures/
+          if-no-files-found: warn
+      - name: Bound AMM v4 candidate discovery once for remaining routes
+        run: |
+          python3 -m arb.atomic_missing_venue_candidates \
+            --registry arb/pool_registry.json \
+            --output "$RUNNER_TEMP/missing-venue-candidates.json"
+      - name: Upload untrusted Raydium candidate provenance for debugging
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: missing-venue-untrusted-candidates
+          path: ${{ runner.temp }}/missing-venue-candidates.json
+          if-no-files-found: error
+      - name: Discover remaining twenty-four authenticated ordered pool candidates
+        run: |
+          python3 -m arb.next_ten_fork_pool_probe --batch remaining \
+            --registry "$RUNNER_TEMP/missing-venue-candidates.json" \
+            --output "$RUNNER_TEMP/remaining-24-pool-pairs.json"
+      - name: Export remaining twenty-four read-only source-fork fixtures
+        run: |
+          python3 -m arb.next_ten_pair_fixture_export --batch remaining \
+            --readiness "$RUNNER_TEMP/remaining-24-pool-pairs.json" \
+            --output-dir "$RUNNER_TEMP/remaining-24-fixtures"
+      - name: Publish remaining twenty-four authenticated source fixtures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: remaining-24-authenticated-source-fixtures
+          path: ${{ runner.temp }}/remaining-24-fixtures/
+          if-no-files-found: warn
+      - name: Export authenticated DAMM and CPMM atomic route
+        run: python3 -m arb.damm_cpmm_atomic_offline export "$RUNNER_TEMP/damm-cpmm-atomic-fixture.json"
+      - name: Produce actionable per-venue blocker breakdown before expensive offline execution
+        run: |
+          python3 -m arb.atomic_source_blocker_report \
+            --probes "$RUNNER_TEMP/next-ten-authenticated-pool-pairs.json" "$RUNNER_TEMP/following-ten-pool-pairs.json" "$RUNNER_TEMP/remaining-24-pool-pairs.json" \
+            --summaries "$RUNNER_TEMP/next-ten-dual-program-fixtures/summary.json" "$RUNNER_TEMP/following-ten-fixtures/summary.json" "$RUNNER_TEMP/remaining-24-fixtures/summary.json" \
+            --output "$RUNNER_TEMP/atomic-source-blockers.json"
+      - name: Publish exact source blockers and priority diagnosis
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: forty-two-source-blocker-diagnostics
+          path: ${{ runner.temp }}/atomic-source-blockers.json
+          if-no-files-found: error
+      - name: Publish one verified fixture bundle for offline-only workers
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-fork-offline-bundle
+          path: |
+            ${{ runner.temp }}/damm-cpmm-atomic-fixture.json
+            ${{ runner.temp }}/next-ten-dual-program-fixtures/
+            ${{ runner.temp }}/following-ten-fixtures/
+            ${{ runner.temp }}/remaining-24-fixtures/
+          if-no-files-found: warn
+      - name: Stop upstream-backed source fork
+        if: always()
+        run: |
+          if test -f "$RUNNER_TEMP/fork.pid"; then kill "$(cat "$RUNNER_TEMP/fork.pid")" || true; fi
+
+  source-evidence-audit:
+    needs: [authenticated-source-fork]
+    if: ${{ needs.authenticated-source-fork.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download authenticated source fixture bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: source-fork-offline-bundle
+          path: ${{ runner.temp }}
+      - name: Check offline route manifests and authenticated fixture structure
+        env:
+          SOURCE_FIXTURE_ROOT: ${{ runner.temp }}
+          SOURCE_EVIDENCE_AUDIT_REPORT: ${{ runner.temp }}/source-evidence-audit.json
+        run: python3 -m arb.source_evidence_audit
+      - name: Publish source evidence audit without additional upstream reads
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: offline-source-evidence-audit
+          path: ${{ runner.temp }}/source-evidence-audit.json
+          if-no-files-found: error
+
+  offline-atomic-route-batches:
+    needs: [authenticated-source-fork]
+    if: ${{ needs.authenticated-source-fork.result == 'success' }}
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        include:
+          - batch: first
+            fixture_dir: next-ten-dual-program-fixtures
+            shard: 0
+            shards: 1
+          - batch: next
+            fixture_dir: following-ten-fixtures
+            shard: 0
+            shards: 1
+          - batch: remaining
+            fixture_dir: remaining-24-fixtures
+            shard: 0
+            shards: 4
+          - batch: remaining
+            fixture_dir: remaining-24-fixtures
+            shard: 1
+            shards: 4
+          - batch: remaining
+            fixture_dir: remaining-24-fixtures
+            shard: 2
+            shards: 4
+          - batch: remaining
+            fixture_dir: remaining-24-fixtures
+            shard: 3
+            shards: 4
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    env:
+      SOLANA_RPC_URL: http://127.0.0.1:8899
+      SURFPOOL_EXPLICITLY_OFFLINE: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install offline Surfpool and signing dependencies
+        run: |
+          set -euo pipefail
+          bash ci/install_surfpool.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Download source-authenticated fixtures without upstream RPC
+        uses: actions/download-artifact@v4
+        with:
+          name: source-fork-offline-bundle
+          path: ${{ runner.temp }}
+      - name: Start isolated offline Surfpool
+        run: |
+          nohup surfpool start --ci --offline > "$RUNNER_TEMP/offline.log" 2>&1 < /dev/null &
+          python3 - <<'PY'
+          import time
+          from arb.rpc import call
+          for _ in range(60):
+              try:
+                  assert call("http://127.0.0.1:8899","getLatestBlockhash")["value"]["blockhash"]
+                  break
+              except Exception: time.sleep(2)
+          else: raise SystemExit("isolated offline Surfpool unavailable")
+          PY
+      - name: Execute authenticated signed batch with rollback verification
+        run: |
+          python3 -m arb.next_ten_signed_atomic_offline --batch "${{ matrix.batch }}" --shard-index "${{ matrix.shard }}" --shard-count "${{ matrix.shards }}" \
+            --fixture-dir "$RUNNER_TEMP/${{ matrix.fixture_dir }}" \
+            --output-dir "$RUNNER_TEMP/signed-evidence"
+      - name: Publish independently replayable signed batch receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: isolated-atomic-receipts-${{ matrix.batch }}-${{ matrix.shard }}
+          path: ${{ runner.temp }}/signed-evidence/
+          if-no-files-found: error
+
+  isolated-orca-execution:
+    needs: [authenticated-source-fork, offline-atomic-route-batches]
+    if: ${{ always() && needs.authenticated-source-fork.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    env:
+      SOLANA_RPC_URL: http://127.0.0.1:8899
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Surfpool
+        run: |
+          set -euo pipefail
+          bash ci/install_surfpool.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - name: Install transaction dependency
+        run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Retrieve authenticated read-only source fixtures
+        uses: actions/download-artifact@v4
+        with:
+          name: source-fork-offline-bundle
+          path: ${{ runner.temp }}
+      - name: Launch strictly offline Surfpool
+        run: |
+          nohup surfpool start --ci --offline > "$RUNNER_TEMP/offline.log" 2>&1 < /dev/null &
+          echo $! > "$RUNNER_TEMP/orca-isolated-offline.pid"
+          python3 - <<'PY'
+          import time
+          from arb.rpc import call
+          for _ in range(60):
+              try:
+                  assert call("http://127.0.0.1:8899","getLatestBlockhash")["value"]["blockhash"]
+                  break
+              except Exception:
+                  time.sleep(2)
+          else: raise SystemExit("offline Surfpool unavailable")
+          PY
+      - name: Attempt signed DAMM to CPMM atomic swap and rollback on isolated fork
+        env:
+          SURFPOOL_EXPLICITLY_OFFLINE: "1"
+        run: |
+          if [ -s "$RUNNER_TEMP/damm-cpmm-atomic-fixture.json" ]; then
+            python3 -m arb.damm_cpmm_atomic_offline offline "$RUNNER_TEMP/damm-cpmm-atomic-fixture.json" \
+              --output "$RUNNER_TEMP/damm-cpmm-atomic-evidence.json"
+          else
+            printf '{"status":"SOURCE_FIXTURE_UNAVAILABLE","signed_atomic_simulation_verified":false,"rollback_failure_case_verified":false,"intermediate_intra_transaction_consumption_verified":false,"actionable":false,"live_execution_approved":false,"broadcast":false}\n' > "$RUNNER_TEMP/damm-cpmm-atomic-evidence.json"
+          fi
+      - name: Attempt signed reverse CPMM to DAMM atomic transaction
+        continue-on-error: true
+        env:
+          SURFPOOL_EXPLICITLY_OFFLINE: "1"
+        run: |
+          python3 -m arb.damm_cpmm_atomic_offline offline-reverse \
+            "$RUNNER_TEMP/damm-cpmm-atomic-fixture.json" \
+            --output "$RUNNER_TEMP/cpmm-damm-reverse-evidence.json"
+      - name: Upload reverse CPMM to DAMM isolated execution
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpmm-damm-signed-atomic-reverse
+          path: ${{ runner.temp }}/cpmm-damm-reverse-evidence.json
+          if-no-files-found: error
+      - name: Independently accept reverse signed Surfpool atomic evidence
+        run: |
+          python3 -m arb.cpmm_damm_reverse_evidence_audit \
+            --input "$RUNNER_TEMP/cpmm-damm-reverse-evidence.json" \
+            --output "$RUNNER_TEMP/cpmm-damm-reverse-acceptance.json"
+      - name: Upload independently accepted reverse atomic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpmm-damm-reverse-independent-acceptance
+          path: ${{ runner.temp }}/cpmm-damm-reverse-acceptance.json
+          if-no-files-found: error
+      - name: Independently accept observed signed atomic Surfpool execution
+        run: |
+          python3 -m arb.damm_cpmm_atomic_evidence_audit \
+            --input "$RUNNER_TEMP/damm-cpmm-atomic-evidence.json" \
+            --output "$RUNNER_TEMP/damm-cpmm-acceptance.json"
+      - name: Download three independent signed atomic runtime artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: isolated-atomic-receipts-*
+          path: ${{ runner.temp }}/receipt-shards
+      - name: Collate disjoint per-batch signed receipts
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/next-ten-signed-evidence" "$RUNNER_TEMP/following-ten-signed-evidence" "$RUNNER_TEMP/remaining-24-signed-evidence"
+          cp -a "$RUNNER_TEMP/receipt-shards/isolated-atomic-receipts-first-0/." "$RUNNER_TEMP/next-ten-signed-evidence/"
+          cp -a "$RUNNER_TEMP/receipt-shards/isolated-atomic-receipts-next-0/." "$RUNNER_TEMP/following-ten-signed-evidence/"
+          for shard in 0 1 2 3; do
+            cp -a "$RUNNER_TEMP/receipt-shards/isolated-atomic-receipts-remaining-$shard/." "$RUNNER_TEMP/remaining-24-signed-evidence/"
+          done
+      - name: Reconcile verified current-run atomic evidence into 42 ordered pairs
+        run: |
+          python3 -m arb.current_run_atomic_matrix \
+            --input "$RUNNER_TEMP/damm-cpmm-atomic-evidence.json" \
+            --reverse-input "$RUNNER_TEMP/cpmm-damm-reverse-evidence.json" \
+            --next-ten-evidence-dir "$RUNNER_TEMP/next-ten-signed-evidence" \
+            --following-ten-evidence-dir "$RUNNER_TEMP/following-ten-signed-evidence" \
+            --remaining-evidence-dir "$RUNNER_TEMP/remaining-24-signed-evidence" \
+            --output "$RUNNER_TEMP/current-run-atomic-matrix.json"
+      - name: Publish next ten ordered route evidence gap report
+        run: |
+          python3 -m arb.next_ten_atomic_evidence \
+            --evidence-dir "$RUNNER_TEMP/next-ten-signed-evidence" \
+            --output "$RUNNER_TEMP/next-ten-ordered-evidence.json"
+      - name: Independently audit following ten signed route receipts
+        run: |
+          python3 -m arb.next_ten_atomic_evidence --batch next \
+            --evidence-dir "$RUNNER_TEMP/following-ten-signed-evidence" \
+            --output "$RUNNER_TEMP/following-ten-evidence-audit.json"
+      - name: Independently audit remaining twenty-four runtime receipts
+        run: |
+          python3 -m arb.next_ten_atomic_evidence --batch remaining \
+            --evidence-dir "$RUNNER_TEMP/remaining-24-signed-evidence" \
+            --output "$RUNNER_TEMP/remaining-24-audit.json"
+      - name: Publish independently audited remaining twenty-four coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: remaining-24-ordered-atomic-audit
+          path: ${{ runner.temp }}/remaining-24-audit.json
+          if-no-files-found: error
+      - name: Upload independently audited following ten coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: following-ten-ordered-signed-atomic-audit
+          path: ${{ runner.temp }}/following-ten-evidence-audit.json
+          if-no-files-found: error
+      - name: Upload next ten ordered evidence audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: next-ten-ordered-signed-atomic-audit
+          path: ${{ runner.temp }}/next-ten-ordered-evidence.json
+          if-no-files-found: error
+      - name: Independently reconcile full 42 directed atomic evidence receipts
+        run: |
+          python3 -m arb.forty_two_atomic_evidence \
+            --evidence-dirs "$RUNNER_TEMP/next-ten-signed-evidence" "$RUNNER_TEMP/following-ten-signed-evidence" "$RUNNER_TEMP/remaining-24-signed-evidence" \
+            --output "$RUNNER_TEMP/forty-two-ordered-atomic-acceptance.json"
+      - name: Require all 42 freshly verified ordered atomic pairs before full CI can pass
+        run: |
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          report=json.loads((Path(os.environ["RUNNER_TEMP"])/"forty-two-ordered-atomic-acceptance.json").read_text())
+          assert report["ordered_pair_target"]==42, "unexpected full coverage target"
+          missing=[row["first_venue"]+"__"+row["second_venue"]
+                   for row in report["routes"] if row["status"]!="VERIFIED"]
+          assert len(report["routes"])==42, "missing full-route audit rows"
+          assert report["ordered_pair_verified"]==42 and not missing, "full regression failures: "+str(missing)
+          assert report["broadcast"] is False
+          print("Fresh single-run signed atomic and rollback acceptance: 42/42")
+          PY
+      - name: Enforce accepted first-five venue pair regression floor
+        run: |
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          p=Path(os.environ["RUNNER_TEMP"])/"forty-two-ordered-atomic-acceptance.json"
+          report=json.loads(p.read_text())
+          core={"orca","raydium_cpmm","meteora_dlmm","meteora_damm_v2","pumpswap"}
+          covered={(row["first_venue"],row["second_venue"]) for row in report["routes"]
+                   if row["status"]=="VERIFIED" and row["first_venue"] in core
+                   and row["second_venue"] in core}
+          print("Core venue signed atomic accepted:",len(covered),"/20")
+          missing=[(x,y) for x in sorted(core) for y in sorted(core)
+                   if x!=y and (x,y) not in covered]
+          if missing:
+              raise SystemExit("Previously verified core ordered pairs regressed: "+str(missing))
+          assert report["ordered_pair_verified"]>=20
+          PY
+      - name: Upload independently accepted 42-pair coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: complete-42-ordered-atomic-coverage-audit
+          path: ${{ runner.temp }}/forty-two-ordered-atomic-acceptance.json
+          if-no-files-found: error
+      - name: Upload current-run ordered atomic acceptance matrix
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: current-run-atomic-pair-matrix
+          path: ${{ runner.temp }}/current-run-atomic-matrix.json
+          if-no-files-found: error
+      - name: Upload accepted ordered-pair execution evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: damm-cpmm-independent-atomic-acceptance
+          path: ${{ runner.temp }}/damm-cpmm-acceptance.json
+          if-no-files-found: error
+      - name: Upload DAMM to CPMM signed atomic and rollback evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: damm-cpmm-signed-atomic-rollback
+          path: ${{ runner.temp }}/damm-cpmm-atomic-evidence.json
+          if-no-files-found: error
+
