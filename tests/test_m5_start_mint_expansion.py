@@ -157,6 +157,77 @@ class StartMintExpansionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             missing_triangle_edge_targets(rows,maximum=0)
 
+    def test_separate_discovery_rpc_only_accepts_source_reverified_pool(self):
+        from arb.m5_start_mint_expansion import discover_on_separate_rpc
+        pair=tuple(sorted(("new",USDC)))
+        calls=[]
+        def external(url,venue,left,right,**kwargs):
+            self.assertEqual(url,"https://candidate.provider.invalid")
+            self.assertEqual((left,right),pair)
+            return {"new-pool":{"untrusted_state":"candidate"}}
+        def source(url,venue,address,state):
+            calls.append((url,venue,address,state))
+            return {"venue":venue,"address":address,"slot":123,
+                    "mints":list(pair),"swap_simulated":False}
+        result=discover_on_separate_rpc(
+            "http://127.0.0.1:8899","https://candidate.provider.invalid",
+            [pair],("raydium_cpmm",),search_fn=external,verify_fn=source)
+        self.assertEqual(result["status"],"COMPLETE")
+        self.assertEqual(len(result["pools"]),1)
+        self.assertEqual(calls[0][0],"http://127.0.0.1:8899")
+        self.assertEqual(result["verification_rpc"],"LOCAL_SOURCE_FORK")
+        self.assertFalse(result["actionable"])
+
+    def test_alternate_discovery_identity_and_source_failure_rejected(self):
+        from arb.m5_start_mint_expansion import discover_on_separate_rpc
+        pair=tuple(sorted(("new",USDC)))
+        def external(*args,**kwargs):
+            return {"candidate":{"state":"untrusted"}}
+        def bad_identity(*args,**kwargs):
+            return {"venue":"raydium_cpmm","address":"candidate",
+                    "slot":3,"mints":["incorrect","USDC"],
+                    "swap_simulated":False}
+        result=discover_on_separate_rpc(
+            "http://127.0.0.1:8899","https://candidate.provider.invalid",
+            [pair],("raydium_cpmm",),
+            search_fn=external,verify_fn=bad_identity)
+        self.assertEqual(result["pools"],[])
+        self.assertEqual(result["status"],"PARTIAL")
+        self.assertEqual(len(result["errors"]),1)
+        def unavailable(*args,**kwargs):
+            raise ValueError("source account missing")
+        result=discover_on_separate_rpc(
+            "http://127.0.0.1:8899","https://candidate.provider.invalid",
+            [pair],("raydium_cpmm",),
+            search_fn=external,verify_fn=unavailable)
+        self.assertEqual(result["pools"],[])
+        self.assertEqual(result["status"],"PARTIAL")
+
+    def test_separate_rpc_429_stops_bounded_search_without_forging(self):
+        from arb.m5_start_mint_expansion import discover_on_separate_rpc
+        pair=tuple(sorted(("new",USDC)))
+        called=[]
+        def limited(*args,**kwargs):
+            called.append(args)
+            raise RuntimeError("429 too many requests")
+        result=discover_on_separate_rpc(
+            "http://127.0.0.1:8899","https://candidate.provider.invalid",
+            [pair,pair],("raydium_cpmm","meteora_damm_v2"),
+            search_fn=limited,verify_fn=lambda *_args:None)
+        self.assertEqual(len(called),1)
+        self.assertEqual(result["status"],"UPSTREAM_RATE_LIMITED")
+        self.assertEqual(result["pools"],[])
+        self.assertFalse(result["broadcast"])
+
+    def test_multi_venue_rejects_insecure_optional_discovery_rpc(self):
+        from unittest.mock import patch
+        from arb.m5_start_mint_expansion import multi_venue_bridge_scout
+        with patch("arb.pumpswap_local_simulation.local_rpc_only"):
+            with self.assertRaisesRegex(ValueError,"HTTPS"):
+                multi_venue_bridge_scout(
+                    "http://127.0.0.1:8899",self.rows(),
+                    discovery_rpc="http://untrusted.provider")
+
     def test_multi_venue_bridge_adds_only_source_verified_new_start(self):
         from unittest.mock import patch
         from arb.m5_start_mint_expansion import multi_venue_bridge_scout
