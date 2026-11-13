@@ -26,6 +26,9 @@ jobs:
     timeout-minutes: 55
     env:
       SURFPOOL_DATASOURCE_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
+      # Optional independent GPA-capable endpoint; candidate addresses must
+      # still be reauthenticated against the locally source-backed fork.
+      SOLANA_POOL_DISCOVERY_RPC_URL: ${{ secrets.SOLANA_POOL_DISCOVERY_RPC_URL }}
       SOLANA_RPC_MIN_INTERVAL_SECONDS: "0.5"
       SOLANA_RPC_ALCHEMY_FREE_TIER: "1"
       SOLANA_RPC_PACING_FILE: /tmp/m5-three-hop-pacing
@@ -82,7 +85,8 @@ jobs:
           # the same Orca pools. GPA rate limits remain visible in evidence.
           multi=multi_venue_bridge_scout(
               rpc,registry["pools"],maximum_pairs=12,
-              venues=("raydium_cpmm","meteora_damm_v2"))
+              venues=("raydium_cpmm","meteora_damm_v2"),
+              discovery_rpc=os.environ.get("SOLANA_POOL_DISCOVERY_RPC_URL") or None)
           (root/"multi-venue-bridge-discovery.json").write_text(
               json.dumps(multi,indent=2)+"\\n")
           other=multi["source_verified_new_pools"]
@@ -100,6 +104,7 @@ jobs:
               "multi_venue_verified_new_pools":min(len(other),available),
               "multi_venue_bridge_pair_attempts":len(multi["searched_pairs"]),
               "multi_venue_discovery_status":multi["discovery_status"] if multi["status"]!="NO_MISSING_BRIDGE_PAIRS" else multi["status"],
+              "multi_venue_rpc_mode":multi.get("discovery_rpc_mode","SOURCE_FORK"),
               "multi_venue_unadmitted_verified_pools":len(other)-min(len(other),available),
               "expanded_registry_pool_hints":len(registry["pools"]),
               "source_topology_start_mints":topology(registry["pools"])["three_hop_start_mint_count"],
