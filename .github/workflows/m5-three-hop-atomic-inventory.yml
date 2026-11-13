@@ -62,7 +62,7 @@ jobs:
           from arb.next_ten_fork_pool_probe import probe
           from arb.m5_seven_venue_route_scan import ORDER
           from arb.m5_three_hop_atomic_inventory import diversified_three_hop_graph
-          from arb.m5_start_mint_expansion import scout,topology
+          from arb.m5_start_mint_expansion import scout,topology,multi_venue_bridge_scout
           registry=json.loads(Path("arb/pool_registry.json").read_text())
           root=Path(os.environ["RUNNER_TEMP"])/"triangles"
           root.mkdir(parents=True,exist_ok=True)
@@ -77,6 +77,17 @@ jobs:
           if len(registry["pools"])+len(new)>512:
               raise ValueError("source-discovered pool identities exceed bounded 512 registry limit")
           registry["pools"].extend(new)
+          # A second, bounded source-authenticated discovery pass searches
+          # missing bridge edges in other venues, not more permutations of
+          # the same Orca pools. GPA rate limits remain visible in evidence.
+          multi=multi_venue_bridge_scout(
+              rpc,registry["pools"],maximum_pairs=12,
+              venues=("raydium_cpmm","meteora_damm_v2"))
+          (root/"multi-venue-bridge-discovery.json").write_text(
+              json.dumps(multi,indent=2)+"\\n")
+          other=multi["source_verified_new_pools"]
+          available=max(0,512-len(registry["pools"]))
+          registry["pools"].extend(other[:available])
           graph=diversified_three_hop_graph(probe(rpc,registry,
                         batch=tuple((a,b) for a in ORDER for b in ORDER if a!=b),
                         maximum_per_venue=48,
@@ -84,7 +95,12 @@ jobs:
                         prefer_start_mint_coverage=True),
                         maximum=200,allow_start_rotations=True)
           graph["source_bridge_discovery"]={
-              "new_verified_pool_identities":len(new),
+              "new_verified_pool_identities":len(new)+min(len(other),available),
+              "orca_verified_new_pools":len(new),
+              "multi_venue_verified_new_pools":min(len(other),available),
+              "multi_venue_bridge_pair_attempts":len(multi["searched_pairs"]),
+              "multi_venue_discovery_status":multi["discovery_status"] if multi["status"]!="NO_MISSING_BRIDGE_PAIRS" else multi["status"],
+              "multi_venue_unadmitted_verified_pools":len(other)-min(len(other),available),
               "expanded_registry_pool_hints":len(registry["pools"]),
               "source_topology_start_mints":topology(registry["pools"])["three_hop_start_mint_count"],
               "source_discovery_status":expansion["discovery_status"]}
