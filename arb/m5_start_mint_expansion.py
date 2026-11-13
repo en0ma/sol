@@ -321,7 +321,6 @@ def discover_on_separate_rpc(source_rpc, discovery_rpc, pairs, venues, *,
     external balances, slot, or state for source-fork evidence.
     """
     from arb.onchain_pool_discovery import search_pair,verify
-    from arb.rpc import RPCError
     search_fn=search_fn or search_pair
     verify_fn=verify_fn or verify
     rows=[]
@@ -337,13 +336,16 @@ def discover_on_separate_rpc(source_rpc, discovery_rpc, pairs, venues, *,
                 found=search_fn(discovery_rpc,venue,*pair,limit=8,
                                 pace_seconds=0.5)
             except (ValueError,RuntimeError,OSError,TypeError,KeyError) as exc:
-                diagnostic=type(exc).__name__+": "+str(exc)[:180]
+                # HTTP errors sometimes contain the provider URL, including
+                # API-key query parameters. Never serialize exception text.
+                message=str(exc).lower()
+                limited=("429" in message or "too many requests" in message
+                         or "rate limit" in message)
                 errors.append({"venue":venue,"pair":list(pair),
-                               "error":diagnostic})
-                if (isinstance(exc,RPCError) or isinstance(exc,RuntimeError)) and (
-                        "429" in diagnostic or
-                        "too many requests" in diagnostic.lower() or
-                        "rate limit" in diagnostic.lower()):
+                               "error":"DISCOVERY_PROVIDER_RATE_LIMITED" if limited
+                                       else "DISCOVERY_PROVIDER_QUERY_FAILED",
+                               "exception_class":type(exc).__name__})
+                if limited:
                     throttled=True
                 continue
             if not isinstance(found,dict):
@@ -366,8 +368,11 @@ def discover_on_separate_rpc(source_rpc, discovery_rpc, pairs, venues, *,
                         raise ValueError("source-verified pool identity mismatch")
                     rows.append(verified)
                 except (ValueError,RuntimeError,TypeError,KeyError,OSError) as exc:
+                    # Keep verification failures inspectable without
+                    # leaking upstream provider URLs in raw exceptions.
                     errors.append({"venue":venue,"address":address,
-                                   "error":type(exc).__name__+": "+str(exc)[:180]})
+                                   "error":"SOURCE_REAUTHENTICATION_FAILED",
+                                   "exception_class":type(exc).__name__})
         if throttled:
             break
     return {"status":"UPSTREAM_RATE_LIMITED" if throttled else (
