@@ -130,6 +130,70 @@ class StartMintExpansionTests(unittest.TestCase):
         self.assertEqual(result["source_whirlpool_config_count"],1)
         self.assertEqual(len(set(batches[1])),9)
 
+    def test_multi_venue_bridge_adds_only_source_verified_new_start(self):
+        from unittest.mock import patch
+        from arb.m5_start_mint_expansion import multi_venue_bridge_scout
+        rows=self.rows()
+        requested=[]
+        def authenticated(rpc,pairs,**kwargs):
+            requested.extend(pairs)
+            self.assertIn("raydium_cpmm",kwargs["venues"])
+            self.assertEqual(kwargs["pace_seconds"],0.5)
+            return {"status":"COMPLETE","errors":[],
+                    "pools":[{"venue":"raydium_cpmm","address":"new-bridge",
+                              "mints":["new",USDC],"slot":77,
+                              "swap_simulated":False}]}
+        with patch("arb.pumpswap_local_simulation.local_rpc_only"):
+            result=multi_venue_bridge_scout(
+                "http://127.0.0.1:8899",rows,maximum_pairs=4,
+                discover_fn=authenticated)
+        self.assertEqual(result["verified_new_pool_count"],1)
+        self.assertEqual(result["additional_candidate_start_mints"],["new"])
+        self.assertEqual(result["after_source_verified_topology_start_mints"],4)
+        self.assertEqual(result["source_verified_new_pools"][0]["source_verified_slot"],77)
+        self.assertFalse(result["target_met_on_signed_simulations"])
+        self.assertFalse(result["actionable"])
+        self.assertTrue(all(tuple(sorted(pair)) in requested for pair in
+                            [("new",USDC)]))
+
+    def test_multi_venue_bridge_rejects_unrequested_or_unverified_identity(self):
+        from unittest.mock import patch
+        from arb.m5_start_mint_expansion import multi_venue_bridge_scout
+        rows=self.rows()
+        invalid=[
+            {"venue":"raydium_cpmm","address":"alien",
+             "mints":["x","y"],"slot":77,"swap_simulated":False},
+            {"venue":"raydium_cpmm","address":"unverified",
+             "mints":["new",USDC],"slot":None,"swap_simulated":False},
+            {"venue":"raydium_cpmm","address":"claimed",
+             "mints":["new",USDC],"slot":77,"swap_simulated":True},
+        ]
+        with patch("arb.pumpswap_local_simulation.local_rpc_only"):
+            for candidate in invalid:
+                with self.subTest(candidate=candidate["address"]):
+                    with self.assertRaisesRegex(ValueError,"not verified"):
+                        multi_venue_bridge_scout(
+                            "http://127.0.0.1:8899",rows,
+                            discover_fn=lambda *_a,**_k:{
+                                "status":"PARTIAL","pools":[candidate]})
+            with self.assertRaisesRegex(ValueError,"bounded"):
+                multi_venue_bridge_scout(
+                    "http://127.0.0.1:8899",rows,maximum_pairs=0)
+
+    def test_multi_venue_rate_limit_never_counts_unverified_hint(self):
+        from unittest.mock import patch
+        from arb.m5_start_mint_expansion import multi_venue_bridge_scout
+        with patch("arb.pumpswap_local_simulation.local_rpc_only"):
+            result=multi_venue_bridge_scout(
+                "http://127.0.0.1:8899",self.rows(),
+                discover_fn=lambda *_a,**_k:{
+                    "status":"UPSTREAM_RATE_LIMITED","pools":[],
+                    "errors":[{"error":"429"}]})
+        self.assertEqual(result["verified_new_pool_count"],0)
+        self.assertEqual(result["additional_candidate_start_mints"],[])
+        self.assertEqual(result["discovery_status"],"UPSTREAM_RATE_LIMITED")
+        self.assertFalse(result["broadcast"])
+
     def test_duplicate_pool_and_invalid_budget_rejected(self):
         with self.assertRaisesRegex(ValueError,"duplicate pool"):
             topology(self.rows()+[self.rows()[0]])
