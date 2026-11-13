@@ -130,6 +130,33 @@ class StartMintExpansionTests(unittest.TestCase):
         self.assertEqual(result["source_whirlpool_config_count"],1)
         self.assertEqual(len(set(batches[1])),9)
 
+    def test_nonhub_two_hop_missing_edge_can_be_discovered(self):
+        from arb.m5_start_mint_expansion import missing_triangle_edge_targets
+        rows=[
+            {"venue":"orca","address":"first","mints":["new-mint","mid-mint"]},
+            {"venue":"raydium_cpmm","address":"second","mints":["mid-mint","last-mint"]},
+        ]
+        targets=missing_triangle_edge_targets(rows,maximum=10)
+        self.assertTrue(any(set(t["pair"])=={"new-mint","last-mint"}
+                            for t in targets["targets"]))
+        self.assertFalse(targets["source_authenticated"])
+        self.assertFalse(targets["signed_simulation_verified"])
+        self.assertFalse(targets["actionable"])
+        self.assertFalse(targets["broadcast"])
+
+    def test_missing_edge_search_does_not_count_existing_triangle(self):
+        from arb.m5_start_mint_expansion import missing_triangle_edge_targets
+        rows=[
+            {"venue":"orca","address":"ab","mints":["A","B"]},
+            {"venue":"raydium_cpmm","address":"bc","mints":["B","C"]},
+            {"venue":"meteora_damm_v2","address":"ca","mints":["C","A"]},
+        ]
+        report=missing_triangle_edge_targets(rows)
+        self.assertEqual(report["missing_edge_pair_count"],0)
+        self.assertEqual(report["targets"],[])
+        with self.assertRaises(ValueError):
+            missing_triangle_edge_targets(rows,maximum=0)
+
     def test_multi_venue_bridge_adds_only_source_verified_new_start(self):
         from unittest.mock import patch
         from arb.m5_start_mint_expansion import multi_venue_bridge_scout
