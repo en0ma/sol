@@ -269,6 +269,50 @@ def derive_orca_bridge_addresses(rpc,entries,targets,*,spacings=(1,2,4,8,16,32,6
             "source_whirlpool_config_count":len(configs),"candidate_tick_spacings":list(spacings),"authentication_errors":errors}
 
 
+
+def missing_triangle_edge_targets(entries, *, maximum=360):
+    """Rank missing edges that would close a three-pool cycle for a new mint.
+
+    Unlike hub-only bridge hints, any genuine two-edge path A-B-C can
+    motivate a bounded search for A-C. These are UNVERIFIED pool hints;
+    only source-authenticated search and subsequent graph reprobe count.
+    """
+    if type(maximum)is not int or not 1<=maximum<=360:
+        raise ValueError("invalid missing-edge search budget")
+    graph=topology(entries)
+    existing=set(graph["three_hop_start_mints"])
+    neighbors={mint:set(other) for mint,other in graph["mint_neighbors"].items()}
+    pairs={}
+    for mint in sorted(neighbors):
+        if mint in existing:
+            continue
+        for intermediate in sorted(neighbors[mint]):
+            for last in sorted(neighbors[intermediate]):
+                if last==mint or last in neighbors[mint]:
+                    continue
+                pair=tuple(sorted((mint,last)))
+                # Require a real two-edge path, never count a missing edge
+                # itself as a pool, quote, or profitable opportunity.
+                proposal={"mint":mint,"connected_neighbor":intermediate,
+                          "missing_neighbor":last,"pair":list(pair),
+                          "closes_new_start":True}
+                score=(last in HUBS,intermediate in HUBS,
+                       len(neighbors[mint]),len(neighbors[last]))
+                old=pairs.get(pair)
+                if old is None or score>old[0]:
+                    pairs[pair]=(score,proposal)
+    ranked=sorted(pairs.values(),key=lambda item:(
+        -int(item[0][0]),-int(item[0][1]),-item[0][2],-item[0][3],
+        item[1]["pair"]))
+    return {"status":"MISSING_TRIANGLE_EDGE_HINTS_NOT_SOURCE_VERIFIED",
+            "missing_edge_pair_count":len(ranked),
+            "targets":[item[1] for item in ranked[:maximum]],
+            "truncated":len(ranked)>maximum,
+            "source_authenticated":False,
+            "signed_simulation_verified":False,**SAFE}
+
+
+
 def multi_venue_bridge_scout(rpc, entries, *, maximum_pairs=12,
                              venues=("raydium_cpmm","meteora_damm_v2"),
                              discover_fn=None):
@@ -286,7 +330,7 @@ def multi_venue_bridge_scout(rpc, entries, *, maximum_pairs=12,
             or len(set(venues))!=len(venues)
             or any(v not in VENUES for v in venues)):
         raise ValueError("invalid bounded multi-venue bridge search")
-    proposals=bridge_targets(entries,maximum=360)
+    proposals=missing_triangle_edge_targets(entries,maximum=360)
     # Pair novelty, not repeated hints: a verified new connection can
     # complete the triangle for an additional unique starting mint.
     pairs=[]
