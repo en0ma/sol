@@ -313,9 +313,75 @@ def missing_triangle_edge_targets(entries, *, maximum=360):
 
 
 
+def discover_on_separate_rpc(source_rpc, discovery_rpc, pairs, venues, *,
+                             search_fn=None, verify_fn=None):
+    """Search on a separate provider, reauthenticate EVERY pool on source fork.
+
+    External GPA search data is an untrusted address hint. Never substitute
+    external balances, slot, or state for source-fork evidence.
+    """
+    from arb.onchain_pool_discovery import search_pair,verify
+    from arb.rpc import RPCError
+    search_fn=search_fn or search_pair
+    verify_fn=verify_fn or verify
+    rows=[]
+    errors=[]
+    attempted=0
+    throttled=False
+    for pair in pairs:
+        for venue in venues:
+            if throttled:
+                break
+            attempted+=1
+            try:
+                found=search_fn(discovery_rpc,venue,*pair,limit=8,
+                                pace_seconds=0.5)
+            except (ValueError,RuntimeError,OSError,TypeError,KeyError) as exc:
+                diagnostic=type(exc).__name__+": "+str(exc)[:180]
+                errors.append({"venue":venue,"pair":list(pair),
+                               "error":diagnostic})
+                if (isinstance(exc,RPCError) or isinstance(exc,RuntimeError)) and (
+                        "429" in diagnostic or
+                        "too many requests" in diagnostic.lower() or
+                        "rate limit" in diagnostic.lower()):
+                    throttled=True
+                continue
+            if not isinstance(found,dict):
+                raise ValueError("invalid alternate discovery account inventory")
+            for address,state in found.items():
+                try:
+                    if not isinstance(address,str) or not address:
+                        raise ValueError("invalid discovered pool address")
+                    # Independently fetch the account and its vaults from the
+                    # source-backed fork. The verifier compares decoded pool
+                    # state, owner and mints at a source context slot.
+                    verified=verify_fn(source_rpc,venue,address,state)
+                    if (not isinstance(verified,dict) or
+                            verified.get("venue")!=venue or
+                            verified.get("address")!=address or
+                            type(verified.get("slot")) is not int or
+                            verified["slot"]<0 or
+                            sorted(verified.get("mints",[]))!=list(pair) or
+                            verified.get("swap_simulated") is not False):
+                        raise ValueError("source-verified pool identity mismatch")
+                    rows.append(verified)
+                except (ValueError,RuntimeError,TypeError,KeyError,OSError) as exc:
+                    errors.append({"venue":venue,"address":address,
+                                   "error":type(exc).__name__+": "+str(exc)[:180]})
+        if throttled:
+            break
+    return {"status":"UPSTREAM_RATE_LIMITED" if throttled else (
+                "PARTIAL" if errors else "COMPLETE"),
+            "pools":rows,"errors":errors,
+            "searched_venue_pairs":attempted,
+            "verification_rpc":"LOCAL_SOURCE_FORK",
+            "discovery_rpc":"SEPARATE_UNTRUSTED_PROVIDER",
+            **SAFE}
+
+
 def multi_venue_bridge_scout(rpc, entries, *, maximum_pairs=12,
                              venues=("raydium_cpmm","meteora_damm_v2"),
-                             discover_fn=None):
+                             discover_fn=None,discovery_rpc=None):
     """Search distinct missing triangle edges and independently verify pools.
 
     getProgramAccounts may be rate limited. Any returned identity must be
@@ -349,9 +415,16 @@ def multi_venue_bridge_scout(rpc, entries, *, maximum_pairs=12,
                 "source_search_venues":list(venues),
                 "discovery_errors":[],"target_met_on_signed_simulations":False,
                 **SAFE}
-    discover_fn=discover_fn or discover
-    evidence=discover_fn(rpc,pairs,limit=8,pace_seconds=0.5,
-                         venues=list(venues))
+    if discovery_rpc is not None:
+        if not isinstance(discovery_rpc,str) or not discovery_rpc.startswith("https://"):
+            raise ValueError("separate discovery RPC must use HTTPS")
+        if discover_fn is not None:
+            raise ValueError("cannot combine alternate RPC with discovery injection")
+        evidence=discover_on_separate_rpc(rpc,discovery_rpc,pairs,venues)
+    else:
+        discover_fn=discover_fn or discover
+        evidence=discover_fn(rpc,pairs,limit=8,pace_seconds=0.5,
+                             venues=list(venues))
     if (not isinstance(evidence,dict) or
             evidence.get("status") not in ("COMPLETE","PARTIAL",
                                             "UPSTREAM_RATE_LIMITED") or
@@ -387,6 +460,9 @@ def multi_venue_bridge_scout(rpc, entries, *, maximum_pairs=12,
     after=topology(entries+added)
     return {"status":"READ_ONLY_MULTI_VENUE_BRIDGE_SCOUT",
             "discovery_status":evidence["status"],
+            "discovery_rpc_mode":("SEPARATE_PROVIDER_SOURCE_REAUTHENTICATED"
+                                  if discovery_rpc else "SOURCE_FORK"),
+            "searched_venue_pairs":evidence.get("searched_venue_pairs"),
             "searched_pairs":[list(p) for p in pairs],
             "source_search_venues":list(venues),
             "source_verified_new_pools":added,
