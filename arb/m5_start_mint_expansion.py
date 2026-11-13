@@ -268,6 +268,96 @@ def derive_orca_bridge_addresses(rpc,entries,targets,*,spacings=(1,2,4,8,16,32,6
     return {"source_verified_pools":verified,"candidate_pd_as_checked":len(keys),
             "source_whirlpool_config_count":len(configs),"candidate_tick_spacings":list(spacings),"authentication_errors":errors}
 
+
+def multi_venue_bridge_scout(rpc, entries, *, maximum_pairs=12,
+                             venues=("raydium_cpmm","meteora_damm_v2"),
+                             discover_fn=None):
+    """Search distinct missing triangle edges and independently verify pools.
+
+    getProgramAccounts may be rate limited. Any returned identity must be
+    source-verified by the venue verifier and match a requested pair exactly.
+    Hints and failed RPC requests are never included as verified pools.
+    """
+    from arb.pumpswap_local_simulation import local_rpc_only
+    from arb.onchain_pool_discovery import discover,VENUES
+    local_rpc_only(rpc)
+    if (type(maximum_pairs)is not int or not 1<=maximum_pairs<=48
+            or not isinstance(venues,(list,tuple)) or not venues
+            or len(set(venues))!=len(venues)
+            or any(v not in VENUES for v in venues)):
+        raise ValueError("invalid bounded multi-venue bridge search")
+    proposals=bridge_targets(entries,maximum=360)
+    # Pair novelty, not repeated hints: a verified new connection can
+    # complete the triangle for an additional unique starting mint.
+    pairs=[]
+    seen=set()
+    for target in proposals["targets"]:
+        pair=tuple(sorted(target["pair"]))
+        if pair not in seen:
+            seen.add(pair)
+            pairs.append(pair)
+        if len(pairs)>=maximum_pairs:
+            break
+    if not pairs:
+        return {"status":"NO_MISSING_BRIDGE_PAIRS","searched_pairs":[],
+                "source_verified_new_pools":[],"verified_new_pool_count":0,
+                "additional_candidate_start_mints":[],
+                "source_search_venues":list(venues),
+                "discovery_errors":[],"target_met_on_signed_simulations":False,
+                **SAFE}
+    discover_fn=discover_fn or discover
+    evidence=discover_fn(rpc,pairs,limit=8,pace_seconds=0.5,
+                         venues=list(venues))
+    if (not isinstance(evidence,dict) or
+            evidence.get("status") not in ("COMPLETE","PARTIAL",
+                                            "UPSTREAM_RATE_LIMITED") or
+            not isinstance(evidence.get("pools"),list)):
+        raise ValueError("multi-venue source discovery failed evidence contract")
+    allowed=set(pairs)
+    existing={(row["venue"],row["address"]) for row in entries}
+    selected={}
+    for result in evidence["pools"]:
+        if (not isinstance(result,dict) or
+                result.get("venue") not in venues or
+                not isinstance(result.get("address"),str) or
+                not result["address"] or
+                type(result.get("slot")) is not int or result["slot"]<0 or
+                not isinstance(result.get("mints"),list) or
+                len(result["mints"])!=2 or
+                not all(isinstance(m,str) and m for m in result["mints"]) or
+                result["mints"][0]==result["mints"][1] or
+                tuple(sorted(result["mints"])) not in allowed or
+                result.get("swap_simulated") is not False):
+            raise ValueError("source pool not verified for requested bridge")
+        identity=(result["venue"],result["address"])
+        if identity in existing:
+            continue
+        candidate={"venue":result["venue"],"address":result["address"],
+                   "mints":result["mints"],"source_verified_slot":result["slot"],
+                   "source_verified_only":True}
+        if identity in selected and selected[identity]["mints"]!=candidate["mints"]:
+            raise ValueError("conflicting source pool identity")
+        selected[identity]=candidate
+    added=list(selected.values())
+    before=topology(entries)
+    after=topology(entries+added)
+    return {"status":"READ_ONLY_MULTI_VENUE_BRIDGE_SCOUT",
+            "discovery_status":evidence["status"],
+            "searched_pairs":[list(p) for p in pairs],
+            "source_search_venues":list(venues),
+            "source_verified_new_pools":added,
+            "verified_new_pool_count":len(added),
+            "before_three_hop_start_mints":before["three_hop_start_mint_count"],
+            "after_source_verified_topology_start_mints":after["three_hop_start_mint_count"],
+            "additional_candidate_start_mints":sorted(
+                set(after["three_hop_start_mints"])-
+                set(before["three_hop_start_mints"])),
+            "discovery_errors":evidence.get("errors",[]),
+            "target_met_on_signed_simulations":False,
+            **SAFE}
+
+
+
 def scout(rpc,entries,*,maximum=360,venues=DEFAULT_VENUES):
     suggestions=bridge_targets(entries,maximum=maximum)
     pairs=[tuple(x["pair"]) for x in suggestions["targets"]]
