@@ -203,6 +203,21 @@ class StartMintExpansionTests(unittest.TestCase):
         self.assertEqual(result["pools"],[])
         self.assertEqual(result["status"],"PARTIAL")
 
+    def test_provider_error_never_exposes_discovery_rpc_credentials(self):
+        from arb.m5_start_mint_expansion import discover_on_separate_rpc
+        pair=tuple(sorted(("new",USDC)))
+        secret="https://candidate.provider.invalid/?api-key=SHOULD-NOT-LOG"
+        def error(*args,**kwargs):
+            raise RuntimeError("provider rejected "+secret)
+        report=discover_on_separate_rpc(
+            "http://127.0.0.1:8899",secret,[pair],("raydium_cpmm",),
+            search_fn=error)
+        import json
+        serialized=json.dumps(report)
+        self.assertNotIn("SHOULD-NOT-LOG",serialized)
+        self.assertNotIn(secret,serialized)
+        self.assertEqual(report["pools"],[])
+
     def test_separate_rpc_429_stops_bounded_search_without_forging(self):
         from arb.m5_start_mint_expansion import discover_on_separate_rpc
         pair=tuple(sorted(("new",USDC)))
