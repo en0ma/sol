@@ -243,6 +243,59 @@ class StartMintExpansionTests(unittest.TestCase):
                     "http://127.0.0.1:8899",self.rows(),
                     discovery_rpc="http://untrusted.provider")
 
+    def test_nonhub_orca_missing_edge_source_verified_expands_topology(self):
+        from unittest.mock import patch
+        from arb.m5_start_mint_expansion import nonhub_orca_bridge_scout
+        entries=[
+            {"venue":"raydium_cpmm","address":"pool-ab","mints":["A","B"]},
+            {"venue":"meteora_damm_v2","address":"pool-bc","mints":["B","C"]}]
+        def derived(rpc,registry,targets):
+            self.assertEqual(len(targets),1)
+            self.assertEqual(set((targets[0]["mint"],
+                                  targets[0]["missing_hub"])),{"A","C"})
+            return {"candidate_pd_as_checked":9,
+                    "source_verified_pools":[
+                        {"venue":"orca","address":"authenticated-ca",
+                         "mints":["C","A"],"slot":64}],
+                    "authentication_errors":[]}
+        with patch("arb.pumpswap_local_simulation.local_rpc_only"):
+            report=nonhub_orca_bridge_scout(
+                "http://127.0.0.1:8899",entries,
+                derive_fn=derived)
+        self.assertEqual(report["verified_new_pool_count"],1)
+        self.assertEqual(report["candidate_pdas_checked"],9)
+        self.assertEqual(report["additional_candidate_start_mints"],
+                         ["A","B","C"])
+        self.assertTrue(report["source_authenticated"])
+        self.assertFalse(report["signed_simulation_verified"])
+        self.assertFalse(report["broadcast"])
+
+    def test_nonhub_orca_no_occupied_pdas_never_invents_pool(self):
+        from unittest.mock import patch
+        from arb.m5_start_mint_expansion import nonhub_orca_bridge_scout
+        entries=[
+            {"venue":"raydium_cpmm","address":"pool-ab","mints":["A","B"]},
+            {"venue":"meteora_damm_v2","address":"pool-bc","mints":["B","C"]}]
+        with patch("arb.pumpswap_local_simulation.local_rpc_only"):
+            report=nonhub_orca_bridge_scout(
+                "http://127.0.0.1:8899",entries,
+                derive_fn=lambda *_a,**_kw:{
+                    "candidate_pd_as_checked":9,
+                    "source_verified_pools":[],
+                    "authentication_errors":[]})
+            self.assertEqual(report["verified_new_pool_count"],0)
+            self.assertEqual(report["additional_candidate_start_mints"],[])
+            with self.assertRaisesRegex(ValueError,"source identity"):
+                nonhub_orca_bridge_scout(
+                    "http://127.0.0.1:8899",entries,
+                    derive_fn=lambda *_a,**_kw:{
+                        "source_verified_pools":[{"venue":"orca",
+                           "address":"wrong-mint","mints":["D","E"],
+                           "slot":64}]})
+            with self.assertRaises(ValueError):
+                nonhub_orca_bridge_scout(
+                    "http://127.0.0.1:8899",entries,maximum_pairs=0)
+
     def test_multi_venue_bridge_adds_only_source_verified_new_start(self):
         from unittest.mock import patch
         from arb.m5_start_mint_expansion import multi_venue_bridge_scout
