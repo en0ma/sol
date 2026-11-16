@@ -270,14 +270,15 @@ def derive_orca_bridge_addresses(rpc,entries,targets,*,spacings=(1,2,4,8,16,32,6
 
 
 
-def missing_triangle_edge_targets(entries, *, maximum=360):
+def missing_triangle_edge_targets(entries, *, maximum=360, nonhub_only=False):
     """Rank missing edges that would close a three-pool cycle for a new mint.
 
     Unlike hub-only bridge hints, any genuine two-edge path A-B-C can
     motivate a bounded search for A-C. These are UNVERIFIED pool hints;
     only source-authenticated search and subsequent graph reprobe count.
     """
-    if type(maximum)is not int or not 1<=maximum<=360:
+    if (type(maximum)is not int or not 1<=maximum<=360
+            or type(nonhub_only)is not bool):
         raise ValueError("invalid missing-edge search budget")
     graph=topology(entries)
     existing=set(graph["three_hop_start_mints"])
@@ -291,6 +292,8 @@ def missing_triangle_edge_targets(entries, *, maximum=360):
                 if last==mint or last in neighbors[mint]:
                     continue
                 pair=tuple(sorted((mint,last)))
+                if nonhub_only and any(m in HUBS for m in pair):
+                    continue
                 # Require a real two-edge path, never count a missing edge
                 # itself as a pool, quote, or profitable opportunity.
                 proposal={"mint":mint,"connected_neighbor":intermediate,
@@ -397,7 +400,10 @@ def nonhub_orca_bridge_scout(rpc, entries, *, maximum_pairs=24,
     local_rpc_only(rpc)
     if type(maximum_pairs)is not int or not 1<=maximum_pairs<=48:
         raise ValueError("invalid nonhub Orca bridge budget")
-    proposals=missing_triangle_edge_targets(entries,maximum=360)
+    # Filter before the 360-hint cap: hub candidates otherwise consume
+    # the entire limit and starve every genuine nonhub edge.
+    proposals=missing_triangle_edge_targets(
+        entries,maximum=360,nonhub_only=True)
     candidates=[]
     selected=set()
     for target in proposals["targets"]:
