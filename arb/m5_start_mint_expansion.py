@@ -384,6 +384,81 @@ def discover_on_separate_rpc(source_rpc, discovery_rpc, pairs, venues, *,
             **SAFE}
 
 
+
+def nonhub_orca_bridge_scout(rpc, entries, *, maximum_pairs=24,
+                            derive_fn=None):
+    """Try deterministic Whirlpool PDAs for genuinely missing non-hub edges.
+
+    Source-fetched Whirlpool config IDs, PDA occupancy, mint identity and
+    vaults must ALL authenticate. A missing/unoccupied PDA stays a hint.
+    This path does not rely on provider getProgramAccounts support.
+    """
+    from arb.pumpswap_local_simulation import local_rpc_only
+    local_rpc_only(rpc)
+    if type(maximum_pairs)is not int or not 1<=maximum_pairs<=48:
+        raise ValueError("invalid nonhub Orca bridge budget")
+    proposals=missing_triangle_edge_targets(entries,maximum=360)
+    candidates=[]
+    selected=set()
+    for target in proposals["targets"]:
+        pair=tuple(sorted(target["pair"]))
+        if pair in selected or any(mint in HUBS for mint in pair):
+            continue
+        selected.add(pair)
+        candidates.append({"mint":pair[0],"missing_hub":pair[1],
+                           "original_bridge":target})
+        if len(candidates)>=maximum_pairs:
+            break
+    if not candidates:
+        return {"status":"NO_NONHUB_ORCA_BRIDGES",
+                "searched_pairs":[],"source_verified_new_pools":[],
+                "verified_new_pool_count":0,
+                "additional_candidate_start_mints":[],
+                "source_authenticated":False,
+                "signed_simulation_verified":False,**SAFE}
+    derive_fn=derive_fn or derive_orca_bridge_addresses
+    evidence=derive_fn(rpc,entries,candidates)
+    pools=evidence.get("source_verified_pools")
+    if not isinstance(pools,list):
+        raise ValueError("nonhub Orca discovery missing source evidence")
+    existing={(p["venue"],p["address"]) for p in entries}
+    pairs={tuple(sorted(p["original_bridge"]["pair"])) for p in candidates}
+    new={}
+    for p in pools:
+        if (not isinstance(p,dict) or p.get("venue")!="orca"
+                or not isinstance(p.get("address"),str) or not p["address"]
+                or type(p.get("slot")) is not int or p["slot"]<0
+                or not isinstance(p.get("mints"),list)
+                or len(p["mints"])!=2 or
+                tuple(sorted(p["mints"])) not in pairs):
+            raise ValueError("nonhub Orca pool source identity mismatch")
+        key=("orca",p["address"])
+        if key in existing:
+            continue
+        row={"venue":"orca","address":p["address"],
+             "mints":p["mints"],"source_verified_slot":p["slot"],
+             "source_verified_only":True}
+        if key in new and new[key]["mints"]!=row["mints"]:
+            raise ValueError("conflicting nonhub Orca source identities")
+        new[key]=row
+    before=topology(entries)
+    after=topology(entries+list(new.values()))
+    return {"status":"READ_ONLY_NONHUB_ORCA_BRIDGE_SCOUT",
+            "searched_pairs":[p["original_bridge"]["pair"] for p in candidates],
+            "candidate_pdas_checked":evidence.get("candidate_pd_as_checked"),
+            "source_verified_new_pools":list(new.values()),
+            "verified_new_pool_count":len(new),
+            "before_three_hop_start_mints":before["three_hop_start_mint_count"],
+            "after_source_verified_topology_start_mints":after["three_hop_start_mint_count"],
+            "additional_candidate_start_mints":sorted(
+                set(after["three_hop_start_mints"])-
+                set(before["three_hop_start_mints"])),
+            "authentication_errors":evidence.get("authentication_errors",[]),
+            "source_authenticated":True,
+            "signed_simulation_verified":False,**SAFE}
+
+
+
 def multi_venue_bridge_scout(rpc, entries, *, maximum_pairs=12,
                              venues=("raydium_cpmm","meteora_damm_v2"),
                              discover_fn=None,discovery_rpc=None):
