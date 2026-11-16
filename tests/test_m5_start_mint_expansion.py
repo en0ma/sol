@@ -243,6 +243,26 @@ class StartMintExpansionTests(unittest.TestCase):
                     "http://127.0.0.1:8899",self.rows(),
                     discovery_rpc="http://untrusted.provider")
 
+    def test_nonhub_filter_precedes_candidate_budget(self):
+        from arb.m5_start_mint_expansion import missing_triangle_edge_targets
+        # Hub candidates rank ahead of nonhub edges. A cap of one cannot
+        # erase an actual nonhub candidate when filtering is requested.
+        rows=[
+            {"venue":"orca","address":"a","mints":["new",SOL]},
+            {"venue":"raydium_cpmm","address":"b","mints":[SOL,USDC]},
+            {"venue":"orca","address":"c","mints":["X","Y"]},
+            {"venue":"raydium_cpmm","address":"d","mints":["Y","Z"]},
+        ]
+        unfiltered=missing_triangle_edge_targets(rows,maximum=1)
+        self.assertTrue(any(m in (SOL,USDC,USDT)
+                            for m in unfiltered["targets"][0]["pair"]))
+        filtered=missing_triangle_edge_targets(
+            rows,maximum=1,nonhub_only=True)
+        self.assertEqual(len(filtered["targets"]),1)
+        self.assertFalse(any(m in (SOL,USDC,USDT)
+                             for m in filtered["targets"][0]["pair"]))
+        self.assertFalse(filtered["source_authenticated"])
+
     def test_nonhub_orca_missing_edge_source_verified_expands_topology(self):
         from unittest.mock import patch
         from arb.m5_start_mint_expansion import nonhub_orca_bridge_scout
