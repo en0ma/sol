@@ -7,12 +7,18 @@ from arb.fixture_all_venue_signed_quotes import quote_leg
 
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
 
-def rank(fixtures, *, amount_in, observed_unix, maximum=30):
+def rank(fixtures, *, amount_in, observed_unix, maximum=30,
+         cost_evidence_by_index=None):
     if (not isinstance(fixtures,list) or len(fixtures)>100
             or type(amount_in)is not int or not 0<amount_in<2**64
             or type(observed_unix)is not int or observed_unix<0
             or type(maximum)is not int or not 1<=maximum<=100):
         raise ValueError("invalid bounded source quote ranking input")
+    if cost_evidence_by_index is not None and (
+            not isinstance(cost_evidence_by_index,dict)
+            or any(type(i)is not int or i<0 or i>=len(fixtures)
+                   for i in cost_evidence_by_index)):
+        raise ValueError("cost evidence must be keyed by source fixture index")
     rows=[]
     for index,fixture in enumerate(fixtures):
         if not isinstance(fixture,dict):
@@ -55,17 +61,30 @@ def rank(fixtures, *, amount_in, observed_unix, maximum=30):
             rows.append({"index":index,"status":"QUOTE_BLOCKED",
                 "quoted_legs":len(quotes),"reason":reason,**SAFE})
             continue
-        rows.append({"index":index,"status":"GROSS_INDICATIVE_ONLY",
+        row={"index":index,"status":"GROSS_INDICATIVE_ONLY",
             "start_mint":mints[0],"input_base_units":amount_in,
             "output_base_units":amount,"gross_delta_start_mint_base_units":amount-amount_in,
             "positive_gross":amount>amount_in,"quotes":quotes,
             "cost_status":"UNVERIFIED_NETWORK_FEE_SLIPPAGE_AND_CONVERSION",
-            "net_profitability_confirmed":False,**SAFE})
+            "net_profitability_confirmed":False,**SAFE}
+        if cost_evidence_by_index is not None:
+            from arb.net_quote_opportunity import evaluate
+            row["net_cost_evaluation"]=evaluate(
+                row,cost_evidence_by_index.get(index),
+                observed_unix=observed_unix)
+        rows.append(row)
     ranked=sorted((r for r in rows if r["status"]=="GROSS_INDICATIVE_ONLY"),
                   key=lambda r:r["gross_delta_start_mint_base_units"],reverse=True)
     return {"status":"GROSS_SOURCE_BOUND_RANKING_ONLY",
         "fixtures_considered":len(rows),"fully_quoted":len(ranked),
         "blocked":len(rows)-len(ranked),
         "positive_gross":sum(r["positive_gross"] for r in ranked),
-        "net_profitable_candidates":0,"ranked":ranked[:maximum],
+        "net_profitable_candidates":0,
+        "indicative_net_positive_candidates":sum(
+            r.get("net_cost_evaluation",{}).get("estimated_net_positive") is True
+            for r in ranked),
+        "indicative_net_cost_assessed":sum(
+            r.get("net_cost_evaluation",{}).get("status","").startswith("ESTIMATED_NET_")
+            for r in ranked),
+        "ranked":ranked[:maximum],
         "all_results":rows,**SAFE}
