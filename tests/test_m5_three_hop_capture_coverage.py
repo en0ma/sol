@@ -19,6 +19,49 @@ def route(mint, pool):
 
 
 class ThreeHopSourceCoverageTests(unittest.TestCase):
+    def test_historical_signed_hint_preserves_first_pass_for_other_mints(self):
+        from arb.m5_historical_capture_priority import fingerprint
+        def complete(mint,pool):
+            return {"start_mint":mint,"hops":3,"legs":[
+                {"venue":"orca","pool":pool,"input":mint,"output":"X"},
+                {"venue":"raydium_cpmm","pool":"cp-"+pool,"input":"X","output":"Y"},
+                {"venue":"meteora_damm_v2","pool":"damm-"+pool,
+                 "input":"Y","output":mint}]}
+        routes=[complete("A","unproven"),
+                complete("B","unproven-b"),
+                complete("A","historically-signed")]
+        historically_verified=fingerprint(routes[2])
+        with patch("arb.m5_historical_capture_priority.PRIORITY_ROUTE_HASHES",
+                   frozenset({historically_verified})):
+            by_start,starts=capture_priority_indices(routes)
+            self.assertEqual(starts,["A","B"])
+            self.assertEqual(by_start["A"],[2,0])
+            self.assertEqual(capture_attempt_order(
+                routes,by_start,starts,set(),set()),2)
+            self.assertEqual(capture_attempt_order(
+                routes,by_start,starts,set(),{2}),1)
+            self.assertEqual(capture_attempt_order(
+                routes,by_start,starts,{"A","B"},{1,2}),0)
+            # Even one changed leg direction cannot reuse a historical hint.
+            changed=complete("A","historically-signed")
+            changed["legs"][0]["input"]="OTHER"
+            self.assertNotEqual(fingerprint(changed),historically_verified)
+            # Receipt fingerprints are only sorting hints, not new evidence.
+            graph={"status":"SOURCE_AUTHENTICATED_ROUTE_DISCOVERY_ONLY",
+                   "routes":routes,
+                   "cycle_coverage_by_hops":{"3":{"truncated":False}}}
+            with tempfile.TemporaryDirectory() as directory:
+                with patch("arb.m5_four_to_six_source_capture.capture",
+                           side_effect=ValueError("current source missing")):
+                    with self.assertRaisesRegex(RuntimeError,"only 0/1"):
+                        source_capture("http://127.0.0.1:8899",graph,
+                                       directory,target=1)
+                report=json.loads((Path(directory)/
+                                   "three-hop-inventory.json").read_text())
+                self.assertEqual(report["source_captured_start_mints"],0)
+                self.assertEqual(report["historically_signed_route_hints_matched"],1)
+                self.assertTrue(report["historical_hint_not_current_verification"])
+
     def test_first_mint_pass_precedes_second_attempt(self):
         routes = [route("A", "a1"), route("A", "a2"),
                   route("B", "b1"), route("C", "c1")]
