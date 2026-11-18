@@ -157,16 +157,14 @@ def capture_priority_indices(routes, *, retries_per_start=3):
     # as a source-capture hypothesis. The historical record is NOT a current
     # source authentication or an accepted signed verification.
     starts=sorted(by_start,key=lambda mint:by_start[mint][0])
-    from arb.m5_historical_capture_priority import (
-        PRIORITY_ROUTE_HASHES,fingerprint)
-    matched=0
+    from arb.m5_historical_capture_priority import is_historical_priority
     for mint in starts:
         indices=by_start[mint]
         preferred=[i for i in indices
-                   if fingerprint(routes[i]) in PRIORITY_ROUTE_HASHES]
+                   if is_historical_priority(routes[i])]
         if preferred:
-            matched+=1
-            others=[i for i in indices if i not in set(preferred)]
+            preferred_indices=set(preferred)
+            others=[i for i in indices if i not in preferred_indices]
             by_start[mint]=preferred+others
     return by_start,starts
 
@@ -274,6 +272,11 @@ def source_capture(rpc, graph, directory, *, shard_index=0, shard_count=1, targe
     if target is not None and (type(target)is not int or not 1<=target<=len(selected)):
         raise ValueError("invalid bounded source capture target")
     by_start,starts=capture_priority_indices(graph["routes"])
+    from arb.m5_historical_capture_priority import is_historical_priority
+    historical_priority_matches=sum(
+        bool(by_start[mint]) and
+        is_historical_priority(graph["routes"][by_start[mint][0]])
+        for mint in starts)
     captured_starts=set()
     attempted=set()
     # For unsharded CI, try unserved mint starts first. Legacy shard paths
@@ -325,14 +328,7 @@ def source_capture(rpc, graph, directory, *, shard_index=0, shard_count=1, targe
              "source_captured_start_mints":len(captured_starts),
              "uncaptured_graph_start_mints":sorted(set(starts)-captured_starts),
              "source_capture_policy":"HISTORICAL_SIGNED_HINT_PER_MINT_THEN_DIRECTIONAL_NOVELTY_RETRY_THREE_THEN_FILL",
-             "historically_signed_route_hints_matched":sum(
-                 bool(by_start[mint]) and
-                 __import__("arb.m5_historical_capture_priority",
-                            fromlist=["fingerprint","PRIORITY_ROUTE_HASHES"])
-                 .fingerprint(graph["routes"][by_start[mint][0]]) in
-                 __import__("arb.m5_historical_capture_priority",
-                            fromlist=["PRIORITY_ROUTE_HASHES"])
-                 .PRIORITY_ROUTE_HASHES for mint in starts),
+             "historically_signed_route_hints_matched":historical_priority_matches,
              "historical_hint_not_current_verification":True,
              "blocked_source_routes":blocked,
              "cached_distinct_pool_directions":len(venue_cache),
