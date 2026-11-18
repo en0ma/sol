@@ -174,7 +174,7 @@ def capture_attempt_order(routes, by_start, starts, captured_starts, attempted, 
             # Later retries should test independent source-account hypotheses
             # before rotating the same failing pool direction. Direction
             # matters for Orca tick arrays and DLMM bin array source reads.
-            if len(earlier)<depth:
+            if len(earlier)!=depth:
                 continue
             seen={(leg["venue"],leg["pool"],leg.get("input"),
                    leg.get("output"))
