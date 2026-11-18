@@ -162,10 +162,40 @@ def capture_attempt_order(routes, by_start, starts, captured_starts, attempted, 
     """Return a next untried route; reserve fresh starts before duplicates."""
     for depth in range(retries_per_start):
         for mint in starts:
-            if mint not in captured_starts and len(by_start[mint])>depth:
-                index=by_start[mint][depth]
-                if index not in attempted:
-                    return index
+            if mint in captured_starts:
+                continue
+            indices=by_start[mint]
+            earlier=[routes[i] for i in indices if i in attempted]
+            if depth==0:
+                # First pass always covers every distinct starting token.
+                if indices and indices[0] not in attempted:
+                    return indices[0]
+                continue
+            # Later retries should test independent source-account hypotheses
+            # before rotating the same failing pool direction. Direction
+            # matters for Orca tick arrays and DLMM bin array source reads.
+            if len(earlier)<depth:
+                continue
+            seen={(leg["venue"],leg["pool"],leg.get("input"),
+                   leg.get("output"))
+                  for route in earlier for leg in route["legs"]}
+            options=[]
+            for i in indices:
+                if i in attempted:
+                    continue
+                fresh=sum((leg["venue"],leg["pool"],leg.get("input"),
+                           leg.get("output")) not in seen
+                          for leg in routes[i]["legs"])
+                if fresh:
+                    options.append((fresh,i))
+            if options:
+                # Preserve source graph order for equally novel alternatives.
+                return max(options,key=lambda x:(x[0],-x[1]))[1]
+            # If genuine alternatives are absent, still try a different
+            # route; never treat a repeated pool as proven unavailable.
+            fallback=next((i for i in indices if i not in attempted),None)
+            if fallback is not None:
+                return fallback
     # Preserve a fourth (or later) independent pool-path attempt for
     # still-uncaptured starting mints before assigning any remaining capacity
     # to starts already captured. Routes that merely permute the same pool
@@ -280,7 +310,7 @@ def source_capture(rpc, graph, directory, *, shard_index=0, shard_count=1, targe
              "selected_graph_start_mints":len(starts),
              "source_captured_start_mints":len(captured_starts),
              "uncaptured_graph_start_mints":sorted(set(starts)-captured_starts),
-             "source_capture_policy":"FIRST_SUCCESS_PER_MINT_RETRY_THREE_UNSERVED_POOL_NOVELTY_REVERSE_ORIENTATION_THEN_FILL",
+             "source_capture_policy":"FIRST_SUCCESS_PER_MINT_DIRECTIONAL_NOVELTY_RETRY_THREE_UNSERVED_POOL_NOVELTY_REVERSE_THEN_FILL",
              "blocked_source_routes":blocked,
              "cached_distinct_pool_directions":len(venue_cache),
             "three_hop_truncated":graph.get("cycle_coverage_by_hops",{}).get("3",{}).get("truncated"),
