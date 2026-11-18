@@ -93,3 +93,11 @@ def fingerprint(route):
     data={"start_mint":route["start_mint"],"legs":selected}
     return hashlib.sha256(json.dumps(
         data,sort_keys=True,separators=(",",":")).encode()).hexdigest()
+
+
+def is_historical_priority(route):
+    """Malformed or changed routes receive NO historical preference."""
+    try:
+        return fingerprint(route) in PRIORITY_ROUTE_HASHES
+    except (ValueError,TypeError,KeyError):
+        return False
