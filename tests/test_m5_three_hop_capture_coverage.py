@@ -107,6 +107,45 @@ class ThreeHopSourceCoverageTests(unittest.TestCase):
         self.assertEqual(capture_attempt_order(
             rows,by_start,starts,{"A"},{0}),2)
 
+    def test_second_retry_prefers_later_independent_pool_direction(self):
+        # Graph order puts two permutations of the same failing pools ahead
+        # of a genuinely distinct source-account hypothesis for mint A.
+        def candidate(mint, pool, *, direction="A"):
+            return {"start_mint":mint,"hops":3,"legs":[
+                {"venue":"orca","pool":pool,"input":direction,
+                 "output":"intermediate"},
+                {"venue":"raydium_cpmm","pool":"cp-shared",
+                 "input":"intermediate","output":"last"},
+                {"venue":"meteora_damm_v2","pool":"damm-shared",
+                 "input":"last","output":mint}]}
+        rows=[candidate("A","blocked"),candidate("B","b1"),
+              candidate("A","blocked"),candidate("B","b2"),
+              candidate("A","blocked"),candidate("A","independent")]
+        by_start,starts=capture_priority_indices(rows)
+        self.assertEqual(capture_attempt_order(
+            rows,by_start,starts,set(),{0,1}),5)
+        self.assertEqual(capture_attempt_order(
+            rows,by_start,starts,set(),{0,1,5}),3)
+        # A's third retry now tests the next available source candidate;
+        # no claimed source capture is inferred from this ordering.
+        self.assertEqual(capture_attempt_order(
+            rows,by_start,starts,set(),{0,1,3,5}),2)
+
+    def test_reversed_pool_direction_is_independent_retry(self):
+        def candidate(direction):
+            return {"start_mint":"A","hops":3,"legs":[
+                {"venue":"orca","pool":"same","input":direction[0],
+                 "output":direction[1]},
+                {"venue":"raydium_cpmm","pool":"cp","input":"X","output":"Y"},
+                {"venue":"meteora_damm_v2","pool":"damm","input":"Y","output":"A"}]}
+        rows=[candidate(("A","B")),candidate(("A","B")),
+              candidate(("B","A"))]
+        by_start,starts=capture_priority_indices(rows)
+        self.assertEqual(capture_attempt_order(
+            rows,by_start,starts,set(),{0}),2)
+        self.assertEqual(capture_attempt_order(
+            rows,by_start,starts,set(),{0,2}),1)
+
     def test_fourth_pool_novel_candidate_precedes_served_mint_fill(self):
         # Three failed same-pool hypotheses for A must not prevent a
         # genuine fourth candidate from being attempted before spare
