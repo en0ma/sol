@@ -152,8 +152,22 @@ def capture_priority_indices(routes, *, retries_per_start=3):
     for index,route in enumerate(routes):
         if route.get("hops")==3:
             by_start[route["start_mint"]].append(index)
-    # Keep deterministic source graph order and preserve graph indices.
+    # Keep deterministic mint-level first appearance. Within a mint only,
+    # favor an *exact* previously signed+rollback-verified route identity
+    # as a source-capture hypothesis. The historical record is NOT a current
+    # source authentication or an accepted signed verification.
     starts=sorted(by_start,key=lambda mint:by_start[mint][0])
+    from arb.m5_historical_capture_priority import (
+        PRIORITY_ROUTE_HASHES,fingerprint)
+    matched=0
+    for mint in starts:
+        indices=by_start[mint]
+        preferred=[i for i in indices
+                   if fingerprint(routes[i]) in PRIORITY_ROUTE_HASHES]
+        if preferred:
+            matched+=1
+            others=[i for i in indices if i not in set(preferred)]
+            by_start[mint]=preferred+others
     return by_start,starts
 
 
@@ -310,7 +324,16 @@ def source_capture(rpc, graph, directory, *, shard_index=0, shard_count=1, targe
              "selected_graph_start_mints":len(starts),
              "source_captured_start_mints":len(captured_starts),
              "uncaptured_graph_start_mints":sorted(set(starts)-captured_starts),
-             "source_capture_policy":"FIRST_SUCCESS_PER_MINT_DIRECTIONAL_NOVELTY_RETRY_THREE_UNSERVED_POOL_NOVELTY_REVERSE_THEN_FILL",
+             "source_capture_policy":"HISTORICAL_SIGNED_HINT_PER_MINT_THEN_DIRECTIONAL_NOVELTY_RETRY_THREE_THEN_FILL",
+             "historically_signed_route_hints_matched":sum(
+                 bool(by_start[mint]) and
+                 __import__("arb.m5_historical_capture_priority",
+                            fromlist=["fingerprint","PRIORITY_ROUTE_HASHES"])
+                 .fingerprint(graph["routes"][by_start[mint][0]]) in
+                 __import__("arb.m5_historical_capture_priority",
+                            fromlist=["PRIORITY_ROUTE_HASHES"])
+                 .PRIORITY_ROUTE_HASHES for mint in starts),
+             "historical_hint_not_current_verification":True,
              "blocked_source_routes":blocked,
              "cached_distinct_pool_directions":len(venue_cache),
             "three_hop_truncated":graph.get("cycle_coverage_by_hops",{}).get("3",{}).get("truncated"),
