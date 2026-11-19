@@ -101,6 +101,20 @@ jobs:
           extra=nonhub["source_verified_new_pools"]
           room=max(0,512-len(registry["pools"]))
           registry["pools"].extend(extra[:room])
+          # Raydium CPMM supports a source-derived subset of deterministic
+          # pool-state PDAs. Direct account reads bypass restricted GPA.
+          from arb.raydium_cpmm_pda_bridge import discover as cpmm_pda_discover
+          from arb.m5_start_mint_expansion import missing_triangle_edge_targets
+          cpmm_hints=missing_triangle_edge_targets(registry["pools"],maximum=48)
+          cpmm_pdas=cpmm_pda_discover(
+              rpc,registry["pools"],
+              [row["pair"] for row in cpmm_hints["targets"]],
+              maximum_pairs=24)
+          (root/"raydium-cpmm-pda-bridge-discovery.json").write_text(
+              json.dumps(cpmm_pdas,indent=2)+"\\n")
+          cpmm_new=cpmm_pdas["source_verified_new_pools"]
+          cpmm_room=max(0,512-len(registry["pools"]))
+          registry["pools"].extend(cpmm_new[:cpmm_room])
           graph=diversified_three_hop_graph(probe(rpc,registry,
                         batch=tuple((a,b) for a in ORDER for b in ORDER if a!=b),
                         maximum_per_venue=48,
@@ -108,7 +122,11 @@ jobs:
                         prefer_start_mint_coverage=True),
                         maximum=200,allow_start_rotations=True)
           graph["source_bridge_discovery"]={
-              "new_verified_pool_identities":len(new)+min(len(other),available)+min(len(extra),room),
+              "new_verified_pool_identities":len(new)+min(len(other),available)+min(len(extra),room)+min(len(cpmm_new),cpmm_room),
+              "raydium_cpmm_pda_verified_new_pools":min(len(cpmm_new),cpmm_room),
+              "raydium_cpmm_pda_pairs_searched":cpmm_pdas["pairs_searched"],
+              "raydium_cpmm_pdas_checked":cpmm_pdas["candidate_pdas_checked"],
+              "raydium_cpmm_source_config_count":cpmm_pdas["source_config_count"],
               "nonhub_orca_verified_new_pools":min(len(extra),room),
               "nonhub_orca_pairs_searched":len(nonhub["searched_pairs"]),
               "nonhub_orca_pdas_checked":nonhub.get("candidate_pdas_checked"),
