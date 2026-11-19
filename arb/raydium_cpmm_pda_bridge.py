@@ -16,7 +16,7 @@ from arb.rpc import call
 
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
 
-def source_config_addresses(rpc,entries,*,maximum_sources=24,call_fn=None):
+def source_config_addresses(rpc,entries,*,maximum_sources=48,call_fn=None):
     """Read source-owned CPMM state to collect AMM configuration addresses."""
     if type(maximum_sources)is not int or not 1<=maximum_sources<=48:
         raise ValueError("invalid config source budget")
@@ -42,14 +42,14 @@ def source_config_addresses(rpc,entries,*,maximum_sources=24,call_fn=None):
     return sorted(configs)
 
 
-def discover(rpc,entries,pairs,*,maximum_pairs=24,maximum_configs=8,
+def discover(rpc,entries,pairs,*,maximum_pairs=72,maximum_configs=16,
              call_fn=None,verify_fn=None,config_fn=None):
     """Probe bounded deterministic CPMM PDA candidates and source verify."""
     from solders.pubkey import Pubkey
     local_rpc_only(rpc)
     if (not isinstance(entries,list) or not isinstance(pairs,list)
-            or type(maximum_pairs)is not int or not 1<=maximum_pairs<=48
-            or type(maximum_configs)is not int or not 1<=maximum_configs<=16):
+            or type(maximum_pairs)is not int or not 1<=maximum_pairs<=96
+            or type(maximum_configs)is not int or not 1<=maximum_configs<=32):
         raise ValueError("invalid bounded CPMM PDA discovery inputs")
     existing={(e["venue"],e["address"]) for e in entries}
     unique=[]
@@ -66,7 +66,7 @@ def discover(rpc,entries,pairs,*,maximum_pairs=24,maximum_configs=8,
         if len(unique)>=maximum_pairs:
             break
     source_configs=config_fn(rpc,entries) if config_fn else source_config_addresses(
-        rpc,entries,call_fn=call_fn)
+        rpc,entries,maximum_sources=48,call_fn=call_fn)
     if (not isinstance(source_configs,list) or len(source_configs)>maximum_configs
             or len(source_configs)!=len(set(source_configs))):
         raise ValueError("CPMM source configuration bound exceeded")
@@ -124,6 +124,8 @@ def discover(rpc,entries,pairs,*,maximum_pairs=24,maximum_configs=8,
             "search_scope":"PDA_POOLS_ONLY_ARBITRARY_SIGNER_POOLS_NOT_SEARCHED",
             "source_config_count":len(source_configs),
             "pairs_searched":len(unique),"candidate_pdas_checked":len(keys),
+            "pair_budget":maximum_pairs,
+            "config_budget":maximum_configs,
             "source_verified_new_pools":list(selected.values()),
             "verified_new_pool_count":len(selected),
             "errors":errors,"source_authenticated":True,
