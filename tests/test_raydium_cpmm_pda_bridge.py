@@ -70,6 +70,40 @@ class CPMMDirectPdaTests(unittest.TestCase):
         self.assertEqual(len(bad["errors"]),1)
         self.assertFalse(bad["actionable"])
 
+    def test_expanded_pair_budget_is_bounded_and_read_only(self):
+        # 72 unique source-mint pair hints, each evaluated against four
+        # separately authenticated configuration addresses. None exists:
+        # this must never grow the pool count.
+        from solders.pubkey import Pubkey
+        def mint(i):
+            return str(Pubkey.from_bytes(i.to_bytes(32,"big")))
+        pairs=[(SOL,mint(i+1)) for i in range(72)]
+        configs=[mint(1000+i) for i in range(4)]
+        batch_sizes=[]
+        def read(rpc,method,params):
+            self.assertEqual(method,"getMultipleAccounts")
+            batch_sizes.append(len(params[0]))
+            return {"value":[None]*len(params[0])}
+        with patch("arb.raydium_cpmm_pda_bridge.local_rpc_only"):
+            result=discover(RPC,[],pairs,maximum_pairs=72,
+                            config_fn=lambda *_:configs,call_fn=read)
+        self.assertEqual(result["pairs_searched"],72)
+        self.assertEqual(result["candidate_pdas_checked"],288)
+        self.assertEqual(result["verified_new_pool_count"],0)
+        self.assertEqual(batch_sizes,[100,100,88])
+        self.assertFalse(result["signed_simulation_verified"])
+        self.assertFalse(result["actionable"])
+
+    def test_excess_configurations_fail_closed_before_pda_reads(self):
+        from solders.pubkey import Pubkey
+        configs=[str(Pubkey.from_bytes((i+1).to_bytes(32,"big")))
+                 for i in range(17)]
+        with patch("arb.raydium_cpmm_pda_bridge.local_rpc_only"):
+            with self.assertRaisesRegex(ValueError,"configuration bound"):
+                discover(RPC,[],[(SOL,USDC)],maximum_configs=16,
+                         config_fn=lambda *_:configs,
+                         call_fn=lambda *_:self.fail("no account reads expected"))
+
     def test_refuses_incomplete_snapshot_and_invalid_search_budget(self):
         with patch("arb.raydium_cpmm_pda_bridge.local_rpc_only"):
             with self.assertRaises(ValueError):
