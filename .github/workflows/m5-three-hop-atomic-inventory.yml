@@ -105,11 +105,11 @@ jobs:
           # pool-state PDAs. Direct account reads bypass restricted GPA.
           from arb.raydium_cpmm_pda_bridge import discover as cpmm_pda_discover
           from arb.m5_start_mint_expansion import missing_triangle_edge_targets
-          cpmm_hints=missing_triangle_edge_targets(registry["pools"],maximum=48)
+          cpmm_hints=missing_triangle_edge_targets(registry["pools"],maximum=72)
           cpmm_pdas=cpmm_pda_discover(
               rpc,registry["pools"],
               [row["pair"] for row in cpmm_hints["targets"]],
-              maximum_pairs=24)
+              maximum_pairs=72,maximum_configs=16)
           (root/"raydium-cpmm-pda-bridge-discovery.json").write_text(
               json.dumps(cpmm_pdas,indent=2)+"\\n")
           cpmm_new=cpmm_pdas["source_verified_new_pools"]
@@ -127,6 +127,7 @@ jobs:
               "raydium_cpmm_pda_pairs_searched":cpmm_pdas["pairs_searched"],
               "raydium_cpmm_pdas_checked":cpmm_pdas["candidate_pdas_checked"],
               "raydium_cpmm_source_config_count":cpmm_pdas["source_config_count"],
+              "raydium_cpmm_unadmitted_verified_pools":len(cpmm_new)-min(len(cpmm_new),cpmm_room),
               "nonhub_orca_verified_new_pools":min(len(extra),room),
               "nonhub_orca_pairs_searched":len(nonhub["searched_pairs"]),
               "nonhub_orca_pdas_checked":nonhub.get("candidate_pdas_checked"),
