@@ -129,6 +129,19 @@ jobs:
               registry["pools"],indexed_new,maximum=MAX_REGISTRY_POOLS)
           registry["pools"].extend(index_admission["admitted"])
           index_room=index_admission["admitted_count"]
+          # Meteora's paginated Data APIs provide untrusted pool addresses;
+          # every accepted DAMM v2 / DLMM pool must be independently
+          # decoded and vault-verified using source-fork RPC accounts.
+          from arb.meteora_indexed_source_bridge import discover as indexed_meteora
+          meteora=indexed_meteora(
+              rpc,registry["pools"],pages=2,page_size=100,
+              maximum_verify_per_venue=32)
+          (root/"meteora-indexed-source-bridge.json").write_text(
+              json.dumps(meteora,indent=2)+"\\n")
+          meteora_admission=admit(
+              registry["pools"],meteora["source_verified_new_pools"],
+              maximum=MAX_REGISTRY_POOLS)
+          registry["pools"].extend(meteora_admission["admitted"])
           graph=diversified_three_hop_graph(probe(rpc,registry,
                         batch=tuple((a,b) for a in ORDER for b in ORDER if a!=b),
                         maximum_per_venue=48,
@@ -136,7 +149,11 @@ jobs:
                         prefer_start_mint_coverage=True),
                         maximum=200,allow_start_rotations=True)
           graph["source_bridge_discovery"]={
-              "new_verified_pool_identities":len(new)+min(len(other),available)+min(len(extra),room)+min(len(cpmm_new),cpmm_room)+index_admission["admitted_count"],
+              "new_verified_pool_identities":len(new)+min(len(other),available)+min(len(extra),room)+min(len(cpmm_new),cpmm_room)+index_admission["admitted_count"]+meteora_admission["admitted_count"],
+              "meteora_indexed_source_verified_new_pools":meteora_admission["admitted_count"],
+              "meteora_indexed_unadmitted_verified_pools":meteora_admission["unadmitted_count"],
+              "meteora_indexer_venue_reports":meteora["venue_reports"],
+              "meteora_indexed_new_topology_starts":len(meteora["additional_topology_start_mints"]),
               "raydium_indexer_status":indexed["status"],
               "raydium_indexer_source_checked":indexed["source_accounts_checked"],
               "raydium_indexer_verified_new_pools":index_admission["admitted_count"],
