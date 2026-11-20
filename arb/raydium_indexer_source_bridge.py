@@ -81,16 +81,39 @@ def discover(rpc,entries,*,pages=3,page_size=100,maximum_verify=48,
     # missing triangles; no indexer token or price fields are consulted.
     base=topology(entries)
     before=set(base["three_hop_start_mints"])
+    # Indexer hints are useful ONLY as source-decoded candidate identities.
+    # A missing triangle may need TWO new edges: A-B and A-C can close
+    # A-B-C-A if B-C already exists. Ranking each pool independently
+    # gives both zero immediate gain and can starve the combination.
+    existing_pairs={frozenset(row["mints"]) for row in entries}
+    old_neighbors={mint:set(peers) for mint,peers in
+                   base["mint_neighbors"].items()}
+    candidate_pairs={frozenset((a,b)) for _,_,a,b in source_candidates}
     priorities=[]
+    complementary_addresses=0
     for address,state,a,b in source_candidates:
         edge={"venue":"raydium_cpmm","address":address,"mints":[a,b]}
         gained=set(topology(entries+[edge])["three_hop_start_mints"])-before
-        priorities.append((len(gained),address,state,a,b))
-    priorities.sort(key=lambda item:(-item[0],item[1]))
+        # Count eligible triangle participants, not an unverified pool as
+        # proof. A complementary edge needs a separate source verification.
+        potential=set()
+        for c in old_neighbors.get(a,set()):
+            if c!=b and frozenset((b,c)) in candidate_pairs:
+                potential.update((a,b,c))
+        for c in old_neighbors.get(b,set()):
+            if c!=a and frozenset((a,c)) in candidate_pairs:
+                potential.update((a,b,c))
+        new_potential=len(potential-before)
+        if new_potential:
+            complementary_addresses+=1
+        novel_pair=int(frozenset((a,b)) not in existing_pairs)
+        priorities.append((len(gained),new_potential,novel_pair,
+                           address,state,a,b))
+    priorities.sort(key=lambda item:(-item[0],-item[1],-item[2],item[3]))
     selected=[]
     failures=0
     verifier=verify_fn or verify
-    for _,address,state,a,b in priorities[:maximum_verify]:
+    for _,_,_,address,state,a,b in priorities[:maximum_verify]:
         try:
             result=verifier(rpc,"raydium_cpmm",address,state)
             if (not isinstance(result,dict)
@@ -113,6 +136,9 @@ def discover(rpc,entries,*,pages=3,page_size=100,maximum_verify=48,
             "new_candidate_addresses":len(addresses),
             "source_accounts_checked":len(addresses),
             "source_decoded_candidate_pools":len(source_candidates),
+            "complementary_edge_candidates":complementary_addresses,
+            "complementary_edge_priority_policy":
+                "DIRECT_TRIANGLE_GAIN_THEN_TWO_EDGE_POTENTIAL_THEN_NEW_PAIR",
             "source_verification_attempts":min(len(priorities),maximum_verify),
             "source_verification_failures":failures,
             "invalid_source_account_count":invalid_source,
