@@ -77,8 +77,8 @@ jobs:
           (root/"source-bridge-discovery.json").write_text(json.dumps(expansion,indent=2)+"\n")
           new=[{"venue":p["venue"],"address":p["address"],"mints":p["mints"]}
                for p in expansion["source_verified_new_pools"]]
-          if len(registry["pools"])+len(new)>512:
-              raise ValueError("source-discovered pool identities exceed bounded 512 registry limit")
+          if len(registry["pools"])+len(new)>768:
+              raise ValueError("source-discovered pool identities exceed bounded 768 registry limit")
           registry["pools"].extend(new)
           # A second, bounded source-authenticated discovery pass searches
           # missing bridge edges in other venues, not more permutations of
@@ -90,7 +90,7 @@ jobs:
           (root/"multi-venue-bridge-discovery.json").write_text(
               json.dumps(multi,indent=2)+"\\n")
           other=multi["source_verified_new_pools"]
-          available=max(0,512-len(registry["pools"]))
+          available=max(0,768-len(registry["pools"]))
           registry["pools"].extend(other[:available])
           # Fill remaining source-pool budget using deterministic PDAs for
           # missing non-hub edges, without invoking rate-limited GPA search.
@@ -99,7 +99,7 @@ jobs:
           (root/"nonhub-orca-bridge-discovery.json").write_text(
               json.dumps(nonhub,indent=2)+"\\n")
           extra=nonhub["source_verified_new_pools"]
-          room=max(0,512-len(registry["pools"]))
+          room=max(0,768-len(registry["pools"]))
           registry["pools"].extend(extra[:room])
           # Raydium CPMM supports a source-derived subset of deterministic
           # pool-state PDAs. Direct account reads bypass restricted GPA.
@@ -113,19 +113,22 @@ jobs:
           (root/"raydium-cpmm-pda-bridge-discovery.json").write_text(
               json.dumps(cpmm_pdas,indent=2)+"\\n")
           cpmm_new=cpmm_pdas["source_verified_new_pools"]
-          cpmm_room=max(0,512-len(registry["pools"]))
+          cpmm_room=max(0,768-len(registry["pools"]))
           registry["pools"].extend(cpmm_new[:cpmm_room])
           # Raydium pool state may also use an arbitrary signer address.
           # Treat Raydium's indexer as UNTRUSTED address hints only; every
           # candidate is decoded and vault-verified on the local source fork.
           from arb.raydium_indexer_source_bridge import discover as indexed_cpmm
           indexed=indexed_cpmm(
-              rpc,registry["pools"],pages=3,page_size=100,maximum_verify=48)
+              rpc,registry["pools"],pages=5,page_size=100,maximum_verify=80)
           (root/"raydium-indexed-source-bridge.json").write_text(
               json.dumps(indexed,indent=2)+"\\n")
           indexed_new=indexed["source_verified_new_pools"]
-          index_room=max(0,512-len(registry["pools"]))
-          registry["pools"].extend(indexed_new[:index_room])
+          from arb.m5_registry_capacity import admit,MAX_REGISTRY_POOLS
+          index_admission=admit(
+              registry["pools"],indexed_new,maximum=MAX_REGISTRY_POOLS)
+          registry["pools"].extend(index_admission["admitted"])
+          index_room=index_admission["admitted_count"]
           graph=diversified_three_hop_graph(probe(rpc,registry,
                         batch=tuple((a,b) for a in ORDER for b in ORDER if a!=b),
                         maximum_per_venue=48,
@@ -133,11 +136,12 @@ jobs:
                         prefer_start_mint_coverage=True),
                         maximum=200,allow_start_rotations=True)
           graph["source_bridge_discovery"]={
-              "new_verified_pool_identities":len(new)+min(len(other),available)+min(len(extra),room)+min(len(cpmm_new),cpmm_room)+min(len(indexed_new),index_room),
+              "new_verified_pool_identities":len(new)+min(len(other),available)+min(len(extra),room)+min(len(cpmm_new),cpmm_room)+index_admission["admitted_count"],
               "raydium_indexer_status":indexed["status"],
               "raydium_indexer_source_checked":indexed["source_accounts_checked"],
-              "raydium_indexer_verified_new_pools":min(len(indexed_new),index_room),
-              "raydium_indexer_unadmitted_verified_pools":len(indexed_new)-min(len(indexed_new),index_room),
+              "raydium_indexer_verified_new_pools":index_admission["admitted_count"],
+              "raydium_indexer_unadmitted_verified_pools":index_admission["unadmitted_count"],
+              "registry_capacity":MAX_REGISTRY_POOLS,
               "raydium_indexer_new_topology_starts":len(indexed["additional_topology_start_mints"]),
               "raydium_cpmm_pda_verified_new_pools":min(len(cpmm_new),cpmm_room),
               "raydium_cpmm_pda_pairs_searched":cpmm_pdas["pairs_searched"],
