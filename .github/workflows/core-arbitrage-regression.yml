@@ -26,7 +26,7 @@ jobs:
         run: python3 -m pip install --disable-pip-version-check solders==0.26.0
       - name: Compile graph, swap adapters, quote, and atomic coordinator
         run: |
-          python3 -m py_compile arb/opportunity_graph.py arb/m5_seven_venue_route_scan.py arb/m5_three_hop_atomic_inventory.py arb/venue_swap_adapter.py arb/atomic_graph_coordinator.py arb/next_ten_signed_atomic_offline.py arb/venue_quote_contract.py arb/continuous_source_scanner.py arb/net_quote_opportunity.py arb/m5_source_triangle_quote_ranking.py arb/raydium_cpmm_pda_bridge.py
+          python3 -m py_compile arb/opportunity_graph.py arb/m5_seven_venue_route_scan.py arb/m5_three_hop_atomic_inventory.py arb/venue_swap_adapter.py arb/atomic_graph_coordinator.py arb/next_ten_signed_atomic_offline.py arb/venue_quote_contract.py arb/continuous_source_scanner.py arb/net_quote_opportunity.py arb/m5_source_triangle_quote_ranking.py arb/raydium_cpmm_pda_bridge.py arb/raydium_indexer_source_bridge.py
       - name: Run fast graph, pricing, builder and safety regressions
         run: |
           set -e
@@ -39,6 +39,7 @@ jobs:
             test_pool_registry.py \
             test_m5_start_mint_expansion.py \
             test_raydium_cpmm_pda_bridge.py \
+            test_raydium_indexer_source_bridge.py \
             test_m5_three_hop_capture_coverage.py \
             test_m5_directional_cache_provenance.py \
             test_m5_directional_source_capture.py \
