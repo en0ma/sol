@@ -41,6 +41,63 @@ class IndexedBridgeTests(unittest.TestCase):
         self.assertFalse(report["actionable"])
         self.assertFalse(report["signed_simulation_verified"])
 
+    def test_complementary_missing_edges_beat_alphabetical_decoys(self):
+        # Neither New-B nor New-C forms a triangle in isolation; together
+        # they close New-B-C-New using the existing B-C pool. The old
+        # direct-gain-only ranking would spend both verify slots on decoys.
+        existing=[pool("orca","bc","B","C")]
+        ordered=[("A"*32,"X","Y"),("B"*32,"P","Q"),
+                 ("Y"*32,"New","B"),("Z"*32,"New","C")]
+        source_by_address={addr:(a,b) for addr,a,b in ordered}
+        index_rows=[{"venue":"raydium_cpmm","address":addr}
+                    for addr,_,_ in ordered]
+        def read(rpc,method,params):
+            return {"value":[{"owner":PROGRAM,"executable":False,
+                "data":[base64.b64encode(addr.encode()).decode(),"base64"]}
+                for addr in params[0]]}
+        checked=[]
+        def reverify(rpc,venue,address,state):
+            checked.append(address)
+            return {"venue":venue,"address":address,
+                    "mints":[state["token_0_mint"],state["token_1_mint"]],
+                    "slot":123,"swap_simulated":False}
+        with patch("arb.raydium_indexer_source_bridge.local_rpc_only"),patch(
+                "arb.raydium_indexer_source_bridge.decode",
+                side_effect=lambda raw:dict(zip(
+                    ("token_0_mint","token_1_mint"),
+                    source_by_address[raw.decode()]))):
+            result=discover(RPC,existing,maximum_verify=2,
+                index_fn=lambda **kwargs:index_rows,
+                call_fn=read,verify_fn=reverify)
+        self.assertEqual(checked,["Y"*32,"Z"*32])
+        self.assertEqual(result["complementary_edge_candidates"],2)
+        self.assertEqual(result["additional_topology_start_mints"],
+                         ["B","C","New"])
+        self.assertEqual(result["verified_new_pool_count"],2)
+        self.assertFalse(result["signed_simulation_verified"])
+        self.assertFalse(result["broadcast"])
+
+    def test_complementary_unverified_pool_does_not_create_topology(self):
+        existing=[pool("orca","bc","B","C")]
+        rows=[{"venue":"raydium_cpmm","address":"Y"*32},
+              {"venue":"raydium_cpmm","address":"Z"*32}]
+        def read(rpc,method,params):
+            return {"value":[{"owner":PROGRAM,"executable":False,
+                "data":[base64.b64encode(addr.encode()).decode(),"base64"]}
+                for addr in params[0]]}
+        with patch("arb.raydium_indexer_source_bridge.local_rpc_only"),patch(
+                "arb.raydium_indexer_source_bridge.decode",
+                side_effect=lambda raw:{"token_0_mint":"New",
+                    "token_1_mint":"B" if raw.decode()=="Y"*32 else "C"}):
+            result=discover(RPC,existing,maximum_verify=2,
+                index_fn=lambda **kwargs:rows,call_fn=read,
+                verify_fn=lambda rpc,venue,address,state:
+                    (_ for _ in ()).throw(ValueError("vault inaccessible")))
+        self.assertEqual(result["complementary_edge_candidates"],2)
+        self.assertEqual(result["verified_new_pool_count"],0)
+        self.assertEqual(result["additional_topology_start_mints"],[])
+        self.assertEqual(result["source_verification_failures"],2)
+
     def test_unverified_and_mismatched_source_fails_closed(self):
         raw=base64.b64encode(b"x").decode()
         def fetch(*args):
