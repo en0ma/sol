@@ -40,7 +40,8 @@ def admit(existing,candidates,*,maximum=MAX_REGISTRY_POOLS):
             continue
         seen.add(key)
         remaining.append(row)
-    count=min(maximum-len(existing),len(remaining))
+    candidate_count=len(remaining)
+    count=min(maximum-len(existing),candidate_count)
     # First retain pools completing NEW three-hop start tokens. With more
     # room than candidates, avoid costly topology recomputation entirely.
     if count==len(remaining):
@@ -64,6 +65,6 @@ def admit(existing,candidates,*,maximum=MAX_REGISTRY_POOLS):
             selected.append(row)
             current=set(topology(selected)["three_hop_start_mints"])
     return {"admitted":chosen,"admitted_count":len(chosen),
-            "unadmitted_count":len(remaining) if count!=len(remaining) else 0,
+            "unadmitted_count":candidate_count-len(chosen),
             "registry_capacity":maximum,"source_reverification_required":True,
             **SAFE}
