@@ -115,6 +115,17 @@ jobs:
           cpmm_new=cpmm_pdas["source_verified_new_pools"]
           cpmm_room=max(0,512-len(registry["pools"]))
           registry["pools"].extend(cpmm_new[:cpmm_room])
+          # Raydium pool state may also use an arbitrary signer address.
+          # Treat Raydium's indexer as UNTRUSTED address hints only; every
+          # candidate is decoded and vault-verified on the local source fork.
+          from arb.raydium_indexer_source_bridge import discover as indexed_cpmm
+          indexed=indexed_cpmm(
+              rpc,registry["pools"],pages=3,page_size=100,maximum_verify=48)
+          (root/"raydium-indexed-source-bridge.json").write_text(
+              json.dumps(indexed,indent=2)+"\\n")
+          indexed_new=indexed["source_verified_new_pools"]
+          index_room=max(0,512-len(registry["pools"]))
+          registry["pools"].extend(indexed_new[:index_room])
           graph=diversified_three_hop_graph(probe(rpc,registry,
                         batch=tuple((a,b) for a in ORDER for b in ORDER if a!=b),
                         maximum_per_venue=48,
@@ -122,7 +133,12 @@ jobs:
                         prefer_start_mint_coverage=True),
                         maximum=200,allow_start_rotations=True)
           graph["source_bridge_discovery"]={
-              "new_verified_pool_identities":len(new)+min(len(other),available)+min(len(extra),room)+min(len(cpmm_new),cpmm_room),
+              "new_verified_pool_identities":len(new)+min(len(other),available)+min(len(extra),room)+min(len(cpmm_new),cpmm_room)+min(len(indexed_new),index_room),
+              "raydium_indexer_status":indexed["status"],
+              "raydium_indexer_source_checked":indexed["source_accounts_checked"],
+              "raydium_indexer_verified_new_pools":min(len(indexed_new),index_room),
+              "raydium_indexer_unadmitted_verified_pools":len(indexed_new)-min(len(indexed_new),index_room),
+              "raydium_indexer_new_topology_starts":len(indexed["additional_topology_start_mints"]),
               "raydium_cpmm_pda_verified_new_pools":min(len(cpmm_new),cpmm_room),
               "raydium_cpmm_pda_pairs_searched":cpmm_pdas["pairs_searched"],
               "raydium_cpmm_pdas_checked":cpmm_pdas["candidate_pdas_checked"],
