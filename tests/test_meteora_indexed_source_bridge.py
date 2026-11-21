@@ -2,7 +2,7 @@
 import base64
 import unittest
 from unittest.mock import patch
-from arb.meteora_indexed_source_bridge import discover,indexed_addresses
+from arb.meteora_indexed_source_bridge import discover,indexed_addresses,audit_recent_pools_isolated
 from arb.next_ten_fork_pool_probe import PROGRAMS
 
 RPC="http://127.0.0.1:8899"
@@ -190,6 +190,42 @@ class MeteoraIndexerTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 discover(RPC,[],pages=5,
                     sort_orders=("tvl:desc","pool_created_at:desc"))
+
+    def test_recent_pool_audit_never_admits_into_control_graph(self):
+        baseline=[{"venue":"orca","address":"ab","mints":["A","B"]},
+                  {"venue":"meteora_damm_v2","address":"bc",
+                   "mints":["B","C"]}]
+        original=[dict(x) for x in baseline]
+        def scout(rpc,entries,**kwargs):
+            self.assertEqual(kwargs["sort_orders"],
+                             ("pool_created_at:desc",))
+            self.assertEqual(kwargs["maximum_verify_per_venue"],12)
+            return {"status":"READ_ONLY_METEORA_INDEXED_SOURCE_SCOUT",
+                    "venue_reports":{VENUE:{"verified_pools":1}},
+                    "source_verified_new_pools":[{
+                        "venue":VENUE,"address":"new",
+                        "mints":["C","A"],
+                        "source_verified_slot":42,
+                        "source_verified_only":True}],
+                    "signed_simulation_verified":False,
+                    "actionable":False,"broadcast":False}
+        report=audit_recent_pools_isolated(
+            RPC,baseline,discover_fn=scout)
+        self.assertEqual(report["incremental_topology_start_mints"],3)
+        self.assertEqual(report["source_verified_recent_pools"],1)
+        self.assertFalse(report["admitted_to_primary_graph"])
+        self.assertNotIn("source_verified_new_pools",report)
+        self.assertEqual(baseline,original)
+        self.assertFalse(report["signed_simulation_verified"])
+
+    def test_recent_audit_rejects_unverified_evidence(self):
+        def bad(rpc,entries,**kwargs):
+            return {"status":"READ_ONLY_METEORA_INDEXED_SOURCE_SCOUT",
+                    "source_verified_new_pools":[],
+                    "signed_simulation_verified":True,
+                    "actionable":False,"broadcast":False}
+        with self.assertRaisesRegex(ValueError,"invalid isolated"):
+            audit_recent_pools_isolated(RPC,[],discover_fn=bad)
 
     def test_invalid_bounds_fail_closed(self):
         with patch("arb.meteora_indexed_source_bridge.local_rpc_only"):
