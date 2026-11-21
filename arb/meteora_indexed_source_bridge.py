@@ -22,7 +22,7 @@ HOSTS={
 }
 
 
-def indexed_addresses(venue,*,pages=2,page_size=100):
+def indexed_addresses(venue,*,pages=4,page_size=100):
     """Retrieve address hints only; reject malformed/partial index pages."""
     if venue not in HOSTS or type(pages)is not int or not 1<=pages<=5 or (
             type(page_size)is not int or not 1<=page_size<=200):
@@ -56,7 +56,7 @@ def indexed_addresses(venue,*,pages=2,page_size=100):
 
 
 def discover(rpc,entries,*,venues=("meteora_damm_v2","meteora_dlmm"),
-             pages=2,page_size=100,maximum_verify_per_venue=32,
+             pages=4,page_size=100,maximum_verify_per_venue=48,
              index_fn=None,call_fn=None,verify_fn=None):
     """Verify bounded indexed pool identities and rank new missing edges."""
     local_rpc_only(rpc)
@@ -74,8 +74,6 @@ def discover(rpc,entries,*,venues=("meteora_damm_v2","meteora_dlmm"),
     known={(r["venue"],r["address"]) for r in entries}
     base=topology(entries)
     before=set(base["three_hop_start_mints"])
-    base_pairs={frozenset(row["mints"]) for row in entries}
-    neighbors={mint:set(p) for mint,p in base["mint_neighbors"].items()}
     reports={}
     admitted=[]
     for venue in venues:
@@ -124,12 +122,20 @@ def discover(rpc,entries,*,venues=("meteora_damm_v2","meteora_dlmm"),
                     decoded.append((address,state,a,b))
                 except (ValueError,KeyError,TypeError):
                     invalid+=1
+        # Re-evaluate each venue against previously SOURCE-verified Meteora
+        # additions, not only the original registry. A second venue may
+        # complete a triangle opened by the first venue's verified pools.
+        current_entries=entries+admitted
+        current_graph=topology(current_entries)
+        current_starts=set(current_graph["three_hop_start_mints"])
+        current_pairs={frozenset(row["mints"]) for row in current_entries}
+        neighbors={mint:set(p) for mint,p in current_graph["mint_neighbors"].items()}
         candidate_pairs={frozenset((a,b)) for _,_,a,b in decoded}
         priorities=[]
         for address,state,a,b in decoded:
             edge={"venue":venue,"address":address,"mints":[a,b]}
-            immediate=len(set(topology(entries+[edge])[
-                "three_hop_start_mints"])-before)
+            immediate=len(set(topology(current_entries+[edge])[
+                "three_hop_start_mints"])-current_starts)
             potential=set()
             for c in neighbors.get(a,()):
                 if c!=b and frozenset((b,c)) in candidate_pairs:
@@ -137,8 +143,8 @@ def discover(rpc,entries,*,venues=("meteora_damm_v2","meteora_dlmm"),
             for c in neighbors.get(b,()):
                 if c!=a and frozenset((a,c)) in candidate_pairs:
                     potential.update((a,b,c))
-            priorities.append((immediate,len(potential-before),
-                int(frozenset((a,b)) not in base_pairs),address,state,a,b))
+            priorities.append((immediate,len(potential-current_starts),
+                int(frozenset((a,b)) not in current_pairs),address,state,a,b))
         priorities.sort(key=lambda x:(-x[0],-x[1],-x[2],x[3]))
         successes=0
         failed=0
@@ -168,7 +174,9 @@ def discover(rpc,entries,*,venues=("meteora_damm_v2","meteora_dlmm"),
             "source_verification_attempts":min(
                 maximum_verify_per_venue,len(priorities)),
             "source_verification_failures":failed,
-            "verified_pools":successes}
+            "verified_pools":successes,
+            "ranking_prior_verified_venue_pools":len(current_entries)-len(entries),
+            "selection_policy":"NEW_STARTS_THEN_COMPLEMENTARY_MISSING_EDGES_THEN_NEW_PAIR"}
     after=topology(entries+admitted)
     return {"status":"READ_ONLY_METEORA_INDEXED_SOURCE_SCOUT",
         "venue_reports":reports,
