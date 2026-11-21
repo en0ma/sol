@@ -151,6 +151,46 @@ class MeteoraIndexerTests(unittest.TestCase):
         self.assertEqual(calls,[1,2,3,4])
         self.assertEqual(len(hints),4)
 
+    def test_two_sort_orders_deduplicate_and_reach_newer_pools(self):
+        import io,json
+        from urllib.parse import urlsplit,parse_qs
+        class Response(io.BytesIO):
+            def __enter__(self):return self
+            def __exit__(self,*args):self.close()
+        calls=[]
+        def index(req,timeout):
+            qs=parse_qs(urlsplit(req.full_url).query)
+            order=qs["sort_by"][0]
+            page=int(qs["page"][0])
+            calls.append((order,page))
+            addresses={
+                ("tvl:desc",1):["A"*32,"B"*32],
+                ("tvl:desc",2):["B"*32,"C"*32],
+                ("pool_created_at:desc",1):["C"*32,"D"*32],
+                ("pool_created_at:desc",2):["E"*32,"A"*32],
+            }[(order,page)]
+            return Response(json.dumps({"data":[{"address":a} for a in addresses],
+                "current_page":page,"pages":2}).encode())
+        with patch("arb.meteora_indexed_source_bridge.urlopen",
+                   side_effect=index):
+            hints=indexed_addresses(VENUE,pages=2,page_size=2,
+                sort_orders=("tvl:desc","pool_created_at:desc"))
+        self.assertEqual([h["address"] for h in hints],
+                         ["A"*32,"B"*32,"C"*32,"D"*32,"E"*32])
+        self.assertEqual(calls,[
+            ("tvl:desc",1),("tvl:desc",2),
+            ("pool_created_at:desc",1),("pool_created_at:desc",2)])
+
+    def test_multiple_sort_index_limits_fail_closed(self):
+        with patch("arb.meteora_indexed_source_bridge.local_rpc_only"):
+            for sorts in (("tvl:desc","tvl:desc"),("unapproved:desc",),
+                          ("tvl:desc",)*4):
+                with self.assertRaises(ValueError):
+                    discover(RPC,[],sort_orders=sorts)
+            with self.assertRaises(ValueError):
+                discover(RPC,[],pages=5,
+                    sort_orders=("tvl:desc","pool_created_at:desc"))
+
     def test_invalid_bounds_fail_closed(self):
         with patch("arb.meteora_indexed_source_bridge.local_rpc_only"):
             with self.assertRaises(ValueError):
