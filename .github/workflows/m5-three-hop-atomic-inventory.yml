@@ -134,8 +134,9 @@ jobs:
           # decoded and vault-verified using source-fork RPC accounts.
           from arb.meteora_indexed_source_bridge import discover as indexed_meteora
           meteora=indexed_meteora(
-              rpc,registry["pools"],pages=4,page_size=100,
-              maximum_verify_per_venue=48)
+              rpc,registry["pools"],pages=2,page_size=100,
+              maximum_verify_per_venue=48,
+              sort_orders=("tvl:desc","pool_created_at:desc"))
           (root/"meteora-indexed-source-bridge.json").write_text(
               json.dumps(meteora,indent=2)+"\\n")
           meteora_admission=admit(
