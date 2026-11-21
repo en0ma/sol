@@ -133,16 +133,36 @@ jobs:
           # every accepted DAMM v2 / DLMM pool must be independently
           # decoded and vault-verified using source-fork RPC accounts.
           from arb.meteora_indexed_source_bridge import discover as indexed_meteora
+          # Proven control: four TVL pages per venue. Newest-pool hints
+          # must never consume its 48 authenticated verification slots.
           meteora=indexed_meteora(
-              rpc,registry["pools"],pages=2,page_size=100,
+              rpc,registry["pools"],pages=4,page_size=100,
               maximum_verify_per_venue=48,
-              sort_orders=("tvl:desc","pool_created_at:desc"))
+              sort_orders=("tvl:desc",))
           (root/"meteora-indexed-source-bridge.json").write_text(
               json.dumps(meteora,indent=2)+"\\n")
           meteora_admission=admit(
               registry["pools"],meteora["source_verified_new_pools"],
               maximum=MAX_REGISTRY_POOLS)
           registry["pools"].extend(meteora_admission["admitted"])
+          # Separate candidate experiment: check only NEW recent-pool
+          # identities and record incremental topology. Do not admit these
+          # pools into the primary graph or signed-simulation sampling.
+          from arb.meteora_indexed_source_bridge import audit_recent_pools_isolated
+          try:
+              recent_audit=audit_recent_pools_isolated(
+                  rpc,registry["pools"],pages=1,page_size=100,
+                  maximum_verify_per_venue=12)
+          except (ValueError,TypeError,RuntimeError,OSError,TimeoutError) as exc:
+              recent_audit={"status":"ISOLATED_RECENT_POOL_AUDIT_UNAVAILABLE",
+                  "exception_class":type(exc).__name__,
+                  "admitted_to_primary_graph":False,
+                  "signed_simulation_verified":False,
+                  "actionable":False,"live_execution_approved":False,
+                  "broadcast":False}
+          (root/"meteora-recent-pool-isolated-audit.json").write_text(
+              json.dumps(recent_audit,indent=2)+"\\n")
+          assert recent_audit["admitted_to_primary_graph"] is False
           graph=diversified_three_hop_graph(probe(rpc,registry,
                         batch=tuple((a,b) for a in ORDER for b in ORDER if a!=b),
                         maximum_per_venue=48,
@@ -155,6 +175,10 @@ jobs:
               "meteora_indexed_unadmitted_verified_pools":meteora_admission["unadmitted_count"],
               "meteora_indexer_venue_reports":meteora["venue_reports"],
               "meteora_indexed_new_topology_starts":len(meteora["additional_topology_start_mints"]),
+              "meteora_recent_audit_status":recent_audit["status"],
+              "meteora_recent_audit_source_verified_pools":recent_audit.get("source_verified_recent_pools",0),
+              "meteora_recent_audit_incremental_topology_starts":recent_audit.get("incremental_topology_start_mints",0),
+              "meteora_recent_audit_admitted":False,
               "raydium_indexer_status":indexed["status"],
               "raydium_indexer_source_checked":indexed["source_accounts_checked"],
               "raydium_indexer_verified_new_pools":index_admission["admitted_count"],
