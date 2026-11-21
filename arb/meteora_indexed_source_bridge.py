@@ -22,41 +22,56 @@ HOSTS={
 }
 
 
-def indexed_addresses(venue,*,pages=4,page_size=100):
-    """Retrieve address hints only; reject malformed/partial index pages."""
-    if venue not in HOSTS or type(pages)is not int or not 1<=pages<=5 or (
-            type(page_size)is not int or not 1<=page_size<=200):
-        raise ValueError("invalid Meteora indexer search")
+SORT_ORDERS=("tvl:desc","pool_created_at:desc")
+ALLOWED_SORT_ORDERS=frozenset(("tvl:desc","volume_24h:desc","pool_created_at:desc"))
+
+
+def indexed_addresses(venue,*,pages=4,page_size=100,
+                      sort_orders=("tvl:desc",)):
+    """Untrusted addresses; stable order and global dedup across index sorts.
+
+    Each sort can explore a different population of pools. A malformed
+    page fails closed rather than silently asserting a complete search.
+    """
+    if (venue not in HOSTS or type(pages)is not int or not 1<=pages<=5
+            or type(page_size)is not int or not 1<=page_size<=200
+            or not isinstance(sort_orders,(tuple,list))
+            or not 1<=len(sort_orders)<=3
+            or len(set(sort_orders))!=len(sort_orders)
+            or any(order not in ALLOWED_SORT_ORDERS for order in sort_orders)
+            or pages*len(sort_orders)>8):
+        raise ValueError("invalid bounded Meteora indexer search")
     out=[]
     seen=set()
-    for page in range(1,pages+1):
-        url=HOSTS[venue]+"/pools?"+urlencode({
-            "page":page,"page_size":page_size,"sort_by":"tvl:desc"})
-        with urlopen(Request(url,headers={"Accept":"application/json",
-                "User-Agent":"sol-source-authenticated-meteora-bridge/1"}),
-                timeout=18) as response:
-            payload=json.load(response)
-        rows=payload.get("data") if isinstance(payload,dict) else None
-        if (not isinstance(rows,list) or len(rows)>page_size
-                or type(payload.get("current_page")) is not int
-                or payload["current_page"]!=page
-                or type(payload.get("pages")) is not int
-                or payload["pages"]<page):
-            raise ValueError("invalid Meteora indexer page")
-        for row in rows:
-            address=row.get("address") if isinstance(row,dict) else None
-            if not isinstance(address,str) or not 32<=len(address)<=44:
-                raise ValueError("invalid Meteora pool address hint")
-            if address not in seen:
-                seen.add(address)
-                out.append({"venue":venue,"address":address})
-        if len(rows)<page_size or page>=payload["pages"]:
-            break
+    for order in sort_orders:
+        for page in range(1,pages+1):
+            url=HOSTS[venue]+"/pools?"+urlencode({
+                "page":page,"page_size":page_size,"sort_by":order})
+            with urlopen(Request(url,headers={"Accept":"application/json",
+                    "User-Agent":"sol-source-authenticated-meteora-bridge/1"}),
+                    timeout=18) as response:
+                payload=json.load(response)
+            rows=payload.get("data") if isinstance(payload,dict) else None
+            if (not isinstance(rows,list) or len(rows)>page_size
+                    or type(payload.get("current_page")) is not int
+                    or payload["current_page"]!=page
+                    or type(payload.get("pages")) is not int
+                    or payload["pages"]<page):
+                raise ValueError("invalid Meteora indexer page")
+            for row in rows:
+                address=row.get("address") if isinstance(row,dict) else None
+                if not isinstance(address,str) or not 32<=len(address)<=44:
+                    raise ValueError("invalid Meteora pool address hint")
+                if address not in seen:
+                    seen.add(address)
+                    out.append({"venue":venue,"address":address})
+            if len(rows)<page_size or page>=payload["pages"]:
+                break
     return out
 
-
 def discover(rpc,entries,*,venues=("meteora_damm_v2","meteora_dlmm"),
-             pages=4,page_size=100,maximum_verify_per_venue=48,
+             pages=2,page_size=100,maximum_verify_per_venue=48,
+             sort_orders=SORT_ORDERS,
              index_fn=None,call_fn=None,verify_fn=None):
     """Verify bounded indexed pool identities and rank new missing edges."""
     local_rpc_only(rpc)
@@ -66,7 +81,12 @@ def discover(rpc,entries,*,venues=("meteora_damm_v2","meteora_dlmm"),
             or type(pages)is not int or not 1<=pages<=5
             or type(page_size)is not int or not 1<=page_size<=200
             or type(maximum_verify_per_venue)is not int
-            or not 1<=maximum_verify_per_venue<=64):
+            or not 1<=maximum_verify_per_venue<=64
+            or not isinstance(sort_orders,(tuple,list))
+            or not 1<=len(sort_orders)<=3
+            or len(set(sort_orders))!=len(sort_orders)
+            or any(order not in ALLOWED_SORT_ORDERS for order in sort_orders)
+            or pages*len(sort_orders)>8):
         raise ValueError("invalid bounded Meteora discovery")
     index=index_fn or indexed_addresses
     fetch=call_fn or call
@@ -78,13 +98,14 @@ def discover(rpc,entries,*,venues=("meteora_damm_v2","meteora_dlmm"),
     admitted=[]
     for venue in venues:
         try:
-            hints=index(venue,pages=pages,page_size=page_size)
+            hints=index(venue,pages=pages,page_size=page_size,
+                        sort_orders=sort_orders)
         except (OSError,TimeoutError,ValueError,RuntimeError,TypeError,KeyError) as exc:
             reports[venue]={"status":"INDEXER_UNAVAILABLE",
                 "error_class":type(exc).__name__,"indexed_addresses":0,
                 "source_accounts_checked":0,"verified_pools":0}
             continue
-        if not isinstance(hints,list) or len(hints)>pages*page_size:
+        if not isinstance(hints,list) or len(hints)>pages*page_size*len(sort_orders):
             raise ValueError("unbounded Meteora index hints")
         addresses=[]
         seen=set()
@@ -168,6 +189,8 @@ def discover(rpc,entries,*,venues=("meteora_damm_v2","meteora_dlmm"),
                 failed+=1
         reports[venue]={"status":"SOURCE_VERIFICATION_COMPLETE",
             "indexed_addresses":len(hints),
+            "index_sort_orders":list(sort_orders),
+            "index_max_requested_addresses":pages*page_size*len(sort_orders),
             "source_accounts_checked":len(addresses),
             "decoded_pool_candidates":len(decoded),
             "invalid_source_accounts":invalid,
