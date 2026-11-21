@@ -22,7 +22,7 @@ HOSTS={
 }
 
 
-SORT_ORDERS=("tvl:desc","pool_created_at:desc")
+SORT_ORDERS=("tvl:desc",)
 ALLOWED_SORT_ORDERS=frozenset(("tvl:desc","volume_24h:desc","pool_created_at:desc"))
 
 
@@ -70,7 +70,7 @@ def indexed_addresses(venue,*,pages=4,page_size=100,
     return out
 
 def discover(rpc,entries,*,venues=("meteora_damm_v2","meteora_dlmm"),
-             pages=2,page_size=100,maximum_verify_per_venue=48,
+             pages=4,page_size=100,maximum_verify_per_venue=48,
              sort_orders=SORT_ORDERS,
              index_fn=None,call_fn=None,verify_fn=None):
     """Verify bounded indexed pool identities and rank new missing edges."""
@@ -209,3 +209,44 @@ def discover(rpc,entries,*,venues=("meteora_damm_v2","meteora_dlmm"),
             set(after["three_hop_start_mints"])-before),
         "indexer_is_not_source_evidence":True,
         "signed_simulation_verified":False,**SAFE}
+
+
+def audit_recent_pools_isolated(rpc,baseline_entries,*,pages=1,
+                                page_size=100,maximum_verify_per_venue=12,
+                                discover_fn=None):
+    """Read-only experiment; never returns pool rows for production admission.
+
+    Existing source-backed, high-TVL authenticated pools are the control
+    group. Recent-pool discovery may report incremental authenticated
+    topology, but is NOT allowed to displace the control graph or raise
+    signed-verification counts. A later controlled CI run must independently
+    establish improved signed simulation coverage before promotion.
+    """
+    if not isinstance(baseline_entries,list):
+        raise ValueError("source-verified baseline pool registry required")
+    baseline=topology(baseline_entries)
+    scout=discover_fn or discover
+    evidence=scout(rpc,list(baseline_entries),pages=pages,
+                   page_size=page_size,
+                   maximum_verify_per_venue=maximum_verify_per_venue,
+                   sort_orders=("pool_created_at:desc",))
+    if (not isinstance(evidence,dict)
+            or evidence.get("status")!="READ_ONLY_METEORA_INDEXED_SOURCE_SCOUT"
+            or not isinstance(evidence.get("source_verified_new_pools"),list)
+            or evidence.get("signed_simulation_verified") is not False
+            or evidence.get("actionable") is not False
+            or evidence.get("broadcast") is not False):
+        raise ValueError("invalid isolated recent-pool evidence")
+    # The isolated output deliberately excludes pool identities so no caller
+    # can inadvertently extend the primary graph with candidate addresses.
+    later=topology(baseline_entries+evidence["source_verified_new_pools"])
+    before=set(baseline["three_hop_start_mints"])
+    return {"status":"ISOLATED_RECENT_POOL_SOURCE_VERIFIED_AUDIT",
+            "source_verified_recent_pools":len(
+                evidence["source_verified_new_pools"]),
+            "incremental_topology_start_mints":len(
+                set(later["three_hop_start_mints"])-before),
+            "baseline_topology_start_mints":len(before),
+            "venue_reports":evidence["venue_reports"],
+            "admitted_to_primary_graph":False,
+            "signed_simulation_verified":False,**SAFE}
