@@ -86,6 +86,71 @@ class MeteoraIndexerTests(unittest.TestCase):
         self.assertNotIn("secret",str(result))
         self.assertEqual(result["verified_new_pool_count"],0)
 
+    def test_second_venue_prioritizes_triangle_closed_by_first_verified_venue(self):
+        damm="meteora_damm_v2"
+        dlmm="meteora_dlmm"
+        first="Y"*32
+        final="Z"*32
+        decoy="A"*32
+        base=[{"venue":"orca","address":"ab","mints":["A","B"]}]
+        found={damm:[first],dlmm:[decoy,final]}
+        tokens={
+            first:("B","C"),
+            final:("C","A"),
+            decoy:("X","Y"),
+        }
+        def index(venue,**kwargs):
+            return [{"venue":venue,"address":address}
+                    for address in found[venue]]
+        def read(rpc,method,params):
+            self.assertEqual(method,"getMultipleAccounts")
+            return {"value":[{"owner":PROGRAMS[damm] if addr==first
+                    else PROGRAMS[dlmm],"executable":False,
+                    "data":[base64.b64encode(addr.encode()).decode(),"base64"]}
+                    for addr in params[0]]}
+        checks=[]
+        def verify(rpc,venue,address,state):
+            checks.append(address)
+            return {"venue":venue,"address":address,
+                    "mints":list(tokens[address]),"slot":99,
+                    "swap_simulated":False}
+        with patch("arb.meteora_indexed_source_bridge.local_rpc_only"),patch.dict(
+                "arb.meteora_indexed_source_bridge.DECODERS",{
+                    damm:lambda raw:{"token_a_mint":tokens[raw.decode()][0],
+                                     "token_b_mint":tokens[raw.decode()][1]},
+                    dlmm:lambda raw:{"token_x_mint":tokens[raw.decode()][0],
+                                     "token_y_mint":tokens[raw.decode()][1]}}):
+            report=discover(RPC,base,venues=(damm,dlmm),
+                maximum_verify_per_venue=1,index_fn=index,
+                call_fn=read,verify_fn=verify)
+        self.assertEqual(checks,[first,final])
+        self.assertEqual(report["verified_new_pool_count"],2)
+        self.assertEqual(report["additional_topology_start_mints"],
+                         ["A","B","C"])
+        self.assertEqual(report["venue_reports"][dlmm][
+            "ranking_prior_verified_venue_pools"],1)
+        self.assertFalse(report["actionable"])
+        self.assertFalse(report["signed_simulation_verified"])
+
+    def test_four_page_bounded_index_discovery(self):
+        import io,json
+        class Response(io.BytesIO):
+            def __enter__(self):return self
+            def __exit__(self,*args):self.close()
+        calls=[]
+        def pages(req,timeout):
+            from urllib.parse import urlsplit,parse_qs
+            params=parse_qs(urlsplit(req.full_url).query)
+            page=int(params["page"][0])
+            calls.append(page)
+            return Response(json.dumps({"data":[{"address":str(page)*32}],
+                "current_page":page,"pages":4}).encode())
+        with patch("arb.meteora_indexed_source_bridge.urlopen",
+                   side_effect=pages):
+            hints=indexed_addresses(VENUE,pages=4,page_size=1)
+        self.assertEqual(calls,[1,2,3,4])
+        self.assertEqual(len(hints),4)
+
     def test_invalid_bounds_fail_closed(self):
         with patch("arb.meteora_indexed_source_bridge.local_rpc_only"):
             with self.assertRaises(ValueError):
