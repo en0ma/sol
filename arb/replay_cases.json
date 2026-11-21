@@ -1,0 +1,4 @@
+{
+  "note": "Populate with captured signed transaction bytes only after verifying network and supported instructions. Never store private keys. Simulation only.",
+  "cases": []
+}

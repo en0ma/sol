@@ -1,0 +1,250 @@
+"""Read-only Meteora DLMM active-bin array evidence for verified pools.
+
+This preflight is NOT a swap quote or an executable adapter. It verifies the
+program-owned active bin array PDA and refuses to infer adjacent liquidity.
+No RPC method here may mutate account state.
+"""
+import base64
+import hashlib
+from solders.pubkey import Pubkey
+from arb.meteora_dlmm import PROGRAM, decode
+from arb.rpc import call
+from arb.orca_swap_v2_local_token_accounts import require_loopback_rpc
+
+BIN_ARRAY_SIZE=70
+BIN_ARRAY_DISC=hashlib.sha256(b"account:BinArray").digest()[:8]
+ORACLE_DISC=bytes([139,194,131,179,140,179,229,244])
+
+def active_bin_array_index(active_id):
+    if type(active_id) is not int or not -(1<<31)<=active_id<(1<<31):
+        raise ValueError("invalid signed active bin id")
+    return active_id//BIN_ARRAY_SIZE
+
+def bin_array_pda(pool, index):
+    if type(index) is not int or not -(1<<63)<=index<(1<<63):
+        raise ValueError("invalid bin array index")
+    program=Pubkey.from_string(PROGRAM)
+    pair=Pubkey.from_string(pool)
+    return str(Pubkey.find_program_address([
+        b"bin_array",bytes(pair),index.to_bytes(8,"little",signed=True)],program)[0])
+
+def inspect_adjacent_bin_arrays(rpc, pool, active_index):
+    """Read-only authentication for nearby arrays; presence is not a quote."""
+    require_loopback_rpc(rpc)
+    if type(active_index) is not int or not -(1<<63)+1 <= active_index < (1<<63)-1:
+        raise ValueError("active array index outside safe neighbor range")
+    indexes=(active_index-1, active_index, active_index+1)
+    addresses=[bin_array_pda(pool,i) for i in indexes]
+    response=call(rpc,"getMultipleAccounts",[
+        addresses,{"encoding":"base64","commitment":"confirmed"}])
+    values=response.get("value")
+    if not isinstance(values,list) or len(values)!=3:
+        raise ValueError("incomplete neighboring bin array read")
+    evidence=[]
+    for idx,address,account in zip(indexes,addresses,values):
+        row={"index":idx,"pda":address,"present":account is not None}
+        if account is None:
+            evidence.append(row)
+            continue
+        if account.get("owner")!=PROGRAM or account.get("executable"):
+            raise ValueError("neighboring bin array owner/executable mismatch")
+        raw=base64.b64decode(account["data"][0],validate=True)
+        if len(raw)<56 or raw[:8]!=BIN_ARRAY_DISC:
+            raise ValueError("neighboring bin array discriminator mismatch")
+        if int.from_bytes(raw[8:16],"little",signed=True)!=idx or (
+            str(Pubkey.from_bytes(raw[24:56]))!=pool):
+            raise ValueError("neighboring bin array index/parent mismatch")
+        if raw[16] not in (0,1,2):
+            raise ValueError("unsupported neighboring array layout version")
+        row.update(authenticated=True,byte_length=len(raw))
+        evidence.append(row)
+    return evidence
+
+
+def inspect_directional_bin_arrays(rpc,pool,active_index,*,input_is_x,
+                                   max_arrays=8):
+    """Read-only, source-authenticated DLMM directional bin-array window.
+
+    The legacy swap walks initialized arrays beyond the active neighborhood.
+    Candidate addresses are PDAs, but only present accounts with matching
+    program owner, discriminator, signed array index and pool are accepted.
+    Absent accounts never become fixture records or executable proof.
+    """
+    require_loopback_rpc(rpc)
+    if (type(active_index)is not int or
+            type(input_is_x)is not bool or
+            type(max_arrays)is not int or not 1<=max_arrays<=8 or
+            not -(1<<63)+max_arrays<active_index<(1<<63)-max_arrays):
+        raise ValueError("invalid bounded DLMM directional source window")
+    direction=-1 if input_is_x else 1
+    indexes=[active_index+direction*i for i in range(max_arrays)]
+    addresses=[bin_array_pda(pool,i) for i in indexes]
+    response=call(rpc,"getMultipleAccounts",[
+        addresses,{"encoding":"base64","commitment":"confirmed"}])
+    values=response.get("value")
+    if (not isinstance(values,list) or len(values)!=len(addresses) or
+            type(response.get("context",{}).get("slot")) is not int or
+            response["context"]["slot"]<0):
+        raise ValueError("incomplete contextual DLMM directional source read")
+    verified=[]
+    observations=[]
+    for index,address,account in zip(indexes,addresses,values):
+        if account is None:
+            observations.append({"index":index,"address":address,
+                                 "present":False})
+            continue
+        if (not isinstance(account,dict) or
+                account.get("owner")!=PROGRAM or
+                account.get("executable") is not False):
+            raise ValueError("directional DLMM bin array owner mismatch")
+        data=account.get("data")
+        if not isinstance(data,list) or len(data)!=2 or data[1]!="base64":
+            raise ValueError("directional DLMM bin array encoding invalid")
+        raw=base64.b64decode(data[0],validate=True)
+        if (len(raw)<56 or raw[:8]!=BIN_ARRAY_DISC or
+                int.from_bytes(raw[8:16],"little",signed=True)!=index or
+                str(Pubkey.from_bytes(raw[24:56]))!=pool or
+                raw[16] not in (0,1,2)):
+            raise ValueError("directional DLMM bin array identity mismatch")
+        verified.append(address)
+        observations.append({"index":index,"address":address,
+                             "present":True,"authenticated":True,
+                             "byte_length":len(raw)})
+    if not observations[0].get("authenticated"):
+        raise ValueError("DLMM active directional bin array absent")
+    return {"pool":pool,"active_bin_array_index":active_index,
+            "input_is_x":input_is_x,
+            "max_arrays_checked":max_arrays,
+            "source_context_slot":response["context"]["slot"],
+            "bin_arrays":verified,"observations":observations,
+            "source_authenticated":True,
+            "executable_liquidity_or_quote_verified":False,
+            "actionable":False,"broadcast":False}
+
+
+
+def verify_directional_bin_snapshot(pool,source,accounts):
+    """Recheck directional arrays from one source-context account inventory."""
+    if (not isinstance(source,dict) or
+            source.get("source_authenticated") is not True or
+            source.get("pool")!=pool or
+            type(source.get("active_bin_array_index")) is not int or
+            type(source.get("input_is_x")) is not bool or
+            source.get("max_arrays_checked")!=8 or
+            not isinstance(accounts,dict)):
+        raise ValueError("invalid contextual DLMM source claim")
+    active=source["active_bin_array_index"]
+    step=-1 if source["input_is_x"] else 1
+    indexes=[active+step*i for i in range(8)]
+    entries=source.get("observations")
+    if (not isinstance(entries,list) or len(entries)!=8 or
+            not isinstance(source.get("bin_arrays"),list)):
+        raise ValueError("incomplete directional DLMM source observations")
+    captured=[]
+    for index,item in zip(indexes,entries):
+        address=bin_array_pda(pool,index)
+        if (not isinstance(item,dict) or item.get("index")!=index or
+                item.get("address")!=address):
+            raise ValueError("DLMM directional source index mismatch")
+        if not item.get("authenticated"):
+            if item.get("present") is not False or address in accounts:
+                raise ValueError("DLMM unverified directional bin array in snapshot")
+            continue
+        account=accounts.get(address)
+        if (not isinstance(account,dict) or
+                account.get("owner")!=PROGRAM or
+                account.get("executable") is not False):
+            raise ValueError("DLMM contextual directional bin array owner mismatch")
+        data=account.get("data")
+        if not isinstance(data,list) or len(data)!=2 or data[1]!="base64":
+            raise ValueError("DLMM contextual directional bin array encoding invalid")
+        raw=base64.b64decode(data[0],validate=True)
+        if (len(raw)<56 or raw[:8]!=BIN_ARRAY_DISC or
+                int.from_bytes(raw[8:16],"little",signed=True)!=index or
+                str(Pubkey.from_bytes(raw[24:56]))!=pool or
+                raw[16] not in (0,1,2)):
+            raise ValueError("DLMM contextual directional bin array identity mismatch")
+        captured.append(address)
+    if captured!=source["bin_arrays"] or not captured or captured[0]!=bin_array_pda(pool,active):
+        raise ValueError("DLMM contextual bin array path diverged from preflight")
+    return True
+
+
+def verify_pool_oracle(rpc, oracle):
+    """Authenticate the oracle account linked by an on-chain DLMM LbPair."""
+    require_loopback_rpc(rpc)
+    Pubkey.from_string(oracle)
+    info=call(rpc,"getAccountInfo",[
+        oracle,{"encoding":"base64","commitment":"confirmed"}])["value"]
+    if not info or info.get("owner")!=PROGRAM or info.get("executable"):
+        raise ValueError("DLMM oracle missing or owner mismatch")
+    raw=base64.b64decode(info["data"][0],validate=True)
+    if len(raw)<32 or raw[:8]!=ORACLE_DISC:
+        raise ValueError("DLMM oracle discriminator/size mismatch")
+    idx=int.from_bytes(raw[8:16],"little")
+    active_size=int.from_bytes(raw[16:24],"little")
+    length=int.from_bytes(raw[24:32],"little")
+    if length==0 or active_size>length or idx>=length:
+        raise ValueError("DLMM oracle observation bounds invalid")
+    return {"oracle":oracle,"authenticated":True,
+            "account_size_bytes":len(raw),
+            "observation_index":idx,"active_observation_size":active_size,
+            "observation_capacity":length}
+
+def check_active_bin_array(rpc,pool):
+    require_loopback_rpc(rpc)
+    account=call(rpc,"getAccountInfo",[pool,{"encoding":"base64","commitment":"confirmed"}])["value"]
+    if not account or account.get("owner")!=PROGRAM or account.get("executable"):
+        raise ValueError("missing genuine Meteora DLMM pair account")
+    state=decode(base64.b64decode(account["data"][0],validate=True))
+    idx=active_bin_array_index(state["active_id"])
+    address=bin_array_pda(pool,idx)
+    candidate=call(rpc,"getAccountInfo",[address,{"encoding":"base64","commitment":"confirmed"}])["value"]
+    report={"venue":"meteora_dlmm","pool":pool,"active_bin_id":state["active_id"],
+            "active_bin_array_index":idx,"active_bin_array_pda":address,
+            "swap_instruction_supported":False,"atomic_simulation_verified":False,
+            "actionable":False,"broadcast":False}
+    if not candidate:
+        return dict(report,status="ACTIVE_BIN_ARRAY_ABSENT")
+    if candidate.get("owner")!=PROGRAM or candidate.get("executable"):
+        raise ValueError("active bin array owner/executable mismatch")
+    raw=base64.b64decode(candidate["data"][0],validate=True)
+    if len(raw)<56 or raw[:8]!=BIN_ARRAY_DISC:
+        raise ValueError("active bin array discriminator/length mismatch")
+    actual_index=int.from_bytes(raw[8:16],"little",signed=True)
+    if raw[16] not in (0,1,2):
+        raise ValueError("unsupported bin array layout version")
+    actual_pair=str(Pubkey.from_bytes(raw[24:56]))
+    if actual_index!=idx or actual_pair!=pool:
+        raise ValueError("active bin array index or parent pool mismatch")
+    oracle=verify_pool_oracle(rpc,state["oracle"])
+    neighboring=inspect_adjacent_bin_arrays(rpc,pool,idx)
+    if neighboring[1].get("authenticated") is not True:
+        raise ValueError("active array changed during adjacent read")
+    return dict(report,status="ACTIVE_BIN_ARRAY_AUTHENTICATED",
+                active_bin_array_byte_length=len(raw),
+                oracle_evidence=oracle,
+                neighboring_bin_arrays=neighboring,
+                neighboring_arrays_checked=True,
+                executable_liquidity_or_quote_verified=False)
+
+def main():
+    import json
+    import os
+    from pathlib import Path
+    readiness=json.loads(Path(os.environ["TOKEN_MIXED_READINESS_REPORT"]).read_text())
+    target=readiness.get("first_dlmm_only_offline_target")
+    report={"status":"NO_VERIFIED_DLMM_TARGET","actionable":False,"broadcast":False,
+            "swap_instruction_supported":False}
+    if target:
+        legs=[leg for leg in target["legs"] if leg["venue"]=="meteora_dlmm"]
+        if len(legs)!=1:
+            raise ValueError("expected exactly one DLMM leg in selected target")
+        report=check_active_bin_array(
+            os.environ.get("SOLANA_RPC_URL","http://127.0.0.1:8899"),legs[0]["pool"])
+        report["target_tokens"]=target["tokens"]
+    Path(os.environ["TOKEN_DLMM_BIN_PREFLIGHT_REPORT"]).write_text(json.dumps(report,indent=2))
+    print(json.dumps(report,indent=2))
+
+if __name__=="__main__":
+    main()
