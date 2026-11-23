@@ -67,6 +67,8 @@ def source_prepare(rpc,baseline_entries,candidates,directory,*,maximum=6):
         raise ValueError("bounded isolated pool inputs required")
     old=topology(baseline_entries)
     old_starts=set(old["three_hop_start_mints"])
+    (root/"control-topology-starts.json").write_text(
+        json.dumps(sorted(old_starts))+"\\n")
     all_rows=list(baseline_entries)+list(candidates)
     after=topology(all_rows)
     new_starts=set(after["three_hop_start_mints"])-old_starts
