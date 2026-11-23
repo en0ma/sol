@@ -163,6 +163,8 @@ jobs:
           (root/"meteora-recent-pool-isolated-audit.json").write_text(
               json.dumps(recent_audit,indent=2)+"\\n")
           assert recent_audit["admitted_to_primary_graph"] is False
+          assert recent_audit["signed_simulation_verified"] is False
+          assert recent_audit.get("source_capture_verified") is not True
           graph=diversified_three_hop_graph(probe(rpc,registry,
                         batch=tuple((a,b) for a in ORDER for b in ORDER if a!=b),
                         maximum_per_venue=48,
@@ -178,6 +180,9 @@ jobs:
               "meteora_recent_audit_status":recent_audit["status"],
               "meteora_recent_audit_source_verified_pools":recent_audit.get("source_verified_recent_pools",0),
               "meteora_recent_audit_incremental_topology_starts":recent_audit.get("incremental_topology_start_mints",0),
+              "meteora_recent_audit_source_reprobed_pools":recent_audit.get("source_reprobed_recent_pools",0),
+              "meteora_recent_audit_source_reprobe_failures":recent_audit.get("source_reprobe_failures",0),
+              "meteora_recent_audit_reprobed_topology_starts":recent_audit.get("source_reprobed_incremental_topology_start_mints",0),
               "meteora_recent_audit_admitted":False,
               "raydium_indexer_status":indexed["status"],
               "raydium_indexer_source_checked":indexed["source_accounts_checked"],
