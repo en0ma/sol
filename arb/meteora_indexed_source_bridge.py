@@ -213,7 +213,8 @@ def discover(rpc,entries,*,venues=("meteora_damm_v2","meteora_dlmm"),
 
 def audit_recent_pools_isolated(rpc,baseline_entries,*,pages=1,
                                 page_size=100,maximum_verify_per_venue=12,
-                                discover_fn=None,snapshot_fn=None):
+                                discover_fn=None,snapshot_fn=None,
+                                isolated_source_prepare_fn=None):
     """Read-only experiment; never returns pool rows for production admission.
 
     Existing source-backed, high-TVL authenticated pools are the control
@@ -273,7 +274,23 @@ def audit_recent_pools_isolated(rpc,baseline_entries,*,pages=1,
     # hypotheses only. Never claim a signed capture or atomic simulation.
     later=topology(baseline_entries+source_probed)
     all_later=topology(baseline_entries+evidence["source_verified_new_pools"])
+    # Optional isolated source capture receives only candidates that passed
+    # the SECOND source snapshot. It must write to a separate directory; no
+    # candidate pool identity is returned by this audit.
+    isolated_capture={"status":"NOT_REQUESTED","selected_routes":0,
+                      "captured_routes":0}
+    if isolated_source_prepare_fn is not None:
+        if not callable(isolated_source_prepare_fn):
+            raise ValueError("isolated source preparation callback required")
+        isolated_capture=isolated_source_prepare_fn(
+            rpc,list(baseline_entries),list(source_probed))
+        if (not isinstance(isolated_capture,dict)
+                or isolated_capture.get("actionable") is not False
+                or isolated_capture.get("broadcast") is not False
+                or isolated_capture.get("baseline_control_unchanged") is False):
+            raise ValueError("unsafe isolated source capture report")
     return {"status":"ISOLATED_RECENT_POOL_SOURCE_VERIFIED_AUDIT",
+            "isolated_source_capture":isolated_capture,
             "source_verified_recent_pools":len(
                 evidence["source_verified_new_pools"]),
             "source_reprobed_recent_pools":len(source_probed),
