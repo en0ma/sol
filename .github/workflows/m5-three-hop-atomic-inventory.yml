@@ -149,10 +149,14 @@ jobs:
           # identities and record incremental topology. Do not admit these
           # pools into the primary graph or signed-simulation sampling.
           from arb.meteora_indexed_source_bridge import audit_recent_pools_isolated
+          from arb.m5_isolated_recent_signed_probe import source_prepare as prepare_recent
           try:
               recent_audit=audit_recent_pools_isolated(
                   rpc,registry["pools"],pages=1,page_size=100,
-                  maximum_verify_per_venue=12)
+                  maximum_verify_per_venue=12,
+                  isolated_source_prepare_fn=lambda rpc,baseline,candidates:
+                      prepare_recent(rpc,baseline,candidates,
+                          root/"isolated-recent",maximum=6))
           except (ValueError,TypeError,RuntimeError,OSError,TimeoutError) as exc:
               recent_audit={"status":"ISOLATED_RECENT_POOL_AUDIT_UNAVAILABLE",
                   "exception_class":type(exc).__name__,
@@ -183,6 +187,8 @@ jobs:
               "meteora_recent_audit_source_reprobed_pools":recent_audit.get("source_reprobed_recent_pools",0),
               "meteora_recent_audit_source_reprobe_failures":recent_audit.get("source_reprobe_failures",0),
               "meteora_recent_audit_reprobed_topology_starts":recent_audit.get("source_reprobed_incremental_topology_start_mints",0),
+              "meteora_recent_signed_probe_source_status":recent_audit.get("isolated_source_capture",{}).get("status","UNAVAILABLE"),
+              "meteora_recent_signed_probe_source_captured":recent_audit.get("isolated_source_capture",{}).get("captured_routes",0),
               "meteora_recent_audit_admitted":False,
               "raydium_indexer_status":indexed["status"],
               "raydium_indexer_source_checked":indexed["source_accounts_checked"],
@@ -337,6 +343,80 @@ jobs:
           path: |
             ${{ runner.temp }}/source-artifact/triangles/
             ${{ runner.temp }}/triangle-offline.log
+          if-no-files-found: warn
+
+  isolated-recent-offline-simulation:
+    needs: source-preparation
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      SURFPOOL_EXPLICITLY_OFFLINE: "1"
+      SURFPOOL_DATASOURCE_RPC_URL: ""
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install explicitly offline signer and Surfpool
+        run: |
+          bash ci/install_surfpool.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          python3 -m pip install --disable-pip-version-check solders==0.26.0
+          python3 -m py_compile arb/m5_isolated_recent_signed_probe.py
+      - uses: actions/download-artifact@v4
+        with:
+          name: m5-three-hop-source-fixtures
+          path: ${{ runner.temp }}/source-artifact
+      - name: Independently sign and rollback-check isolated recent-pool routes
+        run: |
+          test -z "$SURFPOOL_DATASOURCE_RPC_URL"
+          root="$RUNNER_TEMP/source-artifact/triangles/isolated-recent"
+          if test -f "$root/three-hop-inventory.json"; then
+            nohup "$HOME/.local/bin/surfpool" start --ci --offline --no-deploy > "$RUNNER_TEMP/recent-offline.log" 2>&1 < /dev/null &
+            python3 - <<'PY'
+          import time
+          from arb.rpc import call
+          for _ in range(80):
+              try:
+                  assert call("http://127.0.0.1:8899","getLatestBlockhash")["value"]["blockhash"]
+                  break
+              except (ValueError,RuntimeError,OSError,KeyError):
+                  time.sleep(1)
+          else:raise SystemExit("isolated offline fork unavailable")
+          PY
+            python3 -m arb.m5_three_hop_atomic_inventory --phase offline --directory "$root" --amount 100000
+          fi
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          root=Path(os.environ["RUNNER_TEMP"])/"source-artifact/triangles/isolated-recent"
+          if (root/"three-hop-inventory.json").is_file():
+              from arb.m5_isolated_recent_signed_probe import signed_summary
+              control=set(json.loads((root/"control-topology-starts.json").read_text()))
+              report=signed_summary(root,control)
+          else:
+              report={"status":"NO_ISOLATED_SIGNED_ROUTE_SELECTED",
+                      "attempted":0,"signed_and_rollback_verified_routes":0,
+                      "additional_distinct_verified_start_mints":0,
+                      "additional_verified_start_mints":[],
+                      "excluded_from_primary_inventory":True,
+                      "actionable":False,"live_execution_approved":False,
+                      "broadcast":False}
+          assert report["excluded_from_primary_inventory"] is True
+          assert report["broadcast"] is False
+          (root/"isolated-recent-signed-summary.json").write_text(
+              json.dumps(report,indent=2)+"\\n")
+          print(json.dumps(report))
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a") as f:
+              f.write("Isolated recent-pool signed+rollback evidence: "
+                      f"{report['additional_distinct_verified_start_mints']} new starts; "
+                      f"{report['signed_and_rollback_verified_routes']}/{report['attempted']} routes. "
+                      "These are EXCLUDED from the 140-route control inventory.\\n")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: m5-isolated-recent-signed-audit
+          path: |
+            ${{ runner.temp }}/source-artifact/triangles/isolated-recent/
+            ${{ runner.temp }}/recent-offline.log
           if-no-files-found: warn
 
   verify-global-simulation-coverage:
