@@ -210,13 +210,52 @@ class MeteoraIndexerTests(unittest.TestCase):
                     "signed_simulation_verified":False,
                     "actionable":False,"broadcast":False}
         report=audit_recent_pools_isolated(
-            RPC,baseline,discover_fn=scout)
+            RPC,baseline,discover_fn=scout,
+            snapshot_fn=lambda rpc,address,venue:{
+                "pool":address,"venue":venue,"mints":["C","A"],
+                "authenticated":True,"slot":43})
         self.assertEqual(report["incremental_topology_start_mints"],3)
         self.assertEqual(report["source_verified_recent_pools"],1)
+        self.assertEqual(report["source_reprobed_recent_pools"],1)
+        self.assertEqual(report["source_reprobed_incremental_topology_start_mints"],3)
+        self.assertFalse(report["source_capture_verified"])
         self.assertFalse(report["admitted_to_primary_graph"])
         self.assertNotIn("source_verified_new_pools",report)
         self.assertEqual(baseline,original)
         self.assertFalse(report["signed_simulation_verified"])
+
+    def test_isolated_reprobe_failure_never_creates_source_probed_start(self):
+        baseline=[{"venue":"orca","address":"ab","mints":["A","B"]},
+                  {"venue":"meteora_damm_v2","address":"bc","mints":["B","C"]}]
+        def scout(*args,**kwargs):
+            return {"status":"READ_ONLY_METEORA_INDEXED_SOURCE_SCOUT",
+                    "venue_reports":{},"source_verified_new_pools":[{
+                        "venue":VENUE,"address":"new","mints":["C","A"],
+                        "source_verified_slot":42,
+                        "source_verified_only":True}],
+                    "signed_simulation_verified":False,"actionable":False,
+                    "broadcast":False}
+        report=audit_recent_pools_isolated(
+            RPC,baseline,discover_fn=scout,
+            snapshot_fn=lambda *args:{"venue":VENUE,"pool":"new",
+                "mints":["A","WRONG"],"slot":43,"authenticated":True})
+        self.assertEqual(report["incremental_topology_start_mints"],3)
+        self.assertEqual(report["source_reprobed_incremental_topology_start_mints"],0)
+        self.assertEqual(report["source_reprobe_failures"],1)
+        self.assertFalse(report["admitted_to_primary_graph"])
+
+    def test_recent_audit_rejects_fake_verified_candidate(self):
+        def scout(*args,**kwargs):
+            return {"status":"READ_ONLY_METEORA_INDEXED_SOURCE_SCOUT",
+                    "venue_reports":{},"source_verified_new_pools":[{
+                        "venue":VENUE,"address":"new","mints":["C","A"],
+                        "source_verified_slot":42,
+                        "source_verified_only":False}],
+                    "signed_simulation_verified":False,
+                    "actionable":False,"broadcast":False}
+        with self.assertRaisesRegex(ValueError,"unauthenticated"):
+            audit_recent_pools_isolated(RPC,[],discover_fn=scout,
+                                       snapshot_fn=lambda *args:None)
 
     def test_recent_audit_rejects_unverified_evidence(self):
         def bad(rpc,entries,**kwargs):
