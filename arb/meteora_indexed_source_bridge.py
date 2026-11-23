@@ -213,7 +213,7 @@ def discover(rpc,entries,*,venues=("meteora_damm_v2","meteora_dlmm"),
 
 def audit_recent_pools_isolated(rpc,baseline_entries,*,pages=1,
                                 page_size=100,maximum_verify_per_venue=12,
-                                discover_fn=None):
+                                discover_fn=None,snapshot_fn=None):
     """Read-only experiment; never returns pool rows for production admission.
 
     Existing source-backed, high-TVL authenticated pools are the control
@@ -237,16 +237,53 @@ def audit_recent_pools_isolated(rpc,baseline_entries,*,pages=1,
             or evidence.get("actionable") is not False
             or evidence.get("broadcast") is not False):
         raise ValueError("invalid isolated recent-pool evidence")
-    # The isolated output deliberately excludes pool identities so no caller
-    # can inadvertently extend the primary graph with candidate addresses.
-    later=topology(baseline_entries+evidence["source_verified_new_pools"])
+    # Never pass these candidates to the primary registry. Independently
+    # re-read each candidate through the SAME read-only source snapshot
+    # adapter used by graph preparation; merely authenticated vaults
+    # are insufficient to establish source-probe eligibility.
+    from arb.next_ten_fork_pool_probe import snapshot
+    read=snapshot_fn or snapshot
     before=set(baseline["three_hop_start_mints"])
+    source_probed=[]
+    rejected=0
+    for candidate in evidence["source_verified_new_pools"]:
+        if (not isinstance(candidate,dict)
+                or candidate.get("source_verified_only") is not True
+                or candidate.get("venue") not in HOSTS
+                or not isinstance(candidate.get("address"),str)
+                or not isinstance(candidate.get("mints"),list)
+                or len(candidate["mints"])!=2
+                or type(candidate.get("source_verified_slot")) is not int
+                or candidate["source_verified_slot"]<0):
+            raise ValueError("isolated audit received unauthenticated candidate")
+        try:
+            probed=read(rpc,candidate["address"],candidate["venue"])
+            if (not isinstance(probed,dict)
+                    or probed.get("authenticated") is not True
+                    or probed.get("venue")!=candidate["venue"]
+                    or probed.get("pool")!=candidate["address"]
+                    or sorted(probed.get("mints",[]))!=sorted(candidate["mints"])
+                    or type(probed.get("slot")) is not int
+                    or probed["slot"]<0):
+                raise ValueError("independent source probe does not match")
+            source_probed.append(candidate)
+        except (ValueError,KeyError,TypeError,RuntimeError,OSError):
+            rejected+=1
+    # Distinct starts that survive the EXTRA source pool probe remain
+    # hypotheses only. Never claim a signed capture or atomic simulation.
+    later=topology(baseline_entries+source_probed)
+    all_later=topology(baseline_entries+evidence["source_verified_new_pools"])
     return {"status":"ISOLATED_RECENT_POOL_SOURCE_VERIFIED_AUDIT",
             "source_verified_recent_pools":len(
                 evidence["source_verified_new_pools"]),
+            "source_reprobed_recent_pools":len(source_probed),
+            "source_reprobe_failures":rejected,
             "incremental_topology_start_mints":len(
+                set(all_later["three_hop_start_mints"])-before),
+            "source_reprobed_incremental_topology_start_mints":len(
                 set(later["three_hop_start_mints"])-before),
             "baseline_topology_start_mints":len(before),
             "venue_reports":evidence["venue_reports"],
             "admitted_to_primary_graph":False,
+            "source_capture_verified":False,
             "signed_simulation_verified":False,**SAFE}
