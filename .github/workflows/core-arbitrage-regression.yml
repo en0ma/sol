@@ -43,6 +43,7 @@ jobs:
             test_m5_registry_capacity.py \
             test_meteora_indexed_source_bridge.py \
             test_m5_isolated_recent_signed_probe.py \
+            test_m5_source_capture_gap_summary.py \
             test_m5_three_hop_capture_coverage.py \
             test_m5_directional_cache_provenance.py \
             test_m5_directional_source_capture.py \
