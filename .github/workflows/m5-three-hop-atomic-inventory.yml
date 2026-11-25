@@ -245,6 +245,14 @@ jobs:
                             "source_capture_attempts":report["attempted_source_captures"],
                             "source_capture_policy":report["source_capture_policy"]}))
           assert len(report["routes"])==140, "did not capture 140 authenticated source routes"
+          from arb.m5_three_hop_atomic_inventory import source_capture_gap_summary
+          gap=source_capture_gap_summary(report)
+          (Path(os.environ["RUNNER_TEMP"])/"triangles/source-capture-start-mint-gaps.json").write_text(
+              json.dumps(gap,indent=2)+"\\n")
+          print(json.dumps({"source_capture_gap_status":gap["status"],
+                            "uncaptured_start_mints":gap["uncaptured_start_mints"],
+                            "uncaptured_with_attempts":gap["uncaptured_with_attempts"],
+                            "uncaptured_without_attempts":gap["uncaptured_without_attempts"]}))
           assert captured>=40, "fewer than 40 independently source-captured start mints"
           with open(os.environ["GITHUB_STEP_SUMMARY"],"a") as summary:
               summary.write(f"Source graph starts {selected}, source-captured starts {captured}; "
