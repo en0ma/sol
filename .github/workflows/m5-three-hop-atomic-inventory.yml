@@ -154,8 +154,9 @@ jobs:
           from arb.m5_isolated_recent_signed_probe import source_prepare as prepare_recent
           try:
               recent_audit=audit_recent_pools_isolated(
-                  rpc,registry["pools"],pages=1,page_size=100,
-                  maximum_verify_per_venue=12,
+                  rpc,registry["pools"],pages=2,page_size=100,
+                  maximum_verify_per_venue=24,
+                  sort_orders=("pool_created_at:desc","volume_24h:desc"),
                   isolated_source_prepare_fn=lambda rpc,baseline,candidates:
                       prepare_recent(rpc,baseline,candidates,
                           root/"isolated-recent",maximum=6))
@@ -184,6 +185,8 @@ jobs:
               "meteora_indexer_venue_reports":meteora["venue_reports"],
               "meteora_indexed_new_topology_starts":len(meteora["additional_topology_start_mints"]),
               "meteora_recent_audit_status":recent_audit["status"],
+              "meteora_recent_audit_sort_orders":recent_audit.get("isolated_sort_orders",[]),
+              "meteora_recent_audit_index_bound_per_venue":recent_audit.get("isolated_max_indexed_addresses_per_venue",0),
               "meteora_recent_audit_source_verified_pools":recent_audit.get("source_verified_recent_pools",0),
               "meteora_recent_audit_incremental_topology_starts":recent_audit.get("incremental_topology_start_mints",0),
               "meteora_recent_audit_source_reprobed_pools":recent_audit.get("source_reprobed_recent_pools",0),
