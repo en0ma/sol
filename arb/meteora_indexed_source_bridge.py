@@ -211,8 +211,9 @@ def discover(rpc,entries,*,venues=("meteora_damm_v2","meteora_dlmm"),
         "signed_simulation_verified":False,**SAFE}
 
 
-def audit_recent_pools_isolated(rpc,baseline_entries,*,pages=1,
-                                page_size=100,maximum_verify_per_venue=12,
+def audit_recent_pools_isolated(rpc,baseline_entries,*,pages=2,
+                                page_size=100,maximum_verify_per_venue=24,
+                                sort_orders=("pool_created_at:desc","volume_24h:desc"),
                                 discover_fn=None,snapshot_fn=None,
                                 isolated_source_prepare_fn=None):
     """Read-only experiment; never returns pool rows for production admission.
@@ -223,14 +224,24 @@ def audit_recent_pools_isolated(rpc,baseline_entries,*,pages=1,
     signed-verification counts. A later controlled CI run must independently
     establish improved signed simulation coverage before promotion.
     """
-    if not isinstance(baseline_entries,list):
-        raise ValueError("source-verified baseline pool registry required")
+    if (not isinstance(baseline_entries,list)
+            or type(pages) is not int or not 1<=pages<=3
+            or type(page_size) is not int or not 1<=page_size<=100
+            or type(maximum_verify_per_venue) is not int
+            or not 1<=maximum_verify_per_venue<=32
+            or not isinstance(sort_orders,(tuple,list))
+            or not 1<=len(sort_orders)<=2
+            or len(set(sort_orders))!=len(sort_orders)
+            or any(order not in ("pool_created_at:desc","volume_24h:desc")
+                   for order in sort_orders)
+            or pages*len(sort_orders)>6):
+        raise ValueError("invalid bounded isolated Meteora audit")
     baseline=topology(baseline_entries)
     scout=discover_fn or discover
     evidence=scout(rpc,list(baseline_entries),pages=pages,
                    page_size=page_size,
                    maximum_verify_per_venue=maximum_verify_per_venue,
-                   sort_orders=("pool_created_at:desc",))
+                   sort_orders=sort_orders)
     if (not isinstance(evidence,dict)
             or evidence.get("status")!="READ_ONLY_METEORA_INDEXED_SOURCE_SCOUT"
             or not isinstance(evidence.get("source_verified_new_pools"),list)
@@ -291,6 +302,8 @@ def audit_recent_pools_isolated(rpc,baseline_entries,*,pages=1,
             raise ValueError("unsafe isolated source capture report")
     return {"status":"ISOLATED_RECENT_POOL_SOURCE_VERIFIED_AUDIT",
             "isolated_source_capture":isolated_capture,
+            "isolated_sort_orders":list(sort_orders),
+            "isolated_max_indexed_addresses_per_venue":pages*page_size*len(sort_orders),
             "source_verified_recent_pools":len(
                 evidence["source_verified_new_pools"]),
             "source_reprobed_recent_pools":len(source_probed),
