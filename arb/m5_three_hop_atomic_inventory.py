@@ -338,6 +338,65 @@ def source_capture(rpc, graph, directory, *, shard_index=0, shard_count=1, targe
         raise RuntimeError(f"only {len(rows)}/{target} source-capturable routes; {len(blocked)} blocked")
     return rows
 
+def source_capture_gap_summary(report):
+    """Summarize uncaptured starting mints without treating hints as proof.
+
+    A blocked route is not an authenticated simulation failure; do not
+    ascribe a failed swap venue to a source-capture exception. This report
+    records attempted source-capture alternatives, unique pool identities,
+    and coarse diagnostic families only.
+    """
+    if (not isinstance(report,dict)
+            or not isinstance(report.get("uncaptured_graph_start_mints"),list)
+            or not isinstance(report.get("blocked_source_routes"),list)):
+        raise ValueError("source capture report required")
+    from collections import Counter,defaultdict
+    missing=report["uncaptured_graph_start_mints"]
+    if len(set(missing))!=len(missing) or any(
+            not isinstance(m,str) or not m for m in missing):
+        raise ValueError("malformed uncaptured mint identities")
+    grouped=defaultdict(list)
+    for row in report["blocked_source_routes"]:
+        if not isinstance(row,dict):
+            raise ValueError("malformed blocked source capture")
+        mints=row.get("mints")
+        if not isinstance(mints,list) or not mints or not isinstance(mints[0],str):
+            raise ValueError("blocked source route missing start mint")
+        grouped[mints[0]].append(row)
+    details={}
+    for mint in sorted(missing):
+        rows=grouped.get(mint,[])
+        if any(row.get("source_status")!="CAPTURE_BLOCKED" for row in rows):
+            raise ValueError("untrusted source capture status")
+        pools={(venue,pool) for row in rows
+               for venue,pool in zip(row.get("venues",[]),row.get("pools",[]))
+               if isinstance(venue,str) and isinstance(pool,str)}
+        family_counts=Counter()
+        for row in rows:
+            diagnostic=row.get("diagnostic","")
+            if not isinstance(diagnostic,str):
+                raise ValueError("invalid capture diagnostic")
+            # Group exception-family prefixes, not potentially sensitive RPC
+            # responses, endpoint URLs, or misleading swap error inferences.
+            prefix=diagnostic.split(":",1)[0].strip()
+            family=prefix if prefix in (
+                "ValueError","KeyError","TypeError","RuntimeError",
+                "OSError","TimeoutError") else "UNCLASSIFIED"
+            family_counts[family]+=1
+        details[mint]={"source_capture_attempts":len(rows),
+                       "distinct_attempted_pools":len(pools),
+                       "diagnostic_families":dict(sorted(family_counts.items())),
+                       "no_source_capture_attempt":not bool(rows)}
+    return {"status":"SOURCE_CAPTURE_START_MINT_GAP_AUDIT",
+        "uncaptured_start_mints":len(missing),
+        "uncaptured_with_attempts":sum(
+            bool(details[m]["source_capture_attempts"]) for m in missing),
+        "uncaptured_without_attempts":sum(
+            details[m]["no_source_capture_attempt"] for m in missing),
+        "per_start_mint":details,
+        "not_signed_simulation_evidence":True,**SAFE}
+
+
 def orca_tick_array_input_retries(error, venues, amount):
     """Bounded smaller-input hypotheses for isolated Orca prefix error 6038.
 
