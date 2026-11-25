@@ -198,8 +198,9 @@ class MeteoraIndexerTests(unittest.TestCase):
         original=[dict(x) for x in baseline]
         def scout(rpc,entries,**kwargs):
             self.assertEqual(kwargs["sort_orders"],
-                             ("pool_created_at:desc",))
-            self.assertEqual(kwargs["maximum_verify_per_venue"],12)
+                             ("pool_created_at:desc","volume_24h:desc"))
+            self.assertEqual(kwargs["maximum_verify_per_venue"],24)
+            self.assertEqual(kwargs["pages"],2)
             return {"status":"READ_ONLY_METEORA_INDEXED_SOURCE_SCOUT",
                     "venue_reports":{VENUE:{"verified_pools":1}},
                     "source_verified_new_pools":[{
@@ -243,6 +244,19 @@ class MeteoraIndexerTests(unittest.TestCase):
         self.assertEqual(report["source_reprobed_incremental_topology_start_mints"],0)
         self.assertEqual(report["source_reprobe_failures"],1)
         self.assertFalse(report["admitted_to_primary_graph"])
+
+    def test_isolated_multi_sort_budget_rejects_unsafe_expansion(self):
+        for opts in ({"pages":4},
+                     {"pages":3,"sort_orders":(
+                        "pool_created_at:desc","volume_24h:desc",
+                        "tvl:desc")},
+                     {"maximum_verify_per_venue":33},
+                     {"sort_orders":("tvl:desc",)},
+                     {"sort_orders":("pool_created_at:desc",)*2}):
+            with self.subTest(opts=opts):
+                with self.assertRaises(ValueError):
+                    audit_recent_pools_isolated(RPC,[],**opts)
+        self.assertFalse(any(x.get("source_verified_only") for x in []))
 
     def test_recent_audit_rejects_fake_verified_candidate(self):
         def scout(*args,**kwargs):
