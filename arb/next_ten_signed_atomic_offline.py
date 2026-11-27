@@ -374,7 +374,12 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache
     tx,lookup,check=sign_atomic_offline(
         rpc,[ix1,ix2],signer,programs=[PROGRAMS[first],PROGRAMS[second]],
         intermediate=keys[1])
+    if retain_legacy_audit_evidence:
+        from arb.next_ten_fork_pool_probe import source_clock
+        execution_clock_before=source_clock(rpc)
     positive,packet=_simulate(rpc,tx,keys)
+    if retain_legacy_audit_evidence:
+        execution_clock_after=source_clock(rpc)
     result={"status":"POSITIVE_SIGNED_ATOMIC_FAILED" if positive.get("err") else "POSITIVE_PENDING_CPI_CHECK",
             "first_venue":first,"second_venue":second,
             "execution_environment":"ISOLATED_SURFPOOL_OFFLINE",
@@ -469,6 +474,8 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache
             "ephemeral_token_accounts": keys, "ephemeral_authority": owner,
             "positive_response": positive, "negative_response": failed,
             "persistent_before": before, "persistent_after_negative": persistent,
+            "positive_clock_before": execution_clock_before,
+            "positive_clock_after": execution_clock_after,
         }
     result.update(negative_logs=failed.get("logs") or [],
                   negative_error=str(error),

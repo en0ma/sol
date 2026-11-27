@@ -356,3 +356,5 @@ Blockzilla run 46073543937 passed all five jobs, artifacts 15234735363 and 15234
 Blockzilla #46074722274 reproduced three identities; direct same-window full-block control failed 8/8, comparison incomplete (artifact 15234697024). Existing paired native indicative quote and isolated signed runner now wired to novel pool pairs, separate artifacts. Pricing parity, independently audited raw packet/rollback beyond existing pair runner, 4–6-hop and net benefits remain unchecked.
 
 Blockzilla run 46075676623: source 4/4, existing pair signed/rollback 4/4, all negative gross and no full native quotes. Artifacts 15235555309/15234980735 inspected. Added exact signed-leg input model comparison and independent legacy packet/recorded simulation artifact recheck; empirical recheck pending. No primary coverage credit or net gain.
+
+Blockzilla #46076493040 accepted 4/4 legacy packet rechecks and 6/8 native modeled leg samples. Actual bin bytes support SDK ceil capacity correction; independent local replay reconciled the two remaining outputs. Fresh CI parity not yet established.

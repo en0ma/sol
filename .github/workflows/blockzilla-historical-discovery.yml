@@ -26,6 +26,8 @@ on:
       - "arb/blockzilla_rpc_comparison.py"
       - "arb/blockzilla_pair_trials.py"
       - "arb/blockzilla_pair_evidence.py"
+      - "arb/meteora_dlmm_bin_quote.py"
+      - "arb/meteora_dlmm_source_fee_envelope.py"
       - "arb/next_ten_signed_atomic_offline.py"
       - "ci/build_blockzilla_reader.sh"
       - "tests/test_blockzilla*"
@@ -48,6 +50,8 @@ jobs:
           bash -n ci/build_blockzilla_reader.sh
           python3 -m py_compile arb/blockzilla_discovery.py arb/blockzilla_native_archive.py arb/blockzilla_ci_gate.py arb/blockzilla_rpc_comparison.py arb/blockzilla_pair_trials.py arb/blockzilla_pair_evidence.py
           python3 -m unittest discover -s tests -p 'test_blockzilla*.py' -v
+          python3 -m unittest discover -s tests -p 'test_meteora_dlmm*quote*.py' -v
+          python3 -m unittest discover -s tests -p 'test_meteora_dlmm_source_fee_envelope.py' -v
   http-probe:
     needs: unit
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)

@@ -85,6 +85,7 @@ def quote_fee_envelope(fixture, *, pool, mint_in, amount_in, observed_unix,
                 "amount_out":native["amount_out"],
                 "fee_input_base_units":native["fee_input_base_units"],
                 "fee_collect_mode":schedule["fee_collect_mode"],
+                "bins_consumed":native["bins_traversed"],
                 "bin_fee_rates":schedule["rates"],
                 "source_clock":schedule["observed_unix"],
                 "protocol_exact_verified":False,**SAFE}

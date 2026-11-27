@@ -133,6 +133,13 @@ def compare_models(fixture, row, receipt):
     clock = row.get("source_clock")
     if not isinstance(clock, dict) or type(clock.get("unix_timestamp")) is not int:
         raise ValueError("source clock observation unavailable")
+    evidence = receipt.get("legacy_pair_audit_evidence") or {}
+    before, after = evidence.get("positive_clock_before"), evidence.get("positive_clock_after")
+    # Compare source and observed execution timing without claiming the
+    # separate sysvar reads prove the exact instruction clock.
+    stable_clock = (isinstance(before, dict) and isinstance(after, dict)
+        and type(before.get("unix_timestamp")) is int
+        and before.get("unix_timestamp") == after.get("unix_timestamp"))
     legs = []
     for index in range(2):
         result = quote_leg(fixture, leg_index=index, amount_in=inputs[index],
@@ -164,6 +171,8 @@ def compare_models(fixture, row, receipt):
         legs.append(record)
     return {"status": "SIGNED_LEG_AMOUNT_MODEL_COMPARISON",
             "legs": legs, "source_clock_not_execution_clock": True,
+            "positive_clock_before": before, "positive_clock_after": after,
+            "positive_clock_timestamp_stable_across_reads": stable_clock,
             "protocol_exact_verified": False, "net_profit_verified": False, **SAFE}
 
 

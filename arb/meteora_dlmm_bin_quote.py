@@ -61,25 +61,32 @@ def quote_bins(*,amount_in,swap_x_for_y,bins,total_fee_rate,max_bins=32):
             raise ValueError("DLMM invalid per-bin effective fee rate")
         capacity=b["amount_y"] if swap_x_for_y else b["amount_x"]
         price=b["price_q64"]
-        if not 0<price<1<<128 or min(b["amount_x"],b["amount_y"])<0:
+        if min(b["amount_x"],b["amount_y"])<0 or max(b["amount_x"],b["amount_y"])>=2**64:
             raise ValueError("invalid authenticated bin inventory")
         if not capacity:continue
-        # Bound input by output-side bin inventory, reducing the guess-and-
-        # round problem to monotone exact integer binary search.
-        lo,hi=0,remaining
-        while lo<hi:
-            mid=(lo+hi+1)//2
-            fee=(mid*rate+DEN-1)//DEN
-            net=mid-fee
-            out=net*price//Q if swap_x_for_y else net*Q//price
-            if out<=capacity:lo=mid
-            else:hi=mid-1
-        used=lo
-        if used==0:continue
-        fee=(used*rate+DEN-1)//DEN
-        net=used-fee
-        got=net*price//Q if swap_x_for_y else net*Q//price
-        if got<=0:continue
+        if not 0<price<1<<128:
+            raise ValueError("invalid funded DLMM bin price")
+        # SDK Bin::get_amount_in(..., Rounding::Up), then compute_fee
+        # on the net capacity using denominator DEN-rate. Floor-output
+        # binary search is NOT equivalent: it can leave dust in a bin
+        # or overconsume input on a price plateau.
+        net_capacity=((capacity*Q+price-1)//price if swap_x_for_y
+                      else (capacity*price+Q-1)//Q)
+        capacity_fee=(net_capacity*rate+(DEN-rate)-1)//(DEN-rate)
+        gross_capacity=net_capacity+capacity_fee
+        if remaining>=gross_capacity:
+            used=gross_capacity
+            fee=capacity_fee
+            got=capacity
+        else:
+            used=remaining
+            fee=(used*rate+DEN-1)//DEN
+            net=used-fee
+            got=min(capacity,net*price//Q if swap_x_for_y else net*Q//price)
+        if not 0<used<=remaining or not 0<=fee<=used:
+            raise ValueError("invalid DLMM capacity input or fee")
+        if got<=0:
+            raise ValueError("DLMM input cannot produce positive output in funded bin")
         remaining-=used;output+=got;fees+=fee
         consumed.append({"bin_id":idx,"gross_input_base_units":used,
                          "fee_input_base_units":fee,"output_base_units":got,
