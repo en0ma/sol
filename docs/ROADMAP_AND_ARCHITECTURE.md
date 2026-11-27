@@ -289,3 +289,5 @@ On every substantial change: update this roadmap if direction/acceptance changes
 ## Blockzilla historical discovery experiment — 2026-11-27
 
 An optional bounded archive HTTP reader may seed existing registry authentication. Historical transaction account roles are untrusted until existing venue decoders and vault verification succeed. Finalized independent RPC sample comparison, byte/request budgets and separate topology evidence are required. Existing source-state RPC, registry, graph, pricing and isolated signed Surfpool gates remain unchanged. Do not make Blockzilla mandatory or claim savings, source-native quote parity, verified profit or execution coverage until measured.
+
+When the HTTP gateway returns no independently matched blocks, the optional experiment can use a pinned upstream Compact V2 program-dump on a separate uncredentialed runner. Its signature leads require finalized independent membership/program/status checks before account hints, then existing source verification. It does not establish archive packet-byte parity or replace the current source-state RPC.

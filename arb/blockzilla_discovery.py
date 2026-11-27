@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import time
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from solders.pubkey import Pubkey
@@ -219,6 +220,7 @@ def scan(rpc_url, baseline, *, start_slot=0, blocks=6, keys_per_venue=24,
             continue
         limit = min(MAX_BLOCK_BYTES, remaining)
         tick = time.monotonic()
+        stage = "ARCHIVE_HTTP_FETCH"
         try:
             raw = fetcher(slot, limit)
             total_bytes += len(raw)
@@ -226,6 +228,7 @@ def scan(rpc_url, baseline, *, start_slot=0, blocks=6, keys_per_venue=24,
             if len(raw) > limit:
                 raise ValueError("block byte budget exceeded")
             item["archive_sha256"] = digest(raw)
+            stage = "ARCHIVE_DECODE"
             block = parse_block(raw)
             if block["parentSlot"] >= slot:
                 raise ValueError("block parent not earlier than slot")
@@ -247,6 +250,7 @@ def scan(rpc_url, baseline, *, start_slot=0, blocks=6, keys_per_venue=24,
             if not rows:
                 raise ValueError("no successful decodable sample")
             sample = next((x for x in rows if x["venues"]), rows[0])
+            stage = "INDEPENDENT_RPC_CROSSCHECK"
             item["sample"] = crosscheck(block, slot, sample, rpc)
             item["crosschecked"] = True
             item["status"] = "BLOCK_SAMPLE_CROSSCHECKED"
@@ -262,7 +266,10 @@ def scan(rpc_url, baseline, *, start_slot=0, blocks=6, keys_per_venue=24,
             # Transport exception strings can contain upstream credentials.
             item["status"] = "ARCHIVE_OR_INDEPENDENT_CHECK_FAILED"
             item["error_class"] = type(exc).__name__
-            errors.append({"stage": "block", "slot": slot, "error_class": type(exc).__name__})
+            item["failure_stage"] = stage
+            if isinstance(exc, HTTPError):
+                item["http_status"] = exc.code
+            errors.append({k: item[k] for k in ("slot", "error_class", "failure_stage", "http_status") if k in item})
         finally:
             item["elapsed_seconds"] = round(time.monotonic() - tick, 3)
     grouped = defaultdict(list)

@@ -3,22 +3,31 @@ on:
   workflow_dispatch:
     inputs:
       start_slot:
-        description: "First historical slot; 0 = recent minus two nominal epochs plus documented anchor"
+        description: "HTTP first slot; 0 = automatic"
         type: string
         default: "0"
       blocks:
-        description: "Consecutive slots (1–8)"
+        description: "HTTP slots (1–8)"
         type: string
         default: "6"
+      archive_epoch:
+        description: "Fallback public Compact V2 epoch"
+        type: string
+        default: "1094"
+      archive_first_block:
+        description: "Fallback first archive block row, not a slot"
+        type: string
+        default: "0"
   pull_request:
     paths:
       - "arb/blockzilla_discovery.py"
-      - "tests/test_blockzilla_discovery.py"
+      - "arb/blockzilla_native_archive.py"
+      - "tests/test_blockzilla*"
       - ".github/workflows/blockzilla-historical-discovery.yml"
 permissions:
   contents: read
 concurrency:
-  group: blockzilla-discovery-${{ github.event.pull_request.head.ref || github.ref_name}}
+  group: blockzilla-discovery-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 jobs:
   unit:
@@ -30,13 +39,15 @@ jobs:
           persist-credentials: false
       - run: |
           python3 -m pip install --disable-pip-version-check solders==0.26.0
-          python3 -m py_compile arb/blockzilla_discovery.py
-          python3 -m unittest discover -s tests -p test_blockzilla_discovery.py -v
-  read-only-experiment:
+          python3 -m py_compile arb/blockzilla_discovery.py arb/blockzilla_native_archive.py
+          python3 -m unittest discover -s tests -p 'test_blockzilla*.py' -v
+  http-probe:
     needs: unit
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
-    timeout-minutes: 22
+    timeout-minutes: 8
+    outputs:
+      usable: ${{ steps.scan.outputs.usable }}
     env:
       SOLANA_RPC_MIN_INTERVAL_SECONDS: "0.5"
       SOLANA_RPC_PACING_FILE: /tmp/blockzilla-rpc-pacing
@@ -44,22 +55,116 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Install dependencies
-        run: |
-          mkdir -p "$RUNNER_TEMP/blockzilla"
+      - run: |
+          mkdir -p "$RUNNER_TEMP/blockzilla-http"
           python3 -m pip install --disable-pip-version-check solders==0.26.0
-      - name: Retrieve bounded archive and independently cross-check finalized records
+      - name: Probe HTTP and independently cross-check finalized records
+        id: scan
         env:
-          BLOCKZILLA_INDEPENDENT_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL}}
-          START_SLOT: ${{ inputs.start_slot || '0'}}
-          BLOCKS: ${{ inputs.blocks || '6'}}
+          BLOCKZILLA_INDEPENDENT_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
+          START_SLOT: ${{ inputs.start_slot || '0' }}
+          BLOCKS: ${{ inputs.blocks || '6' }}
         run: |
           test -n "$BLOCKZILLA_INDEPENDENT_RPC_URL"
+          set +e
           python3 -m arb.blockzilla_discovery scan --start-slot "$START_SLOT" \
-            --blocks "$BLOCKS" --output "$RUNNER_TEMP/blockzilla/historical-hints.json"
+            --blocks "$BLOCKS" --output "$RUNNER_TEMP/blockzilla-http/historical-hints.json"
+          code=$?
+          set -e
+          if [ "$code" = 0 ]; then
+            echo "usable=true" }} "$GITHUB_OUTPUT"
+          elif [ "$code" = 2 ] && test -s "$RUNNER_TEMP/blockzilla-http/historical-hints.json"; then
+            python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); assert r["status"]=="NO_CROSSCHECKED_BLOCKS" and r["crosschecked_blocks"]==0' "$RUNNER_TEMP/blockzilla-http/historical-hints.json"
+            echo "usable=false" }} "$GITHUB_OUTPUT"
+            echo "::warning::HTTP data unavailable; native archive fallback required"
+          else
+            exit 1
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: blockzilla-http-probe
+          path: ${{ runner.temp }}/blockzilla-http/*.json
+          if-no-files-found: warn
+          retention-days: 7
+  native-archive:
+    needs: [unit, http-probe]
+    if: needs.http-probe.outputs.usable == 'false'
+    runs-on: ubuntu-latest
+    timeout-minutes: 38
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: blockzilla-dev/blockzilla
+          ref: c8265ad3e61a36e8f8f2dee49020f6bb0f01f220
+          path: upstream-blockzilla
+          persist-credentials: false
+      - name: Build pinned public archive reader (no RPC secrets)
+        timeout-minutes: 14
+        run: |
+          mkdir -p "$RUNNER_TEMP/blockzilla-native"
+          python3 -m pip install --disable-pip-version-check solders==0.26.0
+          test "$(git -C upstream-blockzilla rev-parse HEAD)" = c8265ad3e61a36e8f8f2dee49020f6bb0f01f220
+          rustup toolchain install 1.98.0 --profile minimal
+          cd upstream-blockzilla
+          cargo +1.98.0 build --locked -p blockzilla
+      - name: Scan bounded archive rows for seven venue programs
+        timeout-minutes: 20
+        env:
+          ARCHIVE_EPOCH: ${{ inputs.archive_epoch || '1094' }}
+          FIRST_BLOCK: ${{ inputs.archive_first_block || '0' }}
+        run: |
+          python3 -m arb.blockzilla_native_archive read \
+            --binary upstream-blockzilla/target/debug/blockzilla \
+            --directory "$RUNNER_TEMP/blockzilla-native" \
+            --epoch "$ARCHIVE_EPOCH" --first-block "$FIRST_BLOCK" --blocks 8
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: blockzilla-native-archive
+          path: ${{ runner.temp }}/blockzilla-native/
+          if-no-files-found: warn
+          retention-days: 7
+  source-authentication:
+    needs: [unit, http-probe, native-archive]
+    if: always() && needs.unit.result == 'success' && needs.http-probe.result == 'success' && (needs.http-probe.outputs.usable == 'true' || needs.native-archive.result == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 24
+    env:
+      SOLANA_RPC_MIN_INTERVAL_SECONDS: "0.5"
+      SOLANA_RPC_PACING_FILE: /tmp/blockzilla-rpc-pacing
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: |
+          mkdir -p "$RUNNER_TEMP/blockzilla"
+          python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - uses: actions/download-artifact@v4
+        if: needs.http-probe.outputs.usable == 'true'
+        with:
+          name: blockzilla-http-probe
+          path: ${{ runner.temp }}/blockzilla
+      - uses: actions/download-artifact@v4
+        if: needs.http-probe.outputs.usable == 'false'
+        with:
+          name: blockzilla-native-archive
+          path: ${{ runner.temp }}/blockzilla-native
+      - name: Verify native archive leads against finalized RPC
+        if: needs.http-probe.outputs.usable == 'false'
+        env:
+          BLOCKZILLA_INDEPENDENT_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
+        run: |
+          test -n "$BLOCKZILLA_INDEPENDENT_RPC_URL"
+          python3 -m arb.blockzilla_native_archive check \
+            --directory "$RUNNER_TEMP/blockzilla-native" \
+            --output "$RUNNER_TEMP/blockzilla/historical-hints.json"
       - name: Start existing read-only source fork
         env:
-          SURFPOOL_DATASOURCE_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL}}
+          SURFPOOL_DATASOURCE_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
         run: |
           test -n "$SURFPOOL_DATASOURCE_RPC_URL"
           bash ci/install_surfpool.sh
@@ -93,6 +198,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: blockzilla-historical-discovery-evidence
-          path: ${{ runner.temp}}/blockzilla/*.json
+          path: ${{ runner.temp }}/blockzilla/*.json
           if-no-files-found: warn
           retention-days: 7

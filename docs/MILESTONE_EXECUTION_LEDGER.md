@@ -342,3 +342,5 @@ All proof concerns local isolated Surfpool signed simulation only. No independen
 - [ ] Feasibility: archive HTTP retrieval and finalized independent sample match in GitHub Actions; inspect actual artifact.
 - [ ] Discovery: existing seven-venue source decoder/vault verifier authenticates novel hints; measure incremental topology separately from primary inventory.
 - [ ] Follow-up: equal-budget control comparison, 2–6-hop native quote and cost parity, independent signed Surfpool acceptance. No archive transaction substitutes for these gates.
+
+Blockzilla HTTP feasibility attempt #46002136898 failed (artifact 15198772221 inspected: zero bytes, zero crosschecked blocks). Native pinned Compact V2 fallback implemented; keep both acceptance boxes unchecked until actual archive and source artifacts pass.
