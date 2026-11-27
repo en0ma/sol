@@ -299,3 +299,5 @@ The pinned reader must be built and run on the same uncredentialed runner with t
 Native archive control files may exceed the output cap. Bound stdout/stderr independently; retain explicit per-file cache, sampled aggregate cache, disk floor and deadline constraints. Do not report cache size as network usage or partial output as successful archive evidence.
 
 For comparative evaluation, read direct finalized RPC full blocks over the same observed successful archive slots, share per-venue sample/candidate/source-verification budgets, measure pair and triangle topology separately, preserve incomplete control results and distinguish logical calls/result JSON bytes from real network/billing. No archive-derived identity is automatically admitted.
+
+If archive-derived identities share a token pair, test the existing two-leg source fixture/quote/adaptive signed pipeline in a separately isolated job. Prefer two novel identities, preserve source hash and direction, and never credit this to the primary inventory or equate signed gross change with fee-converted net gain. Incomplete RPC controls do not establish exclusive discovery or cost savings.

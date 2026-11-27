@@ -352,3 +352,5 @@ Blockzilla run 46050780906: HTTP 403 confirmed (artifact 15224361688), fallback 
 Blockzilla #46072784974: native pinned compilation/CLI checks passed; artifact 15234275586 shows all seven scans SIGXFSZ and empty outputs. Separate cache and output budgets implemented, acceptance remains unchecked until real data and source authentication pass.
 
 Blockzilla run 46073543937 passed all five jobs, artifacts 15234735363 and 15234061998 inspected: 295 successful venue records, 8 unique independent transactions, 62 hints, 3 novel source-verified pools, no incremental three-hop starts. Native feasibility and identity discovery accepted; same-window direct RPC comparison implemented, comparative savings and signed route gains remain unchecked.
+
+Blockzilla #46074722274 reproduced three identities; direct same-window full-block control failed 8/8, comparison incomplete (artifact 15234697024). Existing paired native indicative quote and isolated signed runner now wired to novel pool pairs, separate artifacts. Pricing parity, independently audited raw packet/rollback beyond existing pair runner, 4–6-hop and net benefits remain unchecked.

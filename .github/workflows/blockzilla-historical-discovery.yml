@@ -24,6 +24,7 @@ on:
       - "arb/blockzilla_native_archive.py"
       - "arb/blockzilla_ci_gate.py"
       - "arb/blockzilla_rpc_comparison.py"
+      - "arb/blockzilla_pair_trials.py"
       - "ci/build_blockzilla_reader.sh"
       - "tests/test_blockzilla*"
       - ".github/workflows/blockzilla-historical-discovery.yml"
@@ -43,7 +44,7 @@ jobs:
       - run: |
           python3 -m pip install --disable-pip-version-check solders==0.26.0
           bash -n ci/build_blockzilla_reader.sh
-          python3 -m py_compile arb/blockzilla_discovery.py arb/blockzilla_native_archive.py arb/blockzilla_ci_gate.py arb/blockzilla_rpc_comparison.py
+          python3 -m py_compile arb/blockzilla_discovery.py arb/blockzilla_native_archive.py arb/blockzilla_ci_gate.py arb/blockzilla_rpc_comparison.py arb/blockzilla_pair_trials.py
           python3 -m unittest discover -s tests -p 'test_blockzilla*.py' -v
   http-probe:
     needs: unit
@@ -190,6 +191,20 @@ jobs:
           python3 -m arb.blockzilla_rpc_comparison \
             --archive-directory "$RUNNER_TEMP/blockzilla-native" \
             --evidence-directory "$RUNNER_TEMP/blockzilla"
+      - name: Capture and quote isolated Blockzilla-derived paired source routes
+        env:
+          HTTP_ROUTE: ${{ needs.http-probe.outputs.usable }}
+        run: |
+          python3 -m arb.blockzilla_pair_trials --phase source \
+            --evidence-directory "$RUNNER_TEMP/blockzilla" \
+            --directory "$RUNNER_TEMP/blockzilla-pairs" --route "$HTTP_ROUTE"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: blockzilla-isolated-pair-source
+          path: ${{ runner.temp }}/blockzilla-pairs/
+          if-no-files-found: warn
+          retention-days: 7
       - name: Stop source fork
         if: always()
         run: |
@@ -233,3 +248,49 @@ jobs:
         run: |
           python3 -m arb.blockzilla_ci_gate evidence \
             --directory "$RUNNER_TEMP/blockzilla-evidence" --route "$HTTP_ROUTE"
+  isolated-pair-offline:
+    needs: [source-authentication, evidence-gate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SURFPOOL_EXPLICITLY_OFFLINE: "1"
+      SURFPOOL_DATASOURCE_RPC_URL: ""
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install offline Surfpool and signer
+        run: |
+          bash ci/install_surfpool.sh
+          python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - uses: actions/download-artifact@v4
+        with:
+          name: blockzilla-isolated-pair-source
+          path: ${{ runner.temp }}/blockzilla-pairs
+      - name: Execute bounded signed pair trials in isolated fork
+        run: |
+          test -z "$SURFPOOL_DATASOURCE_RPC_URL"
+          nohup "$HOME/.local/bin/surfpool" start --ci --offline --no-deploy > "$RUNNER_TEMP/blockzilla-pair-offline.log" 2>&1 < /dev/null &
+          python3 - <<'PY'
+          import time
+          from arb.rpc import call
+          for _ in range(80):
+              try:
+                  assert call("http://127.0.0.1:8899", "getLatestBlockhash", timeout=3, retries=0)["value"]["blockhash"]
+                  break
+              except (ValueError, RuntimeError, OSError, KeyError):
+                  time.sleep(1)
+          else:
+              raise SystemExit("offline fork unavailable")
+          PY
+          python3 -m arb.blockzilla_pair_trials --phase offline --directory "$RUNNER_TEMP/blockzilla-pairs"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: blockzilla-isolated-pair-signed
+          path: |
+            ${{ runner.temp }}/blockzilla-pairs/*-report.json
+            ${{ runner.temp }}/blockzilla-pairs/*-receipt.json
+            ${{ runner.temp }}/blockzilla-pair-offline.log
+          if-no-files-found: warn
+          retention-days: 7
