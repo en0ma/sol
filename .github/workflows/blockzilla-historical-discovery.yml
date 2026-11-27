@@ -1,0 +1,98 @@
+name: Blockzilla bounded historical discovery experiment
+on:
+  workflow_dispatch:
+    inputs:
+      start_slot:
+        description: "First historical slot; 0 = recent minus two nominal epochs plus documented anchor"
+        type: string
+        default: "0"
+      blocks:
+        description: "Consecutive slots (1–8)"
+        type: string
+        default: "6"
+  pull_request:
+    paths:
+      - "arb/blockzilla_discovery.py"
+      - "tests/test_blockzilla_discovery.py"
+      - ".github/workflows/blockzilla-historical-discovery.yml"
+permissions:
+  contents: read
+concurrency:
+  group: blockzilla-discovery-${{ github.event.pull_request.head.ref || github.ref_name}}
+  cancel-in-progress: true
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: |
+          python3 -m pip install --disable-pip-version-check solders==0.26.0
+          python3 -m py_compile arb/blockzilla_discovery.py
+          python3 -m unittest discover -s tests -p test_blockzilla_discovery.py -v
+  read-only-experiment:
+    needs: unit
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    env:
+      SOLANA_RPC_MIN_INTERVAL_SECONDS: "0.5"
+      SOLANA_RPC_PACING_FILE: /tmp/blockzilla-rpc-pacing
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install dependencies
+        run: |
+          mkdir -p "$RUNNER_TEMP/blockzilla"
+          python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Retrieve bounded archive and independently cross-check finalized records
+        env:
+          BLOCKZILLA_INDEPENDENT_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL}}
+          START_SLOT: ${{ inputs.start_slot || '0'}}
+          BLOCKS: ${{ inputs.blocks || '6'}}
+        run: |
+          test -n "$BLOCKZILLA_INDEPENDENT_RPC_URL"
+          python3 -m arb.blockzilla_discovery scan --start-slot "$START_SLOT" \
+            --blocks "$BLOCKS" --output "$RUNNER_TEMP/blockzilla/historical-hints.json"
+      - name: Start existing read-only source fork
+        env:
+          SURFPOOL_DATASOURCE_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL}}
+        run: |
+          test -n "$SURFPOOL_DATASOURCE_RPC_URL"
+          bash ci/install_surfpool.sh
+          nohup "$HOME/.local/bin/surfpool" start --ci --rpc-url "$SURFPOOL_DATASOURCE_RPC_URL" --no-deploy > "$RUNNER_TEMP/blockzilla-source.log" 2>&1 < /dev/null &
+          echo $! > "$RUNNER_TEMP/blockzilla-source.pid"
+          python3 - <<'PY'
+          import time
+          from arb.rpc import call
+          for _ in range(80):
+              try:
+                  assert call("http://127.0.0.1:8899", "getLatestBlockhash", timeout=3, retries=0)["value"]["blockhash"]
+                  break
+              except (ValueError, RuntimeError, OSError, KeyError):
+                  time.sleep(1)
+          else:
+              raise SystemExit("source fork unavailable")
+          PY
+      - name: Authenticate novel pools and compare hint topology
+        run: |
+          python3 -m arb.blockzilla_discovery authenticate \
+            --hints "$RUNNER_TEMP/blockzilla/historical-hints.json" \
+            --output "$RUNNER_TEMP/blockzilla/source-authentication.json"
+      - name: Stop source fork
+        if: always()
+        run: |
+          if test -f "$RUNNER_TEMP/blockzilla-source.pid"; then
+            kill "$(cat "$RUNNER_TEMP/blockzilla-source.pid")" || true
+          fi
+      - name: Upload experimental evidence (never primary inventory)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: blockzilla-historical-discovery-evidence
+          path: ${{ runner.temp}}/blockzilla/*.json
+          if-no-files-found: warn
+          retention-days: 7

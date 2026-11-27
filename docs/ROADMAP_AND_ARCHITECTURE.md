@@ -285,3 +285,7 @@ Capability registries such as `arb/venue_capabilities.py` and `arb/onchain_pool_
 On every substantial change: update this roadmap if direction/acceptance changes; add focused tests and CI coverage; commit actual changes; provide branch, SHA, run ID, artifact, verified/unverified gates and blockers. Avoid hardcoded token pair constraints in new discovery adapters. Preserve safety flags and simulation-only operation. Prefer incremental verified progress over broad unsupported claims.
 
 **Known implementation caveats to revisit:** confirm Raydium API list response shape and pagination with observed payloads; verify legacy AMM market PDA/nonce and OpenBook layout against real accounts; verify Orca Token Swap v1 layout and active pool availability; inspect CI step-level failures despite overall success; ensure cross-venue proof goes beyond terminal balances and invocation logs. Do not silently change status flags to make reports green.
+
+## Blockzilla historical discovery experiment — 2026-11-27
+
+An optional bounded archive HTTP reader may seed existing registry authentication. Historical transaction account roles are untrusted until existing venue decoders and vault verification succeed. Finalized independent RPC sample comparison, byte/request budgets and separate topology evidence are required. Existing source-state RPC, registry, graph, pricing and isolated signed Surfpool gates remain unchanged. Do not make Blockzilla mandatory or claim savings, source-native quote parity, verified profit or execution coverage until measured.

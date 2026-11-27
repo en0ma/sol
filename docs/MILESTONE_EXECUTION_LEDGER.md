@@ -336,3 +336,9 @@ The integrated simulator now validates the actual positive signed post-transacti
 - Non-v4 30-route adaptive workflow green; audit artifacts require review: https://github.com/en0ma/sol/actions/runs/40202601743
 
 All proof concerns local isolated Surfpool signed simulation only. No independently attested source-to-fork quote accuracy and no funded trades.
+
+## M5 Blockzilla experimental acceptance — 2026-11-27
+
+- [ ] Feasibility: archive HTTP retrieval and finalized independent sample match in GitHub Actions; inspect actual artifact.
+- [ ] Discovery: existing seven-venue source decoder/vault verifier authenticates novel hints; measure incremental topology separately from primary inventory.
+- [ ] Follow-up: equal-budget control comparison, 2–6-hop native quote and cost parity, independent signed Surfpool acceptance. No archive transaction substitutes for these gates.
