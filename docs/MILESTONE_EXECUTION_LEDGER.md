@@ -360,3 +360,5 @@ Blockzilla run 46075676623: source 4/4, existing pair signed/rollback 4/4, all n
 Blockzilla #46076493040 accepted 4/4 legacy packet rechecks and 6/8 native modeled leg samples. Actual bin bytes support SDK ceil capacity correction; independent local replay reconciled the two remaining outputs. Fresh CI parity not yet established.
 
 Blockzilla #46078021778: 4/4 independent packet audits, 8/8 exact sample outputs, 36 tests; new output-denominated DLMM MM model, opt-in modeled chain and original-source recomputation wired. New mode empirical parity and net benefit unverified.
+
+Blockzilla #10 46079627951: 8/8 exact leg outputs and 4/4 complete modeled terminal matches with independent source recomputation; all gross negative. Added bounded archive-derived 4–6-hop source/quote/sign/audit experiment, no empirical result yet.

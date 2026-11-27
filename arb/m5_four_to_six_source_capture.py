@@ -13,10 +13,11 @@ from arb.rpc import call
 from arb.source_snapshot_manifest import digest,verify
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
 
-def capture(rpc,graph,route_index,output,*,venue_cache=None):
+def capture(rpc,graph,route_index,output,*,venue_cache=None,allow_hint_graph=False):
     local_rpc_only(rpc)
     if (not isinstance(graph,dict) or
-            graph.get("status")!="SOURCE_AUTHENTICATED_ROUTE_DISCOVERY_ONLY"
+            (graph.get("status")!="SOURCE_AUTHENTICATED_ROUTE_DISCOVERY_ONLY" and not
+             (allow_hint_graph is True and graph.get("status")=="BLOCKZILLA_HINT_GRAPH_ONLY"))
             or any(graph.get(k)is not False for k in SAFE)
             or type(route_index)is not int or route_index<0):
         raise ValueError("safe authenticated graph and index required")

@@ -307,3 +307,5 @@ Retain ephemeral isolated legacy positive/negative packet bytes and recorded loc
 Native DLMM market-maker bin exhaustion must use upward inverse-price capacity input, fee on net capacity, and capped output, not floor-output binary search. Preserve actual per-bin consumption and source/isolated Clock distinctions. No automatic protocol-exact promotion from finite sample agreement.
 
 DLMM OnlyY fees must be charged on output for X→Y and input for Y→X. Keep denomination-specific fee totals, MM-only scope, and modeled chain separate from executable pricing. Recompute artifact quotes from original source fixture bytes on a separate runner rather than trusting saved quote output alone.
+
+Use explicit hint-only existing graph enumeration for archive-seeded multihop candidates; reauthenticate all legs before capture, preserve 4–6-hop artifacts separately and verify positive/negative packets and recorded CPI/rollback with actual isolated lookup readback. No primary admission or profitability assertion.

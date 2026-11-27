@@ -26,6 +26,10 @@ on:
       - "arb/blockzilla_rpc_comparison.py"
       - "arb/blockzilla_pair_trials.py"
       - "arb/blockzilla_pair_evidence.py"
+      - "arb/blockzilla_multihop.py"
+      - "arb/opportunity_graph.py"
+      - "arb/atomic_graph_coordinator.py"
+      - "arb/m5_four_to_six_source_capture.py"
       - "arb/meteora_dlmm_bin_quote.py"
       - "arb/meteora_dlmm_source_fee_decoder.py"
       - "arb/m5_source_indicative_route_chain.py"
@@ -213,6 +217,18 @@ jobs:
           path: ${{ runner.temp }}/blockzilla-pairs/
           if-no-files-found: warn
           retention-days: 7
+      - name: Capture bounded archive-derived 4–6-hop research fixtures
+        env:
+          HTTP_ROUTE: ${{ needs.http-probe.outputs.usable }}
+        run: |
+          python3 -m arb.blockzilla_multihop --phase source --evidence-directory "$RUNNER_TEMP/blockzilla" --directory "$RUNNER_TEMP/blockzilla-multihop" --route "$HTTP_ROUTE"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: blockzilla-multihop-source
+          path: ${{ runner.temp }}/blockzilla-multihop/
+          if-no-files-found: warn
+          retention-days: 7
       - name: Stop source fork
         if: always()
         run: |
@@ -301,6 +317,75 @@ jobs:
             ${{ runner.temp }}/blockzilla-pairs/*-receipt.json
             ${{ runner.temp }}/blockzilla-pairs/*-model-comparison.json
             ${{ runner.temp }}/blockzilla-pair-offline.log
+          if-no-files-found: warn
+          retention-days: 7
+  isolated-multihop-offline:
+    needs: [source-authentication, evidence-gate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SURFPOOL_EXPLICITLY_OFFLINE: "1"
+      SURFPOOL_DATASOURCE_RPC_URL: ""
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: |
+          bash ci/install_surfpool.sh
+          python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - uses: actions/download-artifact@v4
+        with:
+          name: blockzilla-multihop-source
+          path: ${{ runner.temp }}/blockzilla-multihop
+      - name: Run existing adaptive N-leg signer against isolated source fixtures
+        run: |
+          test -z "$SURFPOOL_DATASOURCE_RPC_URL"
+          nohup "$HOME/.local/bin/surfpool" start --ci --offline --no-deploy > "$RUNNER_TEMP/blockzilla-multihop.log" 2>&1 < /dev/null &
+          python3 - <<'PY'
+          import time
+          from arb.rpc import call
+          for _ in range(80):
+              try:
+                  assert call("http://127.0.0.1:8899","getLatestBlockhash",timeout=3,retries=0)["value"]["blockhash"]
+                  break
+              except (ValueError,RuntimeError,OSError,KeyError):
+                  time.sleep(1)
+          else:
+              raise SystemExit("offline fork unavailable")
+          PY
+          python3 -m arb.blockzilla_multihop --phase offline --directory "$RUNNER_TEMP/blockzilla-multihop"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: blockzilla-multihop-signed
+          path: |
+            ${{ runner.temp }}/blockzilla-multihop/multihop-signed.json
+            ${{ runner.temp }}/blockzilla-multihop/*-receipt.json
+          if-no-files-found: warn
+          retention-days: 7
+  independent-multihop-evidence:
+    needs: isolated-multihop-offline
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - uses: actions/download-artifact@v4
+        with:
+          name: blockzilla-multihop-source
+          path: ${{ runner.temp }}/multihop-source
+      - uses: actions/download-artifact@v4
+        with:
+          name: blockzilla-multihop-signed
+          path: ${{ runner.temp }}/multihop-signed
+      - run: python3 -m arb.blockzilla_multihop --phase audit --directory "$RUNNER_TEMP/multihop-signed" --source-directory "$RUNNER_TEMP/multihop-source"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: blockzilla-multihop-independent-audit
+          path: ${{ runner.temp }}/multihop-signed/multihop-audit.json
           if-no-files-found: warn
           retention-days: 7
   independent-pair-evidence:

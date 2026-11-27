@@ -581,7 +581,7 @@ def run_three_venue(rpc,fixture,*,amount_in=100_000_000,program_cache=None):
 
 
 def run_four_to_six_venue(rpc,fixture,*,amount_in=100_000,program_cache=None,
-                          ephemeral_source_registry=False):
+                          ephemeral_source_registry=False,retain_audit_evidence=False):
     """Actually hydrate, construct, sign and simulate an authenticated 4–6-hop route.
 
     Reuse the existing 2–6-hop adaptive signer and independent CPI/rollback
@@ -718,7 +718,8 @@ def run_four_to_six_venue(rpc,fixture,*,amount_in=100_000,program_cache=None,
             # It is a source-coverage experiment, not registry promotion.
             receipt=simulate_adaptive_n_leg_offline(
                 rpc,route,mints,states,evidence,owner,keys,amount_in,None,
-                signer,negative_instructions=negative,require_closed=True)
+                signer,negative_instructions=negative,require_closed=True,
+                retain_audit_evidence=retain_audit_evidence)
             receipt["coordinator_registry_mode"]="AMM_V4_ISOLATED_SOURCE_RUNNER"
         else:
             registered=json.loads(Path("arb/pool_registry.json").read_text())
@@ -739,7 +740,7 @@ def run_four_to_six_venue(rpc,fixture,*,amount_in=100_000,program_cache=None,
             wrapped=coordinate_registered_cycle_offline(
                 rpc,registered,{"start_mint":mints[0],"legs":route},
                 states,evidence,owner,keys,amount_in,signer,
-                negative_instructions=negative)
+                negative_instructions=negative,retain_audit_evidence=retain_audit_evidence)
             receipt=wrapped["signed_receipt"]
             receipt["coordinator_registry_mode"]=(
                 "EPHEMERAL_SOURCE_ONLY_NOT_PERSISTENTLY_PROMOTED"

@@ -15,7 +15,8 @@ MAX_HOPS=4
 MAX_POOLS=200
 MAX_CYCLES=2000
 
-def cycles(pools,anchors=None,max_hops=MAX_HOPS,max_cycles=MAX_CYCLES,truncate=False,min_hops=2):
+def cycles(pools,anchors=None,max_hops=MAX_HOPS,max_cycles=MAX_CYCLES,truncate=False,min_hops=2,hint_only=False):
+    if type(hint_only) is not bool:raise ValueError("invalid hint-only graph flag")
     if type(truncate) is not bool:raise ValueError("invalid truncation flag")
     if type(max_hops) is not int or not 2<=max_hops<=6:
         raise ValueError("max_hops must be 2..6")
@@ -27,7 +28,7 @@ def cycles(pools,anchors=None,max_hops=MAX_HOPS,max_cycles=MAX_CYCLES,truncate=F
     edges=defaultdict(list)
     seen=set()
     for p in pools:
-        if not p.get("verified") or len(p.get("mints",[]))!=2:
+        if (not hint_only and not p.get("verified")) or len(p.get("mints",[]))!=2:
             continue
         a,b=p["mints"]
         venue,address=p.get("venue"),p.get("address")
@@ -57,7 +58,7 @@ def cycles(pools,anchors=None,max_hops=MAX_HOPS,max_cycles=MAX_CYCLES,truncate=F
                     "start_mint":start,"hops":len(new),
                     "legs":new,"venues":sorted(set(x["venue"] for x in new)),
                     "same_venue":len(set(x["venue"] for x in new))==1,
-                    "status":"UNQUOTED","net_profit_lamports":None,
+                    "status":"HINT_ONLY_UNQUOTED" if hint_only else "UNQUOTED","net_profit_lamports":None,
                     "simulation_verified":False,"opportunity_confirmed":False})
                 if len(found)>=max_cycles:
                     if truncate:raise BoundedDiscoveryComplete()

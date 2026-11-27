@@ -1,0 +1,326 @@
+"""Bounded archive-derived 4–6 hop research using existing SOL engines.
+
+The committed registry is only a source of identity hints. The existing
+capture engine reauthenticates every leg before exporting a single-slot
+fixture. No pool is admitted or counted toward the primary inventory.
+"""
+import argparse
+import base64
+from collections import defaultdict
+import json
+import os
+from pathlib import Path
+
+from arb.blockzilla_discovery import SAFE, VENUES, digest, registry_ids, write
+from arb.blockzilla_ci_gate import check_evidence
+from arb.opportunity_graph import cycles, MAX_POOLS
+from arb.pumpswap_local_simulation import local_rpc_only
+from arb.source_snapshot_manifest import verify
+from arb.m5_signed_start_mint_economics import WSOL
+
+AMOUNTS=(100000, 1000000)
+MAX_CAPTURE_PER_HOPS=2
+MAX_ROUTES=3
+MAX_GRAPH_CYCLES=600
+
+
+def candidate_routes(baseline,new_pools):
+    new=registry_ids(new_pools)
+    if new & registry_ids(baseline) or any(p.get("source_verified_only") is not True for p in new_pools):
+        raise ValueError("novel source-verified identities required")
+    all_rows=baseline+new_pools
+    # Per-seed bounded neighborhood, prioritize edges incident on novel mints.
+    # The existing graph enumerator is used in explicit hint-only mode.
+    found={}
+    windows=[]
+    for seed in new_pools:
+        anchors=set(seed["mints"])
+        neighbors=anchors|{m for p in all_rows if anchors.intersection(p["mints"]) for m in p["mints"]}
+        def order(p):
+            ms=set(p["mints"])
+            return (0 if (p["venue"],p["address"]) in new else
+                    1 if ms & anchors else 2 if ms <= neighbors else 3,
+                    p["venue"],p["address"])
+        window=sorted((p for p in all_rows if p["venue"] in VENUES and set(p["mints"]) & neighbors),
+                      key=order)[:MAX_POOLS]
+        windows.append({"seed":[seed["venue"],seed["address"]],"pool_hints":len(window)})
+        for hops in (4,5,6):
+            paths=cycles(window,anchors=anchors,max_hops=hops,min_hops=hops,
+                         max_cycles=MAX_GRAPH_CYCLES,truncate=True,hint_only=True)
+            for row in paths:
+                identities={(l["venue"],l["pool"]) for l in row["legs"]}
+                if not identities & new or len({l["pool"] for l in row["legs"]})!=hops:
+                    continue
+                if len(row["venues"])<2:
+                    continue
+                legs=row["legs"]
+                # Rotate to WSOL where possible for direct fee denomination.
+                if any(l["input"]==WSOL for l in legs):
+                    idx=next(i for i,l in enumerate(legs) if l["input"]==WSOL)
+                    legs=legs[idx:]+legs[:idx]
+                key=tuple((l["venue"],l["pool"],l["input"]) for l in legs)
+                found[key]={**row,"legs":legs,"start_mint":legs[0]["input"],
+                            "novel_pool_identities":[list(k) for k in sorted(identities & new)],
+                            "topology_only":True,**SAFE}
+    by_hops={}
+    for hops in (4,5,6):
+        rows=[r for r in found.values() if r["hops"]==hops]
+        rows.sort(key=lambda r:(-len(r["novel_pool_identities"]),r["start_mint"]!=WSOL,
+                  -len(r["venues"]),tuple((l["venue"],l["pool"]) for l in r["legs"])))
+        by_hops[hops]=rows[:MAX_CAPTURE_PER_HOPS]
+    return by_hops,windows
+
+
+def fixture_identity(fixture,row):
+    verify(fixture)
+    legs=row["legs"]
+    if (fixture.get("fixture_kind")!="AUTHENTICATED_FOUR_TO_SIX_HOP_SOURCE_ROUTE"
+            or fixture.get("source")!="READ_ONLY_MAINNET_BACKED_SURFPOOL"
+            or any(fixture.get(k) is not False for k in SAFE)
+            or fixture["route_venues"]!=[l["venue"] for l in legs]
+            or fixture["route_pool_addresses"]!=[l["pool"] for l in legs]
+            or fixture["route_mints"]!=[legs[0]["input"]]+[l["output"] for l in legs]):
+        raise ValueError("multihop fixture identity mismatch")
+
+
+def prepare(rpc, evidence_dir, directory, baseline, route):
+    from arb.m5_four_to_six_source_capture import capture
+    from arb.next_ten_fork_pool_probe import source_clock
+    from arb.m5_source_indicative_route_chain import research_chain
+    local_rpc_only(rpc)
+    root=Path(directory);root.mkdir(parents=True,exist_ok=True)
+    check_evidence(evidence_dir,baseline,route)
+    raw=(Path(evidence_dir)/"source-authentication.json").read_bytes()
+    source=json.loads(raw)
+    choices,windows=candidate_routes(baseline,source["new_source_verified_pools"])
+    report={"status":"BLOCKZILLA_MULTIHOP_SOURCE_RESEARCH","source_report_sha256":digest(raw),
+            "excluded_from_primary_inventory":True,"windows":windows,
+            "bounded_candidates_by_hops":{str(k):len(v) for k,v in choices.items()},
+            "routes":[],"source_captured":0,**SAFE}
+    for hops, rows in choices.items():
+        for index,row in enumerate(rows):
+            item={**row,"id":f"BZ{hops}-{index+1:02d}","capture_status":"NOT_CAPTURED"}
+            report["routes"].append(item)
+            try:
+                path=root/(item["id"]+"-fixture.json")
+                capture(rpc,{"status":"BLOCKZILLA_HINT_GRAPH_ONLY","routes":[row],**SAFE},
+                        0,path,allow_hint_graph=True)
+                fixture=json.loads(path.read_text())
+                fixture_identity(fixture,item)
+                item.update(capture_status="CAPTURED",fixture_sha256=digest(path.read_bytes()),
+                            source_slot=fixture["state_accounts_observed_slot"])
+                report["source_captured"]+=1
+                clock=source_clock(rpc);item["source_clock"]=clock
+                quotes=[]
+                for amount in AMOUNTS:
+                    result=research_chain(fixture,amount_in=amount,
+                        observed_unix=clock["unix_timestamp"],allow_modeled_dlmm=True)
+                    quotes.append({"amount":amount,"quote":result})
+                quote_path=root/(item["id"]+"-quotes.json")
+                write(quote_path,quotes)
+                item["quote_sha256"]=digest(quote_path.read_bytes())
+                break
+            except (ValueError,RuntimeError,KeyError,TypeError,OSError) as exc:
+                item.update(error_class=type(exc).__name__,diagnostic=str(exc)[:300])
+                if item["capture_status"]=="CAPTURED":
+                    break
+            finally:
+                write(root/"multihop-source.json",report)
+    write(root/"multihop-source.json",report)
+    return report
+
+
+def offline(rpc,directory):
+    from arb.next_ten_signed_atomic_offline import run_four_to_six_venue
+    from arb.dlmm_offline_clock import align_permissioned_dlmm_clock
+    from arb.m5_signed_start_mint_economics import signed_net_economics
+    local_rpc_only(rpc)
+    if os.environ.get("SURFPOOL_EXPLICITLY_OFFLINE")!="1" or os.environ.get("SURFPOOL_DATASOURCE_RPC_URL"):
+        raise ValueError("explicit disconnected fork required")
+    root=Path(directory)
+    raw=(root/"multihop-source.json").read_bytes()
+    source=json.loads(raw)
+    selected=[r for r in source["routes"] if r["capture_status"]=="CAPTURED"]
+    if (len(selected)>MAX_ROUTES or any(source.get(k) is not False for k in SAFE)
+            or source.get("excluded_from_primary_inventory") is not True):
+        raise ValueError("invalid source research report")
+    report={"status":"BLOCKZILLA_MULTIHOP_SIGNED_RESEARCH","source_report_sha256":digest(raw),
+            "excluded_from_primary_inventory":True,"attempts":[],"accepted":0,**SAFE}
+    programs={}
+    for row in selected:
+        path=root/(row["id"]+"-fixture.json")
+        fixture_raw=path.read_bytes()
+        if digest(fixture_raw)!=row["fixture_sha256"]:
+            raise ValueError("multihop source fixture digest mismatch")
+        fixture=json.loads(fixture_raw);fixture_identity(fixture,row)
+        for amount in AMOUNTS:
+            item={"id":row["id"],"amount":amount,"status":"BLOCKED"}
+            report["attempts"].append(item)
+            try:
+                item["clock_alignment"]=align_permissioned_dlmm_clock(rpc,fixture)
+                receipt=run_four_to_six_venue(rpc,fixture,amount_in=amount,
+                    program_cache=programs,ephemeral_source_registry=True,retain_audit_evidence=True)
+                if any(receipt.get(k) is not False for k in SAFE):
+                    raise ValueError("unsafe signed research receipt")
+                if receipt.get("signed_atomic_simulation_verified") is True:
+                    receipt["signed_start_mint_economics"]=signed_net_economics(receipt,
+                        start_mint=fixture["route_mints"][0],source_slot=row["source_slot"],
+                        fixture=fixture,observed_unix=row["source_clock"]["unix_timestamp"])
+                name=f'{row["id"]}-{amount}-receipt.json'
+                write(root/name,receipt)
+                item.update(status=receipt["status"],receipt=name,receipt_sha256=digest((root/name).read_bytes()))
+                if receipt.get("signed_atomic_simulation_verified") is True:
+                    report["accepted"]+=1
+            except (ValueError,RuntimeError,KeyError,TypeError,OSError) as exc:
+                item.update(error_class=type(exc).__name__,diagnostic=str(exc)[:300])
+            finally:
+                write(root/"multihop-signed.json",report)
+    write(root/"multihop-signed.json",report)
+    return report
+
+
+def decode_packet(wire,claimed_hash,claimed_signature,lookup_evidence):
+    from solders.transaction import VersionedTransaction
+    from solders.message import MessageV0
+    from solders.pubkey import Pubkey
+    from solders.address_lookup_table_account import AddressLookupTableAccount
+    from arb.atomic_v0_lookup import ALT_PROGRAM,resolved_v0_keys
+    raw=base64.b64decode(wire,validate=True)
+    if not 1<=len(raw)<=1232 or digest(raw)!=claimed_hash:
+        raise ValueError("signed packet digest or size mismatch")
+    tx=VersionedTransaction.from_bytes(raw)
+    tx.verify_and_hash_message()
+    if bytes(tx)!=raw or str(tx.signatures[0])!=claimed_signature:
+        raise ValueError("signed packet signature mismatch")
+    lookup=None
+    if isinstance(tx.message,MessageV0):
+        info=lookup_evidence["account"]
+        if info["owner"]!=ALT_PROGRAM or info["executable"] is not False or info["data"][1]!="base64":
+            raise ValueError("untrusted isolated ALT readback")
+        table=base64.b64decode(info["data"][0],validate=True)
+        if (len(table)<88 or (len(table)-56)%32 or len(table)>56+240*32
+                or table[:12]!=b"\x01\x00\x00\x00"+(2**64-1).to_bytes(8,"little")):
+            raise ValueError("invalid isolated ALT bytes")
+        lookup=AddressLookupTableAccount(Pubkey.from_string(lookup_evidence["address"]),
+                    [Pubkey.from_bytes(table[i:i+32]) for i in range(56,len(table),32)])
+        keys=resolved_v0_keys(tx.message,lookup)
+    else:
+        if lookup_evidence is not None:
+            raise ValueError("legacy message has unexpected lookup evidence")
+        keys=list(tx.message.account_keys)
+    return tx,lookup,keys
+
+
+def audit_receipt(receipt,fixture,row,amount):
+    from arb.atomic_graph_coordinator import audit_n_leg_cpi,audit_n_leg_balances,signed_n_leg_post_balances
+    from arb.next_ten_signed_atomic_offline import top_level_events
+    from arb.m5_source_indicative_route_chain import research_chain
+    from arb.m5_signed_start_mint_economics import signed_net_economics
+    fixture_identity(fixture,row)
+    n=row["hops"];mints=fixture["route_mints"];venues=fixture["route_venues"]
+    if (receipt.get("status")!="SIGNED_N_LEG_ATOMIC_AND_ROLLBACK_VERIFIED"
+            or any(receipt.get(k) is not False for k in SAFE)
+            or receipt["state_account_manifest_sha256"]!=fixture["state_account_manifest_sha256"]
+            or receipt["state_accounts_observed_slot"]!=row["source_slot"]
+            or receipt["route_mints"]!=mints or receipt["route_venues"]!=venues
+            or receipt["route_pool_addresses"]!=fixture["route_pool_addresses"]):
+        raise ValueError("unaccepted or mismatched source receipt")
+    evidence=receipt["recorded_n_leg_audit_evidence"]
+    positive,lookup,keys=decode_packet(receipt["signed_transaction_wire_base64"],
+        receipt["signed_transaction_sha256"],receipt["signed_transaction_signature"],evidence["isolated_lookup_account"])
+    negative,_,bad_keys=decode_packet(receipt["negative_signed_transaction_wire_base64"],
+        receipt["negative_signed_transaction_sha256"],receipt["negative_signed_transaction_signature"],evidence["isolated_lookup_account"])
+    accounts=evidence["ephemeral_token_accounts"];owner=evidence["ephemeral_authority"]
+    if (len(accounts)!=n+1 or len(set(accounts))!=n+1 or str(keys[0])!=owner
+            or keys!=bad_keys or positive.message.recent_blockhash!=negative.message.recent_blockhash
+            or positive.signatures[0]==negative.signatures[0]
+            or len(positive.message.instructions)!=n or len(negative.message.instructions)!=n):
+        raise ValueError("negative message context differs")
+    programs=[VENUES[v][0] for v in venues]
+    for i,(a,b) in enumerate(zip(positive.message.instructions,negative.message.instructions)):
+        metas=[str(keys[k]) for k in a.accounts]
+        if (str(keys[a.program_id_index])!=programs[i] or a.program_id_index!=b.program_id_index
+                or a.accounts!=b.accounts or fixture["route_pool_addresses"][i] not in metas
+                or not set(accounts[i:i+2])<=set(metas)
+                or (i<n-1 and a.data!=b.data) or (i==n-1 and a.data==b.data)):
+            raise ValueError("compiled route or negative instruction mismatch")
+    pr,nr=evidence["positive_response"],evidence["negative_response"]
+    expected=[event for p in programs for event in ([p,"invoke"],[p,"success"])]
+    if pr.get("err") is not None or top_level_events(pr.get("logs"),set(programs))!=expected:
+        raise ValueError("positive program trace mismatch")
+    expected[-1][1]="failed"
+    if (not isinstance(nr.get("err"),dict) or nr["err"].get("InstructionError",[None])[0]!=n-1
+            or top_level_events(nr.get("logs"),set(programs))!=expected):
+        raise ValueError("negative final-leg failure mismatch")
+    amounts=receipt["planned_inputs"]
+    if len(amounts)!=n or amounts[0]!=amount or evidence["persistent_before"]!=[amount]+[0]*n:
+        raise ValueError("initial signed exact-input mismatch")
+    post=signed_n_leg_post_balances(pr,accounts,mints,owner)
+    if post!=receipt["positive_post_balances_base_units"]:
+        raise ValueError("recorded post balances differ")
+    cpi=audit_n_leg_cpi(positive,pr,accounts,amounts,lookup=lookup)
+    balances=audit_n_leg_balances(amounts,evidence["persistent_before"],post,
+        rollback_balances=evidence["persistent_after_negative"],later_instruction_failed=True)
+    if balances["status"]!="N_LEG_BALANCES_AND_ROLLBACK_RECONCILED":
+        raise ValueError("recorded rollback reconciliation failed")
+    model=research_chain(fixture,amount_in=amount,observed_unix=row["source_clock"]["unix_timestamp"],
+                         allow_modeled_dlmm=True)
+    economics=signed_net_economics(receipt,start_mint=mints[0],source_slot=row["source_slot"],
+                                  fixture=fixture,observed_unix=row["source_clock"]["unix_timestamp"])
+    if economics!=receipt["signed_start_mint_economics"]:
+        raise ValueError("signed economics recomputation differs")
+    return {"status":"N_LEG_PACKET_AND_RECORDED_RESPONSE_RECHECKED","cpi":cpi,
+            "balances":balances,"source_model":model,"signed_economics":economics,
+            "model_matches_terminal":model.get("output_base_units")==post[-1],
+            "rpc_response_cryptographically_attested":False,"net_profit_verified":False,**SAFE}
+
+
+def audit(source_dir,signed_dir):
+    root=Path(signed_dir);src=Path(source_dir)
+    source_raw=(src/"multihop-source.json").read_bytes()
+    source=json.loads(source_raw);signed=json.loads((root/"multihop-signed.json").read_text())
+    if signed["source_report_sha256"]!=digest(source_raw):
+        raise ValueError("signed source report binding mismatch")
+    rows={r["id"]:r for r in source["routes"]}
+    report={"status":"BLOCKZILLA_MULTIHOP_INDEPENDENT_RECHECK","audited":0,
+            "runner_accepted":signed["accepted"],"attempts":[],**SAFE}
+    for attempt in signed["attempts"]:
+        if attempt["status"]!="SIGNED_N_LEG_ATOMIC_AND_ROLLBACK_VERIFIED":
+            continue
+        item={"id":attempt["id"],"amount":attempt["amount"]}
+        report["attempts"].append(item)
+        try:
+            row=rows[attempt["id"]]
+            fixture_raw=(src/(row["id"]+"-fixture.json")).read_bytes()
+            receipt_raw=(root/attempt["receipt"]).read_bytes()
+            if digest(fixture_raw)!=row["fixture_sha256"] or digest(receipt_raw)!=attempt["receipt_sha256"]:
+                raise ValueError("source or receipt digest mismatch")
+            item["audit"]=audit_receipt(json.loads(receipt_raw),json.loads(fixture_raw),row,attempt["amount"])
+            report["audited"]+=1
+        except (ValueError,RuntimeError,KeyError,TypeError,OSError) as exc:
+            item.update(error_class=type(exc).__name__,diagnostic=str(exc)[:300])
+    write(root/"multihop-audit.json",report)
+    return report
+
+
+def main():
+    p=argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--phase",choices=("source","offline","audit"),required=True)
+    p.add_argument("--directory",required=True)
+    p.add_argument("--source-directory")
+    p.add_argument("--evidence-directory")
+    p.add_argument("--route",choices=("true","false"))
+    args=p.parse_args()
+    if args.phase=="source":
+        result=prepare("http://127.0.0.1:8899",args.evidence_directory,args.directory,
+                       json.loads(Path("arb/pool_registry.json").read_text())["pools"],args.route)
+    elif args.phase=="offline":
+        result=offline("http://127.0.0.1:8899",args.directory)
+    else:
+        result=audit(args.source_directory,args.directory)
+    print(json.dumps(result,sort_keys=True))
+    return 2 if args.phase=="audit" and result["audited"]!=result["runner_accepted"] else 0
+
+
+if __name__=="__main__":
+    raise SystemExit(main())

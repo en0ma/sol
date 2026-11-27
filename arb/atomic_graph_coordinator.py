@@ -380,7 +380,7 @@ def signed_n_leg_post_balances(simulation, accounts, mints, authority):
 
 def simulate_adaptive_n_leg_offline(rpc, legs, tokens, states, evidence, owner,
                                     accounts, initial_amount, observe, signer,
-                                    *, negative_instructions=None, require_closed=True):
+                                    *, negative_instructions=None, require_closed=True, retain_audit_evidence=False):
     """Execute signed offline 2–6-leg adaptive route with CPI and rollback gates.
 
     The supplied observer must independently sign/simulate prefix legs on the
@@ -485,8 +485,20 @@ def simulate_adaptive_n_leg_offline(rpc, legs, tokens, states, evidence, owner,
     idx=error.get("InstructionError",[None])[0] if isinstance(error,dict) else None
     fail_expected=[event for p in programs[:-1] for event in ([p,"invoke"],[p,"success"])]
     fail_expected.extend(([programs[-1],"invoke"],[programs[-1],"failed"]))
+    persistent_after=_post(rpc,accounts,tokens,owner)
     rollback=(idx==n-1 and top_level_events(failure.get("logs") or [],set(programs))==fail_expected
-              and _post(rpc,accounts,tokens,owner)==before)
+              and persistent_after==before)
+    if retain_audit_evidence:
+        from arb.rpc import call
+        lookup_evidence=None
+        if lookup is not None:
+            lookup_evidence={"address":str(lookup.key), "account":call(rpc,"getAccountInfo",
+                [str(lookup.key),{"encoding":"base64","commitment":"confirmed"}]).get("value")}
+        receipt["recorded_n_leg_audit_evidence"]={
+            "ephemeral_token_accounts":list(accounts),"ephemeral_authority":owner,
+            "positive_response":positive,"negative_response":failure,
+            "persistent_before":list(before),"persistent_after_negative":persistent_after,
+            "isolated_lookup_account":lookup_evidence}
     receipt.update(negative_error=str(error),negative_failure_instruction_index=idx,negative_packet_bytes=bad_packet,
                    negative_signed_transaction_sha256=negative_digest,
                    negative_signed_transaction_wire_base64=base64.b64encode(bytes(bad_tx)).decode("ascii"),
@@ -509,7 +521,7 @@ def simulation_decision(*,simulation_verified,rollback_verified,net_profit_base_
 
 def coordinate_registered_cycle_offline(rpc,registry,route,states,evidence,owner,
                                         token_accounts,initial_amount,signer,
-                                        *,negative_instructions,observe=None):
+                                        *,negative_instructions,observe=None,retain_audit_evidence=False):
     """Run an admitted registered 2-6-leg cycle through the EXISTING coordinator.
 
     The registered pool list is authoritative for identity; venue builders
@@ -577,7 +589,8 @@ def coordinate_registered_cycle_offline(rpc,registry,route,states,evidence,owner
     # adapter, CPI verifier and rollback verifier remain authoritative.
     receipt=simulate_adaptive_n_leg_offline(
         rpc,legs,tokens,states,evidence,owner,list(token_accounts),
-        initial_amount,observe,signer,negative_instructions=negative_instructions)
+        initial_amount,observe,signer,negative_instructions=negative_instructions,
+        retain_audit_evidence=retain_audit_evidence)
     observed=observed_registered_signed_cycle_economics(
         {"start_mint":tokens[0],"legs":legs},receipt)
     return {"status":"REGISTERED_SIX_VENUE_COORDINATOR_OFFLINE_RESULT",
