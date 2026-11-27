@@ -236,14 +236,13 @@ def offline(rpc, directory):
             result["offline_clock_alignment"] = clock_guard(rpc, fixture)
             receipt = run(rpc, fixture, amount_in=AMOUNT, amount_intermediate=1,
                           batch=(tuple(row["venues"]),), adaptive_all_venues=True,
-                          program_cache=programs)
+                          program_cache=programs, retain_legacy_audit_evidence=True)
             path = root / (row["id"] + "-receipt.json")
             write(path, receipt)
             result["receipt"] = path.name
             result["receipt_sha256"] = digest(path.read_bytes())
             result["receipt_status"] = receipt.get("status")
             if accepted_receipt(receipt, row, fixture):
-                output["signed_and_rollback_verified"] += 1
                 result.update({"status": "EXISTING_PAIR_RUNNER_SIGNED_ROLLBACK_ACCEPTED",
                     "signature": receipt["transaction_signature"],
                     "observed_gross_delta_start_mint_base_units":
@@ -256,6 +255,15 @@ def offline(rpc, directory):
                     quote = json.loads(qraw)
                     if quote.get("indicative_all_legs") is True:
                         result["indicative_gross_delta_start_mint_base_units"] = quote["gross_delta_start_mint_base_units"]
+                from arb.blockzilla_pair_evidence import compare_models
+                try:
+                    comparison = compare_models(fixture, row, receipt)
+                    model_path = root / (row["id"] + "-model-comparison.json")
+                    write(model_path, comparison)
+                    result["model_comparison_sha256"] = digest(model_path.read_bytes())
+                except (ValueError, RuntimeError, KeyError, TypeError, OSError) as exc:
+                    result["model_comparison_error"] = type(exc).__name__
+                output["signed_and_rollback_verified"] += 1
             else:
                 result["status"] = "SIGNED_OR_ROLLBACK_NOT_ACCEPTED"
         except (ValueError, RuntimeError, KeyError, TypeError, OSError) as exc:

@@ -25,6 +25,8 @@ on:
       - "arb/blockzilla_ci_gate.py"
       - "arb/blockzilla_rpc_comparison.py"
       - "arb/blockzilla_pair_trials.py"
+      - "arb/blockzilla_pair_evidence.py"
+      - "arb/next_ten_signed_atomic_offline.py"
       - "ci/build_blockzilla_reader.sh"
       - "tests/test_blockzilla*"
       - ".github/workflows/blockzilla-historical-discovery.yml"
@@ -44,7 +46,7 @@ jobs:
       - run: |
           python3 -m pip install --disable-pip-version-check solders==0.26.0
           bash -n ci/build_blockzilla_reader.sh
-          python3 -m py_compile arb/blockzilla_discovery.py arb/blockzilla_native_archive.py arb/blockzilla_ci_gate.py arb/blockzilla_rpc_comparison.py arb/blockzilla_pair_trials.py
+          python3 -m py_compile arb/blockzilla_discovery.py arb/blockzilla_native_archive.py arb/blockzilla_ci_gate.py arb/blockzilla_rpc_comparison.py arb/blockzilla_pair_trials.py arb/blockzilla_pair_evidence.py
           python3 -m unittest discover -s tests -p 'test_blockzilla*.py' -v
   http-probe:
     needs: unit
@@ -291,6 +293,30 @@ jobs:
           path: |
             ${{ runner.temp }}/blockzilla-pairs/*-report.json
             ${{ runner.temp }}/blockzilla-pairs/*-receipt.json
+            ${{ runner.temp }}/blockzilla-pairs/*-model-comparison.json
             ${{ runner.temp }}/blockzilla-pair-offline.log
+          if-no-files-found: warn
+          retention-days: 7
+  independent-pair-evidence:
+    needs: isolated-pair-offline
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - uses: actions/download-artifact@v4
+        with:
+          name: blockzilla-isolated-pair-signed
+          path: ${{ runner.temp }}/blockzilla-pair-evidence
+      - name: Recheck signed packets, recorded CPI and rollback without RPC secrets
+        run: |
+          python3 -m arb.blockzilla_pair_evidence --directory "$RUNNER_TEMP/blockzilla-pair-evidence/blockzilla-pairs"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: blockzilla-independent-pair-audit
+          path: ${{ runner.temp }}/blockzilla-pair-evidence/blockzilla-pairs/pair-independent-audit.json
           if-no-files-found: warn
           retention-days: 7

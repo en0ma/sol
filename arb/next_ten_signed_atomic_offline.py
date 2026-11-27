@@ -216,7 +216,8 @@ def authenticate_pumpswap_runtime_metas(rpc, required, accounts, *, rpc_lookup=N
 
 
 def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache=None,batch=BATCH_10,
-        adaptive_cpmm_v4=False, adaptive_all_venues=False, adaptive_three_hop=False, adaptive_hops=None):
+        adaptive_cpmm_v4=False, adaptive_all_venues=False, adaptive_three_hop=False, adaptive_hops=None,
+        retain_legacy_audit_evidence=False):
     local_rpc_only(rpc)
     if any(type(n)is not int or not 0<n<2**64 for n in (amount_in,amount_intermediate)):
         raise ValueError("invalid atomic amounts")
@@ -460,6 +461,15 @@ def run(rpc,fixture,*,amount_in=100000000,amount_intermediate=1000,program_cache
                   if isinstance(error,dict) else None)
     persistent=_post(rpc,keys,mints,owner)
     rollback=(failed_index==1 and bad_events==required and persistent==before)
+    if retain_legacy_audit_evidence and lookup is None:
+        # Only ephemeral isolated simulation packets, no private key or broadcast.
+        result["legacy_pair_audit_evidence"] = {
+            "positive_packet_base64": base64.b64encode(bytes(tx)).decode(),
+            "negative_packet_base64": base64.b64encode(bytes(bad)).decode(),
+            "ephemeral_token_accounts": keys, "ephemeral_authority": owner,
+            "positive_response": positive, "negative_response": failed,
+            "persistent_before": before, "persistent_after_negative": persistent,
+        }
     result.update(negative_logs=failed.get("logs") or [],
                   negative_error=str(error),
                   negative_persistent_balances_base_units=persistent,
