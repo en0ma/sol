@@ -27,6 +27,8 @@ on:
       - "arb/blockzilla_pair_trials.py"
       - "arb/blockzilla_pair_evidence.py"
       - "arb/meteora_dlmm_bin_quote.py"
+      - "arb/meteora_dlmm_source_fee_decoder.py"
+      - "arb/m5_source_indicative_route_chain.py"
       - "arb/meteora_dlmm_source_fee_envelope.py"
       - "arb/next_ten_signed_atomic_offline.py"
       - "ci/build_blockzilla_reader.sh"
@@ -314,9 +316,13 @@ jobs:
         with:
           name: blockzilla-isolated-pair-signed
           path: ${{ runner.temp }}/blockzilla-pair-evidence
-      - name: Recheck signed packets, recorded CPI and rollback without RPC secrets
+      - uses: actions/download-artifact@v4
+        with:
+          name: blockzilla-isolated-pair-source
+          path: ${{ runner.temp }}/blockzilla-pair-original-source
+      - name: Recheck signed packets, recorded CPI, rollback and recompute source pricing without RPC secrets
         run: |
-          python3 -m arb.blockzilla_pair_evidence --directory "$RUNNER_TEMP/blockzilla-pair-evidence/blockzilla-pairs"
+          python3 -m arb.blockzilla_pair_evidence --directory "$RUNNER_TEMP/blockzilla-pair-evidence/blockzilla-pairs" --source-directory "$RUNNER_TEMP/blockzilla-pair-original-source"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

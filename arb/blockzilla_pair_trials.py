@@ -93,6 +93,7 @@ def prepare(rpc, evidence_dir, directory, baseline, route):
               "source_evidence_gate": accepted["status"],
               "excluded_from_primary_inventory": True, "routes": routes,
               "source_captured": 0, "indicative_chains_completed": 0,
+              "modeled_chains_completed": 0,
               "amount_in_base_units": AMOUNT, **SAFE}
     for row in routes:
         row["capture_status"] = "NOT_CAPTURED"
@@ -122,7 +123,7 @@ def prepare(rpc, evidence_dir, directory, baseline, route):
             clock = source_clock(rpc)
             row["source_clock"] = clock
             quote = research_chain(fixture, amount_in=AMOUNT,
-                                   observed_unix=clock["unix_timestamp"])
+                                   observed_unix=clock["unix_timestamp"],allow_modeled_dlmm=True)
             quote_path = root / (row["id"] + "-quote.json")
             write(quote_path, quote)
             row["quote_status"] = quote["status"]
@@ -130,6 +131,8 @@ def prepare(rpc, evidence_dir, directory, baseline, route):
             row["quote_sha256"] = digest(quote_path.read_bytes())
             if quote.get("indicative_all_legs") is True:
                 report["indicative_chains_completed"] += 1
+            if quote.get("modeled_all_legs") is True:
+                report["modeled_chains_completed"] += 1
         except (ValueError, RuntimeError, KeyError, TypeError, OSError) as exc:
             row["failure_class"] = type(exc).__name__
             # Only local source errors, no remote RPC credential strings.

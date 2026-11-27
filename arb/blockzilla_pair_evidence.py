@@ -176,16 +176,23 @@ def compare_models(fixture, row, receipt):
             "protocol_exact_verified": False, "net_profit_verified": False, **SAFE}
 
 
-def audit_directory(directory):
+def audit_directory(directory, source_directory):
     root = Path(directory)
-    source = json.loads((root/"pair-source-report.json").read_text())
+    from arb.blockzilla_pair_trials import pair_identity
+    from arb.m5_source_indicative_route_chain import research_chain
+    source_root = Path(source_directory)
+    source_raw = (source_root/"pair-source-report.json").read_bytes()
+    if source_raw != (root/"pair-source-report.json").read_bytes():
+        raise ValueError("source report differs from offline handoff")
+    source = json.loads(source_raw)
     signed = json.loads((root/"pair-signed-report.json").read_text())
     if any(report.get(k) is not False for report in (source, signed) for k in SAFE):
         raise ValueError("unsafe reports")
     routes = {r["id"]: r for r in source["routes"]}
     output = {"status": "ISOLATED_PAIR_ARTIFACT_RECHECK", "runner_accepted": 0,
               "packet_and_recorded_simulation_audited": 0, "model_samples": 0,
-              "matching_model_samples": 0, "routes": [],
+              "matching_model_samples": 0, "recomputed_model_routes": 0,
+              "recomputed_route_chains": 0, "matching_modeled_route_outputs": 0, "routes": [],
               "excluded_from_primary_inventory": True, "net_profit_verified": False, **SAFE}
     for row in signed["routes"]:
         if row["status"] != "EXISTING_PAIR_RUNNER_SIGNED_ROLLBACK_ACCEPTED":
@@ -205,7 +212,32 @@ def audit_directory(directory):
             if digest(comparison_raw) != row["model_comparison_sha256"]:
                 raise ValueError("model evidence hash mismatch")
             comparison = json.loads(comparison_raw)
-            result["model_comparison"] = comparison
+            fixture_raw = (source_root/(row["id"]+"-fixture.json")).read_bytes()
+            if digest(fixture_raw) != original["fixture_sha256"]:
+                raise ValueError("source fixture hash mismatch during audit")
+            fixture = json.loads(fixture_raw)
+            pair_identity(fixture, original)
+            if (receipt.get("state_account_manifest_sha256") != fixture["state_account_manifest_sha256"] or
+                    receipt.get("state_accounts_observed_slot") != original["source_slot"]):
+                raise ValueError("receipt source binding mismatch")
+            recomputed = compare_models(fixture, original, receipt)
+            if recomputed != comparison:
+                raise ValueError("independent source model recomputation mismatch")
+            output["recomputed_model_routes"] += 1
+            result["model_comparison"] = recomputed
+            quote_raw = (source_root/(row["id"]+"-quote.json")).read_bytes()
+            if digest(quote_raw) != original["quote_sha256"]:
+                raise ValueError("source route quote hash mismatch")
+            chain = research_chain(fixture,amount_in=source["amount_in_base_units"],
+                observed_unix=original["source_clock"]["unix_timestamp"],allow_modeled_dlmm=True)
+            if chain != json.loads(quote_raw):
+                raise ValueError("independent route chain recomputation mismatch")
+            output["recomputed_route_chains"] += 1
+            result["recomputed_route_chain"] = chain
+            if chain.get("modeled_all_legs") is True:
+                matched = chain["output_base_units"] == receipt["positive_post_balances_base_units"][2]
+                result["modeled_route_output_matches_signed"] = matched
+                output["matching_modeled_route_outputs"] += int(matched)
             for leg in comparison["legs"]:
                 if type(leg.get("modeled_output")) is int:
                     output["model_samples"] += 1
@@ -222,8 +254,10 @@ if __name__ == "__main__":
     import argparse
     p = argparse.ArgumentParser()
     p.add_argument("--directory", required=True)
+    p.add_argument("--source-directory", required=True)
     args = p.parse_args()
-    report = audit_directory(args.directory)
+    report = audit_directory(args.directory,args.source_directory)
     print(json.dumps(report, sort_keys=True))
-    if report["packet_and_recorded_simulation_audited"] != report["runner_accepted"]:
+    if any(report[k] != report["runner_accepted"] for k in (
+            "packet_and_recorded_simulation_audited","recomputed_model_routes","recomputed_route_chains")):
         raise SystemExit(2)

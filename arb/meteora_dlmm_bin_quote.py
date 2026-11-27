@@ -27,7 +27,7 @@ def quote_one_bin(*,amount_in,swap_x_for_y,price_q64,bin_x,bin_y,total_fee_rate,
             "protocol_exact_verified":False,"actionable":False,
             "live_execution_approved":False,"broadcast":False}
 
-def quote_bins(*,amount_in,swap_x_for_y,bins,total_fee_rate,max_bins=32):
+def quote_bins(*,amount_in,swap_x_for_y,bins,total_fee_rate,max_bins=32,fee_on_input=True):
     """Price a bounded sequence of externally decoded DLMM bins.
 
     Bins MUST be provided in directional walk order by a source-authenticated
@@ -41,8 +41,10 @@ def quote_bins(*,amount_in,swap_x_for_y,bins,total_fee_rate,max_bins=32):
         raise ValueError("DLMM direction or fee invalid")
     if not isinstance(bins,list) or not 1<=len(bins)<=max_bins<=70:
         raise ValueError("DLMM bounded bins missing")
+    if type(fee_on_input) is not bool:
+        raise ValueError("explicit DLMM fee denomination required")
     remaining=amount_in
-    output=fees=0
+    output=fees=output_fees=0
     consumed=[]
     prior=None
     for b in bins:
@@ -72,29 +74,46 @@ def quote_bins(*,amount_in,swap_x_for_y,bins,total_fee_rate,max_bins=32):
         # or overconsume input on a price plateau.
         net_capacity=((capacity*Q+price-1)//price if swap_x_for_y
                       else (capacity*price+Q-1)//Q)
-        capacity_fee=(net_capacity*rate+(DEN-rate)-1)//(DEN-rate)
-        gross_capacity=net_capacity+capacity_fee
-        if remaining>=gross_capacity:
-            used=gross_capacity
-            fee=capacity_fee
-            got=capacity
+        # The current SDK OnlyY collection mode charges on gross Y output
+        # for X->Y, not on X input. Drain MM capacity before deducting
+        # output fee, and never add fees denominated in unlike tokens.
+        if fee_on_input:
+            capacity_fee=(net_capacity*rate+(DEN-rate)-1)//(DEN-rate)
+            gross_capacity=net_capacity+capacity_fee
+            if remaining>=gross_capacity:
+                used=gross_capacity
+                fee=capacity_fee
+                gross_out=capacity
+            else:
+                used=remaining
+                fee=(used*rate+DEN-1)//DEN
+                net=used-fee
+                gross_out=min(capacity,net*price//Q if swap_x_for_y else net*Q//price)
+            output_fee=0
         else:
-            used=remaining
-            fee=(used*rate+DEN-1)//DEN
-            net=used-fee
-            got=min(capacity,net*price//Q if swap_x_for_y else net*Q//price)
-        if not 0<used<=remaining or not 0<=fee<=used:
+            used=min(remaining,net_capacity)
+            fee=0
+            gross_out=(capacity if used==net_capacity else
+                min(capacity,used*price//Q if swap_x_for_y else used*Q//price))
+            output_fee=(gross_out*rate+DEN-1)//DEN
+        got=gross_out-output_fee
+        if (not 0<used<=remaining or not 0<=fee<=used
+                or not 0<=output_fee<=gross_out<=capacity):
             raise ValueError("invalid DLMM capacity input or fee")
         if got<=0:
             raise ValueError("DLMM input cannot produce positive output in funded bin")
-        remaining-=used;output+=got;fees+=fee
+        remaining-=used;output+=got;fees+=fee;output_fees+=output_fee
         consumed.append({"bin_id":idx,"gross_input_base_units":used,
                          "fee_input_base_units":fee,"output_base_units":got,
+                         "gross_output_base_units":gross_out,
+                         "fee_output_base_units":output_fee,
                          "effective_fee_rate":rate})
         if remaining==0:break
-    if remaining or not 0<output<2**64 or not 0<=fees<2**64:
+    if remaining or not 0<output<2**64 or not 0<=fees<2**64 or not 0<=output_fees<2**64:
         raise ValueError("DLMM bin inventory cannot fill bounded exact input/output")
     return {"amount_out":output,"fee_input_base_units":fees,
+            "fee_output_base_units":output_fees,"fee_on_input":fee_on_input,
+            "liquidity_scope":"MARKET_MAKER_BINS_ONLY",
             "bins_traversed":consumed,"exact_input_filled":True,
             "protocol_exact_verified":False,"actionable":False,
             "live_execution_approved":False,"broadcast":False}

@@ -305,3 +305,5 @@ If archive-derived identities share a token pair, test the existing two-leg sour
 Retain ephemeral isolated legacy positive/negative packet bytes and recorded local simulation response only for the bounded experimental pair trials. Recheck signatures, instruction accounts/order, CPI and balance/rollback from artifacts separately; do not confuse RPC response recheck with independent replay or attestation. Compare native model against actual signed leg amounts without promoting source-clock scenarios to exact pricing.
 
 Native DLMM market-maker bin exhaustion must use upward inverse-price capacity input, fee on net capacity, and capped output, not floor-output binary search. Preserve actual per-bin consumption and source/isolated Clock distinctions. No automatic protocol-exact promotion from finite sample agreement.
+
+DLMM OnlyY fees must be charged on output for X→Y and input for Y→X. Keep denomination-specific fee totals, MM-only scope, and modeled chain separate from executable pricing. Recompute artifact quotes from original source fixture bytes on a separate runner rather than trusting saved quote output alone.

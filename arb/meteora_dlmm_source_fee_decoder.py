@@ -92,7 +92,7 @@ def fee_bounds_from_fixture(fixture, *, pool, observed_unix):
             "pool":pool,"source_slot":fixture["state_accounts_observed_slot"],**SAFE}
 
 def dynamic_fee_rate_by_bin(raw, *, bin_step, observed_unix, active_bin_id,
-                            visited_bin_ids, swap_x_for_y):
+                            visited_bin_ids, swap_x_for_y, allow_output_fee=False):
     """Reproduce integer volatility references and bin-crossing fee numerators.
 
     Based on Meteora DLMM LbPair update_references,
@@ -112,7 +112,10 @@ def dynamic_fee_rate_by_bin(raw, *, bin_step, observed_unix, active_bin_id,
     mode=static["collect_fee_mode"]
     if mode not in (0,1):
         raise ValueError("unsupported native DLMM fee collection mode")
-    if mode==1 and swap_x_for_y:
+    if type(allow_output_fee) is not bool:
+        raise ValueError("explicit DLMM output fee support required")
+    fee_on_input=(mode==0 or not swap_x_for_y)
+    if not fee_on_input and not allow_output_fee:
         raise ValueError("DLMM Y-only output-denominated fee requires separate pricing")
     elapsed=observed_unix-variable["last_update_timestamp"]
     if elapsed<0:
@@ -141,6 +144,6 @@ def dynamic_fee_rate_by_bin(raw, *, bin_step, observed_unix, active_bin_id,
     return {"rates":rates,"reference_bin_id":index,
             "updated_volatility_reference":reference,
             "observed_unix":observed_unix,
-            "fee_collect_mode":mode,
+            "fee_collect_mode":mode,"fee_on_input":fee_on_input,
             "integer_fee_schedule_derived":True,
             "protocol_exact_verified":False,**SAFE}

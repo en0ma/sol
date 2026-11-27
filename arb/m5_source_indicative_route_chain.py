@@ -7,7 +7,9 @@ execution-ready. Reuses existing all-seven signed native quote dispatcher.
 from arb.fixture_quote_execution_pipeline import extract_pool_states
 from arb.fixture_all_venue_signed_quotes import quote_leg
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
-def research_chain(fixture, *, amount_in, observed_unix):
+def research_chain(fixture, *, amount_in, observed_unix, allow_modeled_dlmm=False):
+    if type(allow_modeled_dlmm) is not bool:
+        raise ValueError("explicit modeled quote opt-in required")
     rows=extract_pool_states(fixture)
     if any(fixture.get(k) is not False for k in SAFE):
         raise ValueError("unsafe native route fixture")
@@ -23,13 +25,36 @@ def research_chain(fixture, *, amount_in, observed_unix):
         raise ValueError("source account mint topology differs from route")
     current=amount_in
     trace=[]
+    modeled_legs=0
     for index,row in enumerate(rows):
         result=quote_leg(fixture,leg_index=index,amount_in=current,
                          observed_unix=observed_unix)
         if not isinstance(result,dict) or any(result.get(k) is not False for k in SAFE):
             raise ValueError("unsafe or malformed native leg quote")
         status=result.get("quote_status")
-        if status!="SOURCE_BOUND_INDICATIVE":
+        next_amount=result.get("predicted_output_base_units")
+        modeled=False
+        if (allow_modeled_dlmm and row["venue"]=="meteora_dlmm"
+                and status=="NATIVE_QUOTE_SOURCE_DERIVED_NOT_EXACT"):
+            envelope=result.get("native_fee_envelope")
+            if not isinstance(envelope,dict):
+                raise ValueError("missing source DLMM fee envelope")
+            effective=envelope.get("source_derived_dynamic_fee_quote")
+            if (envelope.get("pool")!=row["address"] or
+                    envelope.get("input_mint")!=mints[index] or
+                    envelope.get("output_mint")!=mints[index+1] or
+                    envelope.get("input_base_units")!=current or
+                    envelope.get("source_slot")!=fixture["state_accounts_observed_slot"] or
+                    not isinstance(effective,dict) or
+                    effective.get("status")!="SOURCE_VOLATILITY_DYNAMIC_FEE_MODELED" or
+                    effective.get("source_clock")!=observed_unix or
+                    effective.get("protocol_exact_verified") is not False or
+                    any(effective.get(k) is not False for k in SAFE)):
+                raise ValueError("source DLMM modeled quote identity mismatch")
+            next_amount=effective.get("amount_out")
+            modeled=True
+            modeled_legs+=1
+        if status!="SOURCE_BOUND_INDICATIVE" and not modeled:
             return {"status":"NATIVE_ROUTE_INDICATIVE_BLOCKED",
                     "blocked_leg_index":index,"blocked_venue":row["venue"],
                     "reason":result.get("reason","source native quote missing")[:240],
@@ -39,20 +64,23 @@ def research_chain(fixture, *, amount_in, observed_unix):
                 result.get("venue") not in (None,row["venue"]) or
                 result.get("source_slot")!=fixture.get("state_accounts_observed_slot")):
             raise ValueError("native quote source slot mismatch")
-        next_amount=result.get("predicted_output_base_units")
         if type(next_amount)is not int or not 0<next_amount<2**64:
             raise ValueError("invalid native predicted amount")
         trace.append({"index":index,"venue":row["venue"],"pool":row["address"],
                       "input_base_units":current,"output_base_units":next_amount,
-                      "source_slot":result["source_slot"]})
+                      "source_slot":result["source_slot"],"quote_status":status,
+                      "uses_unverified_dynamic_fee_model":modeled})
         current=next_amount
-    return {"status":"SOURCE_BOUND_INDICATIVE_CHAIN_NOT_EXECUTION_VERIFIED",
+    return {"status":("SOURCE_BOUND_MODELED_CHAIN_NOT_EXECUTION_VERIFIED" if modeled_legs
+                      else "SOURCE_BOUND_INDICATIVE_CHAIN_NOT_EXECUTION_VERIFIED"),
             "hops":len(rows),"input_base_units":amount_in,"output_base_units":current,
             "gross_delta_start_mint_base_units":current-amount_in,
             "estimated_cost_start_mint_base_units":None,
             "net_delta_start_mint_base_units":None,
             "net_economics_status":"UNCONVERTED_NETWORK_AND_PRIORITY_COSTS",
-            "full_route_quoted":False,"indicative_all_legs":True,
+            "full_route_quoted":False,"indicative_all_legs":not bool(modeled_legs),
+            "modeled_all_legs":bool(modeled_legs),"modeled_leg_count":modeled_legs,
+            "protocol_exact_verified":False,
             "quoted_legs":trace,"signed_simulation_verified":False,
             "net_profit_verified":False,**SAFE}
 

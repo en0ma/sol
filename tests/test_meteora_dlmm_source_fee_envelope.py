@@ -24,14 +24,14 @@ class DlmmSourceEnvelopeTests(unittest.TestCase):
         walk.return_value={"bins":[{"bin_id":5,"amount_x":200,"amount_y":200,
                                     "price_q64":1<<64}]}
         dynamic.return_value={"fee_collect_mode":0,"observed_unix":123,
-            "rates":[{"bin_id":5,"effective_fee_rate":5000}]}
-        rates.return_value={"base_fee_rate_numerator":1000,
+            "rates":[{"bin_id":5,"effective_fee_rate":5000}],"fee_on_input":True}
+        rates.return_value={"static":{"collect_fee_mode":0},"base_fee_rate_numerator":1000,
                              "minimum_total_fee_rate_numerator":1000,
                              "maximum_total_fee_rate_numerator":100000000}
         quote.side_effect=[
-            {"amount_out":100,"fee_input_base_units":1,"bins_traversed":[]},
-            {"amount_out":90,"fee_input_base_units":10,"bins_traversed":[]},
-            {"amount_out":95,"fee_input_base_units":5,"bins_traversed":[]}]
+            {"amount_out":100,"fee_input_base_units":1,"fee_output_base_units":0,"bins_traversed":[]},
+            {"amount_out":90,"fee_input_base_units":10,"fee_output_base_units":0,"bins_traversed":[]},
+            {"amount_out":95,"fee_input_base_units":5,"fee_output_base_units":0,"bins_traversed":[]}]
         result=quote_fee_envelope(self.fixture(),pool=POOL,mint_in="X",
             amount_in=101,observed_unix=123,maximum_arrays=1)
         self.assertEqual(result["lower_output_bound"],90)
