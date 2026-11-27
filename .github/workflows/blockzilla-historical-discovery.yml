@@ -23,6 +23,7 @@ on:
       - "arb/blockzilla_discovery.py"
       - "arb/blockzilla_native_archive.py"
       - "arb/blockzilla_ci_gate.py"
+      - "ci/build_blockzilla_reader.sh"
       - "tests/test_blockzilla*"
       - ".github/workflows/blockzilla-historical-discovery.yml"
 permissions:
@@ -40,6 +41,7 @@ jobs:
           persist-credentials: false
       - run: |
           python3 -m pip install --disable-pip-version-check solders==0.26.0
+          bash -n ci/build_blockzilla_reader.sh
           python3 -m py_compile arb/blockzilla_discovery.py arb/blockzilla_native_archive.py arb/blockzilla_ci_gate.py
           python3 -m unittest discover -s tests -p 'test_blockzilla*.py' -v
   http-probe:
@@ -102,10 +104,7 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/blockzilla-native"
           python3 -m pip install --disable-pip-version-check solders==0.26.0
-          test "$(git -C upstream-blockzilla rev-parse HEAD)" = c8265ad3e61a36e8f8f2dee49020f6bb0f01f220
-          rustup toolchain install 1.98.0 --profile minimal
-          cd upstream-blockzilla
-          cargo +1.98.0 build --locked -p blockzilla
+          bash ci/build_blockzilla_reader.sh upstream-blockzilla "$RUNNER_TEMP/blockzilla-native"
       - name: Scan bounded archive rows for seven venue programs
         timeout-minutes: 20
         env:

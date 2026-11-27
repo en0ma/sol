@@ -346,3 +346,5 @@ All proof concerns local isolated Surfpool signed simulation only. No independen
 Blockzilla HTTP feasibility attempt #46002136898 failed (artifact 15198772221 inspected: zero bytes, zero crosschecked blocks). Native pinned Compact V2 fallback implemented; keep both acceptance boxes unchecked until actual archive and source artifacts pass.
 
 Blockzilla #46027571576 false green: artifact 15213190388 proves seven HTTP 403 responses, zero bytes. Native/source jobs skipped because routing output was not written. New mandatory evidence gate and direct output writer added; both empirical acceptance boxes remain unchecked.
+
+Blockzilla run 46050780906: HTTP 403 confirmed (artifact 15224361688), fallback routing and mandatory failure gate behaved correctly; native gxhash build failed for missing AES/SSE2. Documented target-cpu=native build flags, CPU preflight and durable build diagnostics added; empirical boxes still unchecked.

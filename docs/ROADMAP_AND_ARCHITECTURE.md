@@ -293,3 +293,5 @@ An optional bounded archive HTTP reader may seed existing registry authenticatio
 When the HTTP gateway returns no independently matched blocks, the optional experiment can use a pinned upstream Compact V2 program-dump on a separate uncredentialed runner. Its signature leads require finalized independent membership/program/status checks before account hints, then existing source verification. It does not establish archive packet-byte parity or replace the current source-state RPC.
 
 The experimental workflow must fail on missing route selection, skipped expected jobs, or missing/inconsistent evidence. A successful zero-pool measurement is distinct from unavailable data; no positive benefit follows from workflow green alone.
+
+The pinned reader must be built and run on the same uncredentialed runner with the documented native CPU flags; preserve build inputs and diagnostics even when compilation fails. Do not claim archive access from build success alone.
