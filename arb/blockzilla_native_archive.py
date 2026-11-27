@@ -251,6 +251,40 @@ def read_manifest(directory):
     return data, digest(raw)
 
 
+def read_venue_dump(directory, manifest, venue):
+    result = manifest["venues"].get(venue, {})
+    if result.get("completed") is not True or result.get("program_id") != VENUES[venue][0]:
+        raise ValueError("archive venue dump not completed")
+    path = Path(directory) / (venue + ".jsonl")
+    if path.stat().st_size > MAX_DUMP_BYTES:
+        raise ValueError("oversized archive dump")
+    raw = path.read_bytes()
+    if digest(raw) != result.get("dump_sha256") or len(raw) != result.get("dump_bytes"):
+        raise ValueError("archive dump digest mismatch")
+    rows = parse_dump(raw)
+    if len(rows) != result.get("successful_rows"):
+        raise ValueError("archive dump count mismatch")
+    return rows
+
+
+def select_samples(rows, per_venue):
+    if type(per_venue) is not int or not 1 <= per_venue <= 4:
+        raise ValueError("invalid RPC sample budget")
+    chosen, used_slots, used_signatures = [], set(), set()
+    for distinct in (True, False):
+        for row in rows:
+            if row["signature"] in used_signatures or (distinct and row["slot"] in used_slots):
+                continue
+            chosen.append(row)
+            used_slots.add(row["slot"])
+            used_signatures.add(row["signature"])
+            if len(chosen) >= per_venue:
+                break
+        if len(chosen) >= per_venue:
+            break
+    return chosen
+
+
 def sample_leads(directory, manifest, *, per_venue=2):
     if type(per_venue) is not int or not 1 <= per_venue <= 4:
         raise ValueError("invalid RPC sample budget")
@@ -262,34 +296,13 @@ def sample_leads(directory, manifest, *, per_venue=2):
             rejected.append({"venue": venue, "reason": "ARCHIVE_DUMP_NOT_COMPLETED"})
             continue
         try:
-            path = root / (venue + ".jsonl")
-            if path.stat().st_size > MAX_DUMP_BYTES:
-                raise ValueError("oversized archive dump")
-            raw = path.read_bytes()
-            if digest(raw) != result.get("dump_sha256") or len(raw) != result.get("dump_bytes"):
-                raise ValueError("archive dump digest mismatch")
-            rows = parse_dump(raw)
-            if len(rows) != result.get("successful_rows"):
-                raise ValueError("archive dump count mismatch")
+            rows = read_venue_dump(root, manifest, venue)
         except Exception as exc:
             rejected.append({"venue": venue, "reason": "ARCHIVE_DUMP_REJECTED",
                              "error_class": type(exc).__name__})
             continue
         counts[venue] = len(rows)
-        # First spread samples across distinct slots, then fill from remaining rows.
-        chosen, used_slots, used_signatures = [], set(), set()
-        for distinct in (True, False):
-            for row in rows:
-                if row["signature"] in used_signatures or (distinct and row["slot"] in used_slots):
-                    continue
-                chosen.append(row)
-                used_slots.add(row["slot"])
-                used_signatures.add(row["signature"])
-                if len(chosen) >= per_venue:
-                    break
-            if len(chosen) >= per_venue:
-                break
-        leads.extend({"venue": venue, **row} for row in chosen)
+        leads.extend({"venue": venue, **row} for row in select_samples(rows, per_venue))
     return leads, rejected, counts
 
 
@@ -306,9 +319,14 @@ def verify_leads(rpc_url, baseline, directory, *, per_venue=2, rpc_call=call):
     checked_signatures, checked_slots = set(), set()
     multi_venue, errors = [], list(rejected)
 
+    response_json_bytes = Counter()
+
     def rpc(method, params):
         logical_rpc[method] += 1
-        return rpc_call(rpc_url, method, params, timeout=20, retries=1)
+        result = rpc_call(rpc_url, method, params, timeout=20, retries=1)
+        # Reserialized successful RPC results, not transport bytes or retry cost.
+        response_json_bytes[method] += len(json.dumps(result, separators=(",", ":")).encode())
+        return result
 
     for lead in leads:
         sig, slot, venue, index = (lead[k] for k in ("signature", "slot", "venue", "tx_index"))
@@ -369,6 +387,8 @@ def verify_leads(rpc_url, baseline, directory, *, per_venue=2, rpc_call=call):
             "archive_successful_dump_rows_by_venue": counts,
             "crosschecked_blocks": len(checked_slots), "crosschecked_transactions": len(checked_signatures),
             "sample_checks": samples, "independent_rpc_logical_requests": dict(logical_rpc),
+            "successful_rpc_result_json_bytes": dict(response_json_bytes),
+            "sample_budget_per_venue": per_venue,
             "successful_dex_transactions_by_venue": dict(venues),
             "candidate_hints": [row for venue in VENUES for row in grouped[venue][:24]],
             "distinct_novel_hints_by_venue": {v: len(grouped[v]) for v in VENUES},

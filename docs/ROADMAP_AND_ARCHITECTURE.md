@@ -297,3 +297,5 @@ The experimental workflow must fail on missing route selection, skipped expected
 The pinned reader must be built and run on the same uncredentialed runner with the documented native CPU flags; preserve build inputs and diagnostics even when compilation fails. Do not claim archive access from build success alone.
 
 Native archive control files may exceed the output cap. Bound stdout/stderr independently; retain explicit per-file cache, sampled aggregate cache, disk floor and deadline constraints. Do not report cache size as network usage or partial output as successful archive evidence.
+
+For comparative evaluation, read direct finalized RPC full blocks over the same observed successful archive slots, share per-venue sample/candidate/source-verification budgets, measure pair and triangle topology separately, preserve incomplete control results and distinguish logical calls/result JSON bytes from real network/billing. No archive-derived identity is automatically admitted.

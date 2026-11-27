@@ -339,8 +339,8 @@ All proof concerns local isolated Surfpool signed simulation only. No independen
 
 ## M5 Blockzilla experimental acceptance — 2026-11-27
 
-- [ ] Feasibility: archive HTTP retrieval and finalized independent sample match in GitHub Actions; inspect actual artifact.
-- [ ] Discovery: existing seven-venue source decoder/vault verifier authenticates novel hints; measure incremental topology separately from primary inventory.
+- [x] Feasibility (native Compact V2 fallback): archive retrieval and finalized independent sample match in GitHub Actions; actual artifacts inspected. HTTP gateway remains unavailable.
+- [x] Discovery: existing seven-venue source decoder/vault verifier authenticated three novel hints; measured 43→43 three-hop topology separately from primary inventory.
 - [ ] Follow-up: equal-budget control comparison, 2–6-hop native quote and cost parity, independent signed Surfpool acceptance. No archive transaction substitutes for these gates.
 
 Blockzilla HTTP feasibility attempt #46002136898 failed (artifact 15198772221 inspected: zero bytes, zero crosschecked blocks). Native pinned Compact V2 fallback implemented; keep both acceptance boxes unchecked until actual archive and source artifacts pass.
@@ -350,3 +350,5 @@ Blockzilla #46027571576 false green: artifact 15213190388 proves seven HTTP 403 
 Blockzilla run 46050780906: HTTP 403 confirmed (artifact 15224361688), fallback routing and mandatory failure gate behaved correctly; native gxhash build failed for missing AES/SSE2. Documented target-cpu=native build flags, CPU preflight and durable build diagnostics added; empirical boxes still unchecked.
 
 Blockzilla #46072784974: native pinned compilation/CLI checks passed; artifact 15234275586 shows all seven scans SIGXFSZ and empty outputs. Separate cache and output budgets implemented, acceptance remains unchecked until real data and source authentication pass.
+
+Blockzilla run 46073543937 passed all five jobs, artifacts 15234735363 and 15234061998 inspected: 295 successful venue records, 8 unique independent transactions, 62 hints, 3 novel source-verified pools, no incremental three-hop starts. Native feasibility and identity discovery accepted; same-window direct RPC comparison implemented, comparative savings and signed route gains remain unchecked.
