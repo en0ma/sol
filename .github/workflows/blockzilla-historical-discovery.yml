@@ -22,6 +22,7 @@ on:
     paths:
       - "arb/blockzilla_discovery.py"
       - "arb/blockzilla_native_archive.py"
+      - "arb/blockzilla_ci_gate.py"
       - "tests/test_blockzilla*"
       - ".github/workflows/blockzilla-historical-discovery.yml"
 permissions:
@@ -39,7 +40,7 @@ jobs:
           persist-credentials: false
       - run: |
           python3 -m pip install --disable-pip-version-check solders==0.26.0
-          python3 -m py_compile arb/blockzilla_discovery.py arb/blockzilla_native_archive.py
+          python3 -m py_compile arb/blockzilla_discovery.py arb/blockzilla_native_archive.py arb/blockzilla_ci_gate.py
           python3 -m unittest discover -s tests -p 'test_blockzilla*.py' -v
   http-probe:
     needs: unit
@@ -71,15 +72,9 @@ jobs:
             --blocks "$BLOCKS" --output "$RUNNER_TEMP/blockzilla-http/historical-hints.json"
           code=$?
           set -e
-          if [ "$code" = 0 ]; then
-            echo "usable=true" }} "$GITHUB_OUTPUT"
-          elif [ "$code" = 2 ] && test -s "$RUNNER_TEMP/blockzilla-http/historical-hints.json"; then
-            python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); assert r["status"]=="NO_CROSSCHECKED_BLOCKS" and r["crosschecked_blocks"]==0' "$RUNNER_TEMP/blockzilla-http/historical-hints.json"
-            echo "usable=false" }} "$GITHUB_OUTPUT"
-            echo "::warning::HTTP data unavailable; native archive fallback required"
-          else
-            exit 1
-          fi
+          python3 -m arb.blockzilla_ci_gate route \
+            --report "$RUNNER_TEMP/blockzilla-http/historical-hints.json" \
+            --exit-code "$code" --github-output "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -201,3 +196,32 @@ jobs:
           path: ${{ runner.temp }}/blockzilla/*.json
           if-no-files-found: warn
           retention-days: 7
+  evidence-gate:
+    needs: [unit, http-probe, native-archive, source-authentication]
+    if: always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Require the selected retrieval path and source job to have completed
+        env:
+          HTTP_RESULT: ${{ needs.http-probe.result }}
+          HTTP_ROUTE: ${{ needs.http-probe.outputs.usable }}
+          NATIVE_RESULT: ${{ needs.native-archive.result }}
+          SOURCE_RESULT: ${{ needs.source-authentication.result }}
+        run: |
+          python3 -m arb.blockzilla_ci_gate jobs --http "$HTTP_RESULT" \
+            --route "$HTTP_ROUTE" --native "$NATIVE_RESULT" --source "$SOURCE_RESULT"
+      - uses: actions/download-artifact@v4
+        with:
+          name: blockzilla-historical-discovery-evidence
+          path: ${{ runner.temp }}/blockzilla-evidence
+      - name: Reconcile actual historical and source-authentication evidence
+        env:
+          HTTP_ROUTE: ${{ needs.http-probe.outputs.usable }}
+        run: |
+          python3 -m arb.blockzilla_ci_gate evidence \
+            --directory "$RUNNER_TEMP/blockzilla-evidence" --route "$HTTP_ROUTE"
