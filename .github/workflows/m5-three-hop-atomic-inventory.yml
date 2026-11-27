@@ -90,7 +90,7 @@ jobs:
               venues=("raydium_cpmm","meteora_damm_v2"),
               discovery_rpc=os.environ.get("SOLANA_POOL_DISCOVERY_RPC_URL") or None)
           (root/"multi-venue-bridge-discovery.json").write_text(
-              json.dumps(multi,indent=2)+"\\n")
+              json.dumps(multi,indent=2)+"\n")
           other=multi["source_verified_new_pools"]
           available=max(0,768-len(registry["pools"]))
           registry["pools"].extend(other[:available])
@@ -99,7 +99,7 @@ jobs:
           nonhub=nonhub_orca_bridge_scout(
               rpc,registry["pools"],maximum_pairs=24)
           (root/"nonhub-orca-bridge-discovery.json").write_text(
-              json.dumps(nonhub,indent=2)+"\\n")
+              json.dumps(nonhub,indent=2)+"\n")
           extra=nonhub["source_verified_new_pools"]
           room=max(0,768-len(registry["pools"]))
           registry["pools"].extend(extra[:room])
@@ -113,7 +113,7 @@ jobs:
               [row["pair"] for row in cpmm_hints["targets"]],
               maximum_pairs=72,maximum_configs=16)
           (root/"raydium-cpmm-pda-bridge-discovery.json").write_text(
-              json.dumps(cpmm_pdas,indent=2)+"\\n")
+              json.dumps(cpmm_pdas,indent=2)+"\n")
           cpmm_new=cpmm_pdas["source_verified_new_pools"]
           cpmm_room=max(0,768-len(registry["pools"]))
           registry["pools"].extend(cpmm_new[:cpmm_room])
@@ -124,7 +124,7 @@ jobs:
           indexed=indexed_cpmm(
               rpc,registry["pools"],pages=5,page_size=100,maximum_verify=80)
           (root/"raydium-indexed-source-bridge.json").write_text(
-              json.dumps(indexed,indent=2)+"\\n")
+              json.dumps(indexed,indent=2)+"\n")
           indexed_new=indexed["source_verified_new_pools"]
           from arb.m5_registry_capacity import admit,MAX_REGISTRY_POOLS
           index_admission=admit(
@@ -142,7 +142,7 @@ jobs:
               maximum_verify_per_venue=48,
               sort_orders=("tvl:desc",))
           (root/"meteora-indexed-source-bridge.json").write_text(
-              json.dumps(meteora,indent=2)+"\\n")
+              json.dumps(meteora,indent=2)+"\n")
           meteora_admission=admit(
               registry["pools"],meteora["source_verified_new_pools"],
               maximum=MAX_REGISTRY_POOLS)
@@ -168,7 +168,7 @@ jobs:
                   "actionable":False,"live_execution_approved":False,
                   "broadcast":False}
           (root/"meteora-recent-pool-isolated-audit.json").write_text(
-              json.dumps(recent_audit,indent=2)+"\\n")
+              json.dumps(recent_audit,indent=2)+"\n")
           assert recent_audit["admitted_to_primary_graph"] is False
           assert recent_audit["signed_simulation_verified"] is False
           assert recent_audit.get("source_capture_verified") is not True
@@ -248,7 +248,7 @@ jobs:
           from arb.m5_three_hop_atomic_inventory import source_capture_gap_summary
           gap=source_capture_gap_summary(report)
           (Path(os.environ["RUNNER_TEMP"])/"triangles/source-capture-start-mint-gaps.json").write_text(
-              json.dumps(gap,indent=2)+"\\n")
+              json.dumps(gap,indent=2)+"\n")
           print(json.dumps({"source_capture_gap_status":gap["status"],
                             "uncaptured_start_mints":gap["uncaptured_start_mints"],
                             "uncaptured_with_attempts":gap["uncaptured_with_attempts"],
@@ -256,7 +256,7 @@ jobs:
           assert captured>=40, "fewer than 40 independently source-captured start mints"
           with open(os.environ["GITHUB_STEP_SUMMARY"],"a") as summary:
               summary.write(f"Source graph starts {selected}, source-captured starts {captured}; "
-                            f"uncaptured starts {len(missing)} (see job log).\\n")
+                            f"uncaptured starts {len(missing)} (see job log).\n")
           PY
       - name: Shut down read-only source fork
         if: always()
@@ -415,13 +415,13 @@ jobs:
           assert report["excluded_from_primary_inventory"] is True
           assert report["broadcast"] is False
           (root/"isolated-recent-signed-summary.json").write_text(
-              json.dumps(report,indent=2)+"\\n")
+              json.dumps(report,indent=2)+"\n")
           print(json.dumps(report))
           with open(os.environ["GITHUB_STEP_SUMMARY"],"a") as f:
               f.write("Isolated recent-pool signed+rollback evidence: "
                       f"{report['additional_distinct_verified_start_mints']} new starts; "
                       f"{report['signed_and_rollback_verified_routes']}/{report['attempted']} routes. "
-                      "These are EXCLUDED from the 140-route control inventory.\\n")
+                      "These are EXCLUDED from the 140-route control inventory.\n")
           PY
       - uses: actions/upload-artifact@v4
         if: always()
@@ -464,9 +464,9 @@ jobs:
           from collections import Counter
           failed_venues=Counter(f["venue"] or "UNATTRIBUTED" for f in failures)
           with open(os.environ["GITHUB_STEP_SUMMARY"],"a") as f:
-              f.write(f"Verified {len(verified)}/140 distinct signed simulations across ten shards.\\n")
-              f.write(f"Coverage: {len(selected_starts)} selected start mints, {len(selected_pools)} selected pools; {len(verified_starts)} verified start mints, {len(verified_pools)} verified pools.\\n")
-              f.write(f"Failure venue counts: {dict(failed_venues)}.\\n")
+              f.write(f"Verified {len(verified)}/140 distinct signed simulations across ten shards.\n")
+              f.write(f"Coverage: {len(selected_starts)} selected start mints, {len(selected_pools)} selected pools; {len(verified_starts)} verified start mints, {len(verified_pools)} verified pools.\n")
+              f.write(f"Failure venue counts: {dict(failed_venues)}.\n")
           print(json.dumps({"attempted":len(attempts),"fully_verified":len(verified),"required":100,
                             "selected_start_mints":len(selected_starts),"selected_pools":len(selected_pools),
                             "verified_start_mints":len(verified_starts),"required_verified_start_mints":40,
@@ -486,9 +486,9 @@ jobs:
           from pathlib import Path
           report=json.loads((Path(os.environ["RUNNER_TEMP"])/"three-hop-mint-gaps.json").read_text())
           with open(os.environ["GITHUB_STEP_SUMMARY"],"a") as summary:
-              summary.write(f"Captured but not signed-verified start mints: {report['source_captured_but_not_signed_verified_start_mints']}.\\n")
+              summary.write(f"Captured but not signed-verified start mints: {report['source_captured_but_not_signed_verified_start_mints']}.\n")
               for row in report["unverified_start_mints"]:
-                  summary.write(f"- {row['start_mint']}: {row['failure_reason_counts']}\\n")
+                  summary.write(f"- {row['start_mint']}: {row['failure_reason_counts']}\n")
           PY
       - uses: actions/upload-artifact@v4
         with:

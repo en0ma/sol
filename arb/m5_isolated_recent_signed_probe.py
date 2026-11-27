@@ -68,7 +68,7 @@ def source_prepare(rpc,baseline_entries,candidates,directory,*,maximum=6):
     old=topology(baseline_entries)
     old_starts=set(old["three_hop_start_mints"])
     (root/"control-topology-starts.json").write_text(
-        json.dumps(sorted(old_starts))+"\\n")
+        json.dumps(sorted(old_starts))+"\n")
     all_rows=list(baseline_entries)+list(candidates)
     after=topology(all_rows)
     new_starts=set(after["three_hop_start_mints"])-old_starts
@@ -118,7 +118,7 @@ def source_prepare(rpc,baseline_entries,candidates,directory,*,maximum=6):
         return {"status":"NO_SOURCE_AUTHENTICATED_CANDIDATE_ROUTES",
                 "selected_routes":0,"captured_routes":0,
                 "candidate_new_starts":len(new_starts),**SAFE}
-    (root/"graph.json").write_text(json.dumps(isolated,indent=2)+"\\n")
+    (root/"graph.json").write_text(json.dumps(isolated,indent=2)+"\n")
     source_capture(rpc,isolated,root)
     report=json.loads((root/"three-hop-inventory.json").read_text())
     return {"status":"ISOLATED_RECENT_SOURCE_CAPTURE_COMPLETED",
