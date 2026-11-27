@@ -295,3 +295,5 @@ When the HTTP gateway returns no independently matched blocks, the optional expe
 The experimental workflow must fail on missing route selection, skipped expected jobs, or missing/inconsistent evidence. A successful zero-pool measurement is distinct from unavailable data; no positive benefit follows from workflow green alone.
 
 The pinned reader must be built and run on the same uncredentialed runner with the documented native CPU flags; preserve build inputs and diagnostics even when compilation fails. Do not claim archive access from build success alone.
+
+Native archive control files may exceed the output cap. Bound stdout/stderr independently; retain explicit per-file cache, sampled aggregate cache, disk floor and deadline constraints. Do not report cache size as network usage or partial output as successful archive evidence.

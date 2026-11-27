@@ -1,5 +1,7 @@
 """Native archive fallback tests with synthetic packets, not on-chain evidence."""
 import json
+import os
+import sys
 from pathlib import Path
 import tempfile
 import unittest
@@ -84,6 +86,49 @@ class NativeArchiveTests(unittest.TestCase):
             self.assertEqual([row["slot"] for row in leads], [100, 101])
             self.assertEqual(counts["orca"], 3)
 
+
+    def test_real_child_can_write_cache_larger_than_output_budget(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cache = root / "cache"
+            script = ("import pathlib,sys; p=pathlib.Path(sys.argv[1]); "
+                      "(p/'index').write_bytes(b'x'*(5*1024*1024)); "
+                      "print('bounded output'); print('diagnostic', file=sys.stderr)")
+            result = n.run_bounded_reader([sys.executable, "-c", script, str(cache)],
+                root / "rows", root / "log", cache, os.environ.copy(), timeout=10, min_free=0)
+            self.assertEqual(result["exit_code"], 0)
+            self.assertIsNone(result["failure_reason"])
+            self.assertEqual(result["cache_final_bytes"], 5 * 1024 * 1024)
+            self.assertEqual((root / "rows").read_text(), "bounded output\n")
+            self.assertEqual((root / "log").read_text(), "diagnostic\n")
+
+    def test_real_child_stdout_and_stderr_caps_reject_partial_output(self):
+        for stream in ("stdout", "stderr"):
+            with self.subTest(stream=stream), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                script = f"import sys; sys.{stream}.buffer.write(b'x'*16384)"
+                result = n.run_bounded_reader([sys.executable, "-c", script],
+                    root / "rows", root / "log", root / "cache", os.environ.copy(),
+                    timeout=10, output_limit=1024, min_free=0)
+                self.assertEqual(result["failure_reason"], stream.upper() + "_BUDGET_EXCEEDED")
+                self.assertEqual((root / ("rows" if stream == "stdout" else "log")).stat().st_size, 1024)
+
+    def test_cache_budget_and_timeout_fail_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cache = root / "cache"
+            cache.mkdir()
+            (cache / "index").write_bytes(b"x"*2048)
+            result = n.run_bounded_reader([sys.executable, "-c", "raise AssertionError"],
+                root / "rows", root / "log", cache, os.environ.copy(),
+                timeout=10, cache_limit=1024, min_free=0)
+            self.assertIsNone(result["exit_code"])
+            self.assertEqual(result["failure_reason"], "CACHE_AGGREGATE_BUDGET_EXCEEDED")
+            (cache / "index").unlink()
+            result = n.run_bounded_reader([sys.executable, "-c", "import time; time.sleep(10)"],
+                root / "rows", root / "log", cache, os.environ.copy(),
+                timeout=0.3, min_free=0)
+            self.assertEqual(result["failure_reason"], "READER_DEADLINE_EXCEEDED")
 
 if __name__ == "__main__":
     unittest.main()

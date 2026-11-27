@@ -10,6 +10,9 @@ import json
 import os
 from pathlib import Path
 import resource
+import selectors
+import shutil
+import signal
 import subprocess
 import time
 
@@ -23,6 +26,9 @@ UPSTREAM_REVISION = "c8265ad3e61a36e8f8f2dee49020f6bb0f01f220"
 ARCHIVE_ROOT = "https://pub-97348740d6ef467aa2f1b4b62daa98dc.r2.dev/compact-v2/blockzilla-20261004"
 DEFAULT_EPOCH = 1094
 MAX_DUMP_BYTES = 4 * 1024 * 1024
+MAX_CACHE_FILE_BYTES = 3 * 1024**3
+MAX_CACHE_BYTES = 4 * 1024**3
+MIN_FREE_BYTES = 512 * 1024**2
 MAX_ROWS = 20000
 
 
@@ -70,8 +76,117 @@ def parse_dump(raw):
     return rows
 
 
-def limit_output():
-    resource.setrlimit(resource.RLIMIT_FSIZE, (MAX_DUMP_BYTES, MAX_DUMP_BYTES))
+def limit_cache_file():
+    # RLIMIT_FSIZE applies to *all* child file writes, including the archive
+    # index and registry. Keep a separate, larger hard per-file cache limit.
+    resource.setrlimit(resource.RLIMIT_FSIZE, (MAX_CACHE_FILE_BYTES, MAX_CACHE_FILE_BYTES))
+
+
+def cache_size(cache):
+    """Logical on-disk file bytes, including unfinished temporary downloads."""
+    total = 0
+    for directory, dirs, files in os.walk(cache, followlinks=False):
+        for name in dirs + files:
+            path = Path(directory) / name
+            if path.is_symlink():
+                raise ValueError("symlink in private archive cache")
+        for name in files:
+            path = Path(directory) / name
+            try:
+                total += path.stat().st_size
+            except FileNotFoundError:
+                # The reader can rename a control file while we inspect it.
+                continue
+    return total
+
+
+def run_bounded_reader(command, raw_path, log_path, cache, env, *, timeout=150,
+                       output_limit=MAX_DUMP_BYTES, cache_limit=MAX_CACHE_BYTES,
+                       min_free=MIN_FREE_BYTES):
+    """Bound output pipes separately from native archive control-file writes.
+
+    Cache usage is sampled, not a hard aggregate network/disk quota; a separate
+    per-file kernel limit and job deadline remain in force.
+    """
+    if (not 1 <= output_limit <= MAX_DUMP_BYTES or
+            not 1 <= cache_limit <= MAX_CACHE_BYTES or timeout <= 0 or min_free < 0):
+        raise ValueError("invalid reader budget")
+    cache = Path(cache)
+    cache.mkdir(parents=True, exist_ok=True)
+    begin = time.monotonic()
+    peak = cache_size(cache)
+    totals = {"stdout": 0, "stderr": 0}
+    failure = None
+
+    def budget():
+        nonlocal peak
+        peak = max(peak, cache_size(cache))
+        if peak > cache_limit:
+            return "CACHE_AGGREGATE_BUDGET_EXCEEDED"
+        if shutil.disk_usage(cache).free < min_free:
+            return "CACHE_DISK_FREE_FLOOR_REACHED"
+        if time.monotonic() - begin >= timeout:
+            return "READER_DEADLINE_EXCEEDED"
+        return None
+
+    def receipt(code, reason):
+        return {"exit_code": code, "failure_reason": reason,
+                "stdout_bytes_retained": totals["stdout"],
+                "stderr_bytes_retained": totals["stderr"],
+                "cache_peak_observed_bytes": peak,
+                "cache_final_bytes": cache_size(cache)}
+
+    with Path(raw_path).open("wb") as stdout, Path(log_path).open("wb") as stderr:
+        failure = budget()
+        if failure:
+            return receipt(None, failure)
+        proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                env=env, start_new_session=True, preexec_fn=limit_cache_file)
+        try:
+            with selectors.DefaultSelector() as selector:
+                selector.register(proc.stdout, selectors.EVENT_READ, ("stdout", stdout))
+                selector.register(proc.stderr, selectors.EVENT_READ, ("stderr", stderr))
+                while selector.get_map() or proc.poll() is None:
+                    failure = budget()
+                    if failure:
+                        break
+                    if not selector.get_map():
+                        time.sleep(0.1)
+                        continue
+                    for event, _ in selector.select(timeout=0.2):
+                        label, destination = event.data
+                        chunk = os.read(event.fileobj.fileno(), 65536)
+                        if not chunk:
+                            selector.unregister(event.fileobj)
+                            continue
+                        room = output_limit - totals[label]
+                        retained = chunk[:room]
+                        destination.write(retained)
+                        totals[label] += len(retained)
+                        if len(chunk) > room:
+                            failure = label.upper() + "_BUDGET_EXCEEDED"
+                            break
+                    if failure:
+                        break
+                if not failure:
+                    failure = budget()
+        finally:
+            # Terminate the whole reader process group on budget/exception,
+            # including any descendants that might still hold output pipes.
+            if failure or proc.poll() is None:
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+            proc.wait(timeout=10)
+            proc.stdout.close()
+            proc.stderr.close()
+        if not failure and proc.returncode:
+            if proc.returncode == -signal.SIGXFSZ:
+                failure = "CACHE_PER_FILE_LIMIT_SIGNAL"
+            else:
+                failure = "READER_NONZERO_EXIT"
+        return receipt(proc.returncode, failure)
 
 
 def run_reader(binary, directory, *, epoch=DEFAULT_EPOCH, first_block=0, blocks=8):
@@ -83,7 +198,12 @@ def run_reader(binary, directory, *, epoch=DEFAULT_EPOCH, first_block=0, blocks=
     url = f"{ARCHIVE_ROOT}/epoch-{epoch}"
     manifest = {"schema": 1, "upstream_revision": UPSTREAM_REVISION,
                 "archive_url": url, "epoch": epoch, "first_block": first_block,
-                "blocks_per_venue": blocks, "venues": {}, **SAFE}
+                "blocks_per_venue": blocks, "venues": {},
+                "resource_limits": {"output_bytes_per_stream": MAX_DUMP_BYTES,
+                    "cache_file_bytes": MAX_CACHE_FILE_BYTES,
+                    "sampled_cache_bytes": MAX_CACHE_BYTES,
+                    "min_free_disk_bytes": MIN_FREE_BYTES,
+                    "deadline_seconds_per_venue": 150}, **SAFE}
     # Deliberately allow only basic runtime environment, not credentials.
     env = {k: os.environ[k] for k in ("PATH", "HOME", "LANG", "LC_ALL", "SSL_CERT_FILE",
                                       "SSL_CERT_DIR") if k in os.environ}
@@ -97,12 +217,9 @@ def run_reader(binary, directory, *, epoch=DEFAULT_EPOCH, first_block=0, blocks=
         started = time.monotonic()
         result = {"program_id": info[0], "completed": False}
         try:
-            with raw_path.open("wb") as stdout, log_path.open("wb") as stderr:
-                proc = subprocess.run(command, stdout=stdout, stderr=stderr,
-                                      env=env, timeout=150, check=False,
-                                      preexec_fn=limit_output)
-            result["exit_code"] = proc.returncode
-            if proc.returncode == 0:
+            execution = run_bounded_reader(command, raw_path, log_path, cache, env)
+            result.update(execution)
+            if execution["exit_code"] == 0 and execution["failure_reason"] is None:
                 raw = raw_path.read_bytes()
                 rows = parse_dump(raw)
                 result.update({"completed": True, "dump_sha256": digest(raw),
