@@ -15,7 +15,11 @@ MAX_HOPS=4
 MAX_POOLS=200
 MAX_CYCLES=2000
 
-def cycles(pools,anchors=None,max_hops=MAX_HOPS,max_cycles=MAX_CYCLES,truncate=False,min_hops=2,hint_only=False):
+def cycles(pools,anchors=None,max_hops=MAX_HOPS,max_cycles=MAX_CYCLES,truncate=False,min_hops=2,hint_only=False,required_first_pool=None):
+    if required_first_pool is not None and (not isinstance(required_first_pool,(tuple,list))
+            or len(required_first_pool)!=2 or required_first_pool[0] not in TARGET_VENUES
+            or not isinstance(required_first_pool[1],str) or not required_first_pool[1]):
+        raise ValueError("invalid required first pool identity")
     if type(hint_only) is not bool:raise ValueError("invalid hint-only graph flag")
     if type(truncate) is not bool:raise ValueError("invalid truncation flag")
     if type(max_hops) is not int or not 2<=max_hops<=6:
@@ -46,6 +50,8 @@ def cycles(pools,anchors=None,max_hops=MAX_HOPS,max_cycles=MAX_CYCLES,truncate=F
     class BoundedDiscoveryComplete(Exception):pass
     def visit(start,current,path,used,visited):
         for e in edges[current]:
+            if not path and required_first_pool is not None and (e["venue"],e["pool"])!=tuple(required_first_pool):
+                continue
             if (e["venue"],e["pool"]) in used:continue
             nxt=e["output"]
             new=path+[e]

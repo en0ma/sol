@@ -43,10 +43,15 @@ def candidate_routes(baseline,new_pools):
                     p["venue"],p["address"])
         window=sorted((p for p in all_rows if p["venue"] in VENUES and set(p["mints"]) & neighbors),
                       key=order)[:MAX_POOLS]
-        windows.append({"seed":[seed["venue"],seed["address"]],"pool_hints":len(window)})
+        stats={"seed":[seed["venue"],seed["address"]],"pool_hints":len(window),
+               "cycle_counts_by_hops":{},"cycle_limit_reached_by_hops":{}}
+        windows.append(stats)
         for hops in (4,5,6):
             paths=cycles(window,anchors=anchors,max_hops=hops,min_hops=hops,
-                         max_cycles=MAX_GRAPH_CYCLES,truncate=True,hint_only=True)
+                         max_cycles=MAX_GRAPH_CYCLES,truncate=True,hint_only=True,
+                         required_first_pool=(seed["venue"],seed["address"]))
+            stats["cycle_counts_by_hops"][str(hops)]=len(paths)
+            stats["cycle_limit_reached_by_hops"][str(hops)]=len(paths)>=MAX_GRAPH_CYCLES
             for row in paths:
                 identities={(l["venue"],l["pool"]) for l in row["legs"]}
                 if not identities & new or len({l["pool"] for l in row["legs"]})!=hops:
@@ -67,7 +72,18 @@ def candidate_routes(baseline,new_pools):
         rows=[r for r in found.values() if r["hops"]==hops]
         rows.sort(key=lambda r:(-len(r["novel_pool_identities"]),r["start_mint"]!=WSOL,
                   -len(r["venues"]),tuple((l["venue"],l["pool"]) for l in r["legs"])))
-        by_hops[hops]=rows[:MAX_CAPTURE_PER_HOPS]
+        # Prefer an independent pool set for the second capture attempt,
+        # rather than a rotation of an already failing fixture.
+        selected=[]
+        seen_sets=set()
+        for row in rows:
+            pool_set=frozenset((l["venue"],l["pool"]) for l in row["legs"])
+            if pool_set in seen_sets:
+                continue
+            selected.append(row);seen_sets.add(pool_set)
+            if len(selected)>=MAX_CAPTURE_PER_HOPS:
+                break
+        by_hops[hops]=selected
     return by_hops,windows
 
 
@@ -279,10 +295,26 @@ def audit(source_dir,signed_dir):
     root=Path(signed_dir);src=Path(source_dir)
     source_raw=(src/"multihop-source.json").read_bytes()
     source=json.loads(source_raw);signed=json.loads((root/"multihop-signed.json").read_text())
+    if (source.get("status")!="BLOCKZILLA_MULTIHOP_SOURCE_RESEARCH"
+            or signed.get("status")!="BLOCKZILLA_MULTIHOP_SIGNED_RESEARCH"
+            or any(r.get(k) is not False for r in (source,signed) for k in SAFE)
+            or source.get("excluded_from_primary_inventory") is not True
+            or signed.get("excluded_from_primary_inventory") is not True):
+        raise ValueError("unsafe multihop source/signed report")
     if signed["source_report_sha256"]!=digest(source_raw):
         raise ValueError("signed source report binding mismatch")
     rows={r["id"]:r for r in source["routes"]}
-    report={"status":"BLOCKZILLA_MULTIHOP_INDEPENDENT_RECHECK","audited":0,
+    expected={(r["id"],amount) for r in rows.values() if r["capture_status"]=="CAPTURED" for amount in AMOUNTS}
+    attempts=[(a["id"],a["amount"]) for a in signed["attempts"]]
+    if len(attempts)!=len(set(attempts)) or set(attempts)!=expected:
+        raise ValueError("missing or duplicate signed size attempt")
+    accepted=sum(a["status"]=="SIGNED_N_LEG_ATOMIC_AND_ROLLBACK_VERIFIED" for a in signed["attempts"])
+    if accepted!=signed["accepted"]:
+        raise ValueError("signed acceptance count does not reconcile")
+    report={"status":"BLOCKZILLA_MULTIHOP_INDEPENDENT_RECHECK" if accepted else
+            "NO_ACCEPTED_MULTIHOP_RECEIPTS_TO_AUDIT","audited":0,
+            "source_captured":source["source_captured"],"signed_attempt_count":len(attempts),
+            "net_profit_verified":False,
             "runner_accepted":signed["accepted"],"attempts":[],**SAFE}
     for attempt in signed["attempts"]:
         if attempt["status"]!="SIGNED_N_LEG_ATOMIC_AND_ROLLBACK_VERIFIED":

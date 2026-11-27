@@ -362,3 +362,5 @@ Blockzilla #46076493040 accepted 4/4 legacy packet rechecks and 6/8 native model
 Blockzilla #46078021778: 4/4 independent packet audits, 8/8 exact sample outputs, 36 tests; new output-denominated DLMM MM model, opt-in modeled chain and original-source recomputation wired. New mode empirical parity and net benefit unverified.
 
 Blockzilla #10 46079627951: 8/8 exact leg outputs and 4/4 complete modeled terminal matches with independent source recomputation; all gross negative. Added bounded archive-derived 4–6-hop source/quote/sign/audit experiment, no empirical result yet.
+
+Blockzilla #11 46081825787 failed at regression test (23 tests, 1 error); downstream skipped and evidence gate rejected. Corrected no-anchor contract, seed-first graph enumeration and signed attempt reconciliation. No new multihop acceptance.

@@ -309,3 +309,5 @@ Native DLMM market-maker bin exhaustion must use upward inverse-price capacity i
 DLMM OnlyY fees must be charged on output for X→Y and input for Y→X. Keep denomination-specific fee totals, MM-only scope, and modeled chain separate from executable pricing. Recompute artifact quotes from original source fixture bytes on a separate runner rather than trusting saved quote output alone.
 
 Use explicit hint-only existing graph enumeration for archive-seeded multihop candidates; reauthenticate all legs before capture, preserve 4–6-hop artifacts separately and verify positive/negative packets and recorded CPI/rollback with actual isolated lookup readback. No primary admission or profitability assertion.
+
+Bound archive-seeded cycles by forcing the novel identity as first edge before result truncation. Report zero accepted separately from evidence success and require every captured route/amount attempt to reconcile.
