@@ -117,3 +117,20 @@ class MultilegFeeConversionTests(unittest.TestCase):
         self.assertEqual(result["estimated_cost_start_mint_base_units"],50)
         self.assertEqual(len(result["source_native_fee_conversion"]["conversion_legs"]),2)
         self.assertFalse(result["net_profit_verified"])
+
+
+class SourceFeeModelReuseTests(unittest.TestCase):
+    def test_damm_native_fee_conversion_reuses_existing_quote(self):
+        from unittest.mock import patch
+        from arb.m5_signed_start_mint_economics import source_native_fee_conversion
+        fixture={"route_mints":["RAY",WSOL,"RAY"],"state_accounts_observed_slot":42,**SAFE}
+        rows=[{"venue":"orca","address":"p0"},{"venue":"meteora_damm_v2","address":"p1"}]
+        with patch("arb.fixture_quote_execution_pipeline.extract_pool_states",return_value=rows),patch(
+                "arb.fixture_all_venue_signed_quotes.quote_leg",return_value={"quote_status":"SOURCE_BOUND_INDICATIVE",
+                 "predicted_output_base_units":250,"venue":"meteora_damm_v2","pool":"p1","source_slot":42,**SAFE}) as quote:
+            cost,proof,_=source_native_fee_conversion(fixture,start_mint="RAY",source_slot=42,
+                fee_lamports=5000,observed_unix=100)
+            self.assertEqual(cost,250)
+            self.assertEqual(proof["source_fee_lamports"],5000)
+            self.assertFalse(proof["paid_fee_verified"])
+            quote.assert_called_once_with(fixture,leg_index=1,amount_in=5000,observed_unix=100)

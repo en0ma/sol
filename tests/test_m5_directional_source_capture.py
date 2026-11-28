@@ -177,6 +177,26 @@ class ContextClockTests(unittest.TestCase):
             self.assertIsNone(model["estimated_net_delta"])
             self.assertFalse(model["net_profit_verified"])
 
+    def test_contextual_economics_uses_explicit_forward_source_fee_model(self):
+        from arb.m5_source_indicative_route_chain import contextual_economic_model
+        from arb.m5_signed_start_mint_economics import WSOL
+        safe={"actionable":False,"broadcast":False,"live_execution_approved":False}
+        fixture={"route_mints":["A",WSOL,"A"],"state_accounts_observed_slot":123,
+            "state_account_manifest_sha256":"test",**safe}
+        clock={"clock":{"slot":124,"unix_timestamp":456},"same_slot_attested":False}
+        chain={"status":"SOURCE_BOUND_INDICATIVE_CHAIN_NOT_EXECUTION_VERIFIED",
+            "input_base_units":100,"output_base_units":110,"gross_delta_start_mint_base_units":10,
+            "signed_simulation_verified":False,"net_profit_verified":False,**safe}
+        with patch("arb.source_snapshot_manifest.verify"),patch(
+                "arb.next_ten_fork_pool_probe.contextual_pricing_clock",return_value=clock),patch(
+                "arb.m5_source_indicative_route_chain.research_chain",return_value=chain),patch(
+                "arb.m5_signed_start_mint_economics.source_native_fee_conversion",
+                return_value=(7,{"model":True},"test")):
+            result=contextual_economic_model(fixture,amount_in=100)
+            self.assertEqual(result["estimated_net_delta"],3)
+            self.assertEqual(result["estimated_message_fee_base_units"],7)
+            self.assertFalse(result["net_profit_verified"])
+
 
 if __name__ == "__main__":
     unittest.main()

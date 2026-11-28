@@ -109,7 +109,7 @@ def contextual_economic_model(fixture,*,amount_in):
     """
     from arb.next_ten_fork_pool_probe import contextual_pricing_clock
     from arb.source_snapshot_manifest import verify
-    from arb.m5_signed_start_mint_economics import WSOL
+    from arb.m5_signed_start_mint_economics import WSOL,source_native_fee_conversion
     verify(fixture)
     if (any(fixture.get(k) is not False for k in SAFE)
             or type(amount_in) is not int or not 0<amount_in<2**64):
@@ -123,6 +123,7 @@ def contextual_economic_model(fixture,*,amount_in):
         "manifest_sha256":fixture["state_account_manifest_sha256"],"start_mint":mints[0],
         "pricing_clock":clock,"output_base_units":None,"gross_delta":None,
         "estimated_message_fee_base_units":None,"estimated_net_delta":None,
+        "message_fee_scenario_lamports":None,"source_native_fee_conversion":None,
         "priority_cost_included":False,"account_funding_included":False,
         "net_profit_verified":False,**SAFE}
     if clock is None:
@@ -149,7 +150,14 @@ def contextual_economic_model(fixture,*,amount_in):
     # Same explicit research fee assumption as existing Blockzilla grid.
     from arb.blockzilla_size_plan import MESSAGE_FEE_SCENARIO
     fee=MESSAGE_FEE_SCENARIO if mints[0]==WSOL else None
+    conversion=None
+    if mints[0]!=WSOL and WSOL in mints[1:-1]:
+        fee,conversion,_=source_native_fee_conversion(fixture,start_mint=mints[0],
+            source_slot=base["source_slot"],fee_lamports=MESSAGE_FEE_SCENARIO,
+            observed_unix=clock["clock"]["unix_timestamp"])
     return {**base,"status":"PRIMARY_SOURCE_ECONOMIC_MODEL_ONLY",
+        "message_fee_scenario_lamports":MESSAGE_FEE_SCENARIO,
+        "source_native_fee_conversion":conversion,
         "native_chain":chain,"output_base_units":output,"gross_delta":output-amount_in,
         "estimated_message_fee_base_units":fee,
         "estimated_net_delta":output-amount_in-fee if fee is not None else None}

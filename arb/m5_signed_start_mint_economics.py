@@ -7,6 +7,99 @@ start-mint costs require an independently authenticated conversion quote.
 SAFE={"actionable":False,"broadcast":False,"live_execution_approved":False}
 WSOL="So11111111111111111111111111111111111111112"
 
+def source_native_fee_conversion(fixture,*,start_mint,source_slot,fee_lamports,observed_unix):
+    """Model a fee-denominated exact-input conversion on the captured forward path.
+
+    This common implementation serves assumed pre-sign costs and recorded
+    signed-message estimates. Neither use represents a paid fee or a guaranteed
+    acquisition cost; no reverse or different-slot pool is inferred.
+    """
+    if (not isinstance(fixture,dict) or type(start_mint) is not str
+            or type(source_slot) is not int or source_slot<0
+            or type(fee_lamports) is not int or not 0<fee_lamports<2**64
+            or type(observed_unix) is not int or observed_unix<0):
+        raise ValueError("invalid source-native fee conversion inputs")
+    conversion=cost=None
+    reason="no supported same-source forward WSOL conversion"
+    from arb.fixture_quote_execution_pipeline import extract_pool_states
+    from arb.fixture_all_venue_signed_quotes import quote_leg
+    if (fixture.get("state_accounts_observed_slot")!=source_slot or
+            any(fixture.get(k)is not False for k in SAFE) or
+            fixture.get("route_mints",[None])[0]!=start_mint):
+        raise ValueError("fee conversion source manifest or starting mint mismatch")
+    rows=extract_pool_states(fixture)
+    mints=fixture.get("route_mints")
+    if not isinstance(mints,list) or len(mints)!=len(rows)+1:
+        raise ValueError("fee conversion source mint topology invalid")
+    supported=frozenset(("orca","raydium_clmm","raydium_cpmm",
+                         "raydium_amm_v4","meteora_damm_v2"))
+    for i,row in enumerate(rows):
+        if (row["venue"] not in supported or
+                mints[i]!=WSOL or mints[i+1]!=start_mint):
+            continue
+        q=quote_leg(fixture,leg_index=i,
+                    amount_in=fee_lamports,
+                    observed_unix=observed_unix)
+        if (not isinstance(q,dict) or
+                any(q.get(k)is not False for k in SAFE) or
+                q.get("source_slot")!=source_slot or
+                q.get("venue")!=row["venue"] or
+                q.get("pool")!=row["address"]):
+            raise ValueError("non-authenticated fee conversion quote")
+        amount=q.get("predicted_output_base_units")
+        if (q.get("quote_status")!="SOURCE_BOUND_INDICATIVE" or
+                type(amount)is not int or not 0<amount<2**64):
+            continue
+        conversion={"status":"SOURCE_NATIVE_START_MINT_FEE_MODEL_ONLY",
+                    "leg_index":i,"venue":row["venue"],
+                    "pool":row["address"],"source_slot":source_slot,
+                    "source_fee_lamports":fee_lamports,
+                    "modeled_start_mint_fee_units":amount,
+                    "protocol_exact_verified":False,
+                    "conversion_is_guaranteed_upper_bound":False,
+                    "paid_fee_verified":False,**SAFE}
+        cost=amount
+        reason=("source-native same-slot WSOL conversion MODEL; "
+                "fee and exchange rate are not paid or execution verified")
+        break
+    if conversion is None and mints[-1]==start_mint:
+        # Only use the forward suffix of the same captured directed route.
+        # Reversing a leg would lack its directional account evidence.
+        for first in range(len(rows)-2,-1,-1):
+            if mints[first]!=WSOL or len(rows)-first>5:
+                continue
+            if any(r["venue"] not in supported for r in rows[first:]):
+                continue
+            current=fee_lamports
+            trace=[]
+            for i in range(first,len(rows)):
+                row=rows[i]
+                q=quote_leg(fixture,leg_index=i,amount_in=current,
+                            observed_unix=observed_unix)
+                if (not isinstance(q,dict) or any(q.get(k) is not False for k in SAFE)
+                        or q.get("source_slot")!=source_slot or q.get("venue")!=row["venue"]
+                        or q.get("pool")!=row["address"]):
+                    raise ValueError("non-authenticated multileg fee conversion quote")
+                output=q.get("predicted_output_base_units")
+                if q.get("quote_status")!="SOURCE_BOUND_INDICATIVE" or type(output) is not int or not 0<output<2**64:
+                    break
+                trace.append({"leg_index":i,"venue":row["venue"],"pool":row["address"],
+                    "input_mint":mints[i],"output_mint":mints[i+1],
+                    "input_base_units":current,"output_base_units":output,"source_slot":source_slot})
+                current=output
+            if len(trace)!=len(rows)-first:
+                continue
+            conversion={"status":"SOURCE_NATIVE_MULTILEG_START_MINT_FEE_MODEL_ONLY",
+                "source_slot":source_slot,"source_fee_lamports":fee_lamports,
+                "modeled_start_mint_fee_units":current,"conversion_legs":trace,
+                "protocol_exact_verified":False,"conversion_is_guaranteed_upper_bound":False,
+                "paid_fee_verified":False,**SAFE}
+            cost=current
+            reason="same-source forward WSOL conversion chain MODEL; fee and exchange rate not paid or execution verified"
+            break
+    return cost,conversion,reason
+
+
 def signed_net_economics(receipt, *, start_mint, source_slot,
                          fixture=None, observed_unix=None):
     if not isinstance(receipt,dict) or any(receipt.get(k)is not False for k in SAFE):
@@ -43,82 +136,9 @@ def signed_net_economics(receipt, *, start_mint, source_slot,
             fee.get("fee_payer_asset")=="SOL" and
             type(fee.get("estimated_fee_lamports"))is int and
             fee["estimated_fee_lamports"]>0):
-        from arb.fixture_quote_execution_pipeline import extract_pool_states
-        from arb.fixture_all_venue_signed_quotes import quote_leg
-        if (fixture.get("state_accounts_observed_slot")!=source_slot or
-                any(fixture.get(k)is not False for k in SAFE) or
-                fixture.get("route_mints",[None])[0]!=start_mint):
-            raise ValueError("fee conversion source manifest or starting mint mismatch")
-        rows=extract_pool_states(fixture)
-        mints=fixture.get("route_mints")
-        if not isinstance(mints,list) or len(mints)!=len(rows)+1:
-            raise ValueError("fee conversion source mint topology invalid")
-        supported=frozenset(("orca","raydium_clmm","raydium_cpmm",
-                             "raydium_amm_v4"))
-        for i,row in enumerate(rows):
-            if (row["venue"] not in supported or
-                    mints[i]!=WSOL or mints[i+1]!=start_mint):
-                continue
-            q=quote_leg(fixture,leg_index=i,
-                        amount_in=fee["estimated_fee_lamports"],
-                        observed_unix=observed_unix)
-            if (not isinstance(q,dict) or
-                    any(q.get(k)is not False for k in SAFE) or
-                    q.get("source_slot")!=source_slot or
-                    q.get("venue")!=row["venue"] or
-                    q.get("pool")!=row["address"]):
-                raise ValueError("non-authenticated fee conversion quote")
-            amount=q.get("predicted_output_base_units")
-            if (q.get("quote_status")!="SOURCE_BOUND_INDICATIVE" or
-                    type(amount)is not int or amount<=0):
-                continue
-            conversion={"status":"SOURCE_NATIVE_START_MINT_FEE_MODEL_ONLY",
-                        "leg_index":i,"venue":row["venue"],
-                        "pool":row["address"],"source_slot":source_slot,
-                        "source_fee_lamports":fee["estimated_fee_lamports"],
-                        "modeled_start_mint_fee_units":amount,
-                        "protocol_exact_verified":False,
-                        "conversion_is_guaranteed_upper_bound":False,
-                        "paid_fee_verified":False,**SAFE}
-            cost=amount
-            reason=("source-native same-slot WSOL conversion MODEL; "
-                    "fee and exchange rate are not paid or execution verified")
-            break
-        if conversion is None and mints[-1]==start_mint:
-            # Only use the forward suffix of the same captured directed route.
-            # Reversing a leg would lack its directional account evidence.
-            for first in range(len(rows)-2,-1,-1):
-                if mints[first]!=WSOL or len(rows)-first>5:
-                    continue
-                if any(r["venue"] not in supported for r in rows[first:]):
-                    continue
-                current=fee["estimated_fee_lamports"]
-                trace=[]
-                for i in range(first,len(rows)):
-                    row=rows[i]
-                    q=quote_leg(fixture,leg_index=i,amount_in=current,
-                                observed_unix=observed_unix)
-                    if (not isinstance(q,dict) or any(q.get(k) is not False for k in SAFE)
-                            or q.get("source_slot")!=source_slot or q.get("venue")!=row["venue"]
-                            or q.get("pool")!=row["address"]):
-                        raise ValueError("non-authenticated multileg fee conversion quote")
-                    output=q.get("predicted_output_base_units")
-                    if q.get("quote_status")!="SOURCE_BOUND_INDICATIVE" or type(output) is not int or not 0<output<2**64:
-                        break
-                    trace.append({"leg_index":i,"venue":row["venue"],"pool":row["address"],
-                        "input_mint":mints[i],"output_mint":mints[i+1],
-                        "input_base_units":current,"output_base_units":output,"source_slot":source_slot})
-                    current=output
-                if len(trace)!=len(rows)-first:
-                    continue
-                conversion={"status":"SOURCE_NATIVE_MULTILEG_START_MINT_FEE_MODEL_ONLY",
-                    "source_slot":source_slot,"source_fee_lamports":fee["estimated_fee_lamports"],
-                    "modeled_start_mint_fee_units":current,"conversion_legs":trace,
-                    "protocol_exact_verified":False,"conversion_is_guaranteed_upper_bound":False,
-                    "paid_fee_verified":False,**SAFE}
-                cost=current
-                reason="same-source forward WSOL conversion chain MODEL; fee and exchange rate not paid or execution verified"
-                break
+        cost,conversion,reason=source_native_fee_conversion(fixture,start_mint=start_mint,
+            source_slot=source_slot,fee_lamports=fee["estimated_fee_lamports"],
+            observed_unix=observed_unix)
     return {"status":"SIGNED_LOCAL_SIMULATION_ESTIMATED_NET_NOT_PROFIT_VERIFIED"
                       if cost is not None else "SIGNED_LOCAL_SIMULATION_START_MINT_COST_UNCONVERTED",
             "start_mint":start_mint,"source_slot":source_slot,
@@ -172,17 +192,30 @@ def compact_primary_economic_evidence(entry):
         if model_output is not None:
             if (type(model_output) is not int or not 0<model_output<2**64
                     or model_gross!=model_output-amount or source.get("status")!="PRIMARY_SOURCE_ECONOMIC_MODEL_ONLY"
-                    or (model_net is not None and (entry["start_mint"]!=WSOL
+                    or (model_net is not None and (
+                        type(source.get("estimated_message_fee_base_units")) is not int
+                        or source["estimated_message_fee_base_units"]<0
                         or type(model_net) is not int
                         or model_net!=model_gross-source["estimated_message_fee_base_units"]))):
                 raise ValueError("primary model economic arithmetic mismatch")
         elif model_gross is not None or model_net is not None:
             raise ValueError("blocked primary model contains economic result")
+        if model_net is not None and entry["start_mint"]!=WSOL:
+            conversion=source.get("source_native_fee_conversion")
+            if (not isinstance(conversion,dict) or any(conversion.get(k) is not False for k in SAFE)
+                    or conversion.get("source_slot")!=entry["source_slot"]
+                    or conversion.get("source_fee_lamports")!=source.get("message_fee_scenario_lamports")
+                    or conversion.get("modeled_start_mint_fee_units")!=source["estimated_message_fee_base_units"]
+                    or conversion.get("paid_fee_verified") is not False
+                    or conversion.get("protocol_exact_verified") is not False):
+                raise ValueError("unbound primary source fee conversion model")
     return {"id":entry["id"],"start_mint":entry["start_mint"],"source_slot":entry["source_slot"],
         "fixture_sha256":entry["fixture_sha256"],"receipt_sha256":entry["receipt_sha256"],
         "amount":amount,"terminal":post[-1],"observed_gross":gross,"estimated_cost":cost,
         "estimated_net":net,"modeled_output":model_output,"modeled_gross":model_gross,
-        "modeled_net":model_net,"source_model_status":source.get("status") if source else None,
+        "modeled_net":model_net,
+        "modeled_cost":source.get("estimated_message_fee_base_units") if source else None,
+        "source_model_status":source.get("status") if source else None,
         "source_model_matches_terminal":model_output==post[-1] if model_output is not None else None,
         "net_profit_verified":False,**SAFE}
 
@@ -214,6 +247,11 @@ def rank_primary_economic_evidence(rows,*,expected_ids):
                 or r["modeled_gross"]!=output-r["amount"]
                 or r["source_model_matches_terminal"] is not (output==r["terminal"]))):
             raise ValueError("primary economic model output mismatch")
+        model_cost=r.get("modeled_cost")
+        if (model_cost is None and r["modeled_net"] is not None or model_cost is not None and
+                (type(model_cost) is not int or model_cost<0 or type(r["modeled_net"]) is not int
+                 or output is None or r["modeled_net"]!=r["modeled_gross"]-model_cost)):
+            raise ValueError("primary modeled estimated net mismatch")
         groups[(r["start_mint"],r["amount"])].append(r)
     comparisons=[]
     for (mint,amount),items in sorted(groups.items()):
@@ -222,15 +260,20 @@ def rank_primary_economic_evidence(rows,*,expected_ids):
                    key=lambda r:(-r["estimated_net"],r["id"]))
         modeled=sorted((r for r in items if r["modeled_gross"] is not None),
                    key=lambda r:(-r["modeled_gross"],r["id"]))
+        modeled_net=sorted((r for r in items if r["modeled_net"] is not None),
+                           key=lambda r:(-r["modeled_net"],r["id"]))
         slots=[r["source_slot"] for r in items]
         comparisons.append({"start_mint":mint,"amount":amount,"source_slot_range":[min(slots),max(slots)],
             "gross_ranked_ids":[r["id"] for r in gross],"estimated_net_ranked_ids":[r["id"] for r in net],
             "modeled_gross_ranked_ids":[r["id"] for r in modeled],
+            "modeled_net_ranked_ids":[r["id"] for r in modeled_net],
             "net_unconverted_ids":[r["id"] for r in gross if r["estimated_net"] is None],
             "simultaneous_source_snapshot":False,"net_profit_verified":False,**SAFE})
     return {"status":"PRIMARY_ACCEPTED_ROUTE_ECONOMIC_RESEARCH_ONLY",
         "accepted_route_count":len(rows),"comparable_group_count":len(comparisons),
         "complete_source_models":sum(r["modeled_output"] is not None for r in rows),
+        "complete_source_cost_models":sum(r["modeled_net"] is not None for r in rows),
+        "positive_modeled_net_count":sum(r["modeled_net"] is not None and r["modeled_net"]>0 for r in rows),
         "source_terminal_matches":sum(r["source_model_matches_terminal"] is True for r in rows),
         "positive_observed_gross_count":sum(r["observed_gross"]>0 for r in rows),
         "estimated_cost_converted_count":sum(r["estimated_cost"] is not None for r in rows),
