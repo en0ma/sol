@@ -293,7 +293,7 @@ def fixture_identity(fixture,row):
 
 def prepare(rpc, evidence_dir, directory, baseline, route):
     from arb.m5_four_to_six_source_capture import capture
-    from arb.next_ten_fork_pool_probe import source_clock
+    from arb.next_ten_fork_pool_probe import source_clock,contextual_route_clock
     from arb.m5_source_indicative_route_chain import research_chain
     local_rpc_only(rpc)
     root=Path(directory);root.mkdir(parents=True,exist_ok=True)
@@ -323,10 +323,17 @@ def prepare(rpc, evidence_dir, directory, baseline, route):
             try:
                 path=root/(item["id"]+"-fixture.json")
                 capture(rpc,{"status":"BLOCKZILLA_HINT_GRAPH_ONLY","routes":[row],**SAFE},
-                        0,path,allow_hint_graph=True,venue_cache=venue_cache)
+                        0,path,allow_hint_graph=True,venue_cache=venue_cache,
+                        capture_context_clock=True)
                 fixture=json.loads(path.read_text())
                 fixture_identity(fixture,item)
-                clock=source_clock(rpc);item["source_clock"]=clock
+                clock=contextual_route_clock(fixture)
+                if clock is None:
+                    clock=source_clock(rpc)
+                    item["source_clock_provenance"]="POST_CAPTURE_CLOCK_NOT_SAME_SLOT_ATTESTED"
+                else:
+                    item["source_clock_provenance"]="CONTEXTUAL_SOURCE_CLOCK_MATCHED"
+                item["source_clock"]=clock
                 item.update(capture_status="CAPTURED",fixture_sha256=digest(path.read_bytes()),
                             source_slot=fixture["state_accounts_observed_slot"])
                 report["source_captured"]+=1
@@ -418,6 +425,17 @@ def source_signing_inventory(source,root,*,recorded_plans=None):
         fixture=json.loads(raw);fixture_identity(fixture,row)
         if row["hops"]==6 and source_footprint(fixture)!=row["source_account_footprint"]:
             raise ValueError("independent unsigned source footprint differs")
+        from arb.next_ten_fork_pool_probe import contextual_route_clock
+        contextual=contextual_route_clock(fixture)
+        provenance=row.get("source_clock_provenance")
+        if contextual is not None:
+            if provenance!="CONTEXTUAL_SOURCE_CLOCK_MATCHED" or row["source_clock"]!=contextual:
+                raise ValueError("candidate source Clock differs from contextual account")
+        elif fixture.get("contextual_source_clock") is not None:
+            if provenance!="POST_CAPTURE_CLOCK_NOT_SAME_SLOT_ATTESTED":
+                raise ValueError("candidate source Clock fallback provenance missing")
+        elif provenance is not None:
+            raise ValueError("candidate source Clock claim has no captured record")
         clock=row["source_clock"]["unix_timestamp"]
         plans[rid]=(size_plan(fixture,observed_unix=clock) if recorded_plans is None
                     else verify_plan(recorded_plans[rid],fixture,observed_unix=clock))

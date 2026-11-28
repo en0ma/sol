@@ -13,8 +13,11 @@ from arb.rpc import call
 from arb.source_snapshot_manifest import digest,verify
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
 
-def capture(rpc,graph,route_index,output,*,venue_cache=None,allow_hint_graph=False):
+def capture(rpc,graph,route_index,output,*,venue_cache=None,allow_hint_graph=False,
+            capture_context_clock=False):
     local_rpc_only(rpc)
+    if type(capture_context_clock) is not bool:
+        raise ValueError("explicit contextual Clock capture option required")
     if (not isinstance(graph,dict) or
             (graph.get("status")!="SOURCE_AUTHENTICATED_ROUTE_DISCOVERY_ONLY" and not
              (allow_hint_graph is True and graph.get("status")=="BLOCKZILLA_HINT_GRAPH_ONLY"))
@@ -65,6 +68,12 @@ def capture(rpc,graph,route_index,output,*,venue_cache=None,allow_hint_graph=Fal
     optional_bitmap_addresses={bitmap_extension_pda(l["pool"])
         for l in legs if l["venue"]=="meteora_dlmm"}
     addresses.extend(sorted(optional_bitmap_addresses-required_addresses))
+    from arb.next_ten_fork_pool_probe import CLOCK_SYSVAR,decode_source_clock_account
+    if CLOCK_SYSVAR in addresses:
+        raise ValueError("Clock sysvar cannot be a hydratable route account")
+    clock_requested=capture_context_clock and len(addresses)<100
+    if clock_requested:
+        addresses.append(CLOCK_SYSVAR)
     if not addresses or len(addresses)>100:
         raise ValueError("source auxiliary inventory exceeds getMultipleAccounts 100-key limit")
     response=call(rpc,"getMultipleAccounts",[addresses,{"encoding":"base64","commitment":"confirmed"}])
@@ -94,6 +103,16 @@ def capture(rpc,graph,route_index,output,*,venue_cache=None,allow_hint_graph=Fal
     if any(value is not None and not isinstance(value,dict) for value in values):
         raise ValueError("single-slot multi-hop source account data invalid")
     accounts={address:value for address,value in zip(addresses,values) if value is not None}
+    clock_account=accounts.pop(CLOCK_SYSVAR,None)
+    clock_proof=None
+    if capture_context_clock:
+        clock_proof={"address":CLOCK_SYSVAR,"context_slot":slot,
+            "account":clock_account,"status":"SOURCE_CONTEXT_CLOCK_UNAVAILABLE",**SAFE}
+        if clock_account is not None:
+            decoded_clock=decode_source_clock_account(clock_account)
+            clock_proof.update(decoded=decoded_clock,status=(
+                "SOURCE_CONTEXT_CLOCK_MATCHED" if decoded_clock["slot"]==slot
+                else "SOURCE_CONTEXT_CLOCK_SLOT_DIVERGED"))
     addresses=[address for address in addresses if address in accounts]
     for i,leg in enumerate(legs):
         account=accounts[leg["pool"]]
@@ -135,6 +154,8 @@ def capture(rpc,graph,route_index,output,*,venue_cache=None,allow_hint_graph=Fal
             "state_account_manifest_sha256":digest(accounts,addresses,slot),
             "accounts":accounts,"signed_atomic_simulation_verified":False,
             "rollback_failure_case_verified":False,**SAFE}
+    if clock_proof is not None:
+        result["contextual_source_clock"]=clock_proof
     verify(result)
     Path(output).write_text(json.dumps(result,sort_keys=True,indent=2)+"\n")
     return {"status":"AUTHENTICATED_FOUR_TO_SIX_HOP_SOURCE_FIXTURE",

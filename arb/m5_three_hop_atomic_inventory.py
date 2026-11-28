@@ -364,6 +364,8 @@ def source_capture(rpc, graph, directory, *, shard_index=0, shard_count=1, targe
             capture(rpc,graph,index,fixture,venue_cache=venue_cache)
             entry["source_status"]="CAPTURED"
             entry["fixture"]=fixture.name
+            import hashlib
+            entry["source_fixture_sha256"]=hashlib.sha256(fixture.read_bytes()).hexdigest()
         except (ValueError,KeyError,TypeError,RuntimeError,OSError) as exc:
             entry["source_status"]="CAPTURE_BLOCKED"
             entry["diagnostic"]=str(exc)[:1000]
@@ -733,6 +735,9 @@ def audit_primary_shard(directory):
                 or any(row.get(k) is not False for k in SAFE)):
             raise ValueError("invalid accepted primary receipt identity")
         fixture_raw=(root/name).read_bytes()
+        fixture_hash=hashlib.sha256(fixture_raw).hexdigest()
+        if row.get("source_fixture_sha256")!=fixture_hash:
+            raise ValueError("primary source fixture differs from source-phase digest")
         receipt_raw=(root/("receipt-"+rid+".json")).read_bytes()
         fixture=json.loads(fixture_raw);receipt=json.loads(receipt_raw)
         mints=row["mints"];venues=row["venues"];pools=row["pools"]
@@ -748,7 +753,7 @@ def audit_primary_shard(directory):
         reserve_receipt_signatures(receipt,seen)
         accepted.append({"id":rid,"start_mint":mints[0],"pools":pools,
             "source_slot":source_row["source_slot"],"amount":amount,
-            "fixture_sha256":hashlib.sha256(fixture_raw).hexdigest(),
+            "fixture_sha256":fixture_hash,
             "receipt_sha256":hashlib.sha256(receipt_raw).hexdigest(),"audit":audit})
     if len(accepted)!=report["simulations_verified"] or len(seen)!=2*len(accepted):
         raise ValueError("primary independent acceptance count mismatch")

@@ -38,13 +38,16 @@ SAFETY={"actionable":False,"live_execution_approved":False,"broadcast":False}
 
 CLOCK_SYSVAR="SysvarC1ock11111111111111111111111111111111"
 
-def source_clock(rpc):
-    """Read source-fork Clock sysvar; never use wall clock as protocol evidence."""
-    info=call(rpc,"getAccountInfo",[CLOCK_SYSVAR,
-        {"encoding":"base64","commitment":"confirmed"}]).get("value")
-    if not isinstance(info,dict) or info.get("owner")!="Sysvar1111111111111111111111111111111111111":
+def decode_source_clock_account(info):
+    """Decode the original Clock account for read-only pricing provenance."""
+    if (not isinstance(info,dict)
+            or info.get("owner")!="Sysvar1111111111111111111111111111111111111"
+            or info.get("executable") is not False):
         raise ValueError("source Clock sysvar absent or owner mismatch")
-    raw=base64.b64decode(info["data"][0],validate=True)
+    data=info.get("data")
+    if not isinstance(data,list) or len(data)!=2 or data[1]!="base64":
+        raise ValueError("source Clock sysvar encoding mismatch")
+    raw=base64.b64decode(data[0],validate=True)
     if len(raw)!=40:
         raise ValueError("source Clock sysvar length mismatch")
     slot=int.from_bytes(raw[0:8],"little")
@@ -52,6 +55,42 @@ def source_clock(rpc):
     if unix_timestamp<0:
         raise ValueError("negative source Clock timestamp")
     return {"slot":slot,"unix_timestamp":unix_timestamp}
+
+
+def source_clock(rpc):
+    """Read source-fork Clock sysvar; never use wall clock as protocol evidence."""
+    info=call(rpc,"getAccountInfo",[CLOCK_SYSVAR,
+        {"encoding":"base64","commitment":"confirmed"}]).get("value")
+    return decode_source_clock_account(info)
+
+
+def contextual_route_clock(fixture):
+    """Recompute contextual Clock from retained bytes, never hydrate a sysvar.
+
+    Historical fixtures and explicit unavailable observations have no exact
+    context Clock. A malformed present record is not silently downgraded.
+    """
+    proof=fixture.get("contextual_source_clock")
+    if proof is None:
+        return None
+    if (not isinstance(proof,dict)
+            or proof.get("address")!=CLOCK_SYSVAR
+            or proof.get("context_slot")!=fixture.get("state_accounts_observed_slot")
+            or any(proof.get(k) is not False for k in SAFETY)):
+        raise ValueError("source Clock context identity mismatch")
+    if (CLOCK_SYSVAR in fixture["accounts"]
+            or CLOCK_SYSVAR in fixture["state_account_addresses"]):
+        raise ValueError("source Clock must not be hydrated")
+    if proof.get("status")=="SOURCE_CONTEXT_CLOCK_UNAVAILABLE":
+        if proof.get("account") is not None:
+            raise ValueError("unavailable source Clock has account bytes")
+        return None
+    clock=decode_source_clock_account(proof["account"])
+    expected="SOURCE_CONTEXT_CLOCK_MATCHED" if clock["slot"]==proof["context_slot"] else "SOURCE_CONTEXT_CLOCK_SLOT_DIVERGED"
+    if proof.get("status")!=expected or proof.get("decoded")!=clock:
+        raise ValueError("source Clock claim differs from retained account")
+    return clock if expected=="SOURCE_CONTEXT_CLOCK_MATCHED" else None
+
 
 def snapshot(rpc, pool, venue):
     local_rpc_only(rpc)

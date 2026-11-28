@@ -100,5 +100,27 @@ class DirectionalOrcaCaptureTests(unittest.TestCase):
             self.assertFalse(output.exists())
 
 
+class ContextClockTests(unittest.TestCase):
+    def test_context_clock_is_exact_or_explicitly_unavailable(self):
+        from arb.next_ten_fork_pool_probe import contextual_route_clock,CLOCK_SYSVAR,SAFETY
+        raw=bytearray(40);raw[:8]=(123).to_bytes(8,"little")
+        raw[32:40]=(456).to_bytes(8,"little",signed=True)
+        account={"owner":"Sysvar1111111111111111111111111111111111111",
+            "executable":False,"data":[base64.b64encode(raw).decode(),"base64"]}
+        proof={"address":CLOCK_SYSVAR,"context_slot":123,"account":account,
+            "status":"SOURCE_CONTEXT_CLOCK_MATCHED",
+            "decoded":{"slot":123,"unix_timestamp":456},**SAFETY}
+        fixture={"state_accounts_observed_slot":123,"accounts":{},
+            "state_account_addresses":[],"contextual_source_clock":proof}
+        self.assertEqual(contextual_route_clock(fixture),proof["decoded"])
+        with self.assertRaisesRegex(ValueError,"must not be hydrated"):
+            contextual_route_clock({**fixture,"accounts":{CLOCK_SYSVAR:account}})
+        with self.assertRaisesRegex(ValueError,"differs"):
+            contextual_route_clock({**fixture,"contextual_source_clock":{
+                **proof,"decoded":{"slot":123,"unix_timestamp":457}}})
+        self.assertIsNone(contextual_route_clock({**fixture,"contextual_source_clock":{
+            **proof,"status":"SOURCE_CONTEXT_CLOCK_UNAVAILABLE","account":None}}))
+
+
 if __name__ == "__main__":
     unittest.main()
