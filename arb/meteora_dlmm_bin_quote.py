@@ -39,7 +39,7 @@ def quote_bins(*,amount_in,swap_x_for_y,bins,total_fee_rate,max_bins=32,fee_on_i
         raise ValueError("DLMM positive integer input required")
     if type(swap_x_for_y)is not bool or type(total_fee_rate)is not int or not 0<=total_fee_rate<DEN:
         raise ValueError("DLMM direction or fee invalid")
-    if not isinstance(bins,list) or not 1<=len(bins)<=max_bins<=210:
+    if not isinstance(bins,list) or not 1<=len(bins)<=max_bins<=560:
         raise ValueError("DLMM bounded bins missing")
     if type(fee_on_input) is not bool or type(limit_order_support) is not bool:
         raise ValueError("explicit DLMM fee denomination required")

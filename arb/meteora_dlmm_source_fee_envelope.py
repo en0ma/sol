@@ -14,10 +14,10 @@ from arb.fixture_quote_execution_pipeline import extract_pool_states
 SAFE={"actionable":False,"broadcast":False,"live_execution_approved":False}
 
 def quote_fee_envelope(fixture, *, pool, mint_in, amount_in, observed_unix,
-                       maximum_arrays=3):
+                       maximum_arrays=None):
     if type(amount_in)is not int or not 0<amount_in<2**64:
         raise ValueError("positive DLMM integer input required")
-    if type(maximum_arrays)is not int or not 1<=maximum_arrays<=3:
+    if maximum_arrays is not None and (type(maximum_arrays)is not int or not 1<=maximum_arrays<=8):
         raise ValueError("bounded DLMM array traversal required")
     rows=extract_pool_states(fixture)
     row=next((x for x in rows if x["venue"]=="meteora_dlmm"
@@ -32,6 +32,7 @@ def quote_fee_envelope(fixture, *, pool, mint_in, amount_in, observed_unix,
     # A quote may not silently use an extension claim that diverges from
     # captured original bytes. The existing contiguous-bin model is unchanged.
     extension_evidence=None
+    directional_proof=None
     for proof in fixture.get("leg_evidence_by_index",[]):
         if proof.get("venue")=="meteora_dlmm" and proof.get("pool")==pool:
             aux=proof.get("auxiliary") or {}
@@ -39,22 +40,38 @@ def quote_fee_envelope(fixture, *, pool, mint_in, amount_in, observed_unix,
                 from arb.meteora_dlmm_bin_preflight import verified_bitmap_extension_address
                 verified_bitmap_extension_address(pool,aux,fixture)
                 extension_evidence=aux["bitmap_extension_source"]
+                if aux.get("directional_bin_source") is not None:
+                    directional_proof=aux
+    maximum_arrays=maximum_arrays if maximum_arrays is not None else (8 if directional_proof else 3)
+    if maximum_arrays>3 and directional_proof is None:
+        raise ValueError("extended DLMM traversal requires contextual bitmap coverage")
     active=state["active_id"]
     center=active_bin_array_index(active)
     indices=[center+(-i if direction else i) for i in range(maximum_arrays)]
     arrays=[]
     missing=[]
-    for index in indices:
-        try:
-            arrays.append(decode_from_fixture(fixture,pool=pool,array_index=index))
-        except ValueError as exc:
-            missing.append({"array_index":index,"reason":str(exc)[:160]})
-            if index==center:break
+    bitmap_walk=None
+    skipped=[]
+    if directional_proof is not None:
+        from arb.meteora_dlmm_source_bin_decoder import bitmap_directional_bins
+        bitmap_walk=bitmap_directional_bins(fixture,pool=pool,active_id=active,
+            x_to_y=direction,proof=directional_proof,maximum_arrays=maximum_arrays)
+        arrays=bitmap_walk["arrays"]
+        missing=bitmap_walk["missing_arrays"]
+        skipped=bitmap_walk["verified_empty_arrays"]
+    else:
+        for index in indices:
+            try:
+                arrays.append(decode_from_fixture(fixture,pool=pool,array_index=index))
+            except ValueError as exc:
+                missing.append({"array_index":index,"reason":str(exc)[:160]})
+                if index==center:break
     if not arrays:
         return {"status":"SOURCE_NATIVE_DLMM_BIN_ARRAY_BLOCKED",
                 "pool":pool,"source_slot":fixture["state_accounts_observed_slot"],
                 "missing_arrays":missing,"protocol_exact_verified":False,**SAFE}
-    selection=directional_bins(arrays,active_id=active,x_to_y=direction,maximum_bins=maximum_arrays*70)
+    selection=bitmap_walk if bitmap_walk is not None else directional_bins(
+        arrays,active_id=active,x_to_y=direction,maximum_bins=maximum_arrays*70)
     bins=selection["bins"]
     rates=fee_bounds_from_fixture(fixture,pool=pool,observed_unix=observed_unix)
     mode=rates["static"]["collect_fee_mode"]
@@ -96,7 +113,7 @@ def quote_fee_envelope(fixture, *, pool, mint_in, amount_in, observed_unix,
             schedule=dynamic_fee_rate_by_bin(raw,bin_step=state["bin_step"],
                 observed_unix=observed_unix,active_bin_id=active,
                 visited_bin_ids=[b["bin_id"] for b in bins],
-                swap_x_for_y=direction,allow_output_fee=True)
+                swap_x_for_y=direction,allow_output_fee=True,verified_empty_arrays=skipped)
             if schedule["fee_on_input"] is not fee_on_input:
                 raise ValueError("source fee denomination mismatch")
             enriched=[{**b,"effective_fee_rate":rate["effective_fee_rate"]}
@@ -130,6 +147,8 @@ def quote_fee_envelope(fixture, *, pool, mint_in, amount_in, observed_unix,
             "walked_bin_count":len(bins),
             "missing_arrays":missing,
             "bitmap_extension_source":extension_evidence,
+            "bitmap_verified_empty_arrays":skipped,
+            "bitmap_coverage_status":bitmap_walk["coverage_status"] if bitmap_walk else None,
             "fee_bounds":outcomes,
             "source_derived_dynamic_fee_quote":effective,
             "fee_precision":FEE_PRECISION,"fee_on_input":fee_on_input,

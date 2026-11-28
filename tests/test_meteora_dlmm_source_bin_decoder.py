@@ -62,4 +62,34 @@ class SourceBinDecoderTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"source-authenticated"):
             directional_bins([decoded],active_id=15,x_to_y=False)
 
+    def test_actual_source_internal_bitmap_and_extension_boundaries(self):
+        from arb.meteora_dlmm_source_bin_decoder import bitmap_initialized
+        from arb.meteora_dlmm import DISC,SIZE
+        from arb.meteora_dlmm_bin_preflight import BITMAP_EXTENSION_DISC,BITMAP_EXTENSION_SIZE
+        raw=bytearray(SIZE);raw[:8]=DISC
+        # Actual source artifact 15263237974 / source-170.json, slot 474953745.
+        initialized=(-8,-7,-6,-5,-4,0)
+        raw[584:712]=sum(1<<(i+512) for i in initialized).to_bytes(128,"little")
+        self.assertEqual([i for i in range(-8,2) if bitmap_initialized(bytes(raw),i)],list(initialized))
+        self.assertIsNone(bitmap_initialized(bytes(raw),512))
+        ext=bytearray(BITMAP_EXTENSION_SIZE);ext[:8]=BITMAP_EXTENSION_DISC
+        ext[40]=1;ext[808]=2
+        self.assertTrue(bitmap_initialized(bytes(raw),512,extension_raw=bytes(ext)))
+        self.assertTrue(bitmap_initialized(bytes(raw),-514,extension_raw=bytes(ext)))
+        self.assertFalse(bitmap_initialized(bytes(raw),-513,extension_raw=bytes(ext)))
+        self.assertIsNone(bitmap_initialized(bytes(raw),6656,extension_raw=bytes(ext)))
+
+    def test_fee_schedule_allows_only_whole_verified_empty_array_gaps(self):
+        from arb.meteora_dlmm_source_fee_decoder import dynamic_fee_rate_by_bin
+        from arb.meteora_dlmm import DISC,SIZE
+        raw=bytearray(SIZE);raw[:8]=DISC
+        kwargs=dict(bin_step=25,observed_unix=123,active_bin_id=-211,
+                    visited_bin_ids=[-211,0],swap_x_for_y=False)
+        with self.assertRaisesRegex(ValueError,"contiguous"):
+            dynamic_fee_rate_by_bin(bytes(raw),**kwargs)
+        with self.assertRaisesRegex(ValueError,"contiguous"):
+            dynamic_fee_rate_by_bin(bytes(raw),verified_empty_arrays=[-3,-1],**kwargs)
+        result=dynamic_fee_rate_by_bin(bytes(raw),verified_empty_arrays=[-3,-2,-1],**kwargs)
+        self.assertEqual([x["bin_id"] for x in result["rates"]],[-211,0])
+        self.assertFalse(result["protocol_exact_verified"])
 if __name__=="__main__":unittest.main()

@@ -109,7 +109,8 @@ def fee_bounds_from_fixture(fixture, *, pool, observed_unix):
             "pool":pool,"source_slot":fixture["state_accounts_observed_slot"],**SAFE}
 
 def dynamic_fee_rate_by_bin(raw, *, bin_step, observed_unix, active_bin_id,
-                            visited_bin_ids, swap_x_for_y, allow_output_fee=False):
+                            visited_bin_ids, swap_x_for_y, allow_output_fee=False,
+                            verified_empty_arrays=()):
     """Reproduce integer volatility references and bin-crossing fee numerators.
 
     Based on Meteora DLMM LbPair update_references,
@@ -118,12 +119,24 @@ def dynamic_fee_rate_by_bin(raw, *, bin_step, observed_unix, active_bin_id,
     mode and SPL token transfer extensions remain separately gated.
     """
     if (type(active_bin_id)is not int or type(swap_x_for_y)is not bool
-            or not isinstance(visited_bin_ids,list) or not 1<=len(visited_bin_ids)<=210
+            or not isinstance(visited_bin_ids,list) or not 1<=len(visited_bin_ids)<=560
             or visited_bin_ids[0]!=active_bin_id
             or any(type(i)is not int for i in visited_bin_ids)
-            or any(visited_bin_ids[i]!=visited_bin_ids[i-1]+(-1 if swap_x_for_y else 1)
-                   for i in range(1,len(visited_bin_ids)))):
+            or not isinstance(verified_empty_arrays,(tuple,list))
+            or len(verified_empty_arrays)>7
+            or any(type(i) is not int for i in verified_empty_arrays)
+            or len(set(verified_empty_arrays))!=len(verified_empty_arrays)):
         raise ValueError("invalid contiguous DLMM source bin traversal")
+    step=-1 if swap_x_for_y else 1
+    for previous,current in zip(visited_bin_ids,visited_bin_ids[1:]):
+        distance=(current-previous)*step
+        if distance==1:
+            continue
+        if (not 1<distance<=491 or previous%70!=(0 if swap_x_for_y else 69)
+                or current%70!=(69 if swap_x_for_y else 0)
+                or any(i not in verified_empty_arrays for i in
+                       range(previous//70+step,current//70,step))):
+            raise ValueError("invalid contiguous DLMM source bin traversal")
     state=source_fee_bounds(raw,bin_step=bin_step,observed_unix=observed_unix)
     static=state["static"];variable=state["variable"]
     mode=static["collect_fee_mode"]
