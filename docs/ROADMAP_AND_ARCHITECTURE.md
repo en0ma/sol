@@ -327,3 +327,5 @@ PumpSwap V2 event-prefix fee components and actual SPL movements are distinct fr
 Separate source-clock and stable isolated execution-clock DLMM pricing, retain both. Preselect ordinary canonical WSOL PumpSwap model without signed output selection; never promote scenario to protocol certification. Distinguish observed system account funding and estimated message fees from actual wallet economics.
 
 Bounded pre-sign native sizing must retain original controls, rank only complete source models and independently recompute the plan against original fixture/SDK dependency resolution. DLMM may traverse up to three contiguous captured arrays; do not skip matching unmodeled limit-order liquidity or unknown gaps. No promotion of modeled profit.
+
+Independent size-plan audit rebuilds the official SDK from the sizing runner's retained dependency lock, not its executable. Rejected attempts retain separate digest-checked receipt evidence when available; missing execution cannot be promoted.

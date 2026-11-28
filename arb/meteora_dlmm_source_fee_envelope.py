@@ -7,7 +7,7 @@ is only valid for the supplied bounded bin inventory and fee envelope; no
 protocol-exact, executable, or profitability assertions are made.
 """
 from arb.meteora_dlmm_source_bin_decoder import decode_from_fixture,directional_bins
-from arb.meteora_dlmm_source_fee_decoder import fee_bounds_from_fixture,FEE_PRECISION
+from arb.meteora_dlmm_source_fee_decoder import fee_bounds_from_fixture,FEE_PRECISION,static_parameters,limit_order_supported
 from arb.meteora_dlmm_bin_preflight import active_bin_array_index
 from arb.meteora_dlmm_bin_quote import quote_bins
 from arb.fixture_quote_execution_pipeline import extract_pool_states
@@ -52,12 +52,15 @@ def quote_fee_envelope(fixture, *, pool, mint_in, amount_in, observed_unix,
         raise ValueError("unsupported DLMM fee collection mode")
     fee_on_input=(mode==0 or not direction)
     import base64
-    raw=base64.b64decode(fixture["accounts"][pool]["data"][0],validate=True)
-    function_type=rates["static"]["function_type"]
-    if function_type not in (0,1,2):
-        raise ValueError("unsupported DLMM function type")
-    # SDK: Undetermined supports limit orders only with no reward mints.
-    limit_order_support=function_type==2 or (function_type==0 and not any(raw[264:296]+raw[408:440]))
+    encoded=fixture["accounts"][pool].get("data")
+    if not isinstance(encoded,list) or len(encoded)!=2 or encoded[1]!="base64":
+        raise ValueError("source DLMM pool bytes missing for dynamic fee calculation")
+    raw=base64.b64decode(encoded[0],validate=True)
+    static=static_parameters(raw)
+    if (rates["static"].get("function_type")!=static["function_type"]
+            or mode!=static["collect_fee_mode"]):
+        raise ValueError("DLMM source fee mode differs from decoded pool bytes")
+    limit_order_support=limit_order_supported(raw)
     outcomes=[]
     for name,rate in (("minimum_effective_fee",rates["minimum_total_fee_rate_numerator"]),
                       ("maximum_effective_fee",rates["maximum_total_fee_rate_numerator"])):
@@ -77,12 +80,6 @@ def quote_fee_envelope(fixture, *, pool, mint_in, amount_in, observed_unix,
     # Actual LbPair volatility fields drive an independent integer
     # fee trajectory, rather than substituting a static guessed tier.
     from arb.meteora_dlmm_source_fee_decoder import dynamic_fee_rate_by_bin
-    import base64
-    pool_account=fixture["accounts"][pool]
-    encoded=pool_account.get("data")
-    if (not isinstance(encoded,list) or len(encoded)!=2 or encoded[1]!="base64"):
-        raise ValueError("source DLMM pool bytes missing for dynamic fee calculation")
-    raw=base64.b64decode(encoded[0],validate=True)
     effective=None
     if bins:
         try:

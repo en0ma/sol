@@ -404,11 +404,15 @@ jobs:
         with:
           persist-credentials: false
       - run: python3 -m pip install --disable-pip-version-check solders==0.26.0
-      - name: Build existing revision-pinned official DAMM SDK reference (no RPC secrets)
+      - uses: actions/download-artifact@v4
+        with:
+          name: blockzilla-damm-sdk-sizing-build
+          path: ${{ runner.temp }}/damm-sdk-sizing-lock
+      - name: Independently build pinned DAMM SDK from sizing dependency lock (no RPC secrets)
         id: damm-sdk
         continue-on-error: true
         timeout-minutes: 20
-        run: bash ci/build_meteora_damm_v2_reference.sh "$RUNNER_TEMP/damm-sdk-build"
+        run: bash ci/build_meteora_damm_v2_reference.sh "$RUNNER_TEMP/damm-sdk-build" "$RUNNER_TEMP/damm-sdk-sizing-lock/Cargo.lock"
 
       - uses: actions/download-artifact@v4
         with:

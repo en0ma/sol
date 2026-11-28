@@ -380,3 +380,5 @@ Blockzilla #17 46115468678 12/12 independently audited multihop, PumpSwap 4/4 si
 Blockzilla #18 46116220241 12/12 independent,48/50 deterministic native samples,4/4 PumpSwap scenario/event matches, two DLMM discrepancies. Clock bracket, independent event and observed native funding audits plus opt-in preselected PumpSwap research chain pending CI.
 
 Blockzilla #19 46118938733 all 12 signed/independent and terminal source/execution-clock models match, 54/54 sample outputs including four preselected PumpSwap research models; no positive net. Bounded pre-sign grid, independently recomputed size selection, contiguous DLMM expansion and limit-order guard pending CI.
+
+Blockzilla #20 46120596545 failed old mocked DLMM source fee envelope missing function_type after 38+16 tests passed. Corrected strict decoder/mock, locked independent SDK build resolution and rejected-attempt binding; fresh CI pending. No new signed size evidence.

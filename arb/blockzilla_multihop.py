@@ -553,6 +553,8 @@ def audit(source_dir,signed_dir):
     if signed["source_report_sha256"]!=digest(source_raw):
         raise ValueError("signed source report binding mismatch")
     rows={r["id"]:r for r in source["routes"]}
+    if len(rows)!=len(source["routes"]) or any(not isinstance(rid,str) or not __import__("re").fullmatch(r"BZ[3-6]-[0-9]{2}",rid) for rid in rows):
+        raise ValueError("duplicate or invalid captured route identity")
     captured={r["id"]:r for r in rows.values() if r["capture_status"]=="CAPTURED"}
     lock=Path("tools/meteora_damm_v2_reference/Cargo.lock")
     if signed.get("official_damm_sdk_lock_sha256")!=digest(lock.read_bytes()):
@@ -578,15 +580,38 @@ def audit(source_dir,signed_dir):
             "source_captured":source["source_captured"],"signed_attempt_count":len(attempts),
             "net_profit_verified":False,
             "runner_accepted":signed["accepted"],"attempts":[],**SAFE}
+    report["rejected_attempts"]=[]
     for attempt in signed["attempts"]:
         if attempt["status"]!="SIGNED_N_LEG_ATOMIC_AND_ROLLBACK_VERIFIED":
+            rejected={"id":attempt["id"],"amount":attempt["amount"],"status":attempt["status"],
+                      "diagnostic":attempt.get("diagnostic"),"runtime_account_lock_rejected":False,
+                      "recorded_rejection_digest_checked":False,**SAFE}
+            if attempt.get("receipt") is not None:
+                expected_name=f'{attempt["id"]}-{attempt["amount"]}-receipt.json'
+                if attempt["receipt"]!=expected_name:
+                    raise ValueError("rejected receipt filename does not match attempt")
+                raw=(root/expected_name).read_bytes()
+                if digest(raw)!=attempt.get("receipt_sha256"):
+                    raise ValueError("rejected receipt digest mismatch")
+                result=json.loads(raw)
+                if (result.get("status")!=attempt["status"] or
+                        any(result.get(k) is not False for k in SAFE) or
+                        result.get("signed_atomic_simulation_verified") is not False):
+                    raise ValueError("inconsistent rejected signed receipt")
+                rejected["recorded_rejection_digest_checked"]=True
+                rejected["runtime_account_lock_rejected"]=result.get("runtime_account_lock_rejected") is True
+                rejected["positive_error"]=result.get("positive_error")
+            report["rejected_attempts"].append(rejected)
             continue
         item={"id":attempt["id"],"amount":attempt["amount"]}
         report["attempts"].append(item)
         try:
             row=rows[attempt["id"]]
             fixture_raw=(src/(row["id"]+"-fixture.json")).read_bytes()
-            receipt_raw=(root/attempt["receipt"]).read_bytes()
+            expected_name=f'{attempt["id"]}-{attempt["amount"]}-receipt.json'
+            if attempt["receipt"]!=expected_name:
+                raise ValueError("accepted receipt filename does not match attempt")
+            receipt_raw=(root/expected_name).read_bytes()
             if digest(fixture_raw)!=row["fixture_sha256"] or digest(receipt_raw)!=attempt["receipt_sha256"]:
                 raise ValueError("source or receipt digest mismatch")
             item["audit"]=audit_receipt(json.loads(receipt_raw),json.loads(fixture_raw),row,attempt["amount"])

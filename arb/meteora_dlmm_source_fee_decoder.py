@@ -34,6 +34,23 @@ def static_parameters(raw):
         raise ValueError("DLMM native fee reduction factor malformed")
     return result
 
+def limit_order_supported(raw):
+    """Pinned SDK LbPair::is_support_limit_order, with strict layout checks.
+
+    FunctionType 0 derives the mode from the two reward mint keys;
+    1 is liquidity mining; 2 is limit orders. Never interpret a missing
+    field, short reward inventory or unsupported discriminant as MM-only.
+    """
+    kind=static_parameters(raw)["function_type"]
+    if kind==1:
+        return False
+    if kind==2:
+        return True
+    if kind==0:
+        return raw[264:296]==bytes(32) and raw[408:440]==bytes(32)
+    raise ValueError("unsupported DLMM function type")
+
+
 def variable_parameters(raw):
     if type(raw)is not bytes or len(raw)!=SIZE or raw[:8]!=DISC:
         raise ValueError("invalid DLMM LbPair bytes for volatility decoder")

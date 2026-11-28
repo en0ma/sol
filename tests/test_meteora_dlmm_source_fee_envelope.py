@@ -1,12 +1,35 @@
 import unittest
+import base64
+from arb.meteora_dlmm import DISC,SIZE
+from arb.meteora_dlmm_source_fee_decoder import limit_order_supported
 from unittest.mock import patch
 from arb.meteora_dlmm_source_fee_envelope import quote_fee_envelope
 SAFE={"actionable":False,"broadcast":False,"live_execution_approved":False}
 POOL="source-dlmm-pool"
 class DlmmSourceEnvelopeTests(unittest.TestCase):
+    def pool_bytes(self,kind=1,reward_offset=None):
+        raw=bytearray(SIZE)
+        raw[:8]=DISC
+        raw[35]=kind
+        if reward_offset is not None:
+            raw[reward_offset]=1
+        return bytes(raw)
     def fixture(self):
+        # Synthetic layout-valid bytes only; native inputs are mocked in
+        # this test. Never describe these bytes as a genuine source fixture.
+        raw=self.pool_bytes()
         return {"state_accounts_observed_slot":123,
-                "accounts":{POOL:{"data":["AA==","base64"]}},**SAFE}
+                "accounts":{POOL:{"data":[base64.b64encode(raw).decode(),"base64"]}},**SAFE}
+    def test_function_type_and_reward_mints_are_source_bound(self):
+        self.assertFalse(limit_order_supported(self.pool_bytes(1)))
+        self.assertTrue(limit_order_supported(self.pool_bytes(2)))
+        self.assertTrue(limit_order_supported(self.pool_bytes(0)))
+        for offset in (264,408):
+            self.assertFalse(limit_order_supported(self.pool_bytes(0,offset)))
+        with self.assertRaisesRegex(ValueError,"unsupported DLMM function type"):
+            limit_order_supported(self.pool_bytes(3))
+        with self.assertRaisesRegex(ValueError,"invalid DLMM LbPair"):
+            limit_order_supported(self.pool_bytes(0)[:296])
     def rows(self):
         return [{"venue":"meteora_dlmm","address":POOL,
                  "decoded_pool_state":{"token_x_mint":"X",
@@ -25,7 +48,7 @@ class DlmmSourceEnvelopeTests(unittest.TestCase):
                                     "price_q64":1<<64}]}
         dynamic.return_value={"fee_collect_mode":0,"observed_unix":123,
             "rates":[{"bin_id":5,"effective_fee_rate":5000}],"fee_on_input":True}
-        rates.return_value={"static":{"collect_fee_mode":0},"base_fee_rate_numerator":1000,
+        rates.return_value={"static":{"collect_fee_mode":0,"function_type":1},"base_fee_rate_numerator":1000,
                              "minimum_total_fee_rate_numerator":1000,
                              "maximum_total_fee_rate_numerator":100000000}
         quote.side_effect=[
@@ -39,6 +62,12 @@ class DlmmSourceEnvelopeTests(unittest.TestCase):
         self.assertFalse(result["effective_fee_verified"])
         self.assertFalse(result["protocol_exact_verified"])
         self.assertEqual(quote.call_count,3)
+        self.assertFalse(result["source_limit_order_support"])
+        self.assertTrue(all(c.kwargs["limit_order_support"] is False for c in quote.call_args_list))
+        rates.return_value["static"].pop("function_type")
+        with self.assertRaisesRegex(ValueError,"source fee mode differs"):
+            quote_fee_envelope(self.fixture(),pool=POOL,mint_in="X",amount_in=101,
+                               observed_unix=123,maximum_arrays=1)
         self.assertEqual(result["source_derived_dynamic_fee_quote"]["amount_out"],95)
         self.assertFalse(result["broadcast"])
     @patch("arb.meteora_dlmm_source_fee_envelope.decode_from_fixture")
