@@ -212,3 +212,49 @@ class MultitickIndicativeTests(unittest.TestCase):
         self.assertFalse(result["executable_quote"])
         self.assertFalse(result["actionable"])
 
+
+    def test_opposite_side_initialized_ticks_prove_bounded_direction(self):
+        from arb.orca_tick_math import sqrt_price_from_tick_index
+        state={**self.state(),"tick_spacing":1,
+               "sqrt_price_x64":str(sqrt_price_from_tick_index(15))}
+        for layout in ("FIXED_VALID","DYNAMIC_VALID"):
+            for mint,tick in (("a",20),("b",10),("b",15)):
+                with self.subTest(layout=layout,mint=mint,tick=tick):
+                    arrays=[{"start_tick":0,"status":layout,
+                             "ticks":[{"tick_index":tick,"liquidity_net":"100"}]}]
+                    q=quote_from_decoded_arrays(state,mint,100000,arrays)
+                    self.assertEqual(q["source"],"VERIFIED_CURRENT_ARRAY_NO_DIRECTIONAL_INITIALIZED_TICKS")
+                    self.assertEqual(q["ticks_crossed"],0)
+                    self.assertEqual(q["source_current_array_initialized_tick_count"],1)
+                    self.assertFalse(q["executable_quote"])
+                    with self.assertRaisesRegex(ValueError,"crossing budget"):
+                        quote_from_decoded_arrays(state,mint,100000000000,arrays)
+
+    def test_opposite_side_does_not_hide_unvalidated_records(self):
+        state={**self.state(),"tick_spacing":1}
+        for ticks in ([{"tick_index":20,"liquidity_net":"invalid"}],
+                      [{"tick_index":20,"liquidity_net":"1"}]*2,
+                      [{"tick_index":90,"liquidity_net":"1"}]):
+            with self.subTest(ticks=ticks), self.assertRaises(ValueError):
+                quote_from_decoded_arrays(state,"a",100000,
+                    [{"start_tick":0,"status":"DYNAMIC_VALID","ticks":ticks}])
+
+    def test_bz6_05_recorded_source_directional_sample(self):
+        # Decoded source snapshot from artifact 15262507864, slot 474946886.
+        # Pool 9CkWqmXeZdUwPtt2VTAfwXcGTyHVPpGVjeHKM3SZfdb1.
+        # Signed leg input/output observations from independent job 140973653206.
+        state={"token_mint_a":"a","token_mint_b":"b","tick_spacing":16,
+               "tick_current_index":-45213,"sqrt_price_x64":"1923934095850152244",
+               "liquidity":"45192737","fee_rate_hundredths_bps":1600}
+        arrays=[{"start_tick":-46464,"status":"DYNAMIC_VALID",
+                 "ticks":[{"tick_index":-45488,"liquidity_net":"16369220"}]},
+                {"start_tick":-45056,"status":"DYNAMIC_VALID","ticks":[]},
+                {"start_tick":-43648,"status":"DYNAMIC_VALID","ticks":[]}]
+        for amount,expected in ((939,86121),(9393,860319)):
+            with self.subTest(amount=amount):
+                q=quote_from_decoded_arrays(state,"b",amount,arrays,max_crossings=64)
+                self.assertEqual(q["estimated_output_base_units"],expected)
+                self.assertEqual(q["directional_boundary_tick"],-45072)
+                self.assertEqual(q["ticks_crossed"],0)
+                self.assertFalse(q["simulation_verified"])
+                self.assertFalse(q["actionable"])

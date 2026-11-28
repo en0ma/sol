@@ -634,6 +634,10 @@ def audit_receipt(receipt,fixture,row,amount):
             orca_comparison={"observed_unix":execution_unix,"modeled_output":ep,
                 "delta":ep-actual_out if type(ep) is int else None,
                 "exact_sample_match":ep==actual_out if type(ep) is int else None,
+                **({"source_directional_coverage":q["orca_directional_coverage"]}
+                   if "orca_directional_coverage" in q else {}),
+                **({"execution_directional_coverage":eq["orca_directional_coverage"]}
+                   if "orca_directional_coverage" in eq else {}),
                 "protocol_exact_verified":False,**SAFE}
         pump_comparison=None
         if venues[i]=="pumpswap":

@@ -392,3 +392,5 @@ Blockzilla #23 46137863094 4 fresh pools,24/28 signed and24 independent,99/100 d
 Blockzilla #24 46140142941 64/64 complete grids,28/32 signed,28/28 independent execution-clock terminal matches,4 rejected 73-key packets independently audited. 12/12 PumpSwap preselected matches. New source-bound unsigned footprint prioritization and all-venue execution-clock leg comparison pending CI.
 
 Blockzilla #25 46141630351 source footprints63/73/69/66; selected63/66 exact signed counts,28/32 accepted; final independent multihop audit pending at inspection. Pair8/8. Separate lighter graph traversal and expanded bounded source candidates pending CI.
+
+Blockzilla #26 46142553467 30/30 signed/independently rechecked, 55/64 size models, 28/30 source/execution terminal matches, no account-lock rejections. Primary #308 46142553457 125/140 signed, 66/75 starts, 117/135 pools. Actual source artifact 15262507864 confirms BZ6-05 directionally empty (not globally empty) dynamic current array; bounded native pricing correction with source-derived regression and independent comparison wiring pending exact new HEAD CI. No full M5 acceptance.

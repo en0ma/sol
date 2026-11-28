@@ -197,17 +197,30 @@ def quote_from_decoded_arrays(state, mint_in, amount_in, arrays, sqrt_price_at_t
               start_tick(current,spacing)+span-spacing)
         if not (edge<current if down else edge>current):
             raise ValueError("no within-array price interval")
-        if not isinstance(current_array.get("ticks"),list) or current_array["ticks"]:
-            raise ValueError("unverified empty current tick array")
-        ticks=[{"tick_index":edge,"sqrt_price_x64":sqrt_price_at_tick(edge),
+        records=current_array.get("ticks")
+        if not isinstance(records,list):
+            raise ValueError("unverified current tick array records")
+        # The contiguous traversal above validated every current-array record.
+        # Whirlpool A->B includes the current tick; B->A excludes it.
+        # Opposite-side initialized ticks cannot affect this partial step.
+        if any((r["tick_index"]<=current if down else r["tick_index"]>current)
+               for r in records):
+            raise ValueError("directional initialized tick cannot be ignored")
+        edge_price=sqrt_price_at_tick(edge)
+        ticks=[{"tick_index":edge,"sqrt_price_x64":edge_price,
                 "liquidity_net":0}]
         result=quote_multitick(state,mint_in,amount_in,ticks,max_crossings=0)
         if result["ticks_crossed"]!=0:
             raise ValueError("synthetic boundary cannot be crossed")
         return {**result,"tick_arrays_examined":1,
                 "first_unavailable_array_start":first_gap,
-                "source":"VERIFIED_CURRENT_ARRAY_NO_INITIALIZED_TICKS",
+                "source":("VERIFIED_CURRENT_ARRAY_NO_DIRECTIONAL_INITIALIZED_TICKS"
+                          if records else "VERIFIED_CURRENT_ARRAY_NO_INITIALIZED_TICKS"),
                 "source_array_layout":current_array["status"],
+                "directional_boundary_tick":edge,
+                "directional_boundary_sqrt_price_x64":str(edge_price),
+                "source_current_array_start":current_array["start_tick"],
+                "source_current_array_initialized_tick_count":len(records),
                 "actionable":False,"executable_quote":False}
     result = quote_multitick(state, mint_in, amount_in, ticks,
                              max_crossings=max_crossings)

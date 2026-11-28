@@ -256,6 +256,12 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix,
                 "source_fee_mode_scenario":(
                     "OUTPUT_COUNTERFACTUAL" if native_mode_scenario
                     else "SOURCE_POOL_FEE_ON_ENUM"),
+                **({"orca_directional_coverage":{
+                    k:native[k] for k in ("source","source_array_layout",
+                        "directional_boundary_tick","directional_boundary_sqrt_price_x64",
+                        "source_current_array_start","source_current_array_initialized_tick_count",
+                        "post_sqrt_price_x64","ticks_crossed")
+                    }} if v=="orca" and "directional_boundary_tick" in native else {}),
                 "protocol_exact_verified":False,**SAFE}
     except (ValueError,KeyError,TypeError,ArithmeticError) as exc:
         return {"venue":v,"pool":pool,"leg_index":leg_index,
