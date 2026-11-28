@@ -18,7 +18,7 @@ class DirectionalFeeTests(unittest.TestCase):
             self.assertEqual(r["net_quote_input_base_units"]+r["fee_quote_base_units"]+
                 r["input_budget_unspent_base_units"],10000)
             self.assertEqual(r["modeled_output_base_units"],
-                1000000*r["net_quote_input_base_units"]//(2000000+r["net_quote_input_base_units"]))
+                1000000*r.get("curve_input_base_units",r["net_quote_input_base_units"])//(2000000+r.get("curve_input_base_units",r["net_quote_input_base_units"])))
     def test_matching_scenario_never_promoted(self):
         rows=self.scenarios(True)
         out=rows[0]["modeled_output_base_units"]
@@ -28,6 +28,15 @@ class DirectionalFeeTests(unittest.TestCase):
         self.assertFalse(c["protocol_exact_verified"])
         self.assertFalse(c["broadcast"])
         self.assertEqual(compare_directional_scenarios(None,out)["scenario_count"],0)
+    def test_captured_buy_one_unit_curve_adjustment(self):
+        for amount,expected in ((100000,368289),(1000000,3682949)):
+            rows=directional_quote_scenarios(amount_in=amount,
+                base_reserve=31090881266967,quote_reserve=8416568018486-1051281,
+                quote_spendable=8416568018486-1051281,from_base=False,
+                component_fee_bps=[20,5,5])
+            chosen=next(r for r in rows if r["scenario"]=="BUY_NET_QUOTE_PLUS_COMPONENT_CEIL_MINUS_ONE")
+            self.assertEqual(chosen["modeled_output_base_units"],expected)
+            self.assertEqual(chosen["curve_input_base_units"],chosen["net_quote_input_base_units"]-1)
     def test_invalid_fee_rate_refused(self):
         with self.assertRaises(ValueError):
             directional_quote_scenarios(amount_in=100,base_reserve=1000,quote_reserve=2000,

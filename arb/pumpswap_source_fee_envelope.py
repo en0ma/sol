@@ -113,6 +113,18 @@ def directional_quote_scenarios(*,amount_in,base_reserve,quote_reserve,
                 "fee_quote_base_units":fee,"net_quote_input_base_units":net,
                 "input_budget_unspent_base_units":amount_in-net-fee,
                 "modeled_output_base_units":output})
+            # Captured V2 buy events show a one-unit reduction of the net
+            # quote input before invariant math. Preserve as a distinct
+            # source-derived hypothesis, not an asserted universal rule.
+            if mode=="COMPONENT_CEIL" and net>1:
+                curve_in=net-1
+                adjusted=base_reserve*curve_in//(quote_reserve+curve_in)
+                if 0<adjusted<base_reserve:
+                    results.append({"scenario":"BUY_NET_QUOTE_PLUS_COMPONENT_CEIL_MINUS_ONE",
+                        "fee_quote_base_units":fee,"net_quote_input_base_units":net,
+                        "curve_input_base_units":curve_in,
+                        "input_budget_unspent_base_units":amount_in-net-fee,
+                        "modeled_output_base_units":adjusted})
     return results
 
 
@@ -131,7 +143,7 @@ def compare_directional_scenarios(envelope,signed_output):
     comparisons=[]
     for c in candidates:
         scenarios=c.get("directional_fee_scenarios",[])
-        if not isinstance(scenarios,list) or len(scenarios)>3:
+        if not isinstance(scenarios,list) or len(scenarios)>4:
             raise ValueError("invalid directional scenario budget")
         for scenario in scenarios:
             out=scenario.get("modeled_output_base_units")

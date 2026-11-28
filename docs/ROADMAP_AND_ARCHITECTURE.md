@@ -321,3 +321,5 @@ Build pinned DAMM SDK only on uncredentialed audit runner and retain build resol
 CLMM native quote traversal may skip only default PoolState bitmap-proven empty ranges; reject any missing set-bit array, bitmap conflict or extension range. No physical empty array fabrication. Six-hop signed acceptance achieved in bounded experiment, not full M5 or profit proof.
 
 Preserve fixed 4–6-hop budget and use separate WSOL-rooted novel-pool triangle trials for PumpSwap in opposite directions. Record hypothetical fee placement/rounding comparisons separately from deterministic native parity. Group retrospective signed estimated economics by identical input mint and size; no profit certification.
+
+PumpSwap V2 event-prefix fee components and actual SPL movements are distinct from fee-mode hypotheses. Preserve buy curve one-unit adjustment as sample-derived hypothesis until broader independent evidence. Estimated message fee economics excludes account-creation rent unless separately reconciled.

@@ -486,6 +486,8 @@ def audit_receipt(receipt,fixture,row,amount):
         if venues[i]=="pumpswap":
             from arb.pumpswap_source_fee_envelope import compare_directional_scenarios
             pump_comparison=compare_directional_scenarios(q.get("native_fee_envelope"),actual_out)
+            from arb.pumpswap_signed_event_audit import audit_event
+            pump_comparison["event_and_cpi"]=audit_event(fixture,positive,pr,keys,accounts,i,actual_in,actual_out)
         leg_samples.append({"venue":venues[i],"pool":q["pool"],"leg_index":i,
             "input":actual_in,"signed_output":actual_out,"modeled_output":prediction,
             "delta":prediction-actual_out if type(prediction) is int else None,

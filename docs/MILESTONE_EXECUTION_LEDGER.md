@@ -374,3 +374,5 @@ Blockzilla #14 46110307072 14/14 available signed multihop model leg matches, fo
 Blockzilla #15 46112159892 accepted 8/8 multihop including 4/4 six-hop, 40/42 modeled legs, 4/4 DAMM official SDK, six terminal matches; all net negative. CLMM bitmap-aware missing-array correction wired from actual source bytes, fresh CI pending.
 
 Blockzilla #16 46113852671 42/42 multi-hop leg and 8/8 full-chain matches, 8/8 independent audits; pair 8/8. All estimated net negative. Added dedicated PumpSwap triangle directions, non-promoting fee hypotheses and comparable signed net ranking; new CI pending.
+
+Blockzilla #17 46115468678 12/12 independently audited multihop, PumpSwap 4/4 signed,2/4 previous scenario matches,42 deterministic matches,8 CPMM projection blocked. New event/CPI audit and buy curve net-minus-one hypothesis; fresh CI pending.

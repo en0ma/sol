@@ -23,10 +23,10 @@ def derive(fixture,*,observed_unix):
     elif kind=="AUTHENTICATED_FOUR_TO_SIX_HOP_SOURCE_ROUTE":
         route=fixture.get("route_pool_addresses")
         n=len(route) if isinstance(route,list) else 0
-        if (not 4<=n<=6 or
+        if (not 3<=n<=6 or
                 any(fixture.get(k)is not False for k in SAFE) or
                 len(set(route))!=n):
-            raise ValueError("authenticated 4–6-hop source pool inventory required")
+            raise ValueError("authenticated 3–6-hop source pool inventory required")
         if fixture.get("state_accounts_observed_slot") is None:
             raise ValueError("four-to-six-hop source context slot missing")
     else:

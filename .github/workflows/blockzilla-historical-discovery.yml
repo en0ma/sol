@@ -28,6 +28,8 @@ on:
       - "arb/blockzilla_pair_evidence.py"
       - "arb/blockzilla_multihop.py"
       - "arb/pumpswap_source_fee_envelope.py"
+      - "arb/pumpswap_signed_event_audit.py"
+      - "arb/fixture_config_quote_projection.py"
       - "tests/test_pumpswap_directional_fee_scenarios.py"
       - "arb/fixture_all_venue_signed_quotes.py"
       - "arb/raydium_clmm_cross_tick_quote.py"
