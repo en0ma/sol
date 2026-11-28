@@ -822,7 +822,10 @@ def audit_primary_shard(directory):
             "receipt_sha256":hashlib.sha256(receipt_raw).hexdigest(),"audit":audit})
     if len(accepted)!=report["simulations_verified"] or len(seen)!=2*len(accepted):
         raise ValueError("primary independent acceptance count mismatch")
+    from arb.m5_signed_start_mint_economics import compact_primary_economic_evidence
+    economic_rows=[compact_primary_economic_evidence(entry) for entry in accepted]
     return {"status":"PRIMARY_SHARD_RECORDED_PACKETS_INDEPENDENTLY_RECHECKED",
+        "economic_rows":economic_rows,
         "shard":report["shard_index"],"audited":len(accepted),
         "verified_route_ids":[r["id"] for r in accepted],
         "distinct_packet_signatures":sorted(seen),"attempts":accepted,

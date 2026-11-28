@@ -4,6 +4,15 @@ on:
     paths:
       - ".github/workflows/m5-three-hop-atomic-inventory.yml"
       - "arb/m5_three_hop_atomic_inventory.py"
+      - "arb/m5_source_indicative_route_chain.py"
+      - "arb/m5_signed_start_mint_economics.py"
+      - "arb/fixture_all_venue_signed_quotes.py"
+      - "arb/meteora_damm_v2_native_quote.py"
+      - "arb/meteora_dlmm_source_bin_decoder.py"
+      - "arb/orca_spot_quote.py"
+      - "arb/orca_multitick_quote.py"
+      - "ci/build_meteora_damm_v2_reference.sh"
+      - "tools/meteora_damm_v2_reference/**"
       - "arb/m5_isolated_recent_signed_probe.py"
       - "arb/meteora_indexed_source_bridge.py"
       - "arb/m5_start_mint_expansion.py"
@@ -22,6 +31,21 @@ concurrency:
   group: m5-three-hop-inventory-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 jobs:
+  primary-native-sdk:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build pinned DAMM native reference without source RPC credentials
+        run: |
+          bash ci/build_meteora_damm_v2_reference.sh "$RUNNER_TEMP/primary-sdk"
+          cp tools/meteora_damm_v2_reference/target/release/sol-meteora-damm-v2-official-reference "$RUNNER_TEMP/primary-sdk/"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m5-primary-native-sdk
+          path: ${{ runner.temp }}/primary-sdk/
+          if-no-files-found: error
   source-preparation:
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
@@ -277,7 +301,7 @@ jobs:
           if-no-files-found: error
 
   offline-simulation:
-    needs: source-preparation
+    needs: [source-preparation, primary-native-sdk]
     runs-on: ubuntu-latest
     timeout-minutes: 55
     strategy:
@@ -300,6 +324,16 @@ jobs:
         with:
           name: m5-three-hop-source-fixtures
           path: ${{ runner.temp }}/source-artifact
+      - uses: actions/download-artifact@v4
+        with:
+          name: m5-primary-native-sdk
+          path: ${{ runner.temp }}/primary-sdk
+      - name: Install and checksum pinned reference for pricing and replay
+        run: |
+          test "$(cat "$RUNNER_TEMP/primary-sdk/status.txt")" = OFFICIAL_SDK_BUILT
+          mkdir -p tools/meteora_damm_v2_reference/target/release
+          install -m 0755 "$RUNNER_TEMP/primary-sdk/sol-meteora-damm-v2-official-reference" tools/meteora_damm_v2_reference/target/release/
+          sha256sum -c "$RUNNER_TEMP/primary-sdk/binary.sha256"
       - name: Start isolated offline Surfpool
         run: |
           test -z "$SURFPOOL_DATASOURCE_RPC_URL"
@@ -339,6 +373,7 @@ jobs:
                    "verified":len(verified),"independently_audited":audit["audited"],
                    "distinct_packet_signatures":audit["distinct_packet_signatures"],
                    "audited_source_bindings":[{k:x[k] for k in ("id","fixture_sha256","start_mint","pools")} for x in audit["attempts"]],
+                   "economic_rows":audit["economic_rows"],
                    "route_ids":[row["id"] for row in r["routes"]],
                    "verified_route_ids":[row["id"] for row in verified],
                    "selected_start_mints":sorted({row["mints"][0] for row in r["routes"]}),
@@ -484,6 +519,17 @@ jobs:
                   assert receipt["fixture_sha256"]==source["source_fixture_sha256"], "signed fixture differs from original capture"
                   assert receipt["start_mint"]==source["mints"][0] and receipt["pools"]==source["pools"], "signed route differs from original capture"
               assert [r["id"] for r in report["audited_source_bindings"]]==report["verified_route_ids"], "source binding coverage mismatch"
+          from arb.m5_signed_start_mint_economics import rank_primary_economic_evidence
+          economics=[x for r in reports for x in r["economic_rows"]]
+          for report in reports:
+              bindings={x["id"]:x for x in report["audited_source_bindings"]}
+              assert set(bindings)=={x["id"] for x in report["economic_rows"]}, "economic evidence coverage mismatch"
+              for row in report["economic_rows"]:
+                  assert row["fixture_sha256"]==bindings[row["id"]]["fixture_sha256"], "economic fixture identity mismatch"
+                  assert row["start_mint"]==bindings[row["id"]]["start_mint"], "economic mint identity mismatch"
+          economic_report=rank_primary_economic_evidence(economics,expected_ids=verified)
+          (Path(os.environ["RUNNER_TEMP"])/"primary-route-economics.json").write_text(json.dumps(economic_report,indent=2)+"\n")
+          print(json.dumps({k:v for k,v in economic_report.items() if k not in ("groups","routes")}))
           signatures=[s for r in reports for s in r["distinct_packet_signatures"]]
           assert len(signatures)==2*len(verified)==len(set(signatures)), "duplicate primary packet signature across shards"
           assert len(attempts)==140 and len(set(attempts))==140, "duplicate or missing attempted routes"
@@ -526,4 +572,9 @@ jobs:
         with:
           name: m5-three-hop-start-mint-gap-diagnostics
           path: ${{ runner.temp }}/three-hop-mint-gaps.json
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m5-primary-route-economics
+          path: ${{ runner.temp }}/primary-route-economics.json
           if-no-files-found: error

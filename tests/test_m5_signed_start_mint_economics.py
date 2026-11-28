@@ -75,3 +75,22 @@ class AuthenticatedSourceMintFeeConversionTests(unittest.TestCase):
             source_slot=42)
         self.assertIsNone(result["source_native_fee_conversion"])
         self.assertIsNone(result["estimated_cost_start_mint_base_units"])
+
+
+class PrimaryEconomicEvidenceTests(unittest.TestCase):
+    def test_rank_groups_preserve_units_and_unconverted_costs(self):
+        from arb.m5_signed_start_mint_economics import compact_primary_economic_evidence,rank_primary_economic_evidence
+        def make(rid,mint,amount,terminal):
+            return compact_primary_economic_evidence({"id":rid,"start_mint":mint,
+                "source_slot":42,"amount":amount,"fixture_sha256":"fixture",
+                "receipt_sha256":"receipt","audit":{"positive_post_balances":[0,0,0,terminal],
+                "planned_inputs":[amount,2,3],**SAFE}})
+        rows=[make("a","A",100,102),make("b","A",100,105),make("c","B",100,1000000),make("d","A",200,201)]
+        report=rank_primary_economic_evidence(rows,expected_ids=["a","b","c","d"])
+        self.assertEqual(report["groups"][0]["gross_ranked_ids"],["b","a"])
+        self.assertEqual(report["comparable_group_count"],3)
+        self.assertEqual(report["unconverted_cost_count"],4)
+        self.assertEqual(report["positive_estimated_net_count"],0)
+        self.assertFalse(report["net_profit_verified"])
+        with self.assertRaisesRegex(ValueError,"net mismatch"):
+            rank_primary_economic_evidence([{**rows[0],"estimated_net":1},*rows[1:]],expected_ids=["a","b","c","d"])
