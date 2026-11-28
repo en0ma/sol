@@ -28,6 +28,9 @@ on:
       - "arb/blockzilla_pair_evidence.py"
       - "arb/blockzilla_multihop.py"
       - "arb/fixture_all_venue_signed_quotes.py"
+      - "arb/raydium_clmm_cross_tick_quote.py"
+      - "arb/fixture_quote_execution_pipeline.py"
+      - "tests/test_raydium_clmm_bitmap_coverage.py"
       - "arb/meteora_damm_v2_native_quote.py"
       - "arb/meteora_damm_v2_source_scenarios.py"
       - "tools/meteora_damm_v2_reference/**"
@@ -67,6 +70,7 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_meteora_dlmm_source_fee_envelope.py' -v
           python3 -m unittest discover -s tests -p 'test_raydium_amm_v4_fee_ceiling.py' -v
           python3 -m unittest discover -s tests -p 'test_damm_sdk_source_result.py' -v
+          python3 -m unittest discover -s tests -p 'test_raydium_clmm_bitmap_coverage.py' -v
   http-probe:
     needs: unit
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)

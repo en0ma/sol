@@ -317,3 +317,5 @@ Use integer ceiling of AMM v4 swap fee before invariant math; retain rational fe
 For archive seed-edge cycles, filter pool hints using distances between seed endpoints after removing that edge. Per-hop bounded windows and graph edge-visit budget must expose truncation; topology does not guarantee an executable route.
 
 Build pinned DAMM SDK only on uncredentialed audit runner and retain build resolution/hash. Source-clock SDK quote is indicative, never auto-promoted. Diversify six-hop alternatives across shared dependencies, including bounded no-Orca window.
+
+CLMM native quote traversal may skip only default PoolState bitmap-proven empty ranges; reject any missing set-bit array, bitmap conflict or extension range. No physical empty array fabrication. Six-hop signed acceptance achieved in bounded experiment, not full M5 or profit proof.

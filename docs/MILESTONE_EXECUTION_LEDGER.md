@@ -370,3 +370,5 @@ Primary #294 46083652902 123/140 signed,66/74 starts,117/133 pools. Blockzilla #
 Primary #295 46088719280 repeats 123/140 signed,66/74 starts,117/133 pools. Blockzilla #13 46088719256 failed six-hop graph regression (0 candidates vs 2); corrected return-path distance window and bounded DFS edge visits. No fresh native or signed evidence.
 
 Blockzilla #14 46110307072 14/14 available signed multihop model leg matches, four DAMM SDK unavailable; 4/4 independent audits, no six-hop capture. Official SDK audit build and diversity integration pending CI.
+
+Blockzilla #15 46112159892 accepted 8/8 multihop including 4/4 six-hop, 40/42 modeled legs, 4/4 DAMM official SDK, six terminal matches; all net negative. CLMM bitmap-aware missing-array correction wired from actual source bytes, fresh CI pending.

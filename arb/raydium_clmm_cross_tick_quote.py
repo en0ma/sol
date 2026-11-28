@@ -29,8 +29,44 @@ def advance_sqrt(liquidity,at,net,zero_for_one):
         return ceil_div(liquidity*Q*at,liquidity*Q+net*at)
     return at+net*Q//liquidity
 
+def bitmap_coverage(starts,spacing,current_tick,bitmap_bytes):
+    """Check the default PoolState bitmap; never infer absence from a missing PDA.
+
+    The bytes must originate from the same authenticated pool snapshot as
+    current_tick and the decoded tick arrays. Extension range is deliberately
+    unsupported here. A set bit requires a captured array, while an unset
+    bit proves that the pool's default bitmap contains no initialized array
+    at that position. Missing accounts are not manufactured or hydrated.
+    """
+    if not isinstance(bitmap_bytes,bytes) or len(bitmap_bytes)!=128:
+        raise ValueError("CLMM default bitmap bytes missing or malformed")
+    span=60*spacing
+    anchor=current_tick//span*span
+    bitmap=int.from_bytes(bitmap_bytes,"little")
+    def initialized(start):
+        index=start//span+512
+        if start%span or not 0<=index<1024:
+            raise ValueError("CLMM tick bitmap extension required for source coverage")
+        return bool(bitmap>>index&1)
+    if any(not initialized(start) for start in starts):
+        raise ValueError("CLMM captured array contradicts source bitmap")
+    if initialized(anchor) and anchor not in starts:
+        raise ValueError("CLMM active initialized array missing from authenticated range")
+    def cover(target):
+        empty=[]
+        for start in range(min(anchor,target),max(anchor,target)+span,span):
+            bit=initialized(start)
+            if bit and start not in starts:
+                raise ValueError("CLMM initialized array missing across source bitmap range")
+            if not bit:
+                empty.append(start)
+        return empty
+    return cover
+
+
 def quote_across_initialized_ticks(state,mint_in,amount_in,fee_rate_ppm,ticks,
-                                  *,max_crossings=32,fee_on_input=True):
+                                  *,max_crossings=32,fee_on_input=True,
+                                  default_bitmap_bytes=None):
     """Simulate crossing source-initialized ticks, respecting per-tick liquidity net.
 
     Fee rounding is per swap step. A limit-cross requires enough gross input to
@@ -61,6 +97,10 @@ def quote_across_initialized_ticks(state,mint_in,amount_in,fee_rate_ppm,ticks,
     # liquidity. Require explicit positional range coverage when supplied.
     # The caller performs same-slot PDA and program ownership authentication.
     starts=state.get("authenticated_tick_array_starts")
+    coverage=None
+    proven_empty=set()
+    if default_bitmap_bytes is not None and starts is None:
+        raise ValueError("CLMM bitmap proof requires captured array starts")
     if starts is not None:
         spacing=state.get("tick_spacing")
         if (not isinstance(starts,list) or not starts or
@@ -69,11 +109,13 @@ def quote_across_initialized_ticks(state,mint_in,amount_in,fee_rate_ppm,ticks,
             raise ValueError("CLMM authenticated tick array range malformed")
         span=60*spacing
         anchor=tick//span*span
-        if anchor not in starts:
-            raise ValueError("CLMM active tick array missing from authenticated range")
         for start in starts:
             if start%span:
                 raise ValueError("CLMM tick array range not aligned")
+        if default_bitmap_bytes is not None:
+            coverage=bitmap_coverage(starts,spacing,tick,default_bitmap_bytes)
+        elif anchor not in starts:
+            raise ValueError("CLMM active tick array missing from authenticated range")
     by_index={}
     for row in ticks:
         if not isinstance(row,dict):
@@ -83,6 +125,8 @@ def quote_across_initialized_ticks(state,mint_in,amount_in,fee_rate_ppm,ticks,
                 i in by_index or not -443636<=i<=443636 or
                 gross<=0 or abs(net)>gross):
             raise ValueError("source CLMM tick index, liquidity or uniqueness invalid")
+        if starts is not None and (i%spacing or i//span*span not in starts):
+            raise ValueError("CLMM initialized tick not in authenticated array")
         by_index[i]=row
     from arb.orca_tick_math import sqrt_price_from_tick_index
     remaining=amount_in
@@ -100,11 +144,14 @@ def quote_across_initialized_ticks(state,mint_in,amount_in,fee_rate_ppm,ticks,
         target_index=max(candidates) if zero else min(candidates)
         if starts is not None:
             target_start=target_index//span*span
-            first=min(anchor,target_start)
-            last=max(anchor,target_start)
-            for array_start in range(first,last+span,span):
-                if array_start not in starts:
-                    raise ValueError("CLMM source tick array range has an unobserved gap")
+            if coverage is not None:
+                proven_empty.update(coverage(target_start))
+            else:
+                first=min(anchor,target_start)
+                last=max(anchor,target_start)
+                for array_start in range(first,last+span,span):
+                    if array_start not in starts:
+                        raise ValueError("CLMM source tick array range has an unobserved gap")
         target=sqrt_price_from_tick_index(target_index)
         if zero and target>price:
             raise ValueError("CLMM downwards initialized tick above active price")
@@ -180,5 +227,7 @@ def quote_across_initialized_ticks(state,mint_in,amount_in,fee_rate_ppm,ticks,
             "final_sqrt_price_x64":price,
             "crossed_ticks":len(crossed),"crossed_source_liquidity":crossed,
             "steps":steps,"exact_input_filled":True,
+            "default_pool_bitmap_coverage_used":coverage is not None,
+            "bitmap_proven_empty_array_starts":sorted(proven_empty),
             "tick_array_liquidity_source_verified":True,
             "protocol_exact_verified":False,"signed_simulation_verified":False,**SAFE}

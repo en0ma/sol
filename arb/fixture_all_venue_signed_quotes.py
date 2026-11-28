@@ -152,10 +152,17 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix,
             # Alternate mode can be requested only as a non-exact scenario.
             selected_fee_on_input=(source_fee_on_input if
                                    clmm_fee_on_input is True else False)
+            from arb.raydium_clmm_ticks import POOL_BITMAP_OFFSET,POOL_BITMAP_BYTES
+            # extract_pool_states already verifies the manifest, exact pool
+            # owner/layout and decoded mint identity. Use its actual raw pool
+            # bitmap rather than assuming an absent array is empty.
+            pool_raw=base64.b64decode(fixture["accounts"][pool]["data"][0],validate=True)
+            bitmap=pool_raw[POOL_BITMAP_OFFSET:POOL_BITMAP_OFFSET+POOL_BITMAP_BYTES]
             native=quote_across_initialized_ticks(
                 {**state,"authenticated_tick_array_starts":array_starts},
                 leg["input_mint"],amount_in,fee,candidates,
-                max_crossings=32,fee_on_input=selected_fee_on_input)
+                max_crossings=32,fee_on_input=selected_fee_on_input,
+                default_bitmap_bytes=bitmap)
             q={**leg,"amount_in":amount_in,
                "amount_out":native["amount_out"],
                "snapshot_slot":row["snapshot_slot"]}
@@ -243,6 +250,9 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix,
                 "quote_status":(
                     "SOURCE_BOUND_FEE_MODE_SCENARIO_NOT_EXACT"
                     if native_mode_scenario else "SOURCE_BOUND_INDICATIVE"),
+                "clmm_bitmap_coverage":({"default_pool_bitmap_coverage_used":native["default_pool_bitmap_coverage_used"],
+                    "bitmap_proven_empty_array_starts":native["bitmap_proven_empty_array_starts"]}
+                    if v=="raydium_clmm" else None),
                 "source_fee_mode_scenario":(
                     "OUTPUT_COUNTERFACTUAL" if native_mode_scenario
                     else "SOURCE_POOL_FEE_ON_ENUM"),
