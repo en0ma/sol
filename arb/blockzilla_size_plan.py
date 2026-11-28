@@ -136,3 +136,57 @@ def rank_comparable_grid(plans):
             "priority_cost_included":False,"account_funding_included":False,
             "net_profit_verified":False,**SAFE})
     return result
+
+
+def select_priced_six_hop_sources(rows, plans, *, cap=2):
+    """Choose among captured six-hop alternatives before any signed execution.
+
+    Footprint class dominates pricing coverage; controls and completed grid
+    samples determine preference within a class. Neither missing models nor
+    an oversized estimate is treated as an observed runtime rejection.
+    """
+    from arb.blockzilla_source_footprint import PREFERRED_KEYS, select_six_hop_sources
+    baseline=select_six_hop_sources(rows,cap=cap)
+    ids={row["id"] for row in rows}
+    if set(plans)!=ids:
+        raise ValueError("six-hop pricing candidate coverage mismatch")
+    ranked=[]
+    for index,row in enumerate(rows):
+        rid=row["id"]
+        footprint=row["source_account_footprint"]
+        plan=plans[rid]
+        if (plan.get("status")!="SOURCE_NATIVE_BOUNDED_SIZE_PLAN"
+                or plan.get("source_slot")!=row["source_slot"]
+                or plan.get("manifest_sha256")!=footprint["manifest_sha256"]
+                or plan.get("source_unix")!=row["source_clock"]["unix_timestamp"]
+                or plan.get("start_mint")!=row["start_mint"]
+                or any(plan.get(k) is not False for k in SAFE)
+                or plan.get("net_profit_verified") is not False
+                or [s.get("amount") for s in plan.get("samples",[])]!=list(GRID)):
+            raise ValueError("six-hop pricing plan source identity mismatch")
+        rank_comparable_grid({rid:plan})
+        complete=[s["amount"] for s in plan["samples"]
+                  if s["status"]=="COMPLETE_RESEARCH_MODEL"]
+        if (len(complete)!=plan.get("complete_models")
+                or plan.get("selected")!=select_sizes(plan["samples"])
+                or plan.get("signed_amounts")!=list(CONTROL_AMOUNTS)+[
+                    s["amount"] for s in plan["selected"]]):
+            raise ValueError("six-hop pricing plan size coverage mismatch")
+        controls=sum(amount in complete for amount in CONTROL_AMOUNTS)
+        keys=footprint["resolved_account_key_estimate"]
+        group=1 if keys is None else 0 if keys<=PREFERRED_KEYS else 2
+        # Do not compare raw economic values across different mints/sizes.
+        # Larger footprints remain last; prefer fewer keys within that class.
+        priority=(group,keys if group==2 else 0,-controls,-len(complete),index)
+        ranked.append((priority,{"id":rid,"resolved_account_key_estimate":keys,
+            "complete_control_models":controls,"complete_grid_models":len(complete),
+            "source_slot":plan["source_slot"],"source_unix":plan["source_unix"],
+            "manifest_sha256":plan["manifest_sha256"],"start_mint":plan["start_mint"],
+            "footprint_priority_class":group,**SAFE}))
+    candidates=[row for _,row in sorted(ranked,key=lambda item:item[0])]
+    chosen=[row["id"] for row in candidates[:cap]]
+    return {"status":"PRE_SIGN_SOURCE_PRICING_AND_FOOTPRINT_SELECTION",
+            "footprint_only_ids":baseline,"selected_ids":chosen,
+            "candidates":[{**row,"selected":row["id"] in chosen} for row in candidates],
+            "signed_results_used":False,"simultaneous_source_snapshot":False,
+            "net_profit_verified":False,**SAFE}

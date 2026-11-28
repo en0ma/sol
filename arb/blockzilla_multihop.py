@@ -25,6 +25,7 @@ MAX_FOUR_FIVE_CAPTURED=2
 MAX_SIX_HOP_CAPTURE_ATTEMPTS=8
 ORIGINAL_DIVERSITY_ATTEMPTS=4
 MAX_SIX_HOP_CAPTURED=2
+MAX_SIX_HOP_PREFERRED_CAPTURE=4
 MAX_PUMP_CAPTURED=2
 MAX_PUMP_CAPTURE_ATTEMPTS=4
 MAX_ROUTES=2*MAX_FOUR_FIVE_CAPTURED+MAX_SIX_HOP_CAPTURED+MAX_PUMP_CAPTURED
@@ -347,7 +348,7 @@ def prepare(rpc, evidence_dir, directory, baseline, route):
                 if hops!=6 and captured_for_hops>=cap:
                     break
                 if hops==6 and sum((c["source_account_footprint"].get("within_preferred_key_budget") is True)
-                        for c in six_candidates)>=cap:
+                        for c in six_candidates)>=MAX_SIX_HOP_PREFERRED_CAPTURE:
                     break
             except (ValueError,RuntimeError,KeyError,TypeError,OSError) as exc:
                 item.update(error_class=type(exc).__name__,diagnostic=str(exc)[:300])
@@ -376,6 +377,60 @@ def prepare(rpc, evidence_dir, directory, baseline, route):
     return report
 
 
+def source_signing_inventory(source,root,*,recorded_plans=None):
+    """Load all bounded candidates and recompute selection from original bytes.
+
+    Both isolated signing and the independent audit call this before inspecting
+    signed outputs. Preserve the earlier source selection as a separate record.
+    """
+    import re
+    from arb.blockzilla_source_footprint import source_footprint,select_six_hop_sources
+    from arb.blockzilla_size_plan import select_priced_six_hop_sources
+    if (source.get("status")!="BLOCKZILLA_MULTIHOP_SOURCE_RESEARCH"
+            or any(source.get(k) is not False for k in SAFE)
+            or source.get("excluded_from_primary_inventory") is not True):
+        raise ValueError("invalid source research report")
+    rows={r["id"]:r for r in source["routes"]}
+    if (len(rows)!=len(source["routes"]) or any(not isinstance(rid,str)
+            or not re.fullmatch(r"BZ[3-6]-[0-9]{2}",rid) for rid in rows)):
+        raise ValueError("duplicate or invalid captured route identity")
+    initial={r["id"]:r for r in rows.values() if r["capture_status"]=="CAPTURED"}
+    six=[r for r in rows.values() if r["hops"]==6 and r["capture_status"] in
+         ("CAPTURED","CAPTURED_NOT_SELECTED_FOOTPRINT")]
+    candidate_rows={**initial,**{r["id"]:r for r in six}}
+    if (len(initial)>MAX_ROUTES or len(six)>MAX_SIX_HOP_CAPTURE_ATTEMPTS
+            or len(candidate_rows)>MAX_ROUTES+MAX_SIX_HOP_CAPTURE_ATTEMPTS
+            or source.get("source_captured")!=len(initial)
+            or source.get("source_captured_before_footprint_selection")!=len(candidate_rows)
+            or source.get("source_footprint_deferred_count")!=len(candidate_rows)-len(initial)):
+        raise ValueError("source candidate capture coverage mismatch")
+    baseline=select_six_hop_sources(six,cap=MAX_SIX_HOP_CAPTURED)
+    if (baseline!=source.get("six_hop_footprint_selected_ids")
+            or set(baseline)!={rid for rid,row in initial.items() if row["hops"]==6}):
+        raise ValueError("source footprint selection coverage mismatch")
+    if recorded_plans is not None and set(recorded_plans)!=set(candidate_rows):
+        raise ValueError("missing or extra pre-sign candidate size plan")
+    fixtures={};plans={}
+    for rid,row in candidate_rows.items():
+        raw=(root/(rid+"-fixture.json")).read_bytes()
+        if digest(raw)!=row["fixture_sha256"]:
+            raise ValueError("candidate size plan fixture digest mismatch")
+        fixture=json.loads(raw);fixture_identity(fixture,row)
+        if row["hops"]==6 and source_footprint(fixture)!=row["source_account_footprint"]:
+            raise ValueError("independent unsigned source footprint differs")
+        clock=row["source_clock"]["unix_timestamp"]
+        plans[rid]=(size_plan(fixture,observed_unix=clock) if recorded_plans is None
+                    else verify_plan(recorded_plans[rid],fixture,observed_unix=clock))
+        fixtures[rid]=fixture
+    decision=select_priced_six_hop_sources(six,{r["id"]:plans[r["id"]] for r in six},
+                                          cap=MAX_SIX_HOP_CAPTURED)
+    selected_ids={rid for rid,r in initial.items() if r["hops"]!=6}|set(decision["selected_ids"])
+    if len(selected_ids)!=len(initial):
+        raise ValueError("pre-sign selection changed trial route budget")
+    selected=[r for rid,r in rows.items() if rid in selected_ids]
+    return selected,fixtures,plans,decision,six
+
+
 def offline(rpc,directory):
     from arb.next_ten_signed_atomic_offline import run_four_to_six_venue
     from arb.dlmm_offline_clock import align_permissioned_dlmm_clock
@@ -386,27 +441,16 @@ def offline(rpc,directory):
     root=Path(directory)
     raw=(root/"multihop-source.json").read_bytes()
     source=json.loads(raw)
-    selected=[r for r in source["routes"] if r["capture_status"]=="CAPTURED"]
-    if (len(selected)>MAX_ROUTES or any(source.get(k) is not False for k in SAFE)
-            or source.get("excluded_from_primary_inventory") is not True):
-        raise ValueError("invalid source research report")
+    selected,fixtures,candidate_plans,selection,_=source_signing_inventory(source,root)
     report={"status":"BLOCKZILLA_MULTIHOP_SIGNED_RESEARCH","source_report_sha256":digest(raw),
             "excluded_from_primary_inventory":True,"attempts":[],"accepted":0,**SAFE}
     programs={}
-    report["size_plans"]={}
-    fixtures={}
+    report["candidate_size_plans"]=candidate_plans
+    report["pre_sign_six_hop_selection"]=selection
+    report["size_plans"]={row["id"]:candidate_plans[row["id"]] for row in selected}
     from arb.blockzilla_size_plan import rank_comparable_grid
     lock=Path("tools/meteora_damm_v2_reference/Cargo.lock")
     report["official_damm_sdk_lock_sha256"]=digest(lock.read_bytes())
-    for row in selected:
-        path=root/(row["id"]+"-fixture.json")
-        fixture_raw=path.read_bytes()
-        if digest(fixture_raw)!=row["fixture_sha256"]:
-            raise ValueError("multihop source fixture digest mismatch")
-        fixture=json.loads(fixture_raw);fixture_identity(fixture,row)
-        plan=size_plan(fixture,observed_unix=row["source_clock"]["unix_timestamp"])
-        report["size_plans"][row["id"]]=plan
-        fixtures[row["id"]]=fixture
     # Compute all fixture size plans and comparable rankings before signing
     # any route. Ranking does not suppress the original controls.
     report["pre_sign_grid_rankings"]=rank_comparable_grid(report["size_plans"])
@@ -691,40 +735,20 @@ def audit(source_dir,signed_dir):
         raise ValueError("unsafe multihop source/signed report")
     if signed["source_report_sha256"]!=digest(source_raw):
         raise ValueError("signed source report binding mismatch")
-    rows={r["id"]:r for r in source["routes"]}
-    if len(rows)!=len(source["routes"]) or any(not isinstance(rid,str) or not __import__("re").fullmatch(r"BZ[3-6]-[0-9]{2}",rid) for rid in rows):
-        raise ValueError("duplicate or invalid captured route identity")
-    captured={r["id"]:r for r in rows.values() if r["capture_status"]=="CAPTURED"}
-    from arb.blockzilla_source_footprint import source_footprint,select_six_hop_sources
-    six_candidates=[]
-    for row in rows.values():
-        if row["hops"]!=6 or row["capture_status"] not in ("CAPTURED","CAPTURED_NOT_SELECTED_FOOTPRINT"):
-            continue
-        raw=(src/(row["id"]+"-fixture.json")).read_bytes()
-        if digest(raw)!=row["fixture_sha256"]:
-            raise ValueError("six-hop footprint source digest mismatch")
-        fixture=json.loads(raw);fixture_identity(fixture,row)
-        if source_footprint(fixture)!=row["source_account_footprint"]:
-            raise ValueError("independent unsigned source footprint differs")
-        six_candidates.append(row)
-    chosen=select_six_hop_sources(six_candidates,cap=MAX_SIX_HOP_CAPTURED)
-    if (chosen!=source.get("six_hop_footprint_selected_ids")
-            or set(chosen)!={rid for rid,row in captured.items() if row["hops"]==6}
-            or source.get("source_captured")!=len(captured)
-            or source.get("source_footprint_deferred_count")!=len(six_candidates)-len(chosen)):
-        raise ValueError("source footprint selection coverage mismatch")
     lock=Path("tools/meteora_damm_v2_reference/Cargo.lock")
     if signed.get("official_damm_sdk_lock_sha256")!=digest(lock.read_bytes()):
         raise ValueError("offline and independent SDK dependency locks differ")
-    if set(signed.get("size_plans",{}))!=set(captured):
-        raise ValueError("missing or extra pre-sign size plan")
-    plans={}
-    for rid,row in captured.items():
-        raw=(src/(rid+"-fixture.json")).read_bytes()
-        if digest(raw)!=row["fixture_sha256"]:
-            raise ValueError("size plan source fixture digest mismatch")
-        fixture=json.loads(raw);fixture_identity(fixture,row)
-        plans[rid]=verify_plan(signed["size_plans"][rid],fixture,observed_unix=row["source_clock"]["unix_timestamp"])
+    if not isinstance(signed.get("candidate_size_plans"),dict):
+        raise ValueError("missing pre-sign candidate size plans")
+    selected,_,candidate_plans,selection,six_candidates=source_signing_inventory(
+        source,src,recorded_plans=signed["candidate_size_plans"])
+    if selection!=signed.get("pre_sign_six_hop_selection"):
+        raise ValueError("pre-sign six-hop candidate selection differs")
+    rows={r["id"]:r for r in selected}
+    chosen=selection["selected_ids"]
+    plans={rid:candidate_plans[rid] for rid in rows}
+    if plans!=signed.get("size_plans"):
+        raise ValueError("selected size plans differ from candidate recomputation")
     from arb.blockzilla_size_plan import rank_comparable_grid
     rankings=rank_comparable_grid(plans)
     if rankings!=signed.get("pre_sign_grid_rankings"):
@@ -795,6 +819,10 @@ def audit(source_dir,signed_dir):
         except (ValueError,RuntimeError,KeyError,TypeError,OSError) as exc:
             item.update(error_class=type(exc).__name__,diagnostic=str(exc)[:300])
     report["size_plan_recomputed_count"]=len(plans)
+    report["candidate_size_plan_recomputed_count"]=len(candidate_plans)
+    report["candidate_modeled_grid_sample_count"]=sum(len(p["samples"]) for p in candidate_plans.values())
+    report["pre_sign_six_hop_selection"]=selection
+    report["candidate_size_plans"]=candidate_plans
     report["size_plans"]=plans
     report["pre_sign_grid_rankings"]=rankings
     report["pre_sign_ranking_recomputed"]=True
