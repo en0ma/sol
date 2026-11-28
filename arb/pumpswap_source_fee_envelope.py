@@ -165,8 +165,8 @@ def compare_directional_scenarios(envelope,signed_output):
 def selected_directional_model(envelope):
     """Preselect a research model without observing the execution output.
 
-    Limited to the ordinary canonical WSOL tier case tested in isolated
-    execution. Do not infer other pool modes or choose the closest model
+    Limited to ordinary canonical WSOL and creator-free noncanonical WSOL
+    flat-fee configurations tested in isolated execution. Do not infer other pool modes or choose the closest model
     after observing signed output. Budget residue blocks full-input chaining.
     """
     if not isinstance(envelope,dict) or envelope.get("fee_mode_selected_from_source") is not True:
@@ -175,9 +175,16 @@ def selected_directional_model(envelope):
             or any(envelope.get(k) is not False for k in SAFE)):
         return None
     tier=envelope.get("canonical_source_tier_selection") or {}
-    if (tier.get("status")!="PUMP_CANONICAL_SOURCE_MARKET_CAP_TIER_SELECTED"
-            or tier.get("quote_asset")!="WSOL"
+    canonical=tier.get("status")=="PUMP_CANONICAL_SOURCE_MARKET_CAP_TIER_SELECTED"
+    ordinary_flat=(tier.get("status")=="PUMP_NONCANONICAL_SOURCE_FLAT_FEE"
+        and tier.get("ordinary_creator_free_wsol_mode") is True
+        and (tier.get("fees") or {}).get("creator_fee_bps")==0)
+    if (not (canonical or ordinary_flat) or tier.get("quote_asset")!="WSOL"
             or tier.get("source_tier_account_authenticated") is not True):
+        return None
+    fees=tier.get("fees")
+    if (not isinstance(fees,dict) or set(fees)!={"lp_fee_bps","protocol_fee_bps","creator_fee_bps"}
+            or any(type(v) is not int or v<0 for v in fees.values()) or sum(fees.values())>=10000):
         return None
     rows=envelope.get("candidates",[])
     if len(rows)!=1 or rows[0].get("tier")!="selected_onchain_source_tier":
@@ -199,6 +206,7 @@ def selected_directional_model(envelope):
             "source_slot":envelope["source_slot"],"input_mint":envelope["input_mint"],
             "output_mint":envelope["output_mint"],"amount_in":envelope["amount_in"],
             "fee_components_bps":tier["fees"],"fee_quote_base_units":result["fee_quote_base_units"],
+            "source_fee_selection_status":tier["status"],
             "protocol_exact_verified":False,"effective_fee_verified":False,**SAFE}
 
 

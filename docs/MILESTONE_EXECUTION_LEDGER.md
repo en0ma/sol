@@ -386,3 +386,5 @@ Blockzilla #20 46120596545 failed old mocked DLMM source fee envelope missing fu
 Blockzilla #21 46122097907 24/24 signed/independent complete models, 108/108 leg matches (8 PumpSwap preselected), 47/48 grid complete, no positive net. Pair 6/8 source-time native samples; new clock/event comparison and diverse 4/5-hop capture, pre-sign comparable ranking pending CI.
 
 Blockzilla #22 46123078593 32/32 signed/independent,144/144 leg matches including12 PumpSwap preselected,62/64 grid complete; pair8/8, no positive net. Primary #304 46123078610 121/140,66/75 starts,117/135 pools. Fresh redundant-cliff capture deferral, static Orca 64-crossing budget and new archive window pending CI.
+
+Blockzilla #23 46137863094 4 fresh pools,24/28 signed and24 independent,99/100 deterministic plus8/8 scenario matches,20/24 execution-clock terminal matches; pair8/8. Strict creator-free WSOL flat-fee model, Orca execution-time per-leg recheck and independently resolved rejected packets pending CI.

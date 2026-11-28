@@ -443,6 +443,16 @@ def simulate_adaptive_n_leg_offline(rpc, legs, tokens, states, evidence, owner,
             receipt["runtime_account_lock_rejected"]=True
         if retain_audit_evidence:
             receipt["recorded_rejected_positive_response"]=positive
+            if receipt.get("runtime_account_lock_rejected") is True:
+                from arb.rpc import call
+                lookup_readback=None
+                if lookup is not None:
+                    lookup_readback={"address":str(lookup.key),"account":call(rpc,"getAccountInfo",
+                        [str(lookup.key),{"encoding":"base64","commitment":"confirmed"}]).get("value")}
+                receipt["recorded_rejected_packet_evidence"]={
+                    "ephemeral_authority":owner,"ephemeral_token_accounts":list(accounts),
+                    "isolated_lookup_account":lookup_readback,"persistent_before":list(before),
+                    "persistent_after_rejected":_post(rpc,accounts,tokens,owner)}
         return receipt
     try:
         receipt["positive_units_consumed"]=verify_signed_compute_budget(

@@ -436,6 +436,57 @@ def decode_packet(wire,claimed_hash,claimed_signature,lookup_evidence):
     return tx,lookup,keys
 
 
+def audit_account_lock_rejection(receipt,fixture,row,amount):
+    """Authenticate rejected packet and independently resolve its account set.
+
+    A runtime lock rejection is not a rollback control or successful swap.
+    RPC response remains recorded evidence, not a cryptographic attestation.
+    """
+    fixture_identity(fixture,row)
+    n=row["hops"]
+    if (receipt.get("status")!="SIGNED_ACCOUNT_LOCK_LIMIT_REJECTED"
+            or receipt.get("runtime_account_lock_rejected") is not True
+            or receipt.get("positive_error")!="TooManyAccountLocks"
+            or receipt.get("state_account_manifest_sha256")!=fixture["state_account_manifest_sha256"]
+            or receipt.get("state_accounts_observed_slot")!=row["source_slot"]
+            or receipt.get("route_pool_addresses")!=fixture["route_pool_addresses"]
+            or receipt.get("route_mints")!=fixture["route_mints"]
+            or receipt.get("route_venues")!=fixture["route_venues"]
+            or any(receipt.get(k) is not False for k in (*SAFE,"signed_atomic_simulation_verified",
+                    "signed_cpi_per_leg_verified","rollback_failure_case_verified"))):
+        raise ValueError("rejected packet source or status mismatch")
+    evidence=receipt["recorded_rejected_packet_evidence"]
+    response=receipt["recorded_rejected_positive_response"]
+    if (response.get("err")!="TooManyAccountLocks" or response.get("innerInstructions")
+            or response.get("logs") or response.get("unitsConsumed")!=0):
+        raise ValueError("recorded account lock rejection response inconsistent")
+    tx,lookup,keys=decode_packet(receipt["signed_transaction_wire_base64"],
+        receipt["signed_transaction_sha256"],receipt["signed_transaction_signature"],
+        evidence["isolated_lookup_account"])
+    user_accounts=evidence["ephemeral_token_accounts"]
+    if (len(keys)!=len(set(keys)) or len(keys)!=receipt["resolved_account_key_count"]
+            or len(tx.message.account_keys)!=receipt["static_account_key_count"]
+            or len(keys)-len(tx.message.account_keys)!=receipt["lookup_account_key_count"]
+            or len(tx.message.instructions)!=n or len(user_accounts)!=n+1
+            or len(set(user_accounts))!=n+1 or str(keys[0])!=evidence["ephemeral_authority"]
+            or evidence["persistent_before"]!=[amount]+[0]*n
+            or evidence["persistent_after_rejected"]!=evidence["persistent_before"]
+            or receipt["planned_inputs"][0]!=amount):
+        raise ValueError("rejected packet key count, input or persistent readback mismatch")
+    for i,ix in enumerate(tx.message.instructions):
+        metas=[str(keys[k]) for k in ix.accounts]
+        if (str(keys[ix.program_id_index])!=VENUES[fixture["route_venues"][i]][0]
+                or fixture["route_pool_addresses"][i] not in metas
+                or not set(user_accounts[i:i+2])<=set(metas)):
+            raise ValueError("rejected packet route account mismatch")
+    return {"status":"REJECTED_PACKET_SIGNATURE_AND_RESOLVED_KEYS_RECHECKED",
+        "resolved_account_key_count":len(keys),"static_account_key_count":len(tx.message.account_keys),
+        "lookup_account_key_count":len(keys)-len(tx.message.account_keys),
+        "runtime_error":response["err"],"persistent_user_balances_unchanged":True,
+        "signed_atomic_simulation_verified":False,"rollback_failure_case_verified":False,
+        "rpc_response_cryptographically_attested":False,**SAFE}
+
+
 def audit_receipt(receipt,fixture,row,amount):
     from arb.atomic_graph_coordinator import audit_n_leg_cpi,audit_n_leg_balances,signed_n_leg_post_balances
     from arb.next_ten_signed_atomic_offline import top_level_events
@@ -522,6 +573,17 @@ def audit_receipt(receipt,fixture,row,amount):
                 dlmm_comparison["execution_clock_delta"]=ep-actual_out if type(ep) is int else None
                 dlmm_comparison["execution_clock_fee_input_units"]=effective.get("fee_input_base_units")
                 dlmm_comparison["execution_clock_fee_output_units"]=effective.get("fee_output_base_units")
+        orca_comparison=None
+        if venues[i]=="orca" and execution_unix is not None:
+            eq=quote_leg(fixture,leg_index=i,amount_in=actual_in,observed_unix=execution_unix)
+            if (eq.get("pool")!=q["pool"] or eq.get("source_slot")!=row["source_slot"]
+                    or any(eq.get(k) is not False for k in SAFE)):
+                raise ValueError("Orca execution-clock quote identity mismatch")
+            ep=eq.get("predicted_output_base_units")
+            orca_comparison={"observed_unix":execution_unix,"modeled_output":ep,
+                "delta":ep-actual_out if type(ep) is int else None,
+                "exact_sample_match":ep==actual_out if type(ep) is int else None,
+                "protocol_exact_verified":False,**SAFE}
         pump_comparison=None
         if venues[i]=="pumpswap":
             from arb.pumpswap_source_fee_envelope import compare_directional_scenarios
@@ -537,6 +599,7 @@ def audit_receipt(receipt,fixture,row,amount):
             "delta":prediction-actual_out if type(prediction) is int else None,
             "quote_status":q.get("quote_status"),"reason":q.get("reason"),
             "pumpswap_scenario_comparison":pump_comparison,
+            "orca_execution_clock_comparison":orca_comparison,
             "dlmm_execution_clock_comparison":dlmm_comparison,
             "protocol_exact_verified":False,**SAFE})
     economics=signed_net_economics(receipt,start_mint=mints[0],source_slot=row["source_slot"],
@@ -622,6 +685,12 @@ def audit(source_dir,signed_dir):
                 rejected["recorded_rejection_digest_checked"]=True
                 rejected["runtime_account_lock_rejected"]=result.get("runtime_account_lock_rejected") is True
                 rejected["positive_error"]=result.get("positive_error")
+                if rejected["runtime_account_lock_rejected"]:
+                    original=rows[attempt["id"]]
+                    original_raw=(src/(original["id"]+"-fixture.json")).read_bytes()
+                    if digest(original_raw)!=original["fixture_sha256"]:
+                        raise ValueError("rejected packet source fixture digest mismatch")
+                    rejected["packet_audit"]=audit_account_lock_rejection(result,json.loads(original_raw),original,attempt["amount"])
             report["rejected_attempts"].append(rejected)
             continue
         item={"id":attempt["id"],"amount":attempt["amount"]}

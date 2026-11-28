@@ -41,4 +41,24 @@ class ClockFundingTests(unittest.TestCase):
         self.assertEqual(selected_directional_model(e)["amount_out"],90)
         e["candidates"][0]["directional_fee_scenarios"][0]["input_budget_unspent_base_units"]=1
         self.assertIsNone(selected_directional_model(e))
+    def test_creator_free_flat_fee_source_model_is_narrow(self):
+        from arb.pumpswap_source_fee_envelope import directional_quote_scenarios
+        for amount,expected in ((100000,7042),(1000000,70422)):
+            rows=directional_quote_scenarios(amount_in=amount,base_reserve=2841368742259,
+                quote_reserve=40226675718968-615223,quote_spendable=40226675718968-615223,
+                from_base=False,component_fee_bps=[25,5,0])
+            tier={"status":"PUMP_NONCANONICAL_SOURCE_FLAT_FEE","quote_asset":"WSOL",
+                "ordinary_creator_free_wsol_mode":True,"source_tier_account_authenticated":True,
+                "fees":{"lp_fee_bps":25,"protocol_fee_bps":5,"creator_fee_bps":0}}
+            e={"status":"PUMPSWAP_SOURCE_FEE_TIER_SCENARIOS_NOT_EXHAUSTIVE",
+                "fee_mode_selected_from_source":True,"canonical_source_tier_selection":tier,
+                "direction":"BUY_WITH_QUOTE","pool":"p","source_slot":1,"input_mint":"a",
+                "output_mint":"b","amount_in":amount,"candidates":[{"tier":"selected_onchain_source_tier",
+                    "directional_fee_scenarios":rows}],**SAFE}
+            self.assertEqual(selected_directional_model(e)["amount_out"],expected)
+            tier["ordinary_creator_free_wsol_mode"]=False
+            self.assertIsNone(selected_directional_model(e))
+            tier["ordinary_creator_free_wsol_mode"]=True
+            tier["fees"]["creator_fee_bps"]=1
+            self.assertIsNone(selected_directional_model(e))
 if __name__=="__main__":unittest.main()

@@ -333,3 +333,5 @@ Independent size-plan audit rebuilds the official SDK from the sizing runner's r
 Capture diverse alternate 4/5-hop pool sets within separate bounded budgets. Calculate all source size plans and comparable denomination/input rankings before any signed trial; preserve source-slot ranges and independently recompute. Pair source and execution-clock quote parity remain separate evidence.
 
 Primary capture retains the first fixture per starting mint and may defer redundant fresh source-authenticated downward Orca cliff observations, restoring captured fallbacks when necessary to preserve exact target. Do not equate cliff with proven failure. Use existing static Whirlpool64-crossing bounded model and vary archive block windows without widening authentication budgets.
+
+Ordinary noncanonical creator-free WSOL PumpSwap flat-fee scenarios may enter the preselected research model only with authenticated mode and fee selection. Preserve separate source and execution-time Orca samples. Rejected lock-limit messages require signed packet and ALT readback recheck, never successful execution or rollback evidence.

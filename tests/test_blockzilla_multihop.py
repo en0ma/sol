@@ -147,4 +147,11 @@ class MultihopTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             decode_packet(wire,"bad",str(tx.signatures[0]),None)
 
+    def test_rejected_packet_requires_source_and_runtime_error(self):
+        from arb.blockzilla_multihop import audit_account_lock_rejection
+        from unittest.mock import patch
+        with patch("arb.blockzilla_multihop.fixture_identity"):
+            with self.assertRaisesRegex(ValueError,"source or status"):
+                audit_account_lock_rejection({"status":"UNVERIFIED"},{"state_account_manifest_sha256":"x"},
+                    {"hops":6,"source_slot":1},100000)
 if __name__=="__main__":unittest.main()

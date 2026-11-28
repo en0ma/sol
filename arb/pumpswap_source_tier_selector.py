@@ -62,7 +62,20 @@ def choose_tier_by_source_market_cap(*,pool_state,fee_config,
         fees=fee_config.get("flat_fees")
         if not isinstance(fees,dict):
             raise ValueError("noncanonical PumpSwap native flat fee unavailable")
+        # Restrict research chaining to the ordinary creator-free flat
+        # WSOL configuration observed in both signed V2 directions.
+        # Other noncanonical modes still expose fee candidates, not a
+        # preselected effective quote.
+        ordinary=(quote_mint==NATIVE_WSOL_MINT
+            and base_mint!=NATIVE_WSOL_MINT
+            and pool_state.get("coin_creator")=="11111111111111111111111111111111"
+            and all(type(pool_state.get(k)) is int and pool_state[k]==0 for k in (
+                "creator_fee_bps","can_edit_creator_fee","is_holder_reward",
+                "is_mayhem_mode","is_cashback_coin"))
+            and fees.get("creator_fee_bps")==0)
         return {"status":"PUMP_NONCANONICAL_SOURCE_FLAT_FEE",
+                "ordinary_creator_free_wsol_mode":ordinary,
+                "quote_asset":"WSOL" if quote_mint==NATIVE_WSOL_MINT else "OTHER",
                 "tier_selected":True,"fees":fees,
                 "selected_total_fee_bps":sum(fees.values()),
                 "source_tier_account_authenticated":True,
