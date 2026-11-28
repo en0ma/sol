@@ -50,7 +50,9 @@ def quote_multitick(state, mint_in, amount_in, ticks, *, max_crossings=12):
         previous_index = index
         if not 0 < target < (1 << 128) or not (-1 << 127) <= net < (1 << 127):
             raise ValueError('invalid tick price or liquidity net')
-        if not (target < previous if down else target > previous):
+        at_current_boundary=(not prepared and down and index==state["tick_current_index"]
+                             and target==p)
+        if not at_current_boundary and not (target < previous if down else target > previous):
             raise ValueError('unordered or wrong-direction tick price')
         previous = target
         prepared.append((target, net, t['tick_index']))
@@ -60,8 +62,21 @@ def quote_multitick(state, mint_in, amount_in, ticks, *, max_crossings=12):
     for target, net, tick_index in prepared:
         required_net = (_ceil(liquidity * Q * (p - target), p * target)
                         if down else _ceil(liquidity * (target - p), Q))
-        if required_net <= 0:
-            raise ValueError('invalid zero-input crossing')
+        if required_net == 0:
+            if not down or crosses!=0 or tick_index!=state["tick_current_index"] or target!=p:
+                raise ValueError('invalid zero-input crossing')
+            if crosses>=max_crossings:
+                raise ValueError("crossing budget exceeded")
+            next_liquidity=liquidity-net
+            if not 0<next_liquidity<1<<128:
+                raise ValueError('invalid liquidity following tick crossing')
+            liquidity=next_liquidity
+            crosses+=1
+            steps.append({'kind':'cross','tick_index':tick_index,'input':0,'output':0,
+                          'liquidity_after':str(liquidity)})
+            continue
+        if required_net < 0:
+            raise ValueError('invalid negative-input crossing')
         required_gross = _ceil(required_net * FEE_DENOM, FEE_DENOM - fee)
         if remaining < required_gross:
             effective = remaining - _ceil(remaining * fee, FEE_DENOM)

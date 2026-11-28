@@ -85,6 +85,8 @@ def research_chain(fixture, *, amount_in, observed_unix, allow_modeled_dlmm=Fals
                       "uses_unverified_dynamic_fee_model":modeled})
         if row["venue"]=="orca" and "orca_directional_coverage" in result:
             trace[-1]["orca_directional_coverage"]=result["orca_directional_coverage"]
+        if row["venue"]=="orca" and "orca_sparse_source_coverage" in result:
+            trace[-1]["orca_sparse_source_coverage"]=result["orca_sparse_source_coverage"]
         current=next_amount
     return {"status":("SOURCE_BOUND_MODELED_CHAIN_NOT_EXECUTION_VERIFIED" if modeled_legs
                       else "SOURCE_BOUND_INDICATIVE_CHAIN_NOT_EXECUTION_VERIFIED"),

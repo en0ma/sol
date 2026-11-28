@@ -96,9 +96,27 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix,
                 seen_starts.add(start)
                 decoded_arrays.append({"start_tick":start,"ticks":records,
                     "status":"FIXED_VALID" if is_fixed else "DYNAMIC_VALID"})
+            sparse=None
             for proof in fixture.get("leg_evidence_by_index",[]):
                 if proof.get("pool")==pool and proof.get("auxiliary",{}).get("sparse_tick_source") is not None:
-                    raise ValueError("Orca sparse source arrays require separate native traversal proof")
+                    from arb.whirlpool_ticks import verify_sparse_tick_fixture,start_tick
+                    verify_sparse_tick_fixture(fixture)
+                    sparse=proof["auxiliary"]["sparse_tick_source"]
+                    if sparse["input_mint"]!=leg["input_mint"]:
+                        raise ValueError("Orca sparse source direction mismatch")
+                    # Only the observed contiguous prefix is usable. Null
+                    # PDAs are not interpreted as liquidity or crossed.
+                    first=start_tick(tick,spacing);step=88*spacing*(-1 if sparse["a_to_b"] else 1)
+                    by_start={a["start_tick"]:a for a in decoded_arrays}
+                    prefix=[]
+                    for i in range(3):
+                        ix=first+i*step
+                        if ix not in by_start or orca_array_addresses(pool,[ix])[0] not in sparse["present_arrays"]:
+                            break
+                        prefix.append(by_start[ix])
+                    if not prefix:
+                        raise ValueError("Orca sparse current array absent; native quote blocked")
+                    decoded_arrays=prefix
             if decoded_arrays:
                 if orca_fee_oracle is not None:
                     from arb.orca_adaptive_fee_source import quote_adaptive_from_arrays
@@ -114,6 +132,11 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix,
                     raise ValueError("adaptive Whirlpool must have authenticated tick arrays")
                 native=quote_bounded_single_tick(state,leg["input_mint"],amount_in,
                     lower_sqrt_x64=lower,upper_sqrt_x64=upper)
+            if sparse is not None:
+                native["sparse_source_coverage"]={"source_slot":sparse["source_slot"],
+                    "present_contiguous_array_starts":[a["start_tick"] for a in decoded_arrays],
+                    "observed_absent_arrays":sparse["absent_arrays"],
+                    "absent_arrays_crossed":False,"protocol_exact_verified":False}
             q={**leg,"amount_in":amount_in,
                "amount_out":native["estimated_output_base_units"],
                "snapshot_slot":row["snapshot_slot"]}
@@ -272,6 +295,8 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix,
                         "source_current_array_start","source_current_array_initialized_tick_count",
                         "post_sqrt_price_x64","ticks_crossed")
                     }} if v=="orca" and "directional_boundary_tick" in native else {}),
+                **({"orca_sparse_source_coverage":native["sparse_source_coverage"]}
+                   if v=="orca" and "sparse_source_coverage" in native else {}),
                 "protocol_exact_verified":False,**SAFE}
     except (ValueError,KeyError,TypeError,ArithmeticError) as exc:
         return {"venue":v,"pool":pool,"leg_index":leg_index,

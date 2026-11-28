@@ -258,3 +258,21 @@ class MultitickIndicativeTests(unittest.TestCase):
                 self.assertEqual(q["ticks_crossed"],0)
                 self.assertFalse(q["simulation_verified"])
                 self.assertFalse(q["actionable"])
+
+
+class ExactCurrentBoundaryTests(unittest.TestCase):
+    def test_zero_input_crossing_changes_liquidity_before_next_step(self):
+        state={"token_mint_a":"a","token_mint_b":"b","sqrt_price_x64":str(Q),
+               "liquidity":1000000000000,"fee_rate_hundredths_bps":3000,"tick_current_index":0}
+        ticks=[{"tick_index":0,"sqrt_price_x64":Q,"liquidity_net":10000000000},
+               {"tick_index":-1,"sqrt_price_x64":Q-100000000000000,"liquidity_net":0}]
+        q=quote_multitick(state,"a",10000,ticks)
+        self.assertEqual(q["steps"][0]["input"],0)
+        self.assertEqual(q["steps"][0]["output"],0)
+        self.assertEqual(q["steps"][0]["liquidity_after"],"990000000000")
+        self.assertEqual(q["ticks_crossed"],1)
+        self.assertGreater(q["estimated_output_base_units"],0)
+        with self.assertRaisesRegex(ValueError,"liquidity following"):
+            quote_multitick(state,"a",10000,[{**ticks[0],"liquidity_net":10**12},ticks[1]])
+        with self.assertRaisesRegex(ValueError,"crossing budget"):
+            quote_multitick(state,"a",10000,ticks,max_crossings=0)
