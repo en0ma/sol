@@ -285,3 +285,23 @@ class ThreeHopSourceCoverageTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HistoricalRecoveryOrientationTests(unittest.TestCase):
+    def test_reverse_candidate_prioritized_even_beyond_novelty_window(self):
+        from arb.m5_historical_capture_priority import reverse_triangle,RECOVERY_FAILURES,RECOVERY_OUTPUT_MINT
+        from arb.m5_three_hop_atomic_inventory import choose_pool_diverse_candidate
+        mint,venue,pool,_=RECOVERY_FAILURES[0]
+        f={"start_mint":mint,"hops":3,"legs":[
+            {"venue":venue,"pool":pool,"input":mint,"output":RECOVERY_OUTPUT_MINT},
+            {"venue":"orca","pool":"p1","input":RECOVERY_OUTPUT_MINT,"output":"Y"},
+            {"venue":"raydium_cpmm","pool":"p2","input":"Y","output":mint}]}
+        r=reverse_triangle(f)
+        self.assertEqual(reverse_triangle(r),f)
+        self.assertEqual(r["legs"][-1]["pool"],pool)
+        q=[(str(i),f) for i in range(300)]+[("reverse",r)]
+        self.assertEqual(choose_pool_diverse_candidate(q,set(),set(),recovery_ordering=True)[0],"reverse")
+        by_start,_=capture_priority_indices([f,r])
+        self.assertEqual(by_start[mint],[1,0])
+        q=[("fallback",f)]
+        self.assertEqual(choose_pool_diverse_candidate(q,set(),set(),recovery_ordering=True)[0],"fallback")

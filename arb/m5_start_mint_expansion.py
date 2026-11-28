@@ -200,7 +200,7 @@ def starting_mint_coverage_pool_subset(entries, *, maximum_per_venue=24,
             "signed_simulation_verified":False,
             **SAFE}
 
-def resilience_bridge_targets(entries,*,maximum=24):
+def resilience_bridge_targets(entries,*,maximum=24,historical_recovery=False):
     """Bound source discovery toward starts dependent on a single pool.
 
     Work on mint-pair triangles rather than enumerating all combinations
@@ -208,7 +208,8 @@ def resilience_bridge_targets(entries,*,maximum=24):
     in every triangle through the start and there is just one such pool.
     This is topology, not an assertion about price or executable liquidity.
     """
-    if type(maximum) is not int or not 1<=maximum<=72 or len(entries)>768:
+    if (type(maximum) is not int or not 1<=maximum<=72 or len(entries)>768
+            or type(historical_recovery) is not bool):
         raise ValueError("invalid bounded resilience target budget")
     graph=topology(entries)
     neighbors={m:set(n) for m,n in graph["mint_neighbors"].items()}
@@ -255,7 +256,26 @@ def resilience_bridge_targets(entries,*,maximum=24):
                 if avoided:
                     proposals[closure].add(mint)
                     alternatives[closure].add(mint)
+    recovery_pairs=set()
+    if historical_recovery:
+        from arb.m5_historical_capture_priority import RECOVERY_FAILURES,RECOVERY_OUTPUT_MINT
+        identities={(p["venue"],p["address"]):set(p["mints"]) for p in entries}
+        for mint,venue,pool,_ in RECOVERY_FAILURES:
+            failed_pair=pair(mint,RECOVERY_OUTPUT_MINT)
+            if identities.get((venue,pool))!=set(failed_pair):
+                continue
+            proposals[failed_pair].add(mint)
+            recovery_pairs.add(failed_pair)
+            for first in sorted(neighbors.get(mint,set())-{RECOVERY_OUTPUT_MINT}):
+                for last in sorted(neighbors[first]-{mint,RECOVERY_OUTPUT_MINT}):
+                    closure=pair(mint,last)
+                    if closure in by_pair:
+                        continue
+                    proposals[closure].add(mint)
+                    alternatives[closure].add(mint)
+                    recovery_pairs.add(closure)
     ranked=sorted(proposals,key=lambda edge:(
+        -int(edge in recovery_pairs),
         -len(proposals[edge]),-len(alternatives[edge]),
         -int(any(m in HUBS for m in edge)),edge))
     targets=[]
@@ -265,7 +285,8 @@ def resilience_bridge_targets(entries,*,maximum=24):
             "reason":"FRAGILE_START_PARALLEL_POOL_OR_ALTERNATE_CLOSURE",
             "affected_start_mints":sorted(proposals[edge]),
             "alternate_closure_start_mints":sorted(alternatives[edge]),
-            "existing_pair":edge in by_pair})
+            "existing_pair":edge in by_pair,
+            "historical_recovery_hint":edge in recovery_pairs})
     return {"status":"TOPOLOGY_FRAGILITY_HINTS_ONLY","fragile_start_mints":fragile,
             "targets":targets,"candidate_pair_count":len(ranked),
             "truncated":len(ranked)>maximum,"source_authenticated":False,
@@ -636,13 +657,16 @@ def multi_venue_bridge_scout(rpc, entries, *, maximum_pairs=12,
 
 
 
-def scout(rpc,entries,*,maximum=360,venues=DEFAULT_VENUES,resilience_maximum=0):
+def scout(rpc,entries,*,maximum=360,venues=DEFAULT_VENUES,resilience_maximum=0,
+          historical_recovery=False):
     if (type(maximum) is not int or not 1<=maximum<=360
             or type(resilience_maximum) is not int
-            or not 0<=resilience_maximum<=min(72,maximum-1)):
+            or not 0<=resilience_maximum<=min(72,maximum-1)
+            or type(historical_recovery) is not bool):
         raise ValueError("invalid combined bridge search budget")
     suggestions=bridge_targets(entries,maximum=maximum)
-    resilience=(resilience_bridge_targets(entries,maximum=resilience_maximum)
+    resilience=(resilience_bridge_targets(entries,maximum=resilience_maximum,
+                                          historical_recovery=historical_recovery)
                 if resilience_maximum else None)
     # Preserve the overall pair budget. Reserve only genuine distinct
     # resilience targets not already searched by new-mint discovery.

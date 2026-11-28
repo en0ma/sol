@@ -416,3 +416,18 @@ class ResilienceBridgeTests(unittest.TestCase):
         rows=[{"venue":"orca","address":a+b,"mints":[a,b]}
               for a,b in (("A","B"),("B","C"),("C","A"),("A","D"),("D","E"),("E","A"))]
         self.assertNotIn("A",resilience_bridge_targets(rows)["fragile_start_mints"])
+
+
+class HistoricalRecoveryBridgeTests(unittest.TestCase):
+    def test_matching_prior_failure_prioritizes_parallel_pair_without_removing_pool(self):
+        from arb.m5_historical_capture_priority import RECOVERY_FAILURES,RECOVERY_OUTPUT_MINT
+        from arb.m5_start_mint_expansion import resilience_bridge_targets
+        mint,venue,pool,_=RECOVERY_FAILURES[0]
+        rows=[{"venue":venue,"address":pool,"mints":[mint,RECOVERY_OUTPUT_MINT]},
+              {"venue":"orca","address":"p","mints":[mint,"Y"]},
+              {"venue":"raydium_cpmm","address":"q","mints":["Y",RECOVERY_OUTPUT_MINT]},
+              {"venue":"orca","address":"parallel","mints":[mint,RECOVERY_OUTPUT_MINT]}]
+        result=resilience_bridge_targets(rows,maximum=8,historical_recovery=True)
+        self.assertTrue(any(set(r["pair"])=={mint,RECOVERY_OUTPUT_MINT}
+            and r["historical_recovery_hint"] for r in result["targets"]))
+        self.assertFalse(result["source_authenticated"])

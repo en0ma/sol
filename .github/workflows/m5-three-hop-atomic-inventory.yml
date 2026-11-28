@@ -99,7 +99,7 @@ jobs:
           # Authenticate new bridge candidates on the read-only source fork.
           # Only ephemeral registry hints are added; probe() independently
           # authenticates every chosen pool again before constructing cycles.
-          expansion=scout(rpc,registry["pools"],maximum=360,venues=("orca",),resilience_maximum=24)
+          expansion=scout(rpc,registry["pools"],maximum=360,venues=("orca",),resilience_maximum=24,historical_recovery=True)
           (root/"source-bridge-discovery.json").write_text(json.dumps(expansion,indent=2)+"\n")
           new=[{"venue":p["venue"],"address":p["address"],"mints":p["mints"]}
                for p in expansion["source_verified_new_pools"]]
@@ -201,7 +201,7 @@ jobs:
                         maximum_per_venue=48,
                         require_dlmm_swap_eligible=True,
                         prefer_start_mint_coverage=True),
-                        maximum=200,allow_start_rotations=True)
+                        maximum=200,allow_start_rotations=True,recovery_ordering=True)
           graph["source_bridge_discovery"]={
               "new_verified_pool_identities":len(new)+min(len(other),available)+min(len(extra),room)+min(len(cpmm_new),cpmm_room)+index_admission["admitted_count"]+meteora_admission["admitted_count"],
               "meteora_indexed_source_verified_new_pools":meteora_admission["admitted_count"],

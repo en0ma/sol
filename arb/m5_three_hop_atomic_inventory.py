@@ -10,7 +10,8 @@ from pathlib import Path
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
 
 def choose_pool_diverse_candidate(queue, selected_identities, used_pools, *,
-                                  start_used_pools=None, window=256):
+                                  start_used_pools=None, window=256,
+                                  recovery_ordering=False):
     """Pick a fresh route maximizing pool coverage within a bounded queue window.
 
     Retain start-token round robin; do not treat candidate discovery as execution.
@@ -23,6 +24,12 @@ def choose_pool_diverse_candidate(queue, selected_identities, used_pools, *,
     # repeatedly sample the same large pool cluster.
     if start_used_pools is None:
         start_used_pools=set()
+    if type(recovery_ordering) is not bool:
+        raise ValueError("invalid historical recovery ordering")
+    if recovery_ordering:
+        from arb.m5_historical_capture_priority import recovery_order
+        best=min(recovery_order(item[2]) for item in eligible)
+        eligible=[item for item in eligible if recovery_order(item[2])==best]
     def score(item):
         index,identity,route=item
         pools={(leg["venue"],leg["pool"]) for leg in route["legs"]}
@@ -65,15 +72,17 @@ def failed_instruction_context(row, error):
     return result
 
 def diversified_three_hop_graph(readiness, maximum=100, *,
-                                allow_start_rotations=False):
+                                allow_start_rotations=False,recovery_ordering=False):
     """Bounded round-robin across authenticated token cycles and pool identities."""
     from collections import defaultdict, deque
     from arb.m5_seven_venue_route_scan import analyze, ORDER, SAFE
     from arb.opportunity_graph import cycles
     if type(maximum)is not int or not 1<=maximum<=200:
         raise ValueError("invalid cycle budget")
-    if type(allow_start_rotations) is not bool:
+    if type(allow_start_rotations) is not bool or type(recovery_ordering) is not bool:
         raise ValueError("invalid start-token rotation policy")
+    from arb.m5_historical_capture_priority import reverse_triangle,failure_direction_count,RECOVERY_FAILURES
+    recovery_starts={row[0] for row in RECOVERY_FAILURES} if recovery_ordering else set()
     pools=[{"venue":v,"address":p["pool"],"mints":p["mints"],"verified":True}
            for v in ORDER for p in readiness["authenticated_pools"][v]]
     graph=analyze(readiness,max_cycles=100)
@@ -85,14 +94,17 @@ def diversified_three_hop_graph(readiness, maximum=100, *,
     for anchor in sorted({m for p in pools for m in p["mints"]}):
         for route in cycles(pools,anchors=[anchor],min_hops=3,max_hops=3,
                             max_cycles=1000,truncate=True):
-            legs=route["legs"]
-            keys=tuple((x["venue"],x["pool"],x["input"]) for x in legs)
-            identity=min(keys[i:]+keys[:i] for i in range(3))
-            unique_identities.add(identity)
-            if identity in seen_by_start[anchor]:
-                continue
-            seen_by_start[anchor].add(identity)
-            candidates[anchor].append((identity,route))
+            variants=[route]
+            if anchor in recovery_starts:
+                variants.append(reverse_triangle(route))
+            for variant in variants:
+                keys=tuple((x["venue"],x["pool"],x["input"]) for x in variant["legs"])
+                identity=min(keys[i:]+keys[:i] for i in range(3))
+                unique_identities.add(identity)
+                if identity in seen_by_start[anchor]:
+                    continue
+                seen_by_start[anchor].add(identity)
+                candidates[anchor].append((identity,variant))
     result=[]
     selected_identities=set()
     used_pools=set()
@@ -111,7 +123,8 @@ def diversified_three_hop_graph(readiness, maximum=100, *,
                           else selected_identities)
             choice=choose_pool_diverse_candidate(
                 q,scoped_seen,used_pools,
-                start_used_pools=used_pools_by_start[start])
+                start_used_pools=used_pools_by_start[start],
+                recovery_ordering=start in recovery_starts)
             if choice is not None:
                 identity,r=choice
                 selected_identities.add((start,identity) if allow_start_rotations else identity)
@@ -140,6 +153,10 @@ def diversified_three_hop_graph(readiness, maximum=100, *,
         three_hop_distinct_start_mints=len({r["start_mint"] for r in result}),
         three_hop_distinct_selected_pools=len(used_pools),
         three_hop_distinct_selected_venues=len({v for v,_ in used_pools}),
+        historical_recovery_ordering=recovery_ordering,
+        historical_recovery_start_mints=sorted(recovery_starts&{r["start_mint"] for r in result}),
+        historical_recovery_avoids_failed_direction=sorted({r["start_mint"] for r in result
+            if r["start_mint"] in recovery_starts and not failure_direction_count(r)}),
         three_hop_sample_policy=("START_MINT_ROUND_ROBIN_PER_START_POOL_NOVELTY_256_ROTATIONS" if allow_start_rotations else
                                  "START_MINT_ROUND_ROBIN_PER_START_POOL_NOVELTY_256_ROTATION_DEDUP"),
         cycle_coverage_by_hops={"3":{"returned":len(result),
@@ -164,8 +181,13 @@ def capture_priority_indices(routes, *, retries_per_start=3):
     # source authentication or an accepted signed verification.
     starts=sorted(by_start,key=lambda mint:by_start[mint][0])
     from arb.m5_historical_capture_priority import is_historical_priority
+    from arb.m5_historical_capture_priority import recovery_order,RECOVERY_FAILURES
+    recovery_starts={r[0] for r in RECOVERY_FAILURES}
     for mint in starts:
         indices=by_start[mint]
+        if mint in recovery_starts:
+            by_start[mint]=sorted(indices,key=lambda i:recovery_order(routes[i]))
+            continue
         preferred=[i for i in indices
                    if is_historical_priority(routes[i])]
         if preferred:

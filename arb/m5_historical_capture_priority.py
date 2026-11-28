@@ -101,3 +101,43 @@ def is_historical_priority(route):
         return fingerprint(route) in PRIORITY_ROUTE_HASHES
     except (ValueError,TypeError,KeyError):
         return False
+
+
+# Source inventory 15268533546 and independent gap artifact 15269541011,
+# run 46156750004: first-leg failure directions, never current rejection rules.
+RECOVERY_ORIGIN_RUN=46156750004
+RECOVERY_FAILURES=(
+    ("3BWA5RBXyPXuMGZmVL8Snefu573FMJNGpsVi79baiBLV","meteora_damm_v2","C2C8RFRLniyeVWiKZ57LNvzuZEoVJPZoqq8C4x8tuc9H",6002),
+    ("4Cnk9EPnW5ixfLZatCPJjDB1PUtcRpVVgTQukm9epump","orca","34RU4j4A3Xi1Bamxdqu3sHc1TwYLR6aU5hQFsaYzG44z",6038),
+    ("61V8vBaqAGMpgDQi4JcAwo1dmBGHsyhzodcPqnEVpump","orca","9B5g1rcCw7anvu8uqV7tBazeridindu2zsiKbwcioCJh",6038),
+    ("63LfDmNb3MQ8mw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9","orca","B4uCRELBJ9ntodU2dfRHqq93WDAFpYSv9NkCKJB18NTm",6038),
+    ("69kdRLyP5DTRkpHraaSZAQbWmAwzF9guKjZfzMXzcbAs","orca","7tzifcqTc16itg5RTyC9rGghFn63wjdNEtoaeVVUFY1N",6038),
+    ("8x5VqbHA8D7NkD52uNuS5nnt3PwA8pLD34ymskeSo2Wn","orca","9gjx3b1NQW5DGxK1hDBUtGY3fdJXEXeQQDP4JGX5yDZH",6038),
+    ("AiYi7HyVVXnDSuj8BoPirDsuuWgddeKkD5MQN35VpwNz","meteora_dlmm","3msAL8G7Kq4C9GGASVjp5F5QjpvJuBZyyXNV2nsegQUD",6036),
+    ("D2Nccx6vDC5vGgV9s3Tn7QbsVYknmHx1Q31rj1SjaJMm","meteora_damm_v2","HtoZbnFf7BDGvPg3RxwiXN5pPG7hLa78XVGscLF9fkYV",6002),
+    ("MEW1gQWJ3nEXg2qgERiKu7FAFj79PHvQVREQUzScPP5","orca","ErntNRzo5jcpDsmJdjqt35fqgFgDkZobhyCyThqFkBtL",6038),
+    ("WskzsKqEW3ZsmrhPAevfVZb6PuuLzWov9mJWZsfDePC","orca","3wgDvTY3cGvqzcWg9NuSAb2GQBTKNSd6xdEunrwLyjuu",6036),
+    ("soKqZS9pASwBNS46G388nhK7XVtPaTyReffXEd3zora","meteora_dlmm","8JdFW78z26cFbfdcKpipSCAbC62ugxycT4s4B6To38kZ",6036),
+)
+RECOVERY_OUTPUT_MINT="EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+
+def failure_direction_count(route):
+    directions={(venue,pool,mint,RECOVERY_OUTPUT_MINT) for mint,venue,pool,_ in RECOVERY_FAILURES}
+    return sum((l.get("venue"),l.get("pool"),l.get("input"),l.get("output")) in directions
+               for l in route.get("legs",[]))
+
+
+def reverse_triangle(route):
+    """Reverse an existing closed distinct-pool route without adding pools."""
+    start=route["start_mint"];legs=route["legs"]
+    if (len(legs)!=3 or len({(l["venue"],l["pool"]) for l in legs})!=3
+            or legs[0]["input"]!=start or legs[-1]["output"]!=start
+            or any(a["output"]!=b["input"] for a,b in zip(legs,legs[1:]))
+            or len({l["input"] for l in legs})!=3):
+        raise ValueError("invalid triangle reversal topology")
+    return {**route,"legs":[{**l,"input":l["output"],"output":l["input"]}
+                            for l in reversed(legs)]}
+
+
+def recovery_order(route):
+    return (failure_direction_count(route),not is_historical_priority(route))
