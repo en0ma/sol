@@ -182,14 +182,57 @@ class MeteoraIndexerTests(unittest.TestCase):
             ("pool_created_at:desc",1),("pool_created_at:desc",2)])
 
     def test_multiple_sort_index_limits_fail_closed(self):
-        with patch("arb.meteora_indexed_source_bridge.local_rpc_only"):
-            for sorts in (("tvl:desc","tvl:desc"),("unapproved:desc",),
-                          ("tvl:desc",)*4):
-                with self.assertRaises(ValueError):
-                    discover(RPC,[],sort_orders=sorts)
-            with self.assertRaises(ValueError):
-                discover(RPC,[],pages=5,
-                    sort_orders=("tvl:desc","pool_created_at:desc"))
+        sorts=("tvl:desc","pool_created_at:desc")
+        invalid=(
+            {"sort_orders":("tvl:desc","tvl:desc")},
+            {"sort_orders":("unapproved:desc",)},
+            {"sort_orders":("tvl:desc",)*4},
+            {"pages":5,"sort_orders":sorts},
+            {"pages":6},
+            {"pages":21,"maximum_verify_per_venue":None},
+            {"pages":True,"maximum_verify_per_venue":None},
+            {"maximum_verify_per_venue":65},
+        )
+        with patch("arb.meteora_indexed_source_bridge.local_rpc_only"), \
+                patch("arb.meteora_indexed_source_bridge.indexed_addresses") as index, \
+                patch("arb.meteora_indexed_source_bridge.call") as rpc, \
+                patch("arb.meteora_indexed_source_bridge.verify") as verify:
+            for kwargs in invalid:
+                with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):
+                    discover(RPC,[],**kwargs)
+            index.assert_not_called()
+            rpc.assert_not_called()
+            verify.assert_not_called()
+
+    def test_expanded_primary_index_budget_is_explicit_and_network_isolated(self):
+        sorts=("tvl:desc","pool_created_at:desc","volume_24h:desc")
+        scenarios=(
+            (4,sorts[:2],48),
+            (5,sorts[:2],None),
+            (8,sorts[:1],None),
+            (20,sorts,None),
+        )
+        with patch("arb.meteora_indexed_source_bridge.local_rpc_only"), \
+                patch("arb.meteora_indexed_source_bridge.indexed_addresses",return_value=[]) as index, \
+                patch("arb.meteora_indexed_source_bridge.call") as rpc, \
+                patch("arb.meteora_indexed_source_bridge.verify") as verify:
+            for pages,orders,limit in scenarios:
+                with self.subTest(pages=pages,orders=orders,limit=limit):
+                    index.reset_mock()
+                    report=discover(RPC,[],venues=(VENUE,),pages=pages,
+                        sort_orders=orders,maximum_verify_per_venue=limit)
+                    index.assert_called_once_with(VENUE,pages=pages,page_size=100,
+                        sort_orders=orders)
+                    venue_report=report["venue_reports"][VENUE]
+                    self.assertEqual(venue_report["source_verification_pool_limit"],limit)
+                    self.assertEqual(venue_report["index_max_requested_addresses"],
+                        pages*100*len(orders))
+                    self.assertEqual(report["verified_new_pool_count"],0)
+                    self.assertIs(report["signed_simulation_verified"],False)
+                    self.assertIs(report["actionable"],False)
+                    self.assertIs(report["broadcast"],False)
+            rpc.assert_not_called()
+            verify.assert_not_called()
 
     def test_recent_pool_audit_never_admits_into_control_graph(self):
         baseline=[{"venue":"orca","address":"ab","mints":["A","B"]},

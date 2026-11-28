@@ -88,6 +88,11 @@ def discover(rpc,entries,*,venues=("meteora_damm_v2","meteora_dlmm"),
             or any(order not in ALLOWED_SORT_ORDERS for order in sort_orders)
             or pages*len(sort_orders)>60):
         raise ValueError("invalid bounded Meteora discovery")
+    # Preserve the historical bounded scout contract. The active primary
+    # discovery explicitly opts out of pool-count limits with None.
+    if maximum_verify_per_venue is not None and (
+            pages>5 or pages*len(sort_orders)>8):
+        raise ValueError("invalid bounded Meteora discovery")
     index=index_fn or indexed_addresses
     fetch=call_fn or call
     verifier=verify_fn or verify
