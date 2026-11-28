@@ -316,7 +316,11 @@ jobs:
           python3 - <<'PY'
           import json,os
           from pathlib import Path
-          r=json.loads((Path(os.environ["RUNNER_TEMP"])/"source-artifact/triangles/three-hop-inventory.json").read_text())
+          from arb.m5_three_hop_atomic_inventory import audit_primary_shard
+          root=Path(os.environ["RUNNER_TEMP"])/"source-artifact/triangles"
+          r=json.loads((root/"three-hop-inventory.json").read_text())
+          audit=audit_primary_shard(root)
+          (root/"primary-shard-independent-audit.json").write_text(json.dumps(audit,indent=2)+"\n")
           assert len(r["routes"])<=14, "shard must contain at most fourteen routes"
           with open(os.environ["GITHUB_STEP_SUMMARY"],"a") as f:
               f.write(f"Shard {r['shard_index']}: {r.get('build_confirmed',0)}/{len(r['routes'])} signed builds; {r.get('simulations_verified',0)}/{len(r['routes'])} verified simulations.\n")
@@ -325,8 +329,10 @@ jobs:
           print(json.dumps({"verified":len(verified),"attempted":len(r["routes"]),"blocked":blocked}))
           assert len(r["routes"])==14, "expected fourteen attempted routes per shard"
           assert len(verified)==r.get("simulations_verified"), "receipt count disagrees with simulation inventory"
+          assert audit["verified_route_ids"]==[row["id"] for row in verified], "independent receipt audit disagrees"
           summary={"shard":r["shard_index"],"attempted":len(r["routes"]),
-                   "verified":len(verified),
+                   "verified":len(verified),"independently_audited":audit["audited"],
+                   "distinct_packet_signatures":audit["distinct_packet_signatures"],
                    "route_ids":[row["id"] for row in r["routes"]],
                    "verified_route_ids":[row["id"] for row in verified],
                    "selected_start_mints":sorted({row["mints"][0] for row in r["routes"]}),
@@ -454,6 +460,10 @@ jobs:
           attempts=[route_id for r in reports for route_id in r["route_ids"]]
           verified=[route_id for r in reports for route_id in r["verified_route_ids"]]
           assert all(r["attempted"]==14 and r["verified"]==len(r["verified_route_ids"]) for r in reports)
+          assert all(r["independently_audited"]==r["verified"] and
+                     len(r["distinct_packet_signatures"])==2*r["verified"] for r in reports)
+          signatures=[s for r in reports for s in r["distinct_packet_signatures"]]
+          assert len(signatures)==2*len(verified)==len(set(signatures)), "duplicate primary packet signature across shards"
           assert len(attempts)==140 and len(set(attempts))==140, "duplicate or missing attempted routes"
           assert len(verified)==len(set(verified)) and set(verified)<=set(attempts), "invalid verified route identities"
           selected_starts={mint for r in reports for mint in r["selected_start_mints"]}

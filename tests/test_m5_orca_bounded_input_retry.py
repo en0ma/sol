@@ -333,6 +333,20 @@ class BoundedOfflineOrcaInputTests(unittest.TestCase):
         result,_=self.simulate_mocked_route(error,incomplete)
         self.assertEqual(result["simulations_verified"],0)
 
+    def test_primary_audit_rejects_missing_raw_receipt(self):
+        from arb.m5_three_hop_atomic_inventory import audit_primary_shard,SAFE
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            routes=[{"id":f"3H-{i+1:02d}","fixture":f"source-{i:02d}.json",
+                "source_status":"CAPTURED","atomic_build_status":"SIGNED_ATOMIC_PACKET_BUILT",
+                "simulation_status":"SIGNED_SIMULATION_AND_ROLLBACK_VERIFIED",**SAFE}
+                for i in range(14)]
+            (root/"three-hop-inventory.json").write_text(json.dumps({
+                "status":"OFFLINE_THREE_HOP_ATOMIC_BUILD_AND_SIMULATION_INVENTORY",
+                "routes":routes,"shard_index":0,"simulations_verified":14,**SAFE}))
+            with self.assertRaises(FileNotFoundError):
+                audit_primary_shard(root)
+
     def test_other_venue_failure_does_not_trigger_retry(self):
         with tempfile.TemporaryDirectory() as directory:
             root = self.report(directory)

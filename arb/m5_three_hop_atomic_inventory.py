@@ -635,7 +635,7 @@ def offline_simulate(rpc,directory,*,amount=100000,shard_index=0,shard_count=1):
                     row["signed_exact_input_attempts"].append(attempt)
                     receipt=run_four_to_six_venue(
                         rpc,fixture,amount_in=exact_input,
-                        ephemeral_source_registry=True)
+                        ephemeral_source_registry=True,retain_audit_evidence=True)
                     attempt["status"]="RECEIPT_RETURNED"
                     row["signed_exact_input_base_units"]=exact_input
                     break
@@ -703,6 +703,61 @@ def offline_simulate(rpc,directory,*,amount=100000,shard_index=0,shard_count=1):
         report["simulations_verified"]=sum(r["simulation_status"]=="SIGNED_SIMULATION_AND_ROLLBACK_VERIFIED" for r in report["routes"])
         (root/"three-hop-inventory.json").write_text(json.dumps(report,indent=2)+"\n")
     return report
+
+def audit_primary_shard(directory):
+    """Re-decode retained primary packets using the shared independent audit.
+
+    No signing, local RPC or quote SDK. Bind the exact original source
+    fixture, positive and negative packets, CPI and SPL/rollback evidence.
+    """
+    import hashlib,re
+    from arb.blockzilla_multihop import audit_signed_core,reserve_receipt_signatures
+    root=Path(directory)
+    report=json.loads((root/"three-hop-inventory.json").read_text())
+    if (report.get("status")!="OFFLINE_THREE_HOP_ATOMIC_BUILD_AND_SIMULATION_INVENTORY"
+            or any(report.get(k) is not False for k in SAFE)
+            or not isinstance(report.get("routes"),list)):
+        raise ValueError("invalid primary offline shard inventory")
+    routes=report["routes"]
+    if len(routes)!=14 or len({r["id"] for r in routes})!=len(routes):
+        raise ValueError("invalid primary shard route coverage")
+    seen=set();accepted=[]
+    for row in routes:
+        if row.get("simulation_status")!="SIGNED_SIMULATION_AND_ROLLBACK_VERIFIED":
+            continue
+        rid=row["id"];name=row["fixture"]
+        if (not re.fullmatch(r"3H-[0-9]{2,4}",rid)
+                or not re.fullmatch(r"source-[0-9]{2,4}\.json",name)
+                or row.get("source_status")!="CAPTURED"
+                or row.get("atomic_build_status")!="SIGNED_ATOMIC_PACKET_BUILT"
+                or any(row.get(k) is not False for k in SAFE)):
+            raise ValueError("invalid accepted primary receipt identity")
+        fixture_raw=(root/name).read_bytes()
+        receipt_raw=(root/("receipt-"+rid+".json")).read_bytes()
+        fixture=json.loads(fixture_raw);receipt=json.loads(receipt_raw)
+        mints=row["mints"];venues=row["venues"];pools=row["pools"]
+        if len(mints)!=4 or len(venues)!=3 or len(pools)!=3 or mints[0]!=mints[-1]:
+            raise ValueError("invalid primary route topology")
+        amount=row["signed_exact_input_base_units"]
+        if row.get("signed_transaction_signature")!=receipt.get("signed_transaction_signature"):
+            raise ValueError("primary signature inventory differs from retained receipt")
+        source_row={"hops":3,"source_slot":fixture["state_accounts_observed_slot"],
+            "legs":[{"venue":v,"pool":p,"input":mints[i],"output":mints[i+1]}
+                    for i,(v,p) in enumerate(zip(venues,pools))]}
+        audit=audit_signed_core(receipt,fixture,source_row,amount)
+        reserve_receipt_signatures(receipt,seen)
+        accepted.append({"id":rid,"start_mint":mints[0],"pools":pools,
+            "source_slot":source_row["source_slot"],"amount":amount,
+            "fixture_sha256":hashlib.sha256(fixture_raw).hexdigest(),
+            "receipt_sha256":hashlib.sha256(receipt_raw).hexdigest(),"audit":audit})
+    if len(accepted)!=report["simulations_verified"] or len(seen)!=2*len(accepted):
+        raise ValueError("primary independent acceptance count mismatch")
+    return {"status":"PRIMARY_SHARD_RECORDED_PACKETS_INDEPENDENTLY_RECHECKED",
+        "shard":report["shard_index"],"audited":len(accepted),
+        "verified_route_ids":[r["id"] for r in accepted],
+        "distinct_packet_signatures":sorted(seen),"attempts":accepted,
+        "rpc_response_cryptographically_attested":False,**SAFE}
+
 
 def main():
     p=argparse.ArgumentParser()

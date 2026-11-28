@@ -622,11 +622,10 @@ def reserve_receipt_signatures(receipt,seen):
     seen.update(signatures)
 
 
-def audit_receipt(receipt,fixture,row,amount):
+def audit_signed_core(receipt,fixture,row,amount):
+    """Shared independent packet and recorded simulation audit; no quote SDK needed."""
     from arb.atomic_graph_coordinator import audit_n_leg_cpi,audit_n_leg_balances,signed_n_leg_post_balances
     from arb.next_ten_signed_atomic_offline import top_level_events
-    from arb.m5_source_indicative_route_chain import research_chain
-    from arb.m5_signed_start_mint_economics import signed_net_economics
     fixture_identity(fixture,row)
     n=row["hops"];mints=fixture["route_mints"];venues=fixture["route_venues"]
     metadata=accepted_receipt_metadata(receipt,hops=n,amount=amount)
@@ -682,6 +681,29 @@ def audit_receipt(receipt,fixture,row,amount):
         rollback_balances=evidence["persistent_after_negative"],later_instruction_failed=True)
     if balances["status"]!="N_LEG_BALANCES_AND_ROLLBACK_RECONCILED":
         raise ValueError("recorded rollback reconciliation failed")
+    return {"status":"N_LEG_PACKET_AND_RECORDED_RESPONSE_RECHECKED",
+            "receipt_metadata":metadata,"cpi":cpi,"balances":balances,
+            "resolved_account_key_count":len(keys),"positive_post_balances":post,
+            "planned_inputs":amounts,"positive_signature":str(positive.signatures[0]),
+            "negative_signature":str(negative.signatures[0]),**SAFE}
+
+
+def audit_receipt(receipt,fixture,row,amount):
+    from arb.m5_source_indicative_route_chain import research_chain
+    from arb.m5_signed_start_mint_economics import signed_net_economics
+    core=audit_signed_core(receipt,fixture,row,amount)
+    metadata=core["receipt_metadata"];cpi=core["cpi"];balances=core["balances"]
+    post=core["positive_post_balances"];amounts=core["planned_inputs"]
+    n=row["hops"];mints=fixture["route_mints"];venues=fixture["route_venues"]
+    evidence=receipt["recorded_n_leg_audit_evidence"]
+    pr=evidence["positive_response"]
+    # Resolve the already independently checked packet again for the existing
+    # funding/event comparisons; keep pricing separate from packet acceptance.
+    positive,lookup,keys=decode_packet(receipt["signed_transaction_wire_base64"],
+        receipt["signed_transaction_sha256"],receipt["signed_transaction_signature"],
+        evidence["isolated_lookup_account"])
+    owner=evidence["ephemeral_authority"]
+    accounts=evidence["ephemeral_token_accounts"]
     model=research_chain(fixture,amount_in=amount,observed_unix=row["source_clock"]["unix_timestamp"],
                          allow_modeled_dlmm=True,allow_modeled_pumpswap=True)
     from arb.meteora_dlmm_signed_event_audit import stable_execution_timestamp,audit_swap_event

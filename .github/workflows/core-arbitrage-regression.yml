@@ -55,6 +55,7 @@ jobs:
             test_m5_dlmm_active_source_retry.py \
             test_m5_dlmm_offline_clock.py \
             test_meteora_dlmm_bin_preflight.py \
+            test_meteora_dlmm_source_bin_decoder.py \
             test_continuous_source_scanner.py \
             test_m5_source_triangle_quote_ranking.py; do
             python3 -m unittest discover -s tests -p "$pattern" -v
