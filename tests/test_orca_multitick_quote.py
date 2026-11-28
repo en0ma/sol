@@ -302,3 +302,36 @@ class ObservedAbsentArrayTests(unittest.TestCase):
                 quote_inside_observed_absent_array(state,"a",10**12,pool="pool",fixture=f)
             with self.assertRaisesRegex(ValueError,"direction"):
                 quote_inside_observed_absent_array(state,"b",10000,pool="pool",fixture=f)
+
+
+class AdaptiveObservedAbsentIntervalTests(unittest.TestCase):
+    def test_adaptive_group_steps_use_no_synthetic_tick_account(self):
+        from unittest.mock import patch
+        from arb.orca_tick_math import sqrt_price_from_tick_index
+        from arb.orca_adaptive_fee_source import quote_adaptive_from_arrays
+        safe={"actionable":False,"broadcast":False,"live_execution_approved":False}
+        state={"token_mint_a":"a","token_mint_b":"b","tick_spacing":1,
+            "fee_tier_index_seed":1024,"tick_current_index":15,
+            "sqrt_price_x64":str(sqrt_price_from_tick_index(15)),
+            "liquidity":10**12,"fee_rate_hundredths_bps":3000}
+        oracle={"oracle_layout_authenticated":True,"trade_enable_timestamp":0,
+            "constants":{"tick_group_size":8,"max_volatility_accumulator":100000,
+                "adaptive_fee_control_factor":10000,"decay_period":100,"filter_period":5,
+                "reduction_factor":5000},"variables":{"tick_group_index_reference":1,
+                "volatility_reference":0,"last_reference_update_timestamp":100,
+                "last_major_swap_timestamp":100,"volatility_accumulator":0},**safe}
+        interval={"bounded_tick_interval":[0,87],"source_slot":123,
+            "absent_arrays_crossed":False,"protocol_exact_verified":False}
+        with patch("arb.orca_adaptive_fee_source.source_oracle",return_value=oracle),patch(
+                "arb.orca_spot_quote.observed_absent_current_interval",return_value=interval):
+            kw=dict(observed_unix=101,observed_absent_fixture={},pool="pool")
+            result=quote_adaptive_from_arrays(state,"a",10000,[],oracle,**kw)
+            self.assertGreater(result["estimated_output_base_units"],0)
+            self.assertEqual(result["crossed_initialized_ticks"],[])
+            self.assertEqual(result["sparse_source_coverage"],interval)
+            with self.assertRaises(ValueError):
+                quote_adaptive_from_arrays(state,"a",10**12,[],oracle,**kw)
+            with self.assertRaisesRegex(ValueError,"exclusive"):
+                quote_adaptive_from_arrays(state,"a",10000,[{}],oracle,**kw)
+            with self.assertRaisesRegex(ValueError,"Oracle differs"):
+                quote_adaptive_from_arrays(state,"a",10000,[],{**oracle,"trade_enable_timestamp":102},**kw)

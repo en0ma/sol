@@ -117,10 +117,14 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix,
                     decoded_arrays=prefix
             if sparse is not None and not decoded_arrays:
                 if orca_fee_oracle is not None:
-                    raise ValueError("adaptive Orca sparse current array absent; native quote blocked")
-                from arb.orca_spot_quote import quote_inside_observed_absent_array
-                native=quote_inside_observed_absent_array(state,leg["input_mint"],amount_in,
-                    pool=pool,fixture=fixture)
+                    from arb.orca_adaptive_fee_source import quote_adaptive_from_arrays
+                    native=quote_adaptive_from_arrays(state,leg["input_mint"],amount_in,[],
+                        orca_fee_oracle,observed_unix=observed_unix,
+                        observed_absent_fixture=fixture,pool=pool)
+                else:
+                    from arb.orca_spot_quote import quote_inside_observed_absent_array
+                    native=quote_inside_observed_absent_array(state,leg["input_mint"],amount_in,
+                        pool=pool,fixture=fixture)
             elif decoded_arrays:
                 if orca_fee_oracle is not None:
                     from arb.orca_adaptive_fee_source import quote_adaptive_from_arrays

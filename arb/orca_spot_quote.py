@@ -126,10 +126,9 @@ def maximum_bounded_input(state, mint_in, *, lower_sqrt_x64, upper_sqrt_x64,
             "actionable":False,"executable_quote":False}
 
 
-def quote_inside_observed_absent_array(state,mint_in,amount_in,*,pool,fixture):
-    """Static-fee research only; original null PDA is not a synthetic tick array."""
+def observed_absent_current_interval(state,mint_in,*,pool,fixture):
+    """Revalidate the canonical current-array absence against original source."""
     from arb.whirlpool_ticks import verify_sparse_tick_fixture,start_tick,MAX_TICK,ARRAY_TICKS
-    from arb.orca_tick_math import sqrt_price_from_tick_index
     from arb.fixture_quote_execution_pipeline import extract_pool_states
     if any(fixture.get(k) is not False for k in ("actionable","broadcast","live_execution_approved")):
         raise ValueError("unsafe sparse Whirlpool quote fixture")
@@ -142,22 +141,28 @@ def quote_inside_observed_absent_array(state,mint_in,amount_in,*,pool,fixture):
     if row["decoded_pool_state"]!=state or fixture["route_mints"][i]!=mint_in:
         raise ValueError("sparse Whirlpool decoded pool/direction differs")
     proof=fixture["leg_evidence_by_index"][i]["auxiliary"].get("sparse_tick_source")
-    if (not isinstance(proof,dict) or proof["ordered_arrays"][0] not in proof["absent_arrays"]
-            or state["fee_tier_index_seed"]!=state["tick_spacing"]):
-        raise ValueError("static sparse current array absence required")
+    if (not isinstance(proof,dict) or proof["ordered_arrays"][0] not in proof["absent_arrays"]):
+        raise ValueError("sparse current array absence required")
     spacing=state["tick_spacing"];current=state["tick_current_index"]
     start=start_tick(current,spacing)
     low=max(-MAX_TICK,start)
     high=min(MAX_TICK,start+(ARRAY_TICKS-1)*spacing)
     if not low<high:
         raise ValueError("empty sparse array has no bounded price interval")
-    # Keep the final price strictly inside the current observed array. No
-    # assumption about another array, tick crossing or adaptive fee update.
-    lower=sqrt_price_from_tick_index(low);upper=sqrt_price_from_tick_index(high)
+    return {"source_slot":row["snapshot_slot"],
+        "present_contiguous_array_starts":[],"observed_absent_arrays":proof["absent_arrays"],
+        "current_array_start":start,"bounded_tick_interval":[low,high],
+        "absent_arrays_crossed":False,"protocol_exact_verified":False}
+
+
+def quote_inside_observed_absent_array(state,mint_in,amount_in,*,pool,fixture):
+    """Static-fee research only; original null PDA is not a synthetic tick array."""
+    from arb.orca_tick_math import sqrt_price_from_tick_index
+    if state["fee_tier_index_seed"]!=state["tick_spacing"]:
+        raise ValueError("static sparse current array absence required")
+    interval=observed_absent_current_interval(state,mint_in,pool=pool,fixture=fixture)
+    low,high=interval["bounded_tick_interval"]
     native=quote_bounded_single_tick(state,mint_in,amount_in,
-        lower_sqrt_x64=lower,upper_sqrt_x64=upper)
+        lower_sqrt_x64=sqrt_price_from_tick_index(low),upper_sqrt_x64=sqrt_price_from_tick_index(high))
     return {**native,"source":"OBSERVED_ABSENT_CURRENT_ARRAY_STATIC_BOUNDED",
-        "ticks_crossed":0,"sparse_source_coverage":{"source_slot":row["snapshot_slot"],
-            "present_contiguous_array_starts":[],"observed_absent_arrays":proof["absent_arrays"],
-            "current_array_start":start,"bounded_tick_interval":[low,high],
-            "absent_arrays_crossed":False,"protocol_exact_verified":False}}
+        "ticks_crossed":0,"sparse_source_coverage":interval}

@@ -65,7 +65,8 @@ def source_oracle(fixture,pool,state):
     return {"oracle_address":address,
             **decode_oracle(base64.b64decode(data[0],validate=True),pool)}
 
-def quote_adaptive_from_arrays(state,mint_in,amount_in,arrays,oracle,*,observed_unix):
+def quote_adaptive_from_arrays(state,mint_in,amount_in,arrays,oracle,*,observed_unix,
+                               observed_absent_fixture=None,pool=None):
     """Exact-input source-native Whirlpool adaptive fee/group tick traversal.
 
     Reimplements Orca FeeRateManager's reference decay, volatility accumulator,
@@ -93,7 +94,16 @@ def quote_adaptive_from_arrays(state,mint_in,amount_in,arrays,oracle,*,observed_
         raise ValueError("invalid source Whirlpool liquidity, price or base fee")
     if type(current_tick)is not int or type(spacing)is not int or spacing<=0:
         raise ValueError("invalid Whirlpool tick metadata")
-    if not isinstance(arrays,list) or not 1<=len(arrays)<=9:
+    empty_interval=None
+    if observed_absent_fixture is not None:
+        from arb.orca_spot_quote import observed_absent_current_interval
+        if arrays!=[] or not isinstance(pool,str) or state["fee_tier_index_seed"]==spacing:
+            raise ValueError("adaptive sparse quote requires exclusive current-array absence")
+        if source_oracle(observed_absent_fixture,pool,state)!=oracle:
+            raise ValueError("adaptive sparse source Oracle differs from original bytes")
+        empty_interval=observed_absent_current_interval(state,mint_in,
+            pool=pool,fixture=observed_absent_fixture)
+    elif not isinstance(arrays,list) or not 1<=len(arrays)<=9:
         raise ValueError("authenticated source Whirlpool arrays required")
     span=ARRAY_TICKS*spacing
     start=start_tick(current_tick,spacing)
@@ -106,7 +116,7 @@ def quote_adaptive_from_arrays(state,mint_in,amount_in,arrays,oracle,*,observed_
                 not isinstance(array.get("ticks"),list)):
             raise ValueError("invalid source tick array layout or duplicate start")
         by_start[array["start_tick"]]=array
-    if start not in by_start:
+    if empty_interval is None and start not in by_start:
         raise ValueError("Whirlpool current tick array missing")
     contiguous=[]
     while start in by_start:
@@ -125,8 +135,14 @@ def quote_adaptive_from_arrays(state,mint_in,amount_in,arrays,oracle,*,observed_
             if idx<=current_tick if down else idx>current_tick:
                 ticks[idx]=int(net)
     # A missing source array is a hard price boundary, not a zero-liquidity tick.
-    extreme=(contiguous[-1]["start_tick"] if down else
-             contiguous[-1]["start_tick"]+span-1)
+    if empty_interval is not None:
+        low,high=empty_interval["bounded_tick_interval"]
+        extreme=low if down else high
+        if not sqrt_price_from_tick_index(low)<=price<sqrt_price_from_tick_index(high):
+            raise ValueError("adaptive sparse current price outside observed interval")
+    else:
+        extreme=(contiguous[-1]["start_tick"] if down else
+                 contiguous[-1]["start_tick"]+span-1)
     if not -443636<=extreme<=443636:
         raise ValueError("Whirlpool authenticated source coverage out of bounds")
     end_price=sqrt_price_from_tick_index(extreme)
@@ -143,6 +159,8 @@ def quote_adaptive_from_arrays(state,mint_in,amount_in,arrays,oracle,*,observed_
     latest=max(v["last_reference_update_timestamp"],v["last_major_swap_timestamp"])
     if observed_unix<latest:
         raise ValueError("fork observation clock precedes Oracle reference")
+    if empty_interval is not None and observed_unix<oracle["trade_enable_timestamp"]:
+        raise ValueError("adaptive sparse trade not yet enabled")
     age=observed_unix-v["last_reference_update_timestamp"]
     elapsed=observed_unix-latest
     if age>3600 or elapsed>=const["decay_period"]:
@@ -245,9 +263,14 @@ def quote_adaptive_from_arrays(state,mint_in,amount_in,arrays,oracle,*,observed_
         raise ValueError("adaptive fee crossing iteration budget exceeded")
     if remaining or not 0<output<2**64:
         raise ValueError("Orca adaptive fee source model could not fully fill")
+    if empty_interval is not None and (crossed or not (
+            sqrt_price_from_tick_index(low)<price<sqrt_price_from_tick_index(high))):
+        raise ValueError("adaptive sparse quote reached observed array boundary")
     return {"status":"SOURCE_ORCA_ADAPTIVE_FEE_NATIVE_INTEGER_QUOTE",
             "amount_in":amount_in,"estimated_output_base_units":output,
             "signed_source_quote_exact_verified":False,
             "crossed_initialized_ticks":crossed,"adaptive_fee_steps":trace,
             "source_oracle_decoded":True,
+            **({"sparse_source_coverage":empty_interval,"ticks_crossed":0,
+                "post_sqrt_price_x64":str(price)} if empty_interval is not None else {}),
             "actionable":False,"broadcast":False,"live_execution_approved":False}
