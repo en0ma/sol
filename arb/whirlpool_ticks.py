@@ -336,3 +336,86 @@ def main():
 
 if __name__=="__main__":
     raise SystemExit(main())
+
+
+def contextual_sparse_tick_proof(pool,state,mint_in,aux,accounts,slot):
+    """Observe canonical missing PDAs; never fabricate tick account bytes."""
+    from arb.whirlpool_swap import select_tick_arrays
+    if type(slot) is not int or slot<0 or mint_in not in (state["token_mint_a"],state["token_mint_b"]):
+        raise ValueError("invalid sparse Whirlpool context")
+    direction=mint_in==state["token_mint_a"]
+    tick=state["tick_current_index"];spacing=state["tick_spacing"]
+    start=start_tick(tick,spacing)
+    if not direction and tick+spacing>=start+88*spacing:
+        raise ValueError("sparse Whirlpool shifted sequence unsupported")
+    expected=select_tick_arrays(pool,tick,spacing,direction)
+    supplied=aux.get("tick_arrays")
+    if not isinstance(supplied,list) or len(supplied)!=3 or set(supplied)!=set(expected):
+        raise ValueError("sparse Whirlpool canonical array sequence changed")
+    starts=[start+i*88*spacing*(-1 if direction else 1) for i in range(3)]
+    if any(s>MAX_TICK or s+88*spacing<=-MAX_TICK for s in starts):
+        raise ValueError("sparse Whirlpool boundary sequence unsupported")
+    present=[];absent=[]
+    for address,index in zip(expected,starts):
+        if address not in accounts:
+            absent.append(address)
+            continue
+        acct=accounts[address]
+        if not isinstance(acct,dict) or acct.get("owner")!=PROGRAM or acct.get("executable") is not False:
+            raise ValueError("sparse Whirlpool present array owner mismatch")
+        data=acct.get("data")
+        if not isinstance(data,list) or len(data)!=2 or data[1]!="base64":
+            raise ValueError("sparse Whirlpool array encoding mismatch")
+        raw=base64.b64decode(data[0],validate=True)
+        if raw[:8]==DISC:
+            decode_fixed_ticks(raw,pool,index,spacing)
+        elif raw[:8]==DYNAMIC_DISC:
+            decode_dynamic_ticks(raw,pool,index,spacing)
+        else:
+            raise ValueError("unsupported sparse Whirlpool array layout")
+        present.append(address)
+    return {"status":"SOURCE_OBSERVED_SPARSE_WHIRLPOOL_TICK_ARRAYS",
+        "pool":pool,"source_slot":slot,"input_mint":mint_in,"a_to_b":direction,
+        "ordered_arrays":expected,"present_arrays":present,"absent_arrays":absent,
+        "absence_is_rpc_observation":True,"protocol_exact_verified":False,
+        "actionable":False,"broadcast":False,"live_execution_approved":False}
+
+
+def verify_sparse_tick_fixture(fixture):
+    from arb.source_snapshot_manifest import verify
+    from arb.fixture_quote_execution_pipeline import extract_pool_states
+    if not any(p.get("auxiliary",{}).get("sparse_tick_source") is not None
+               for p in fixture.get("leg_evidence_by_index",[])):
+        return []
+    verify(fixture)
+    rows=extract_pool_states(fixture)
+    missing=set()
+    for i,(row,proof) in enumerate(zip(rows,fixture["leg_evidence_by_index"])):
+        aux=proof["auxiliary"];claim=aux.get("sparse_tick_source")
+        if claim is None:
+            continue
+        if row["venue"]!="orca" or row["address"]!=proof["pool"]:
+            raise ValueError("sparse Whirlpool route identity mismatch")
+        actual=contextual_sparse_tick_proof(row["address"],row["decoded_pool_state"],
+            fixture["route_mints"][i],aux,fixture["accounts"],fixture["state_accounts_observed_slot"])
+        if (actual!=claim or not actual["absent_arrays"]
+                or not set(actual["present_arrays"])<=set(fixture["state_account_addresses"])
+                or set(actual["absent_arrays"])&set(fixture["state_account_addresses"])):
+            raise ValueError("sparse Whirlpool proof differs from contextual inventory")
+        missing.update(actual["absent_arrays"])
+    return sorted(missing)
+
+
+def verify_sparse_tick_offline(rpc,fixture):
+    from arb.pumpswap_local_simulation import local_rpc_only
+    local_rpc_only(rpc)
+    missing=verify_sparse_tick_fixture(fixture)
+    if not missing:
+        return None
+    result=call(rpc,"getMultipleAccounts",[missing,{"encoding":"base64","commitment":"confirmed"}])
+    values=result.get("value");slot=result.get("context",{}).get("slot")
+    if type(slot) is not int or values!=[None]*len(missing):
+        raise ValueError("sparse Whirlpool offline absent PDA readback mismatch")
+    return {"status":"OFFLINE_SPARSE_WHIRLPOOL_PDAS_ABSENT",
+        "source_slot":fixture["state_accounts_observed_slot"],"offline_slot":slot,
+        "absent_arrays":missing,"actionable":False,"broadcast":False,"live_execution_approved":False}

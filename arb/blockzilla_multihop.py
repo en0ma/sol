@@ -680,6 +680,23 @@ def audit_signed_core(receipt,fixture,row,amount):
                 or not set(accounts[i:i+2])<=set(metas)
                 or (i<n-1 and a.data!=b.data) or (i==n-1 and a.data==b.data)):
             raise ValueError("compiled route or negative instruction mismatch")
+    from arb.whirlpool_ticks import verify_sparse_tick_fixture
+    absent=verify_sparse_tick_fixture(fixture)
+    if absent:
+        sparse=receipt.get("sparse_whirlpool_offline_readback")
+        if (not isinstance(sparse,dict)
+                or sparse.get("status")!="OFFLINE_SPARSE_WHIRLPOOL_PDAS_ABSENT"
+                or sparse.get("absent_arrays")!=absent
+                or sparse.get("source_slot")!=row["source_slot"]
+                or type(sparse.get("offline_slot")) is not int
+                or any(sparse.get(k) is not False for k in SAFE)
+                or not set(absent)<={str(k) for k in keys}):
+            raise ValueError("sparse Whirlpool signed source/readback mismatch")
+        for i,proof in enumerate(fixture["leg_evidence_by_index"]):
+            claim=proof["auxiliary"].get("sparse_tick_source")
+            if claim is not None and not set(claim["ordered_arrays"])<={
+                    str(keys[k]) for k in positive.message.instructions[i].accounts}:
+                raise ValueError("sparse Whirlpool signed leg array mismatch")
     pr,nr=evidence["positive_response"],evidence["negative_response"]
     expected=[event for p in programs for event in ([p,"invoke"],[p,"success"])]
     if pr.get("err") is not None or top_level_events(pr.get("logs"),set(programs))!=expected:

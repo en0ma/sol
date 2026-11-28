@@ -100,6 +100,23 @@ class DirectionalOrcaCaptureTests(unittest.TestCase):
             self.assertFalse(output.exists())
 
 
+class SparseTickSourceTests(unittest.TestCase):
+    def test_observed_absence_not_synthetic_account(self):
+        from arb.whirlpool_ticks import contextual_sparse_tick_proof,verify_sparse_tick_offline
+        state={"token_mint_a":"A","token_mint_b":"B","tick_current_index":100,"tick_spacing":64}
+        aux={"tick_arrays":["x","y","z"]}
+        with patch("arb.whirlpool_swap.select_tick_arrays",return_value=["x","y","z"]):
+            proof=contextual_sparse_tick_proof("pool",state,"A",aux,{},123)
+            self.assertEqual(proof["absent_arrays"],["x","y","z"])
+            self.assertFalse(proof["protocol_exact_verified"])
+            with self.assertRaisesRegex(ValueError,"owner mismatch"):
+                contextual_sparse_tick_proof("pool",state,"A",aux,{"x":{"owner":"wrong"}},123)
+        with patch("arb.whirlpool_ticks.verify_sparse_tick_fixture",return_value=["x"]),patch(
+                "arb.whirlpool_ticks.call",return_value={"context":{"slot":1},"value":[{}]}):
+            with self.assertRaisesRegex(ValueError,"readback mismatch"):
+                verify_sparse_tick_offline("http://127.0.0.1:8899",{})
+
+
 class ContextClockTests(unittest.TestCase):
     def test_context_clock_is_exact_or_explicitly_unavailable(self):
         from arb.next_ten_fork_pool_probe import contextual_route_clock,CLOCK_SYSVAR,SAFETY

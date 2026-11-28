@@ -14,9 +14,9 @@ from arb.source_snapshot_manifest import digest,verify
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
 
 def capture(rpc,graph,route_index,output,*,venue_cache=None,allow_hint_graph=False,
-            capture_context_clock=False):
+            capture_context_clock=False,allow_sparse_orca=False):
     local_rpc_only(rpc)
-    if type(capture_context_clock) is not bool:
+    if type(capture_context_clock) is not bool or type(allow_sparse_orca) is not bool:
         raise ValueError("explicit contextual Clock capture option required")
     if (not isinstance(graph,dict) or
             (graph.get("status")!="SOURCE_AUTHENTICATED_ROUTE_DISCOVERY_ONLY" and not
@@ -37,6 +37,7 @@ def capture(rpc,graph,route_index,output,*,venue_cache=None,allow_hint_graph=Fal
     mints=[current]
     addresses=[]
     evidence=[]
+    sparse_candidates=set();non_tick_required=set()
     for leg in legs:
         venue,pool=leg.get("venue"),leg.get("pool")
         if (venue not in PROGRAMS or not isinstance(pool,str) or not pool or
@@ -57,13 +58,20 @@ def capture(rpc,graph,route_index,output,*,venue_cache=None,allow_hint_graph=Fal
                 set(proof.get("mints",[]))!={current,leg["output"]}):
             raise ValueError("source pool reauthentication failed")
         addresses.extend(extra)
+        if allow_sparse_orca and venue=="orca":
+            ticks=set(aux["tick_arrays"])
+            sparse_candidates.update(ticks)
+            non_tick_required.update(set(extra)-ticks)
+        else:
+            non_tick_required.update(extra)
         evidence.append({"venue":venue,"pool":pool,"source_slot":proof["slot"],"auxiliary":aux})
         current=leg["output"]
         mints.append(current)
     if current!=mints[0] or len({leg["pool"] for leg in legs})!=len(legs):
         raise ValueError("four-to-six route must be closed with distinct pools")
     addresses=list(dict.fromkeys(addresses))
-    required_addresses=set(addresses)
+    sparse_candidates-=non_tick_required|set(mints)|{l['pool'] for l in legs}
+    required_addresses=set(addresses)-sparse_candidates
     from arb.meteora_dlmm_bin_preflight import bitmap_extension_pda,contextual_bitmap_extension
     optional_bitmap_addresses={bitmap_extension_pda(l["pool"])
         for l in legs if l["venue"]=="meteora_dlmm"}
@@ -125,6 +133,14 @@ def capture(rpc,graph,route_index,output,*,venue_cache=None,allow_hint_graph=Fal
         state=DECODERS[venue](base64.b64decode(raw[0],validate=True))
         if set(state[k] for k in MINT_KEYS[venue])!={mints[i],mints[i+1]}:
             raise ValueError("source pool changed mint identity")
+        if venue=="orca" and allow_sparse_orca:
+            aux=evidence[i]["auxiliary"]
+            if any(a not in accounts for a in aux["tick_arrays"]):
+                from arb.whirlpool_ticks import contextual_sparse_tick_proof
+                sparse=contextual_sparse_tick_proof(leg["pool"],state,mints[i],aux,accounts,slot)
+                if not set(sparse["absent_arrays"])<=sparse_candidates:
+                    raise ValueError("missing required Whirlpool source account")
+                evidence[i]["auxiliary"]={**aux,"sparse_tick_source":sparse}
         if venue=="meteora_dlmm":
             evidence[i]["auxiliary"]={**evidence[i]["auxiliary"],
                 "bitmap_extension_source":contextual_bitmap_extension(leg["pool"],accounts)}
@@ -157,6 +173,9 @@ def capture(rpc,graph,route_index,output,*,venue_cache=None,allow_hint_graph=Fal
     if clock_proof is not None:
         result["contextual_source_clock"]=clock_proof
     verify(result)
+    if allow_sparse_orca:
+        from arb.whirlpool_ticks import verify_sparse_tick_fixture
+        verify_sparse_tick_fixture(result)
     Path(output).write_text(json.dumps(result,sort_keys=True,indent=2)+"\n")
     return {"status":"AUTHENTICATED_FOUR_TO_SIX_HOP_SOURCE_FIXTURE",
             "hops":len(legs),"source_slot":slot,"state_account_count":len(addresses),**SAFE}

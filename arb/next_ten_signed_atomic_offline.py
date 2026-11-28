@@ -617,6 +617,8 @@ def run_four_to_six_venue(rpc,fixture,*,amount_in=100_000,program_cache=None,
     hydrate(rpc,fixture,program_cache=program_cache)
     from arb.hydrated_fork_state_audit import verify_hydrated_state
     readback=verify_hydrated_state(rpc,fixture)
+    from arb.whirlpool_ticks import verify_sparse_tick_offline
+    sparse_readback=verify_sparse_tick_offline(rpc,fixture)
     states={}
     evidence={}
     route=[]
@@ -773,6 +775,7 @@ def run_four_to_six_venue(rpc,fixture,*,amount_in=100_000,program_cache=None,
         state_account_manifest_sha256=fixture["state_account_manifest_sha256"],
         hydrated_fork_state_readback=readback,
         execution_environment="ISOLATED_SURFPOOL_OFFLINE",
+        sparse_whirlpool_offline_readback=sparse_readback,
         independently_validated_quote_samples=0,**SAFETY)
     if receipt.get("positive_post_balances_base_units") is not None:
         from arb.m5_signed_start_mint_economics import signed_net_economics

@@ -308,7 +308,7 @@ def capture_selection(rows,deferred,*,target):
     return rows+restored,deferred[needed:]
 
 
-def source_capture(rpc, graph, directory, *, shard_index=0, shard_count=1, target=None):
+def source_capture(rpc, graph, directory, *, shard_index=0, shard_count=1, target=None,allow_sparse_orca=False):
     from arb.m5_four_to_six_source_capture import capture
     root=Path(directory)
     root.mkdir(parents=True,exist_ok=True)
@@ -361,7 +361,8 @@ def source_capture(rpc, graph, directory, *, shard_index=0, shard_count=1, targe
                "simulation_status":"NOT_ATTEMPTED",**SAFE}
         fixture=root/("source-%02d.json"%j)
         try:
-            capture(rpc,graph,index,fixture,venue_cache=venue_cache)
+            options={'allow_sparse_orca':True} if allow_sparse_orca else {}
+            capture(rpc,graph,index,fixture,venue_cache=venue_cache,**options)
             entry["source_status"]="CAPTURED"
             entry["fixture"]=fixture.name
             import hashlib
@@ -778,7 +779,8 @@ def main():
     if args.phase=="source":
         if not args.graph: p.error("--graph required for source")
         result=source_capture(args.rpc,json.loads(Path(args.graph).read_text()),args.directory,
-                              shard_index=args.shard_index,shard_count=args.shard_count,target=args.source_target)
+                              shard_index=args.shard_index,shard_count=args.shard_count,target=args.source_target,
+                              allow_sparse_orca=True)
         print(json.dumps({"three_hop_capture_attempts":len(result),
                           "source_captured":sum(r["source_status"]=="CAPTURED" for r in result)}))
     else:
