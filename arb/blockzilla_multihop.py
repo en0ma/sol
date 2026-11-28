@@ -666,6 +666,8 @@ def audit_signed_core(receipt,fixture,row,amount):
         receipt["signed_transaction_sha256"],receipt["signed_transaction_signature"],evidence["isolated_lookup_account"])
     negative,_,bad_keys=decode_packet(receipt["negative_signed_transaction_wire_base64"],
         receipt["negative_signed_transaction_sha256"],receipt["negative_signed_transaction_signature"],evidence["isolated_lookup_account"])
+    from arb.m5_signed_message_fee_estimate import verify_recorded_signed_fee_estimate
+    fee_audit=verify_recorded_signed_fee_estimate(positive,receipt["signed_message_fee_estimate"])
     accounts=evidence["ephemeral_token_accounts"];owner=evidence["ephemeral_authority"]
     static_count=len(positive.message.account_keys)
     counts=(receipt.get("resolved_account_key_count"),receipt.get("static_account_key_count"),
@@ -734,6 +736,7 @@ def audit_signed_core(receipt,fixture,row,amount):
         raise ValueError("recorded rollback reconciliation failed")
     return {"status":"N_LEG_PACKET_AND_RECORDED_RESPONSE_RECHECKED",
             "receipt_metadata":metadata,"cpi":cpi,"balances":balances,
+            "signed_message_fee_estimate_audit":fee_audit,
             "resolved_account_key_count":len(keys),"positive_post_balances":post,
             "planned_inputs":amounts,"positive_signature":str(positive.signatures[0]),
             "negative_signature":str(negative.signatures[0]),**SAFE}

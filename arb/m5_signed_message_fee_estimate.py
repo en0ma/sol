@@ -44,3 +44,33 @@ def estimate_signed_message_fee(rpc,transaction):
             "swap_output_debited_for_network_fee":False,
             "source":"getFeeForMessage",
             **SAFE}
+
+
+def verify_recorded_signed_fee_estimate(transaction,recorded):
+    """Bind an RPC fee estimate to the cryptographically checked message.
+
+    The RPC value is recorded evidence, not an independently attested paid fee.
+    """
+    from solders.message import to_bytes_versioned
+    if not isinstance(recorded,dict) or any(recorded.get(k) is not False for k in SAFE):
+        raise ValueError("unsafe recorded signed fee estimate")
+    expected=hashlib.sha256(to_bytes_versioned(transaction.message)).hexdigest()
+    if recorded.get("signed_message_sha256")!=expected:
+        raise ValueError("recorded fee estimate message digest mismatch")
+    status=recorded.get("status")
+    if status=="FEE_ESTIMATE_UNAVAILABLE":
+        if recorded.get("estimated_fee_lamports") is not None:
+            raise ValueError("unavailable fee estimate contains amount")
+        value=None
+    elif status=="SIGNED_MESSAGE_FEE_ESTIMATE_ONLY":
+        value=recorded.get("estimated_fee_lamports")
+        if (type(value) is not int or not 0<=value<2**64
+                or recorded.get("paid_fee_verified") is not False
+                or recorded.get("swap_output_debited_for_network_fee") is not False
+                or recorded.get("fee_payer_asset")!="SOL" or recorded.get("source")!="getFeeForMessage"):
+            raise ValueError("recorded signed fee estimate fields inconsistent")
+    else:
+        raise ValueError("unsupported recorded signed fee estimate status")
+    return {"status":"SIGNED_MESSAGE_FEE_ESTIMATE_DIGEST_RECHECKED",
+        "signed_message_sha256":expected,"estimated_fee_lamports":value,
+        "rpc_fee_value_independently_attested":False,"paid_fee_verified":False,**SAFE}

@@ -84,6 +84,41 @@ def signed_net_economics(receipt, *, start_mint, source_slot,
             reason=("source-native same-slot WSOL conversion MODEL; "
                     "fee and exchange rate are not paid or execution verified")
             break
+        if conversion is None and mints[-1]==start_mint:
+            # Only use the forward suffix of the same captured directed route.
+            # Reversing a leg would lack its directional account evidence.
+            for first in range(len(rows)-2,-1,-1):
+                if mints[first]!=WSOL or len(rows)-first>5:
+                    continue
+                if any(r["venue"] not in supported for r in rows[first:]):
+                    continue
+                current=fee["estimated_fee_lamports"]
+                trace=[]
+                for i in range(first,len(rows)):
+                    row=rows[i]
+                    q=quote_leg(fixture,leg_index=i,amount_in=current,
+                                observed_unix=observed_unix)
+                    if (not isinstance(q,dict) or any(q.get(k) is not False for k in SAFE)
+                            or q.get("source_slot")!=source_slot or q.get("venue")!=row["venue"]
+                            or q.get("pool")!=row["address"]):
+                        raise ValueError("non-authenticated multileg fee conversion quote")
+                    output=q.get("predicted_output_base_units")
+                    if q.get("quote_status")!="SOURCE_BOUND_INDICATIVE" or type(output) is not int or not 0<output<2**64:
+                        break
+                    trace.append({"leg_index":i,"venue":row["venue"],"pool":row["address"],
+                        "input_mint":mints[i],"output_mint":mints[i+1],
+                        "input_base_units":current,"output_base_units":output,"source_slot":source_slot})
+                    current=output
+                if len(trace)!=len(rows)-first:
+                    continue
+                conversion={"status":"SOURCE_NATIVE_MULTILEG_START_MINT_FEE_MODEL_ONLY",
+                    "source_slot":source_slot,"source_fee_lamports":fee["estimated_fee_lamports"],
+                    "modeled_start_mint_fee_units":current,"conversion_legs":trace,
+                    "protocol_exact_verified":False,"conversion_is_guaranteed_upper_bound":False,
+                    "paid_fee_verified":False,**SAFE}
+                cost=current
+                reason="same-source forward WSOL conversion chain MODEL; fee and exchange rate not paid or execution verified"
+                break
     return {"status":"SIGNED_LOCAL_SIMULATION_ESTIMATED_NET_NOT_PROFIT_VERIFIED"
                       if cost is not None else "SIGNED_LOCAL_SIMULATION_START_MINT_COST_UNCONVERTED",
             "start_mint":start_mint,"source_slot":source_slot,

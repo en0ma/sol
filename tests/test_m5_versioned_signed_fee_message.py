@@ -48,3 +48,24 @@ class SignedVersionedFeeEstimateTests(unittest.TestCase):
         self.assertNotIn("estimated_fee_lamports",result)
         self.assertFalse(result["broadcast"])
 if __name__=="__main__":unittest.main()
+
+
+class RecordedFeeBindingTests(unittest.TestCase):
+    def test_digest_and_unknown_fee_binding(self):
+        from unittest.mock import patch
+        import hashlib
+        from arb.m5_signed_message_fee_estimate import verify_recorded_signed_fee_estimate,SAFE
+        from types import SimpleNamespace
+        tx=SimpleNamespace(message=object())
+        raw=b"versioned-message"
+        valid={"status":"SIGNED_MESSAGE_FEE_ESTIMATE_ONLY","signed_message_sha256":hashlib.sha256(raw).hexdigest(),
+            "estimated_fee_lamports":5000,"paid_fee_verified":False,"fee_payer_asset":"SOL",
+            "swap_output_debited_for_network_fee":False,"source":"getFeeForMessage",**SAFE}
+        with patch("solders.message.to_bytes_versioned",return_value=raw):
+            result=verify_recorded_signed_fee_estimate(tx,valid)
+            self.assertEqual(result["estimated_fee_lamports"],5000)
+            self.assertFalse(result["rpc_fee_value_independently_attested"])
+            with self.assertRaisesRegex(ValueError,"digest mismatch"):
+                verify_recorded_signed_fee_estimate(tx,{**valid,"signed_message_sha256":"wrong"})
+            with self.assertRaisesRegex(ValueError,"unavailable fee estimate"):
+                verify_recorded_signed_fee_estimate(tx,{**valid,"status":"FEE_ESTIMATE_UNAVAILABLE"})

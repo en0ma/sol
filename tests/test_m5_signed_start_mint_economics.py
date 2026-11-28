@@ -94,3 +94,26 @@ class PrimaryEconomicEvidenceTests(unittest.TestCase):
         self.assertFalse(report["net_profit_verified"])
         with self.assertRaisesRegex(ValueError,"net mismatch"):
             rank_primary_economic_evidence([{**rows[0],"estimated_net":1},*rows[1:]],expected_ids=["a","b","c","d"])
+
+
+class MultilegFeeConversionTests(unittest.TestCase):
+    def test_forward_same_source_suffix_and_no_reverse_guess(self):
+        from unittest.mock import patch
+        fixture={"route_mints":["RAY",WSOL,"USDC","RAY"],
+            "state_accounts_observed_slot":42,**SAFE}
+        rows=[{"venue":"orca","address":"p0"},{"venue":"raydium_cpmm","address":"p1"},
+              {"venue":"orca","address":"p2"}]
+        seen=[]
+        def quote(fixture,*,leg_index,amount_in,observed_unix):
+            seen.append((leg_index,amount_in))
+            row=rows[leg_index]
+            return {"quote_status":"SOURCE_BOUND_INDICATIVE","predicted_output_base_units":amount_in//10,
+                "venue":row["venue"],"pool":row["address"],"source_slot":42,**SAFE}
+        with patch("arb.fixture_quote_execution_pipeline.extract_pool_states",return_value=rows),patch(
+                "arb.fixture_all_venue_signed_quotes.quote_leg",side_effect=quote):
+            result=signed_net_economics(SignedStartMintEconomicsTests().receipt(),start_mint="RAY",
+                source_slot=42,fixture=fixture,observed_unix=100)
+        self.assertEqual(seen,[(1,5000),(2,500)])
+        self.assertEqual(result["estimated_cost_start_mint_base_units"],50)
+        self.assertEqual(len(result["source_native_fee_conversion"]["conversion_legs"]),2)
+        self.assertFalse(result["net_profit_verified"])
