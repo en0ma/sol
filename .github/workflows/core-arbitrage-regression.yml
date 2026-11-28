@@ -36,6 +36,8 @@ jobs:
             test_m5_graph_prepared_signed_bridge.py \
             test_pumpswap_signed_instruction_binding.py \
             test_raydium_clmm_native_single_tick.py \
+            test_raydium_clmm_ticks.py \
+            test_raydium_clmm_bitmap_coverage.py \
             test_pool_registry.py \
             test_m5_start_mint_expansion.py \
             test_raydium_cpmm_pda_bridge.py \

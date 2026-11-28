@@ -149,8 +149,17 @@ def verify_extended_direction(pool,mint_in,aux,fixture):
     claim=aux.get("extended_tick_source")
     if claim is None:
         return None
+    from arb.source_snapshot_manifest import verify
+    verify(fixture)
     accounts=fixture["accounts"];inventory=set(fixture["state_account_addresses"])
-    raw=base64.b64decode(accounts[pool]["data"][0],validate=True);state=decode(raw)
+    acct=accounts.get(pool)
+    if (pool not in inventory or not isinstance(acct,dict) or acct.get("owner")!=PROGRAM
+            or acct.get("executable") is not False):
+        raise ValueError("CLMM extension source pool absent or owner mismatch")
+    data=acct.get("data")
+    if not isinstance(data,list) or len(data)!=2 or data[1]!="base64":
+        raise ValueError("CLMM extension source pool encoding mismatch")
+    raw=base64.b64decode(data[0],validate=True);state=decode(raw)
     if mint_in not in (state["token_mint_0"],state["token_mint_1"]):
         raise ValueError("CLMM extended route mint mismatch")
     direction=mint_in==state["token_mint_0"]

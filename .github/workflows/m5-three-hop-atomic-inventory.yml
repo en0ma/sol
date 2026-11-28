@@ -231,7 +231,7 @@ jobs:
                             "dlmm_swap_activation_rejections":graph["source_swap_eligibility_rejection_count"],
                             "selection_policy":graph["three_hop_sample_policy"]}))
           PY
-          python3 -m arb.m5_three_hop_atomic_inventory --phase source --graph "$RUNNER_TEMP/triangles/graph.json" --directory "$RUNNER_TEMP/triangles" --source-target 140
+          python3 -m arb.m5_three_hop_atomic_inventory --phase source --graph "$RUNNER_TEMP/triangles/graph.json" --directory "$RUNNER_TEMP/triangles" --source-target 140 --allow-sparse-orca
           python3 - <<'PY'
           import json,os
           from pathlib import Path
@@ -258,6 +258,11 @@ jobs:
               summary.write(f"Source graph starts {selected}, source-captured starts {captured}; "
                             f"uncaptured starts {len(missing)} (see job log).\n")
           PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m5-three-hop-original-inventory
+          path: ${{ runner.temp }}/triangles/three-hop-inventory.json
+          if-no-files-found: error
       - name: Shut down read-only source fork
         if: always()
         run: |
@@ -333,6 +338,7 @@ jobs:
           summary={"shard":r["shard_index"],"attempted":len(r["routes"]),
                    "verified":len(verified),"independently_audited":audit["audited"],
                    "distinct_packet_signatures":audit["distinct_packet_signatures"],
+                   "audited_source_bindings":[{k:x[k] for k in ("id","fixture_sha256","start_mint","pools")} for x in audit["attempts"]],
                    "route_ids":[row["id"] for row in r["routes"]],
                    "verified_route_ids":[row["id"] for row in verified],
                    "selected_start_mints":sorted({row["mints"][0] for row in r["routes"]}),
@@ -448,6 +454,10 @@ jobs:
           pattern: m5-three-hop-metrics-*
           path: ${{ runner.temp }}/shard-metrics
           merge-multiple: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: m5-three-hop-original-inventory
+          path: ${{ runner.temp }}/original-inventory
       - name: Enforce at least 100 uniquely verified signed simulations
         run: |
           python3 - <<'PY'
@@ -462,6 +472,18 @@ jobs:
           assert all(r["attempted"]==14 and r["verified"]==len(r["verified_route_ids"]) for r in reports)
           assert all(r["independently_audited"]==r["verified"] and
                      len(r["distinct_packet_signatures"])==2*r["verified"] for r in reports)
+          original=json.loads((Path(os.environ["RUNNER_TEMP"])/"original-inventory/three-hop-inventory.json").read_text())
+          original_rows={row["id"]:row for row in original["routes"]}
+          assert len(original["routes"])==len(original_rows)==140, "invalid original source inventory"
+          assert set(attempts)==set(original_rows), "signed attempts differ from source inventory"
+          for report in reports:
+              expected=[row for j,row in enumerate(original["routes"]) if j%10==report["shard"]]
+              assert report["route_ids"]==[row["id"] for row in expected], "source shard assignment differs"
+              for receipt in report["audited_source_bindings"]:
+                  source=original_rows[receipt["id"]]
+                  assert receipt["fixture_sha256"]==source["source_fixture_sha256"], "signed fixture differs from original capture"
+                  assert receipt["start_mint"]==source["mints"][0] and receipt["pools"]==source["pools"], "signed route differs from original capture"
+              assert [r["id"] for r in report["audited_source_bindings"]]==report["verified_route_ids"], "source binding coverage mismatch"
           signatures=[s for r in reports for s in r["distinct_packet_signatures"]]
           assert len(signatures)==2*len(verified)==len(set(signatures)), "duplicate primary packet signature across shards"
           assert len(attempts)==140 and len(set(attempts))==140, "duplicate or missing attempted routes"

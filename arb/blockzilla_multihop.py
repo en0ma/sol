@@ -680,6 +680,14 @@ def audit_signed_core(receipt,fixture,row,amount):
                 or not set(accounts[i:i+2])<=set(metas)
                 or (i<n-1 and a.data!=b.data) or (i==n-1 and a.data==b.data)):
             raise ValueError("compiled route or negative instruction mismatch")
+    from arb.raydium_clmm_ticks import verify_extended_direction
+    for i,proof in enumerate(fixture["leg_evidence_by_index"]):
+        aux=proof.get("auxiliary",{})
+        if venues[i]=="raydium_clmm" and aux.get("extended_tick_source") is not None:
+            extension=verify_extended_direction(fixture["route_pool_addresses"][i],mints[i],aux,fixture)
+            metas={str(keys[k]) for k in positive.message.instructions[i].accounts}
+            if not {extension,*aux["extended_tick_source"]["ordered_arrays"]}<=metas:
+                raise ValueError("CLMM signed extension or directional tick array mismatch")
     from arb.whirlpool_ticks import verify_sparse_tick_fixture
     absent=verify_sparse_tick_fixture(fixture)
     if absent:

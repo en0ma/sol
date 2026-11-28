@@ -165,7 +165,7 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix,
             for proof in fixture.get("leg_evidence_by_index",[]):
                 if proof.get("pool")==pool and proof.get("venue")==v:
                     from arb.raydium_clmm_ticks import verify_extended_direction,extension_bytes
-                    extension=verify_extended_direction(pool,leg["input_mint"],proof["auxiliary"],fixture)
+                    extension=verify_extended_direction(pool,leg["input_mint"],proof.get("auxiliary",{}),fixture)
                     if extension is not None:
                         extension_raw=extension_bytes(pool,extension,fixture["accounts"][extension])
             native=quote_across_initialized_ticks(

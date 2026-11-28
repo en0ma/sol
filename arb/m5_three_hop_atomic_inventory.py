@@ -773,6 +773,7 @@ def main():
     p.add_argument("--directory",required=True)
     p.add_argument("--amount",type=int,default=100000)
     p.add_argument("--source-target",type=int,default=None)
+    p.add_argument("--allow-sparse-orca",action="store_true")
     p.add_argument("--shard-index",type=int,default=0)
     p.add_argument("--shard-count",type=int,default=1)
     args=p.parse_args()
@@ -780,7 +781,7 @@ def main():
         if not args.graph: p.error("--graph required for source")
         result=source_capture(args.rpc,json.loads(Path(args.graph).read_text()),args.directory,
                               shard_index=args.shard_index,shard_count=args.shard_count,target=args.source_target,
-                              allow_sparse_orca=True)
+                              allow_sparse_orca=args.allow_sparse_orca)
         print(json.dumps({"three_hop_capture_attempts":len(result),
                           "source_captured":sum(r["source_status"]=="CAPTURED" for r in result)}))
     else:
