@@ -137,9 +137,10 @@ def compare_models(fixture, row, receipt):
     before, after = evidence.get("positive_clock_before"), evidence.get("positive_clock_after")
     # Compare source and observed execution timing without claiming the
     # separate sysvar reads prove the exact instruction clock.
-    stable_clock = (isinstance(before, dict) and isinstance(after, dict)
-        and type(before.get("unix_timestamp")) is int
-        and before.get("unix_timestamp") == after.get("unix_timestamp"))
+    from arb.meteora_dlmm_signed_event_audit import stable_execution_timestamp
+    execution_unix=stable_execution_timestamp({"positive_execution_clock_before":before,
+        "positive_execution_clock_after":after})
+    stable_clock=execution_unix is not None
     legs = []
     for index in range(2):
         result = quote_leg(fixture, leg_index=index, amount_in=inputs[index],
@@ -168,6 +169,16 @@ def compare_models(fixture, row, receipt):
                           exact_sample_amount_match=prediction == outputs[index])
         else:
             record["exact_sample_amount_match"] = None
+        if record["venue"]=="meteora_dlmm" and stable_clock:
+            eq=quote_leg(fixture,leg_index=index,amount_in=inputs[index],observed_unix=execution_unix)
+            ee=(eq.get("native_fee_envelope") or {}).get("source_derived_dynamic_fee_quote") or {}
+            ep=ee.get("amount_out")
+            record["execution_clock_comparison"]={"observed_unix":execution_unix,
+                "modeled_output":ep,"delta_base_units":ep-outputs[index] if type(ep) is int else None,
+                "exact_sample_amount_match":ep==outputs[index] if type(ep) is int else None,
+                "fee_input_base_units":ee.get("fee_input_base_units"),
+                "fee_output_base_units":ee.get("fee_output_base_units"),
+                "protocol_exact_verified":False,**SAFE}
         legs.append(record)
     return {"status": "SIGNED_LEG_AMOUNT_MODEL_COMPARISON",
             "legs": legs, "source_clock_not_execution_clock": True,
@@ -192,7 +203,9 @@ def audit_directory(directory, source_directory):
     output = {"status": "ISOLATED_PAIR_ARTIFACT_RECHECK", "runner_accepted": 0,
               "packet_and_recorded_simulation_audited": 0, "model_samples": 0,
               "matching_model_samples": 0, "recomputed_model_routes": 0,
-              "recomputed_route_chains": 0, "matching_modeled_route_outputs": 0, "routes": [],
+              "recomputed_route_chains": 0, "matching_modeled_route_outputs": 0,
+              "execution_clock_dlmm_samples":0,"matching_execution_clock_dlmm_samples":0,
+              "execution_clock_route_models":0,"matching_execution_clock_route_outputs":0,"routes": [],
               "excluded_from_primary_inventory": True, "net_profit_verified": False, **SAFE}
     for row in signed["routes"]:
         if row["status"] != "EXISTING_PAIR_RUNNER_SIGNED_ROLLBACK_ACCEPTED":
@@ -238,6 +251,29 @@ def audit_directory(directory, source_directory):
                 matched = chain["output_base_units"] == receipt["positive_post_balances_base_units"][2]
                 result["modeled_route_output_matches_signed"] = matched
                 output["matching_modeled_route_outputs"] += int(matched)
+            from arb.meteora_dlmm_signed_event_audit import audit_swap_event
+            evidence=receipt["legacy_pair_audit_evidence"]
+            tx,_=packet(evidence["positive_packet_base64"])
+            result["dlmm_recorded_events"]=[]
+            for leg in recomputed["legs"]:
+                if leg["venue"]=="meteora_dlmm":
+                    i=leg["leg_index"]
+                    event=audit_swap_event(evidence["positive_response"],tx.message.account_keys,
+                        tx.message.instructions[i],leg["pool"],evidence["ephemeral_authority"],i,
+                        leg["actual_signed_input"],leg["actual_signed_output"])
+                    result["dlmm_recorded_events"].append({"leg_index":i,**event})
+                    ec=leg.get("execution_clock_comparison") or {}
+                    if type(ec.get("modeled_output")) is int:
+                        output["execution_clock_dlmm_samples"]+=1
+                        output["matching_execution_clock_dlmm_samples"]+=int(ec["exact_sample_amount_match"])
+            if recomputed["positive_clock_timestamp_stable_across_reads"]:
+                exec_chain=research_chain(fixture,amount_in=source["amount_in_base_units"],
+                    observed_unix=recomputed["positive_clock_before"]["unix_timestamp"],allow_modeled_dlmm=True)
+                result["execution_clock_route_chain"]=exec_chain
+                if type(exec_chain.get("output_base_units")) is int:
+                    output["execution_clock_route_models"]+=1
+                    output["matching_execution_clock_route_outputs"]+=int(
+                        exec_chain["output_base_units"]==receipt["positive_post_balances_base_units"][2])
             for leg in comparison["legs"]:
                 if type(leg.get("modeled_output")) is int:
                     output["model_samples"] += 1

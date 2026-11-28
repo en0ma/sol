@@ -329,3 +329,5 @@ Separate source-clock and stable isolated execution-clock DLMM pricing, retain b
 Bounded pre-sign native sizing must retain original controls, rank only complete source models and independently recompute the plan against original fixture/SDK dependency resolution. DLMM may traverse up to three contiguous captured arrays; do not skip matching unmodeled limit-order liquidity or unknown gaps. No promotion of modeled profit.
 
 Independent size-plan audit rebuilds the official SDK from the sizing runner's retained dependency lock, not its executable. Rejected attempts retain separate digest-checked receipt evidence when available; missing execution cannot be promoted.
+
+Capture diverse alternate 4/5-hop pool sets within separate bounded budgets. Calculate all source size plans and comparable denomination/input rankings before any signed trial; preserve source-slot ranges and independently recompute. Pair source and execution-clock quote parity remain separate evidence.

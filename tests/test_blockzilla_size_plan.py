@@ -39,4 +39,23 @@ class SizeAndTraversalTests(unittest.TestCase):
             quote_bins(amount_in=11,swap_x_for_y=False,bins=rows,total_fee_rate=0,limit_order_support=True)
         self.assertEqual(quote_bins(amount_in=11,swap_x_for_y=False,bins=rows,
             total_fee_rate=0,limit_order_support=False)["amount_out"],11)
+    def test_comparable_ranking_separates_mints_and_amounts(self):
+        from arb.blockzilla_size_plan import rank_comparable_grid,WSOL,SAFE
+        def plan(mint,slot,gross):
+            return {"status":"SOURCE_NATIVE_BOUNDED_SIZE_PLAN","start_mint":mint,
+                "source_slot":slot,"signed_amounts":list(CONTROL_AMOUNTS),
+                "samples":[{"amount":a,"status":"COMPLETE_RESEARCH_MODEL",
+                    "output":a+gross,"gross_delta":gross,
+                    "estimated_message_fee":5000 if mint==WSOL else None,
+                    "estimated_net":gross-5000 if mint==WSOL else None} for a in GRID],**SAFE}
+        plans={"a":plan(WSOL,12,-10),"b":plan(WSOL,17,-2),"c":plan("OTHER",20,99)}
+        ranked=rank_comparable_grid(plans)
+        self.assertEqual(len(ranked),16)
+        sol=next(g for g in ranked if g["start_mint"]==WSOL)
+        self.assertEqual([r["id"] for r in sol["routes"]],["b","a"])
+        self.assertEqual(sol["source_slot_range"],[12,17])
+        self.assertFalse(sol["simultaneous_source_snapshot"])
+        plans["a"]["samples"][0]["estimated_net"]=999
+        with self.assertRaisesRegex(ValueError,"economic identity"):
+            rank_comparable_grid(plans)
 if __name__=="__main__":unittest.main()

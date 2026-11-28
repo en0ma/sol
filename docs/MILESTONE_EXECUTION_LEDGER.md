@@ -382,3 +382,5 @@ Blockzilla #18 46116220241 12/12 independent,48/50 deterministic native samples,
 Blockzilla #19 46118938733 all 12 signed/independent and terminal source/execution-clock models match, 54/54 sample outputs including four preselected PumpSwap research models; no positive net. Bounded pre-sign grid, independently recomputed size selection, contiguous DLMM expansion and limit-order guard pending CI.
 
 Blockzilla #20 46120596545 failed old mocked DLMM source fee envelope missing function_type after 38+16 tests passed. Corrected strict decoder/mock, locked independent SDK build resolution and rejected-attempt binding; fresh CI pending. No new signed size evidence.
+
+Blockzilla #21 46122097907 24/24 signed/independent complete models, 108/108 leg matches (8 PumpSwap preselected), 47/48 grid complete, no positive net. Pair 6/8 source-time native samples; new clock/event comparison and diverse 4/5-hop capture, pre-sign comparable ranking pending CI.

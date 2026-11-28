@@ -20,12 +20,13 @@ from arb.m5_signed_start_mint_economics import WSOL
 
 from arb.blockzilla_size_plan import CONTROL_AMOUNTS as AMOUNTS, evaluate as size_plan, verify_plan
 
-MAX_CAPTURE_PER_HOPS=2
+MAX_CAPTURE_PER_HOPS=4
+MAX_FOUR_FIVE_CAPTURED=2
 MAX_SIX_HOP_CAPTURE_ATTEMPTS=4
 MAX_SIX_HOP_CAPTURED=2
 MAX_PUMP_CAPTURED=2
 MAX_PUMP_CAPTURE_ATTEMPTS=4
-MAX_ROUTES=4+MAX_PUMP_CAPTURED
+MAX_ROUTES=2*MAX_FOUR_FIVE_CAPTURED+MAX_SIX_HOP_CAPTURED+MAX_PUMP_CAPTURED
 # Coarse venue-account pressure estimates used ONLY to prioritize six-hop
 # hints; actual signed message keys and SVM acceptance remain authoritative.
 VENUE_LOCK_PRESSURE={"raydium_cpmm":8,"orca":9,"meteora_damm_v2":10,
@@ -164,21 +165,27 @@ def diverse_candidates(rows,new,*,hops):
         ids=frozenset((l["venue"],l["pool"]) for l in row["legs"])
         if ids not in seen_sets:
             seen_sets.add(ids)
-            remaining.append((row,ids))
+            remaining.append((len(remaining),row,ids))
     chosen=[]
     used=defaultdict(int)
     maximum=MAX_SIX_HOP_CAPTURE_ATTEMPTS if hops==6 else MAX_CAPTURE_PER_HOPS
     while remaining and len(chosen)<maximum:
         def score(item):
-            row,ids=item
+            rank,row,ids=item
             repeated=ids-new
             orca=sum(used[k] for k in repeated if k[0]=="orca")
             overlap=sum(used[k] for k in repeated)
             no_orca_penalty=int("orca" in row["venues"]) if hops==6 and len(chosen)==1 else 0
-            return (no_orca_penalty,orca,overlap,remaining.index(item)) if hops==6 and chosen else (remaining.index(item),)
+            if not chosen:
+                return (rank,)
+            if hops==6:
+                return (no_orca_penalty,orca,overlap,rank)
+            # A second 4/5-hop fixture should explore other dependencies,
+            # rather than merely repeating the original seed's bridge.
+            return (overlap,rank)
         selected=min(remaining,key=score)
         remaining.remove(selected)
-        row,ids=selected
+        _,row,ids=selected
         chosen.append(row)
         for k in ids-new:
             used[k]+=1
@@ -286,10 +293,11 @@ def prepare(rpc, evidence_dir, directory, baseline, route):
     report={"status":"BLOCKZILLA_MULTIHOP_SOURCE_RESEARCH","source_report_sha256":digest(raw),
             "excluded_from_primary_inventory":True,"windows":windows,
             "bounded_candidates_by_hops":{str(k):len(v) for k,v in choices.items()},
-            "routes":[],"source_captured":0,**SAFE}
+            "routes":[],"source_captured":0,"capture_caps_by_hops":{"3":MAX_PUMP_CAPTURED,
+                "4":MAX_FOUR_FIVE_CAPTURED,"5":MAX_FOUR_FIVE_CAPTURED,"6":MAX_SIX_HOP_CAPTURED},**SAFE}
     for hops, rows in choices.items():
         captured_for_hops=0
-        cap=MAX_SIX_HOP_CAPTURED if hops==6 else MAX_PUMP_CAPTURED if hops==3 else 1
+        cap=MAX_SIX_HOP_CAPTURED if hops==6 else MAX_PUMP_CAPTURED if hops==3 else MAX_FOUR_FIVE_CAPTURED
         captured_directions=set()
         for index,row in enumerate(rows):
             if hops==3 and row["pump_direction"] in captured_directions:
@@ -302,13 +310,13 @@ def prepare(rpc, evidence_dir, directory, baseline, route):
                         0,path,allow_hint_graph=True)
                 fixture=json.loads(path.read_text())
                 fixture_identity(fixture,item)
+                clock=source_clock(rpc);item["source_clock"]=clock
                 item.update(capture_status="CAPTURED",fixture_sha256=digest(path.read_bytes()),
                             source_slot=fixture["state_accounts_observed_slot"])
                 report["source_captured"]+=1
                 captured_for_hops+=1
                 if hops==3:
                     captured_directions.add(row["pump_direction"])
-                clock=source_clock(rpc);item["source_clock"]=clock
                 quotes=[]
                 for amount in AMOUNTS:
                     result=research_chain(fixture,amount_in=amount,
@@ -348,6 +356,8 @@ def offline(rpc,directory):
             "excluded_from_primary_inventory":True,"attempts":[],"accepted":0,**SAFE}
     programs={}
     report["size_plans"]={}
+    fixtures={}
+    from arb.blockzilla_size_plan import rank_comparable_grid
     lock=Path("tools/meteora_damm_v2_reference/Cargo.lock")
     report["official_damm_sdk_lock_sha256"]=digest(lock.read_bytes())
     for row in selected:
@@ -358,7 +368,14 @@ def offline(rpc,directory):
         fixture=json.loads(fixture_raw);fixture_identity(fixture,row)
         plan=size_plan(fixture,observed_unix=row["source_clock"]["unix_timestamp"])
         report["size_plans"][row["id"]]=plan
-        write(root/"multihop-signed.json",report)
+        fixtures[row["id"]]=fixture
+    # Compute all fixture size plans and comparable rankings before signing
+    # any route. Ranking does not suppress the original controls.
+    report["pre_sign_grid_rankings"]=rank_comparable_grid(report["size_plans"])
+    write(root/"multihop-signed.json",report)
+    for row in selected:
+        fixture=fixtures[row["id"]]
+        plan=report["size_plans"][row["id"]]
         for amount in plan["signed_amounts"]:
             item={"id":row["id"],"amount":amount,"status":"BLOCKED"}
             report["attempts"].append(item)
@@ -568,6 +585,10 @@ def audit(source_dir,signed_dir):
             raise ValueError("size plan source fixture digest mismatch")
         fixture=json.loads(raw);fixture_identity(fixture,row)
         plans[rid]=verify_plan(signed["size_plans"][rid],fixture,observed_unix=row["source_clock"]["unix_timestamp"])
+    from arb.blockzilla_size_plan import rank_comparable_grid
+    rankings=rank_comparable_grid(plans)
+    if rankings!=signed.get("pre_sign_grid_rankings"):
+        raise ValueError("pre-sign comparable ranking differs from independent recomputation")
     expected={(rid,amount) for rid,plan in plans.items() for amount in plan["signed_amounts"]}
     attempts=[(a["id"],a["amount"]) for a in signed["attempts"]]
     if len(attempts)!=len(set(attempts)) or set(attempts)!=expected:
@@ -620,6 +641,8 @@ def audit(source_dir,signed_dir):
             item.update(error_class=type(exc).__name__,diagnostic=str(exc)[:300])
     report["size_plan_recomputed_count"]=len(plans)
     report["size_plans"]=plans
+    report["pre_sign_grid_rankings"]=rankings
+    report["pre_sign_ranking_recomputed"]=True
     report["modeled_grid_sample_count"]=sum(len(p["samples"]) for p in plans.values())
     report["positive_modeled_net_grid_samples"]=sum(p["positive_estimated_net_count"] for p in plans.values())
     report["native_pricing_summary"]=pricing_summary(report["attempts"])

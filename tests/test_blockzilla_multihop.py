@@ -94,6 +94,16 @@ class MultihopTests(unittest.TestCase):
         c=row([("meteora_dlmm","e"),("raydium_cpmm","f"),("raydium_cpmm","g"),
                ("raydium_clmm","h"),("meteora_damm_v2","i")])
         self.assertEqual(diverse_candidates([a,b,c],{novel},hops=6),[a,c,b])
+    def test_four_five_diversity_does_not_repeat_same_bridge(self):
+        seed=("raydium_cpmm","novel")
+        def row(ids):
+            return {"legs":[{"venue":v,"pool":p} for v,p in [seed]+ids],
+                    "venues":["raydium_cpmm","orca"]}
+        a=row([("orca","a"),("raydium_cpmm","b"),("raydium_cpmm","c")])
+        b=row([("orca","a"),("raydium_cpmm","b"),("raydium_cpmm","d")])
+        c=row([("orca","x"),("raydium_cpmm","y"),("raydium_cpmm","z")])
+        for hops in (4,5):
+            self.assertEqual(diverse_candidates([a,b,c],{seed},hops=hops),[a,c,b])
     def test_pump_triangles_both_directions_with_novel_bridge(self):
         from arb.blockzilla_multihop import pump_triangles,WSOL
         token,stable=key(),key()

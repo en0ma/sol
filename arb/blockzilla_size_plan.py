@@ -93,3 +93,46 @@ def verify_plan(recorded,fixture,*,observed_unix):
     if recorded!=recomputed:
         raise ValueError("recorded pre-sign size plan differs from independent recomputation")
     return recomputed
+
+
+def rank_comparable_grid(plans):
+    """Compare complete models only at equal input amount and denomination.
+
+    Source fixtures are independently captured at potentially different slots.
+    Rankings are historical research comparisons, not simultaneous prices.
+    A non-WSOL group has no modeled message-fee conversion; rank gross only.
+    """
+    from collections import defaultdict
+    groups=defaultdict(list)
+    for rid,plan in sorted(plans.items()):
+        if (not isinstance(rid,str) or plan.get("status")!="SOURCE_NATIVE_BOUNDED_SIZE_PLAN"
+                or any(plan.get(k) is not False for k in SAFE)
+                or [s.get("amount") for s in plan.get("samples",[])]!=list(GRID)):
+            raise ValueError("invalid complete comparable size plan")
+        mint=plan.get("start_mint")
+        if not isinstance(mint,str) or not mint or type(plan.get("source_slot")) is not int:
+            raise ValueError("size plan source identity missing")
+        for sample in plan["samples"]:
+            if sample.get("status")!="COMPLETE_RESEARCH_MODEL":
+                continue
+            amount=sample["amount"];gross=sample.get("gross_delta")
+            net=sample.get("estimated_net")
+            if (type(gross) is not int or sample.get("output")!=amount+gross
+                    or (mint==WSOL and (sample.get("estimated_message_fee")!=MESSAGE_FEE_SCENARIO
+                                        or net!=gross-MESSAGE_FEE_SCENARIO))
+                    or (mint!=WSOL and (net is not None or sample.get("estimated_message_fee") is not None))):
+                raise ValueError("size grid economic identity mismatch")
+            groups[(mint,amount)].append({"id":rid,"source_slot":plan["source_slot"],
+                "gross_delta":gross,"estimated_net":net,
+                "selected_for_signing":amount in plan["signed_amounts"],
+                "net_profit_verified":False,**SAFE})
+    result=[]
+    for (mint,amount),rows in sorted(groups.items()):
+        ordered=sorted(rows,key=lambda r:(-(r["estimated_net"] if mint==WSOL else r["gross_delta"]),r["id"]))
+        slots=[r["source_slot"] for r in ordered]
+        result.append({"start_mint":mint,"amount":amount,"rank_by":"ESTIMATED_MESSAGE_FEE_NET" if mint==WSOL else "GROSS_ONLY",
+            "source_slot_range":[min(slots),max(slots)],"simultaneous_source_snapshot":False,
+            "status":"PRE_SIGN_RESEARCH_COMPARISON_ONLY","routes":ordered,
+            "priority_cost_included":False,"account_funding_included":False,
+            "net_profit_verified":False,**SAFE})
+    return result

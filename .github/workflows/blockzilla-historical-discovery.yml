@@ -240,7 +240,7 @@ jobs:
           path: ${{ runner.temp }}/blockzilla-pairs/
           if-no-files-found: warn
           retention-days: 7
-      - name: Capture bounded archive-derived 4–6-hop research fixtures
+      - name: Capture diverse bounded archive-derived 3–6-hop research fixtures
         env:
           HTTP_ROUTE: ${{ needs.http-probe.outputs.usable }}
         run: |
