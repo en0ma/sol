@@ -15,7 +15,12 @@ MAX_HOPS=4
 MAX_POOLS=200
 MAX_CYCLES=2000
 
-def cycles(pools,anchors=None,max_hops=MAX_HOPS,max_cycles=MAX_CYCLES,truncate=False,min_hops=2,hint_only=False,required_first_pool=None):
+def cycles(pools,anchors=None,max_hops=MAX_HOPS,max_cycles=MAX_CYCLES,truncate=False,min_hops=2,hint_only=False,required_first_pool=None,
+           max_edge_visits=None,search_stats=None):
+    if max_edge_visits is not None and (type(max_edge_visits) is not int or not 1<=max_edge_visits<=2_000_000):
+        raise ValueError("invalid graph edge visit budget")
+    if search_stats is not None and not isinstance(search_stats,dict):
+        raise ValueError("invalid graph search stats")
     if required_first_pool is not None and (not isinstance(required_first_pool,(tuple,list))
             or len(required_first_pool)!=2 or required_first_pool[0] not in TARGET_VENUES
             or not isinstance(required_first_pool[1],str) or not required_first_pool[1]):
@@ -47,9 +52,16 @@ def cycles(pools,anchors=None,max_hops=MAX_HOPS,max_cycles=MAX_CYCLES,truncate=F
     anchors=set(anchors) if anchors is not None else set(edges)
     if not anchors:raise ValueError("empty anchors")
     found=[];identities=set()
+    edge_visits=0;stop_reason=None
     class BoundedDiscoveryComplete(Exception):pass
     def visit(start,current,path,used,visited):
+        nonlocal edge_visits,stop_reason
         for e in edges[current]:
+            if max_edge_visits is not None and edge_visits>=max_edge_visits:
+                stop_reason="EDGE_VISIT_LIMIT"
+                if truncate:raise BoundedDiscoveryComplete()
+                raise ValueError("graph edge visit budget exceeded")
+            edge_visits+=1
             if not path and required_first_pool is not None and (e["venue"],e["pool"])!=tuple(required_first_pool):
                 continue
             if (e["venue"],e["pool"]) in used:continue
@@ -67,7 +79,9 @@ def cycles(pools,anchors=None,max_hops=MAX_HOPS,max_cycles=MAX_CYCLES,truncate=F
                     "status":"HINT_ONLY_UNQUOTED" if hint_only else "UNQUOTED","net_profit_lamports":None,
                     "simulation_verified":False,"opportunity_confirmed":False})
                 if len(found)>=max_cycles:
-                    if truncate:raise BoundedDiscoveryComplete()
+                    if truncate:
+                        stop_reason="CYCLE_LIMIT"
+                        raise BoundedDiscoveryComplete()
                     if len(found)>max_cycles:raise ValueError("cycle budget exceeded")
             elif nxt not in visited and len(new)<max_hops:
                 visit(start,nxt,new,used|{(e["venue"],e["pool"])},visited|{nxt})
@@ -76,6 +90,9 @@ def cycles(pools,anchors=None,max_hops=MAX_HOPS,max_cycles=MAX_CYCLES,truncate=F
             visit(anchor,anchor,[],set(),{anchor})
     except BoundedDiscoveryComplete:
         pass
+    if search_stats is not None:
+        search_stats.update(edge_visits=edge_visits,stop_reason=stop_reason,
+                            complete=stop_reason is None,returned_cycles=len(found))
     return found
 
 def scan(rpc,registry,extra_pairs=(),anchors=None,max_cycles=MAX_CYCLES):

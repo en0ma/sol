@@ -313,3 +313,5 @@ Use explicit hint-only existing graph enumeration for archive-seeded multihop ca
 Bound archive-seeded cycles by forcing the novel identity as first edge before result truncation. Report zero accepted separately from evidence success and require every captured route/amount attempt to reconcile.
 
 Use integer ceiling of AMM v4 swap fee before invariant math; retain rational fee scenario for comparison only. ALT compression is not account-lock reduction; preserve runtime rejections, rank alternate candidates by clearly labeled heuristic and report actual resolved key count. Recompute each signed leg even when full modeled chain is blocked.
+
+For archive seed-edge cycles, filter pool hints using distances between seed endpoints after removing that edge. Per-hop bounded windows and graph edge-visit budget must expose truncation; topology does not guarantee an executable route.

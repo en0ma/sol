@@ -6,7 +6,7 @@ fixture. No pool is admitted or counted toward the primary inventory.
 """
 import argparse
 import base64
-from collections import defaultdict
+from collections import defaultdict, deque
 import json
 import os
 from pathlib import Path
@@ -28,6 +28,60 @@ MAX_ROUTES=4
 VENUE_LOCK_PRESSURE={"raydium_cpmm":8,"orca":9,"meteora_damm_v2":10,
     "raydium_clmm":11,"meteora_dlmm":12,"raydium_amm_v4":14,"pumpswap":18}
 MAX_GRAPH_CYCLES=600
+MAX_EDGE_VISITS=250000
+
+
+def seed_window(rows, seed, *, hops, maximum=MAX_POOLS):
+    """Necessary reachability filter for a simple cycle through one edge.
+
+    Removing the seed leaves a return path between its endpoints. For an
+    edge (u,v) on that path, dist(a,u)+1+dist(v,b) <= hops-1 (or reverse).
+    Shortest-distance filtering is necessary, not sufficient: the existing
+    cycle engine still checks distinct pools, closed paths and exact length.
+    Unlike an immediate-neighbor window, this retains the middle of a
+    six-edge ring. The capped window may still omit eligible cycles.
+    """
+    if type(hops) is not int or not 4<=hops<=6 or type(maximum) is not int or not 1<=maximum<=MAX_POOLS:
+        raise ValueError("invalid seed window budget")
+    identity=(seed["venue"],seed["address"])
+    a,b=seed["mints"]
+    adjacency=defaultdict(set)
+    others=[]
+    for pool in rows:
+        if pool["venue"] not in VENUES or (pool["venue"],pool["address"])==identity:
+            continue
+        u,v=pool["mints"]
+        adjacency[u].add(v);adjacency[v].add(u)
+        others.append(pool)
+    def distances(start):
+        result={start:0}
+        pending=deque([start])
+        while pending:
+            u=pending.popleft()
+            if result[u]>=hops-1:
+                continue
+            for v in sorted(adjacency[u]):
+                if v not in result:
+                    result[v]=result[u]+1
+                    pending.append(v)
+        return result
+    da,db=distances(a),distances(b)
+    eligible=[]
+    for pool in others:
+        u,v=pool["mints"]
+        distance=min(da.get(u,hops)+db.get(v,hops),
+                     da.get(v,hops)+db.get(u,hops))
+        if distance<=hops-2:
+            # Heuristic only. Keep short return paths first, then lighter
+            # venues in the six-hop case; retain a stable identity order.
+            rank=(distance,VENUE_LOCK_PRESSURE[pool["venue"]] if hops==6 else 0,
+                  pool["venue"],pool["address"])
+            eligible.append((rank,pool))
+    eligible.sort(key=lambda item:item[0])
+    window=[seed]+[p for _,p in eligible[:maximum-1]]
+    return window,{"eligible_pool_hints":1+len(eligible),"pool_hints":len(window),
+                   "pool_window_truncated":len(eligible)+1>maximum,
+                   "shortest_return_edges":da.get(b)}
 
 
 def candidate_routes(baseline,new_pools):
@@ -41,23 +95,19 @@ def candidate_routes(baseline,new_pools):
     windows=[]
     for seed in new_pools:
         anchors=set(seed["mints"])
-        neighbors=anchors|{m for p in all_rows if anchors.intersection(p["mints"]) for m in p["mints"]}
-        def order(p):
-            ms=set(p["mints"])
-            return (0 if (p["venue"],p["address"]) in new else
-                    1 if ms & anchors else 2 if ms <= neighbors else 3,
-                    p["venue"],p["address"])
-        window=sorted((p for p in all_rows if p["venue"] in VENUES and set(p["mints"]) & neighbors),
-                      key=order)[:MAX_POOLS]
-        stats={"seed":[seed["venue"],seed["address"]],"pool_hints":len(window),
+        stats={"seed":[seed["venue"],seed["address"]],"windows_by_hops":{},
                "cycle_counts_by_hops":{},"cycle_limit_reached_by_hops":{}}
         windows.append(stats)
         for hops in (4,5,6):
+            window,window_stats=seed_window(all_rows,seed,hops=hops)
+            search={}
             paths=cycles(window,anchors=anchors,max_hops=hops,min_hops=hops,
                          max_cycles=MAX_GRAPH_CYCLES,truncate=True,hint_only=True,
-                         required_first_pool=(seed["venue"],seed["address"]))
+                         required_first_pool=(seed["venue"],seed["address"]),
+                         max_edge_visits=MAX_EDGE_VISITS,search_stats=search)
+            stats["windows_by_hops"][str(hops)]={**window_stats,**search}
             stats["cycle_counts_by_hops"][str(hops)]=len(paths)
-            stats["cycle_limit_reached_by_hops"][str(hops)]=len(paths)>=MAX_GRAPH_CYCLES
+            stats["cycle_limit_reached_by_hops"][str(hops)]=search["stop_reason"]=="CYCLE_LIMIT"
             for row in paths:
                 identities={(l["venue"],l["pool"]) for l in row["legs"]}
                 if not identities & new or len({l["pool"] for l in row["legs"]})!=hops:

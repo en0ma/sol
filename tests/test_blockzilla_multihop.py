@@ -5,7 +5,7 @@ from solders.hash import Hash
 from solders.instruction import Instruction
 from solders.transaction import Transaction
 import base64
-from arb.blockzilla_multihop import candidate_routes,decode_packet,digest
+from arb.blockzilla_multihop import candidate_routes,decode_packet,digest,seed_window
 from arb.opportunity_graph import cycles
 
 def key():return str(Pubkey.new_unique())
@@ -55,6 +55,34 @@ class MultihopTests(unittest.TestCase):
                         picked[6][1]["heuristic_venue_lock_pressure"])
         self.assertTrue(picked[6][0]["topology_only"])
         self.assertFalse(picked[6][0]["simulation_verified"])
+    def test_seed_window_preserves_middle_edges_and_excludes_disconnected(self):
+        mints=[key() for _ in range(6)]
+        rows=[{"venue":"raydium_cpmm","address":key(),"mints":[mints[i],mints[(i+1)%6]]}
+              for i in range(6)]
+        unrelated={"venue":"orca","address":key(),"mints":[key(),key()]}
+        window,stats=seed_window(rows+[unrelated],rows[0],hops=6)
+        self.assertEqual({p["address"] for p in window},{p["address"] for p in rows})
+        self.assertEqual(stats["shortest_return_edges"],5)
+        self.assertFalse(stats["pool_window_truncated"])
+        small,stats=seed_window(rows,rows[0],hops=6,maximum=3)
+        self.assertEqual(len(small),3)
+        self.assertEqual(small[0],rows[0])
+        self.assertTrue(stats["pool_window_truncated"])
+        self.assertEqual(seed_window(rows,rows[0],hops=4)[0],[rows[0]])
+
+    def test_graph_edge_budget_is_explicit(self):
+        a,b,c,d=[key() for _ in range(4)]
+        rows=[{"venue":"orca","address":key(),"mints":[u,v]}
+              for u,v in ((a,b),(b,c),(c,d),(d,a))]
+        stats={}
+        found=cycles(rows,anchors=[a],min_hops=4,max_hops=4,
+                     hint_only=True,truncate=True,max_edge_visits=1,search_stats=stats)
+        self.assertEqual(found,[])
+        self.assertEqual(stats["edge_visits"],1)
+        self.assertEqual(stats["stop_reason"],"EDGE_VISIT_LIMIT")
+        self.assertFalse(stats["complete"])
+        with self.assertRaisesRegex(ValueError,"edge visit budget"):
+            cycles(rows,anchors=[a],hint_only=True,max_edge_visits=1)
     def test_legacy_packet_crypto_and_digest(self):
         payer=Keypair()
         tx=Transaction.new_signed_with_payer([Instruction(Pubkey.new_unique(),b"x",[])],
