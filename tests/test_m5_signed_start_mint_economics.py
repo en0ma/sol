@@ -134,3 +134,74 @@ class SourceFeeModelReuseTests(unittest.TestCase):
             self.assertEqual(proof["source_fee_lamports"],5000)
             self.assertFalse(proof["paid_fee_verified"])
             quote.assert_called_once_with(fixture,leg_index=1,amount_in=5000,observed_unix=100)
+
+class SelectedResearchFeeConversionTests(unittest.TestCase):
+    def fixture(self,venue):
+        return ({"route_mints":["RAY",WSOL,"RAY"],
+                 "state_accounts_observed_slot":42,**SAFE},
+                [{"venue":"orca","address":"p0"},
+                 {"venue":venue,"address":"p1"}])
+
+    def dlmm_quote(self):
+        return {"venue":"meteora_dlmm","pool":"p1","source_slot":42,
+            "quote_status":"NATIVE_QUOTE_SOURCE_DERIVED_NOT_EXACT",
+            "predicted_output_base_units":None,
+            "native_fee_envelope":{"pool":"p1","source_slot":42,
+                "input_mint":WSOL,"output_mint":"RAY","input_base_units":5000,
+                "source_derived_dynamic_fee_quote":{
+                    "status":"SOURCE_VOLATILITY_DYNAMIC_FEE_MODELED",
+                    "source_clock":100,"amount_out":250,
+                    "protocol_exact_verified":False,**SAFE}},**SAFE}
+
+    def convert(self,fixture,rows,quote):
+        from unittest.mock import patch
+        from arb.m5_signed_start_mint_economics import source_native_fee_conversion
+        with patch("arb.fixture_quote_execution_pipeline.extract_pool_states",return_value=rows),patch(
+                "arb.fixture_all_venue_signed_quotes.quote_leg",return_value=quote):
+            return source_native_fee_conversion(fixture,start_mint="RAY",
+                source_slot=42,fee_lamports=5000,observed_unix=100)
+
+    def test_dlmm_fee_conversion_uses_original_clock_model_only(self):
+        fixture,rows=self.fixture("meteora_dlmm")
+        amount,proof,_=self.convert(fixture,rows,self.dlmm_quote())
+        self.assertEqual(amount,250)
+        self.assertTrue(proof["uses_unverified_dynamic_fee_model"])
+        self.assertFalse(proof["protocol_exact_verified"])
+        self.assertFalse(proof["paid_fee_verified"])
+        self.assertFalse(proof["conversion_is_guaranteed_upper_bound"])
+        for key,value in (("source_clock",101),("protocol_exact_verified",True),
+                          ("broadcast",True)):
+            q=self.dlmm_quote()
+            q["native_fee_envelope"]["source_derived_dynamic_fee_quote"][key]=value
+            with self.subTest(key=key),self.assertRaises(ValueError):
+                self.convert(fixture,rows,q)
+
+    def test_pumpswap_requires_source_selected_direction_and_full_input(self):
+        from unittest.mock import patch
+        fixture,rows=self.fixture("pumpswap")
+        q={"venue":"pumpswap","pool":"p1","source_slot":42,
+            "quote_status":"NATIVE_QUOTE_SELECTED_FEE_MODE_NOT_EXACT",
+            "predicted_output_base_units":None,"native_fee_envelope":{},**SAFE}
+        chosen={"pool":"p1","source_slot":42,"input_mint":WSOL,
+                "output_mint":"RAY","amount_in":5000,"amount_out":220,**SAFE}
+        with patch("arb.pumpswap_source_fee_envelope.selected_directional_model",
+                   return_value=None):
+            self.assertIsNone(self.convert(fixture,rows,q)[0])
+        with patch("arb.pumpswap_source_fee_envelope.selected_directional_model",
+                   return_value=chosen):
+            amount,proof,_=self.convert(fixture,rows,q)
+            self.assertEqual(amount,220)
+            self.assertTrue(proof["uses_unverified_dynamic_fee_model"])
+            self.assertFalse(proof["paid_fee_verified"])
+        for key,value in (("input_mint","RAY"),("source_slot",43),("amount_in",4999)):
+            with self.subTest(key=key),patch(
+                    "arb.pumpswap_source_fee_envelope.selected_directional_model",
+                    return_value={**chosen,key:value}),self.assertRaises(ValueError):
+                self.convert(fixture,rows,q)
+
+    def test_ambiguous_fee_scenarios_remain_unconverted(self):
+        fixture,rows=self.fixture("pumpswap")
+        q={"venue":"pumpswap","pool":"p1","source_slot":42,
+            "quote_status":"NATIVE_QUOTE_MODELED_NOT_EXACT",
+            "predicted_output_base_units":999,"native_fee_envelope":{},**SAFE}
+        self.assertIsNone(self.convert(fixture,rows,q)[0])

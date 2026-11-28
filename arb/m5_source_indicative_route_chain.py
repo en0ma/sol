@@ -7,6 +7,51 @@ execution-ready. Reuses existing all-seven signed native quote dispatcher.
 from arb.fixture_quote_execution_pipeline import extract_pool_states
 from arb.fixture_all_venue_signed_quotes import quote_leg
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
+def source_model_output(fixture,row,index,current,observed_unix,result,*,
+                        allow_modeled_dlmm=False,allow_modeled_pumpswap=False):
+    """Resolve only the existing source-selected research models, never exactness.
+
+    Shared by route chaining and same-fixture fee conversion. Callers still
+    validate the quote's outer pool, venue and source-slot identity.
+    """
+    if not isinstance(result,dict) or any(result.get(k) is not False for k in SAFE):
+        raise ValueError("unsafe or malformed native leg quote")
+    mints=fixture["route_mints"]
+    status=result.get("quote_status")
+    next_amount=result.get("predicted_output_base_units")
+    modeled=False
+    if (allow_modeled_dlmm and row["venue"]=="meteora_dlmm"
+            and status=="NATIVE_QUOTE_SOURCE_DERIVED_NOT_EXACT"):
+        envelope=result.get("native_fee_envelope")
+        if not isinstance(envelope,dict):
+            raise ValueError("missing source DLMM fee envelope")
+        effective=envelope.get("source_derived_dynamic_fee_quote")
+        if (envelope.get("pool")!=row["address"] or
+                envelope.get("input_mint")!=mints[index] or
+                envelope.get("output_mint")!=mints[index+1] or
+                envelope.get("input_base_units")!=current or
+                envelope.get("source_slot")!=fixture["state_accounts_observed_slot"] or
+                not isinstance(effective,dict) or
+                effective.get("status")!="SOURCE_VOLATILITY_DYNAMIC_FEE_MODELED" or
+                effective.get("source_clock")!=observed_unix or
+                effective.get("protocol_exact_verified") is not False or
+                any(effective.get(k) is not False for k in SAFE)):
+            raise ValueError("source DLMM modeled quote identity mismatch")
+        next_amount=effective.get("amount_out")
+        modeled=True
+    if (allow_modeled_pumpswap and row["venue"]=="pumpswap"
+            and status=="NATIVE_QUOTE_SELECTED_FEE_MODE_NOT_EXACT"):
+        from arb.pumpswap_source_fee_envelope import selected_directional_model
+        chosen=selected_directional_model(result.get("native_fee_envelope"))
+        if chosen is not None:
+            if (chosen["pool"]!=row["address"] or chosen["source_slot"]!=fixture["state_accounts_observed_slot"]
+                    or chosen["input_mint"]!=mints[index] or chosen["output_mint"]!=mints[index+1]
+                    or chosen["amount_in"]!=current or any(chosen.get(k) is not False for k in SAFE)):
+                raise ValueError("PumpSwap modeled quote source identity mismatch")
+            next_amount=chosen["amount_out"]
+            modeled=True
+    return status,next_amount,modeled
+
 def research_chain(fixture, *, amount_in, observed_unix, allow_modeled_dlmm=False,
                    allow_modeled_pumpswap=False):
     if type(allow_modeled_dlmm) is not bool or type(allow_modeled_pumpswap) is not bool:
@@ -32,41 +77,11 @@ def research_chain(fixture, *, amount_in, observed_unix, allow_modeled_dlmm=Fals
                          observed_unix=observed_unix)
         if not isinstance(result,dict) or any(result.get(k) is not False for k in SAFE):
             raise ValueError("unsafe or malformed native leg quote")
-        status=result.get("quote_status")
-        next_amount=result.get("predicted_output_base_units")
-        modeled=False
-        if (allow_modeled_dlmm and row["venue"]=="meteora_dlmm"
-                and status=="NATIVE_QUOTE_SOURCE_DERIVED_NOT_EXACT"):
-            envelope=result.get("native_fee_envelope")
-            if not isinstance(envelope,dict):
-                raise ValueError("missing source DLMM fee envelope")
-            effective=envelope.get("source_derived_dynamic_fee_quote")
-            if (envelope.get("pool")!=row["address"] or
-                    envelope.get("input_mint")!=mints[index] or
-                    envelope.get("output_mint")!=mints[index+1] or
-                    envelope.get("input_base_units")!=current or
-                    envelope.get("source_slot")!=fixture["state_accounts_observed_slot"] or
-                    not isinstance(effective,dict) or
-                    effective.get("status")!="SOURCE_VOLATILITY_DYNAMIC_FEE_MODELED" or
-                    effective.get("source_clock")!=observed_unix or
-                    effective.get("protocol_exact_verified") is not False or
-                    any(effective.get(k) is not False for k in SAFE)):
-                raise ValueError("source DLMM modeled quote identity mismatch")
-            next_amount=effective.get("amount_out")
-            modeled=True
-            modeled_legs+=1
-        if (allow_modeled_pumpswap and row["venue"]=="pumpswap"
-                and status=="NATIVE_QUOTE_SELECTED_FEE_MODE_NOT_EXACT"):
-            from arb.pumpswap_source_fee_envelope import selected_directional_model
-            chosen=selected_directional_model(result.get("native_fee_envelope"))
-            if chosen is not None:
-                if (chosen["pool"]!=row["address"] or chosen["source_slot"]!=fixture["state_accounts_observed_slot"]
-                        or chosen["input_mint"]!=mints[index] or chosen["output_mint"]!=mints[index+1]
-                        or chosen["amount_in"]!=current or any(chosen.get(k) is not False for k in SAFE)):
-                    raise ValueError("PumpSwap modeled quote source identity mismatch")
-                next_amount=chosen["amount_out"]
-                modeled=True
-                modeled_legs+=1
+        status,next_amount,modeled=source_model_output(
+            fixture,row,index,current,observed_unix,result,
+            allow_modeled_dlmm=allow_modeled_dlmm,
+            allow_modeled_pumpswap=allow_modeled_pumpswap)
+        modeled_legs+=int(modeled)
         if status!="SOURCE_BOUND_INDICATIVE" and not modeled:
             return {"status":"NATIVE_ROUTE_INDICATIVE_BLOCKED",
                     "blocked_leg_index":index,"blocked_venue":row["venue"],

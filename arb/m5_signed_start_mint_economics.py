@@ -31,8 +31,25 @@ def source_native_fee_conversion(fixture,*,start_mint,source_slot,fee_lamports,o
     mints=fixture.get("route_mints")
     if not isinstance(mints,list) or len(mints)!=len(rows)+1:
         raise ValueError("fee conversion source mint topology invalid")
+    from arb.m5_source_indicative_route_chain import source_model_output
     supported=frozenset(("orca","raydium_clmm","raydium_cpmm",
-                         "raydium_amm_v4","meteora_damm_v2"))
+                         "raydium_amm_v4","meteora_damm_v2","meteora_dlmm",
+                         "pumpswap"))
+
+    def conversion_output(index,amount,q):
+        row=rows[index]
+        if (not isinstance(q,dict) or
+                any(q.get(k) is not False for k in SAFE) or
+                q.get("source_slot")!=source_slot or
+                q.get("venue")!=row["venue"] or q.get("pool")!=row["address"]):
+            raise ValueError("non-authenticated fee conversion quote")
+        status,output,modeled=source_model_output(
+            fixture,row,index,amount,observed_unix,q,
+            allow_modeled_dlmm=True,allow_modeled_pumpswap=True)
+        if ((status!="SOURCE_BOUND_INDICATIVE" and not modeled)
+                or type(output) is not int or not 0<output<2**64):
+            return None,status,False
+        return output,status,modeled
     for i,row in enumerate(rows):
         if (row["venue"] not in supported or
                 mints[i]!=WSOL or mints[i+1]!=start_mint):
@@ -40,21 +57,16 @@ def source_native_fee_conversion(fixture,*,start_mint,source_slot,fee_lamports,o
         q=quote_leg(fixture,leg_index=i,
                     amount_in=fee_lamports,
                     observed_unix=observed_unix)
-        if (not isinstance(q,dict) or
-                any(q.get(k)is not False for k in SAFE) or
-                q.get("source_slot")!=source_slot or
-                q.get("venue")!=row["venue"] or
-                q.get("pool")!=row["address"]):
-            raise ValueError("non-authenticated fee conversion quote")
-        amount=q.get("predicted_output_base_units")
-        if (q.get("quote_status")!="SOURCE_BOUND_INDICATIVE" or
-                type(amount)is not int or not 0<amount<2**64):
+        amount,status,modeled=conversion_output(i,fee_lamports,q)
+        if amount is None:
             continue
         conversion={"status":"SOURCE_NATIVE_START_MINT_FEE_MODEL_ONLY",
                     "leg_index":i,"venue":row["venue"],
                     "pool":row["address"],"source_slot":source_slot,
                     "source_fee_lamports":fee_lamports,
                     "modeled_start_mint_fee_units":amount,
+                    "quote_status":status,
+                    "uses_unverified_dynamic_fee_model":modeled,
                     "protocol_exact_verified":False,
                     "conversion_is_guaranteed_upper_bound":False,
                     "paid_fee_verified":False,**SAFE}
@@ -76,22 +88,21 @@ def source_native_fee_conversion(fixture,*,start_mint,source_slot,fee_lamports,o
                 row=rows[i]
                 q=quote_leg(fixture,leg_index=i,amount_in=current,
                             observed_unix=observed_unix)
-                if (not isinstance(q,dict) or any(q.get(k) is not False for k in SAFE)
-                        or q.get("source_slot")!=source_slot or q.get("venue")!=row["venue"]
-                        or q.get("pool")!=row["address"]):
-                    raise ValueError("non-authenticated multileg fee conversion quote")
-                output=q.get("predicted_output_base_units")
-                if q.get("quote_status")!="SOURCE_BOUND_INDICATIVE" or type(output) is not int or not 0<output<2**64:
+                output,status,modeled=conversion_output(i,current,q)
+                if output is None:
                     break
                 trace.append({"leg_index":i,"venue":row["venue"],"pool":row["address"],
                     "input_mint":mints[i],"output_mint":mints[i+1],
-                    "input_base_units":current,"output_base_units":output,"source_slot":source_slot})
+                    "input_base_units":current,"output_base_units":output,"source_slot":source_slot,
+                    "quote_status":status,"uses_unverified_dynamic_fee_model":modeled})
                 current=output
             if len(trace)!=len(rows)-first:
                 continue
             conversion={"status":"SOURCE_NATIVE_MULTILEG_START_MINT_FEE_MODEL_ONLY",
                 "source_slot":source_slot,"source_fee_lamports":fee_lamports,
                 "modeled_start_mint_fee_units":current,"conversion_legs":trace,
+                "uses_unverified_dynamic_fee_model":any(
+                    leg["uses_unverified_dynamic_fee_model"] for leg in trace),
                 "protocol_exact_verified":False,"conversion_is_guaranteed_upper_bound":False,
                 "paid_fee_verified":False,**SAFE}
             cost=current
