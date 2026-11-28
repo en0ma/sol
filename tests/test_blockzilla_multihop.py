@@ -94,6 +94,38 @@ class MultihopTests(unittest.TestCase):
         c=row([("meteora_dlmm","e"),("raydium_cpmm","f"),("raydium_cpmm","g"),
                ("raydium_clmm","h"),("meteora_damm_v2","i")])
         self.assertEqual(diverse_candidates([a,b,c],{novel},hops=6),[a,c,b])
+    def test_pump_triangles_both_directions_with_novel_bridge(self):
+        from arb.blockzilla_multihop import pump_triangles,WSOL
+        token,stable=key(),key()
+        pump={"venue":"pumpswap","address":key(),"mints":[token,WSOL]}
+        bridge={"venue":"raydium_clmm","address":key(),"mints":[WSOL,stable]}
+        seed={"venue":"raydium_cpmm","address":key(),"mints":[token,stable],"source_verified_only":True}
+        routes=pump_triangles([pump,bridge],[seed])
+        self.assertEqual([r["pump_direction"] for r in routes],["FROM_WSOL","TO_WSOL"])
+        for r in routes:
+            self.assertEqual(r["legs"][0]["input"],WSOL)
+            self.assertEqual(r["legs"][-1]["output"],WSOL)
+            self.assertEqual(r["novel_pool_identities"],[["raydium_cpmm",seed["address"]]])
+            self.assertFalse(r["simulation_verified"])
+        self.assertEqual(routes[0]["legs"][0]["venue"],"pumpswap")
+        self.assertEqual(routes[1]["legs"][-1]["venue"],"pumpswap")
+        self.assertEqual(pump_triangles([pump,bridge,seed],[]),[])
+    def test_economics_ranks_only_same_denomination_and_input(self):
+        from arb.blockzilla_multihop import rank_estimated_economics,pricing_summary
+        def trial(name,amount,net):
+            return {"id":name,"amount":amount,"audit":{
+                "status":"N_LEG_PACKET_AND_RECORDED_RESPONSE_RECHECKED",
+                "model_matches_terminal":False,"signed_economics":{
+                    "start_mint":"SOL","estimated_net_delta_start_mint_base_units":net,
+                    "observed_local_fork_gross_delta_start_mint_base_units":net+5000,
+                    "estimated_cost_start_mint_base_units":5000,
+                    "actionable":False,"broadcast":False,"live_execution_approved":False}}}
+        groups=rank_estimated_economics([trial("a",100,-9),trial("b",100,-2),trial("c",200,-1),
+                                      {"id":"blocked","amount":100}])
+        self.assertEqual(len(groups),2)
+        self.assertEqual([r["id"] for r in groups[0]["routes"]],["b","a"])
+        self.assertFalse(groups[0]["routes"][0]["net_profit_verified"])
+        self.assertEqual(pricing_summary([]),{})
     def test_legacy_packet_crypto_and_digest(self):
         payer=Keypair()
         tx=Transaction.new_signed_with_payer([Instruction(Pubkey.new_unique(),b"x",[])],

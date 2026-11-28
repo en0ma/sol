@@ -64,6 +64,92 @@ def quote_component_rounding_scenarios(*,amount_in,reserve_in,reserve_out,
             "effective_fee_rounding_verified":False,
             "protocol_exact_verified":False,**SAFE}
 
+def directional_quote_scenarios(*,amount_in,base_reserve,quote_reserve,
+                                quote_spendable,from_base,component_fee_bps):
+    """Quote-denominated V2 fee hypotheses, not an asserted deployed formula.
+
+    A sell can charge fees on the quote output; a budgeted buy can compute
+    fees on net quote input and invert net+fees <= budget. Preserve rounding
+    variants independently. These scenarios deliberately do not claim which
+    fee schedule, liabilities, rounding or V2 fee split the program uses.
+    """
+    if (type(from_base) is not bool or
+            any(type(v) is not int or not 0<v<2**64 for v in (amount_in,base_reserve,quote_reserve,quote_spendable))
+            or not isinstance(component_fee_bps,(list,tuple)) or len(component_fee_bps)!=3
+            or any(type(v) is not int or v<0 for v in component_fee_bps)
+            or sum(component_fee_bps)>=10000):
+        raise ValueError("invalid PumpSwap directional scenario inputs")
+    rate=sum(component_fee_bps)
+    modes=("AGGREGATE_CEIL","COMPONENT_CEIL","AGGREGATE_FLOOR")
+    def fees(x,mode):
+        if mode=="COMPONENT_CEIL":
+            return sum((x*r+9999)//10000 for r in component_fee_bps)
+        return (x*rate+(9999 if mode=="AGGREGATE_CEIL" else 0))//10000
+    results=[]
+    for mode in modes:
+        if from_base:
+            gross=quote_reserve*amount_in//(base_reserve+amount_in)
+            fee=fees(gross,mode)
+            output=gross-fee
+            if not 0<output<=gross<=quote_spendable or gross>=quote_reserve:
+                continue
+            results.append({"scenario":"SELL_QUOTE_OUTPUT_"+mode,
+                "fee_quote_base_units":fee,"gross_quote_base_units":gross,
+                "modeled_output_base_units":output,"input_budget_unspent_base_units":0})
+        else:
+            lo,hi=0,amount_in
+            while lo<hi:
+                mid=(lo+hi+1)//2
+                if mid+fees(mid,mode)<=amount_in:
+                    lo=mid
+                else:
+                    hi=mid-1
+            net=lo
+            fee=fees(net,mode)
+            output=base_reserve*net//(quote_reserve+net)
+            if not 0<output<base_reserve:
+                continue
+            results.append({"scenario":"BUY_NET_QUOTE_PLUS_FEE_"+mode,
+                "fee_quote_base_units":fee,"net_quote_input_base_units":net,
+                "input_budget_unspent_base_units":amount_in-net-fee,
+                "modeled_output_base_units":output})
+    return results
+
+
+def compare_directional_scenarios(envelope,signed_output):
+    """Reconcile an existing source envelope; never pick a winning fee model.
+
+    Matching multiple hypotheses is ambiguous. Even a single match is
+    sample agreement only; independent native SDK or repeated direction
+    and rounding-boundary evidence is still required.
+    """
+    if type(signed_output) is not int or signed_output<=0:
+        raise ValueError("positive actual PumpSwap output required")
+    candidates=envelope.get("candidates",[]) if isinstance(envelope,dict) else []
+    if not isinstance(candidates,list) or len(candidates)>131:
+        raise ValueError("invalid PumpSwap candidate budget")
+    comparisons=[]
+    for c in candidates:
+        scenarios=c.get("directional_fee_scenarios",[])
+        if not isinstance(scenarios,list) or len(scenarios)>3:
+            raise ValueError("invalid directional scenario budget")
+        for scenario in scenarios:
+            out=scenario.get("modeled_output_base_units")
+            if type(out) is not int or out<=0:
+                raise ValueError("invalid PumpSwap scenario output")
+            comparisons.append({"tier":c["tier"],"scenario":scenario["scenario"],
+                "modeled_output":out,"delta":out-signed_output,
+                "fee_quote_base_units":scenario["fee_quote_base_units"]})
+    matches=[x for x in comparisons if x["delta"]==0]
+    return {"status":"PUMPSWAP_DIRECTIONAL_SCENARIO_COMPARISON" if comparisons else
+            "NO_PUMPSWAP_DIRECTIONAL_SCENARIOS_AVAILABLE",
+        "scenario_count":len(comparisons),"matching_scenario_count":len(matches),
+        "matching_scenarios":matches,
+        "closest_absolute_delta":min((abs(x["delta"]) for x in comparisons),default=None),
+        "signed_output":signed_output,"effective_fee_verified":False,
+        "protocol_exact_verified":False,**SAFE}
+
+
 def quote_fee_candidates(fixture,*,pool,mint_in,amount_in):
     if type(amount_in)is not int or not 0<amount_in<2**64 or any(fixture.get(k)is not False for k in SAFE):
         raise ValueError("safe integer source amount required")
@@ -165,6 +251,9 @@ def quote_fee_candidates(fixture,*,pool,mint_in,amount_in):
                          "aggregate_floor_fee_units":model["aggregate_floor_fee_units"],
                          "modeled_output_rounding_low":model["minimum_modeled_output_base_units"],
                          "modeled_output_rounding_high":model["maximum_modeled_output_base_units"],
+                         "directional_fee_scenarios":directional_quote_scenarios(
+                             amount_in=amount_in,base_reserve=base,quote_reserve=pricing_quote,
+                             quote_spendable=spent_quote,from_base=from_base,component_fee_bps=values),
                          "fee_rounding_is_protocol_verified":False})
     if not outcomes:
         return {"status":"PUMPSWAP_SOURCE_FEE_CANDIDATES_CANNOT_FILL",
@@ -173,6 +262,9 @@ def quote_fee_candidates(fixture,*,pool,mint_in,amount_in):
     return {"status":"PUMPSWAP_SOURCE_FEE_TIER_SCENARIOS_NOT_EXHAUSTIVE",
             "source_slot":fixture["state_accounts_observed_slot"],"pool":pool,
             "input_mint":mint_in,"amount_in":amount_in,
+            "direction":"SELL_BASE" if from_base else "BUY_WITH_QUOTE",
+            "source_reserves":{"base":base,"quote_vault":quote,"virtual_quote":virtual,
+                "quote_spendable":spent_quote,"accrued_quote_fee_liabilities":accrued},
             "candidate_count":len(outcomes),"candidates":outcomes,
             "canonical_source_tier_selection":selected,
             "fee_mode_selected_from_source":selected is not None and selected.get("tier_selected") is True,

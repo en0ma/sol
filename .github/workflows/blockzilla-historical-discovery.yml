@@ -27,6 +27,8 @@ on:
       - "arb/blockzilla_pair_trials.py"
       - "arb/blockzilla_pair_evidence.py"
       - "arb/blockzilla_multihop.py"
+      - "arb/pumpswap_source_fee_envelope.py"
+      - "tests/test_pumpswap_directional_fee_scenarios.py"
       - "arb/fixture_all_venue_signed_quotes.py"
       - "arb/raydium_clmm_cross_tick_quote.py"
       - "arb/fixture_quote_execution_pipeline.py"
@@ -71,6 +73,7 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_raydium_amm_v4_fee_ceiling.py' -v
           python3 -m unittest discover -s tests -p 'test_damm_sdk_source_result.py' -v
           python3 -m unittest discover -s tests -p 'test_raydium_clmm_bitmap_coverage.py' -v
+          python3 -m unittest discover -s tests -p 'test_pumpswap_directional_fee_scenarios.py' -v
   http-probe:
     needs: unit
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)

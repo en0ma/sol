@@ -319,3 +319,5 @@ For archive seed-edge cycles, filter pool hints using distances between seed end
 Build pinned DAMM SDK only on uncredentialed audit runner and retain build resolution/hash. Source-clock SDK quote is indicative, never auto-promoted. Diversify six-hop alternatives across shared dependencies, including bounded no-Orca window.
 
 CLMM native quote traversal may skip only default PoolState bitmap-proven empty ranges; reject any missing set-bit array, bitmap conflict or extension range. No physical empty array fabrication. Six-hop signed acceptance achieved in bounded experiment, not full M5 or profit proof.
+
+Preserve fixed 4–6-hop budget and use separate WSOL-rooted novel-pool triangle trials for PumpSwap in opposite directions. Record hypothetical fee placement/rounding comparisons separately from deterministic native parity. Group retrospective signed estimated economics by identical input mint and size; no profit certification.

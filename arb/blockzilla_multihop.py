@@ -22,7 +22,9 @@ AMOUNTS=(100000, 1000000)
 MAX_CAPTURE_PER_HOPS=2
 MAX_SIX_HOP_CAPTURE_ATTEMPTS=4
 MAX_SIX_HOP_CAPTURED=2
-MAX_ROUTES=4
+MAX_PUMP_CAPTURED=2
+MAX_PUMP_CAPTURE_ATTEMPTS=4
+MAX_ROUTES=4+MAX_PUMP_CAPTURED
 # Coarse venue-account pressure estimates used ONLY to prioritize six-hop
 # hints; actual signed message keys and SVM acceptance remain authoritative.
 VENUE_LOCK_PRESSURE={"raydium_cpmm":8,"orca":9,"meteora_damm_v2":10,
@@ -182,6 +184,80 @@ def diverse_candidates(rows,new,*,hops):
     return chosen
 
 
+def pump_triangles(baseline,new_pools):
+    """Dedicated source-hint triangles with one PumpSwap edge and one novel edge.
+
+    Enumerate WSOL-rooted triangles by mint-pair index, not by filtering the
+    truncated four-to-six-hop search. Reserve both orientations of the same
+    topology for independent buy/sell-direction evidence. No source, quote,
+    or signed success is inferred by the graph.
+    """
+    new=registry_ids(new_pools)
+    if new & registry_ids(baseline) or any(p.get("source_verified_only") is not True for p in new_pools):
+        raise ValueError("novel source-verified identities required")
+    pairs=defaultdict(list)
+    by_id={}
+    for p in baseline+new_pools:
+        key=(p["venue"],p["address"])
+        if p["venue"] not in VENUES or key in by_id or len(p["mints"])!=2 or p["mints"][0]==p["mints"][1]:
+            continue
+        by_id[key]=p
+        pairs[frozenset(p["mints"])].append(p)
+    # Build triangles from a novel edge incident on a PumpSwap pair. This
+    # includes a novel PumpSwap seed itself and novel non-PumpSwap bridges.
+    triangles={}
+    for pump in by_id.values():
+        if pump["venue"]!="pumpswap" or WSOL not in pump["mints"]:
+            continue
+        token=next(x for x in pump["mints"] if x!=WSOL)
+        for seed in new_pools:
+            if seed["venue"]=="pumpswap" and seed["address"]!=pump["address"]:
+                continue
+            if (seed["venue"],seed["address"])==(pump["venue"],pump["address"]):
+                others=[p for p in by_id.values() if p["venue"]!="pumpswap" and token in p["mints"]]
+            else:
+                others=[seed]
+            for edge in others:
+                if edge["venue"]=="pumpswap" or token not in edge["mints"] and WSOL not in edge["mints"]:
+                    continue
+                for middle in edge["mints"]:
+                    if middle in (token,WSOL):
+                        continue
+                    # edge joins token or WSOL to middle. The other leg
+                    # must join middle to the remaining endpoint.
+                    edge_at=token if token in edge["mints"] else WSOL
+                    other_at=WSOL if edge_at==token else token
+                    for bridge in pairs.get(frozenset((middle,other_at)),[]):
+                        if bridge["venue"]=="pumpswap":
+                            continue
+                        first,last=(edge,bridge) if edge_at==token else (bridge,edge)
+                        rows=(pump,first,last)
+                        ids=frozenset((p["venue"],p["address"]) for p in rows)
+                        if len(ids)!=3 or len({p["address"] for p in rows})!=3 or not ids & new:
+                            continue
+                        if len({p["venue"] for p in rows})<2:
+                            continue
+                        triangles[tuple(sorted(ids))]=(rows,token,middle,ids)
+    ranked=sorted(triangles.values(),key=lambda x:(-len(x[3]&new),
+        sum(VENUE_LOCK_PRESSURE[p["venue"]] for p in x[0]),
+        -len({p["venue"] for p in x[0]}),tuple(sorted(x[3]))))
+    routes=[]
+    # Two topologies maximum, with opposite signed input directions for each.
+    for rows,token,middle,ids in ranked[:MAX_PUMP_CAPTURE_ATTEMPTS//2]:
+        forward=[(rows[0],WSOL,token),(rows[1],token,middle),(rows[2],middle,WSOL)]
+        reverse=[(p,out,inp) for p,inp,out in reversed(forward)]
+        for direction,ordered in (("FROM_WSOL",forward),("TO_WSOL",reverse)):
+            legs=[{"venue":p["venue"],"pool":p["address"],"input":inp,"output":out}
+                  for p,inp,out in ordered]
+            routes.append({"status":"HINT_ONLY_UNQUOTED","hops":3,"start_mint":WSOL,
+                "legs":legs,"venues":sorted({l["venue"] for l in legs}),
+                "novel_pool_identities":[list(k) for k in sorted(ids&new)],
+                "heuristic_venue_lock_pressure":sum(VENUE_LOCK_PRESSURE[p["venue"]] for p in rows),
+                "pump_direction":direction,"topology_only":True,
+                "simulation_verified":False,"net_profit_verified":False,**SAFE})
+    return routes
+
+
 def fixture_identity(fixture,row):
     verify(fixture)
     legs=row["legs"]
@@ -204,14 +280,19 @@ def prepare(rpc, evidence_dir, directory, baseline, route):
     raw=(Path(evidence_dir)/"source-authentication.json").read_bytes()
     source=json.loads(raw)
     choices,windows=candidate_routes(baseline,source["new_source_verified_pools"])
+    # Keep established 4–6-hop research budget separate from targeted PumpSwap.
+    choices[3]=pump_triangles(baseline,source["new_source_verified_pools"])
     report={"status":"BLOCKZILLA_MULTIHOP_SOURCE_RESEARCH","source_report_sha256":digest(raw),
             "excluded_from_primary_inventory":True,"windows":windows,
             "bounded_candidates_by_hops":{str(k):len(v) for k,v in choices.items()},
             "routes":[],"source_captured":0,**SAFE}
     for hops, rows in choices.items():
         captured_for_hops=0
-        cap=MAX_SIX_HOP_CAPTURED if hops==6 else 1
+        cap=MAX_SIX_HOP_CAPTURED if hops==6 else MAX_PUMP_CAPTURED if hops==3 else 1
+        captured_directions=set()
         for index,row in enumerate(rows):
+            if hops==3 and row["pump_direction"] in captured_directions:
+                continue
             item={**row,"id":f"BZ{hops}-{index+1:02d}","capture_status":"NOT_CAPTURED"}
             report["routes"].append(item)
             try:
@@ -224,6 +305,8 @@ def prepare(rpc, evidence_dir, directory, baseline, route):
                             source_slot=fixture["state_accounts_observed_slot"])
                 report["source_captured"]+=1
                 captured_for_hops+=1
+                if hops==3:
+                    captured_directions.add(row["pump_direction"])
                 clock=source_clock(rpc);item["source_clock"]=clock
                 quotes=[]
                 for amount in AMOUNTS:
@@ -399,10 +482,15 @@ def audit_receipt(receipt,fixture,row,amount):
         if venues[i]=="meteora_dlmm" and type(prediction) is not int:
             env=q.get("native_fee_envelope") or {}
             prediction=(env.get("source_derived_dynamic_fee_quote") or {}).get("amount_out")
+        pump_comparison=None
+        if venues[i]=="pumpswap":
+            from arb.pumpswap_source_fee_envelope import compare_directional_scenarios
+            pump_comparison=compare_directional_scenarios(q.get("native_fee_envelope"),actual_out)
         leg_samples.append({"venue":venues[i],"pool":q["pool"],"leg_index":i,
             "input":actual_in,"signed_output":actual_out,"modeled_output":prediction,
             "delta":prediction-actual_out if type(prediction) is int else None,
             "quote_status":q.get("quote_status"),"reason":q.get("reason"),
+            "pumpswap_scenario_comparison":pump_comparison,
             "protocol_exact_verified":False,**SAFE})
     economics=signed_net_economics(receipt,start_mint=mints[0],source_slot=row["source_slot"],
                                   fixture=fixture,observed_unix=row["source_clock"]["unix_timestamp"])
@@ -455,8 +543,58 @@ def audit(source_dir,signed_dir):
             report["audited"]+=1
         except (ValueError,RuntimeError,KeyError,TypeError,OSError) as exc:
             item.update(error_class=type(exc).__name__,diagnostic=str(exc)[:300])
+    report["native_pricing_summary"]=pricing_summary(report["attempts"])
+    report["estimated_economics_by_input"]=rank_estimated_economics(report["attempts"])
     write(root/"multihop-audit.json",report)
     return report
+
+
+def pricing_summary(attempts):
+    counts={}
+    for row in attempts:
+        for sample in row.get("audit",{}).get("native_leg_samples",[]):
+            venue=sample["venue"]
+            c=counts.setdefault(venue,{"samples":0,"predicted":0,"exact_matches":0,
+                "blocked":0,"fee_scenario_comparisons":0,"fee_scenario_match_samples":0})
+            c["samples"]+=1
+            if type(sample.get("modeled_output")) is int:
+                c["predicted"]+=1
+                c["exact_matches"]+=int(sample["delta"]==0)
+            else:
+                c["blocked"]+=1
+            comparison=sample.get("pumpswap_scenario_comparison")
+            if isinstance(comparison,dict) and comparison.get("scenario_count",0)>0:
+                c["fee_scenario_comparisons"]+=1
+                c["fee_scenario_match_samples"]+=int(comparison["matching_scenario_count"]>0)
+    return counts
+
+
+def rank_estimated_economics(attempts):
+    """Rank only independently audited outcomes with comparable denomination/size.
+
+    This is a retrospective local simulation ranking, not a quote-based
+    trading recommendation or evidence of paid fees, executable profits,
+    priority fee coverage, or a new opportunity.
+    """
+    groups=defaultdict(list)
+    for row in attempts:
+        evidence=row.get("audit",{})
+        econ=evidence.get("signed_economics",{})
+        if (evidence.get("status")!="N_LEG_PACKET_AND_RECORDED_RESPONSE_RECHECKED"
+                or any(econ.get(k) is not False for k in SAFE)
+                or type(econ.get("estimated_net_delta_start_mint_base_units")) is not int
+                or type(econ.get("observed_local_fork_gross_delta_start_mint_base_units")) is not int):
+            continue
+        key=(econ["start_mint"],row["amount"])
+        groups[key].append({"id":row["id"],"gross_delta":econ["observed_local_fork_gross_delta_start_mint_base_units"],
+            "estimated_cost":econ["estimated_cost_start_mint_base_units"],
+            "estimated_net_delta":econ["estimated_net_delta_start_mint_base_units"],
+            "model_matches_terminal":evidence["model_matches_terminal"],
+            "net_profit_verified":False,**SAFE})
+    return [{"start_mint":mint,"input_base_units":amount,
+        "status":"SIGNED_LOCAL_ESTIMATED_NET_RANKING_ONLY",
+        "routes":sorted(rows,key=lambda x:(-x["estimated_net_delta"],x["id"])),**SAFE}
+        for (mint,amount),rows in sorted(groups.items())]
 
 
 def main():
