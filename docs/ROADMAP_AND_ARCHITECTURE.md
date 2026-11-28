@@ -335,3 +335,5 @@ Capture diverse alternate 4/5-hop pool sets within separate bounded budgets. Cal
 Primary capture retains the first fixture per starting mint and may defer redundant fresh source-authenticated downward Orca cliff observations, restoring captured fallbacks when necessary to preserve exact target. Do not equate cliff with proven failure. Use existing static Whirlpool64-crossing bounded model and vary archive block windows without widening authentication budgets.
 
 Ordinary noncanonical creator-free WSOL PumpSwap flat-fee scenarios may enter the preselected research model only with authenticated mode and fee selection. Preserve separate source and execution-time Orca samples. Rejected lock-limit messages require signed packet and ALT readback recheck, never successful execution or rollback evidence.
+
+For six-hop archive selection reuse existing builders to compile unsigned source-bound account unions with distinct public placeholders. Prefer a bounded research key budget without treating estimates as runtime proof; retain deferred authenticated candidates and recompute selection independently. Preserve source versus execution-clock native leg counts.

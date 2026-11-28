@@ -295,6 +295,8 @@ def prepare(rpc, evidence_dir, directory, baseline, route):
             "bounded_candidates_by_hops":{str(k):len(v) for k,v in choices.items()},
             "routes":[],"source_captured":0,"capture_caps_by_hops":{"3":MAX_PUMP_CAPTURED,
                 "4":MAX_FOUR_FIVE_CAPTURED,"5":MAX_FOUR_FIVE_CAPTURED,"6":MAX_SIX_HOP_CAPTURED},**SAFE}
+    from arb.blockzilla_source_footprint import source_footprint,select_six_hop_sources
+    six_candidates=[]
     for hops, rows in choices.items():
         captured_for_hops=0
         cap=MAX_SIX_HOP_CAPTURED if hops==6 else MAX_PUMP_CAPTURED if hops==3 else MAX_FOUR_FIVE_CAPTURED
@@ -315,6 +317,9 @@ def prepare(rpc, evidence_dir, directory, baseline, route):
                             source_slot=fixture["state_accounts_observed_slot"])
                 report["source_captured"]+=1
                 captured_for_hops+=1
+                if hops==6:
+                    item["source_account_footprint"]=source_footprint(fixture)
+                    six_candidates.append(item)
                 if hops==3:
                     captured_directions.add(row["pump_direction"])
                 quotes=[]
@@ -326,14 +331,28 @@ def prepare(rpc, evidence_dir, directory, baseline, route):
                 quote_path=root/(item["id"]+"-quotes.json")
                 write(quote_path,quotes)
                 item["quote_sha256"]=digest(quote_path.read_bytes())
-                if captured_for_hops>=cap:
+                if hops!=6 and captured_for_hops>=cap:
                     break
             except (ValueError,RuntimeError,KeyError,TypeError,OSError) as exc:
                 item.update(error_class=type(exc).__name__,diagnostic=str(exc)[:300])
-                if captured_for_hops>=cap:
+                if hops==6 and item["capture_status"]=="CAPTURED" and item not in six_candidates:
+                    # The fixture cannot enter the selected inventory until
+                    # its source-bound footprint can be reproduced.
+                    item["capture_status"]="FOOTPRINT_PREFLIGHT_BLOCKED"
+                    report["source_captured"]-=1
+                    captured_for_hops-=1
+                if hops!=6 and captured_for_hops>=cap:
                     break
             finally:
                 write(root/"multihop-source.json",report)
+    chosen=select_six_hop_sources(six_candidates,cap=MAX_SIX_HOP_CAPTURED)
+    report["six_hop_footprint_selected_ids"]=chosen
+    report["source_captured_before_footprint_selection"]=report["source_captured"]
+    for item in six_candidates:
+        if item["id"] not in chosen:
+            item["capture_status"]="CAPTURED_NOT_SELECTED_FOOTPRINT"
+            report["source_captured"]-=1
+    report["source_footprint_deferred_count"]=len(six_candidates)-len(chosen)
     write(root/"multihop-source.json",report)
     return report
 
@@ -562,11 +581,28 @@ def audit_receipt(receipt,fixture,row,amount):
         if venues[i]=="meteora_dlmm" and type(prediction) is not int:
             env=q.get("native_fee_envelope") or {}
             prediction=(env.get("source_derived_dynamic_fee_quote") or {}).get("amount_out")
+        # Independently reprice each actual signed input at the stable clock,
+        # including downstream legs of an incomplete or divergent source chain.
+        eq=None
+        execution_prediction=None
+        if execution_unix is not None:
+            eq=quote_leg(fixture,leg_index=i,amount_in=actual_in,observed_unix=execution_unix)
+            if (eq.get("pool")!=q["pool"] or eq.get("venue")!=venues[i]
+                    or eq.get("source_slot")!=row["source_slot"] or any(eq.get(k) is not False for k in SAFE)):
+                raise ValueError("execution-clock native model identity mismatch")
+            execution_prediction=eq.get("predicted_output_base_units")
+            if venues[i]=="meteora_dlmm" and type(execution_prediction) is not int:
+                execution_prediction=((eq.get("native_fee_envelope") or {}).get(
+                    "source_derived_dynamic_fee_quote") or {}).get("amount_out")
+            if venues[i]=="pumpswap" and type(execution_prediction) is not int:
+                from arb.pumpswap_source_fee_envelope import selected_directional_model
+                chosen=selected_directional_model(eq.get("native_fee_envelope"))
+                if chosen is not None:
+                    execution_prediction=chosen["amount_out"]
         dlmm_comparison=None
         if venues[i]=="meteora_dlmm":
             dlmm_comparison=audit_swap_event(pr,keys,positive.message.instructions[i],q["pool"],owner,i,actual_in,actual_out)
             if execution_unix is not None:
-                eq=quote_leg(fixture,leg_index=i,amount_in=actual_in,observed_unix=execution_unix)
                 effective=(eq.get("native_fee_envelope") or {}).get("source_derived_dynamic_fee_quote") or {}
                 ep=effective.get("amount_out")
                 dlmm_comparison["execution_clock_modeled_output"]=ep
@@ -575,11 +611,7 @@ def audit_receipt(receipt,fixture,row,amount):
                 dlmm_comparison["execution_clock_fee_output_units"]=effective.get("fee_output_base_units")
         orca_comparison=None
         if venues[i]=="orca" and execution_unix is not None:
-            eq=quote_leg(fixture,leg_index=i,amount_in=actual_in,observed_unix=execution_unix)
-            if (eq.get("pool")!=q["pool"] or eq.get("source_slot")!=row["source_slot"]
-                    or any(eq.get(k) is not False for k in SAFE)):
-                raise ValueError("Orca execution-clock quote identity mismatch")
-            ep=eq.get("predicted_output_base_units")
+            ep=execution_prediction
             orca_comparison={"observed_unix":execution_unix,"modeled_output":ep,
                 "delta":ep-actual_out if type(ep) is int else None,
                 "exact_sample_match":ep==actual_out if type(ep) is int else None,
@@ -600,6 +632,10 @@ def audit_receipt(receipt,fixture,row,amount):
             "quote_status":q.get("quote_status"),"reason":q.get("reason"),
             "pumpswap_scenario_comparison":pump_comparison,
             "orca_execution_clock_comparison":orca_comparison,
+            "execution_clock_leg_comparison":None if eq is None else {
+                "modeled_output":execution_prediction,
+                "delta":execution_prediction-actual_out if type(execution_prediction) is int else None,
+                "preselected_research_model":venues[i]=="pumpswap",**SAFE},
             "dlmm_execution_clock_comparison":dlmm_comparison,
             "protocol_exact_verified":False,**SAFE})
     economics=signed_net_economics(receipt,start_mint=mints[0],source_slot=row["source_slot"],
@@ -636,6 +672,24 @@ def audit(source_dir,signed_dir):
     if len(rows)!=len(source["routes"]) or any(not isinstance(rid,str) or not __import__("re").fullmatch(r"BZ[3-6]-[0-9]{2}",rid) for rid in rows):
         raise ValueError("duplicate or invalid captured route identity")
     captured={r["id"]:r for r in rows.values() if r["capture_status"]=="CAPTURED"}
+    from arb.blockzilla_source_footprint import source_footprint,select_six_hop_sources
+    six_candidates=[]
+    for row in rows.values():
+        if row["hops"]!=6 or row["capture_status"] not in ("CAPTURED","CAPTURED_NOT_SELECTED_FOOTPRINT"):
+            continue
+        raw=(src/(row["id"]+"-fixture.json")).read_bytes()
+        if digest(raw)!=row["fixture_sha256"]:
+            raise ValueError("six-hop footprint source digest mismatch")
+        fixture=json.loads(raw);fixture_identity(fixture,row)
+        if source_footprint(fixture)!=row["source_account_footprint"]:
+            raise ValueError("independent unsigned source footprint differs")
+        six_candidates.append(row)
+    chosen=select_six_hop_sources(six_candidates,cap=MAX_SIX_HOP_CAPTURED)
+    if (chosen!=source.get("six_hop_footprint_selected_ids")
+            or set(chosen)!={rid for rid,row in captured.items() if row["hops"]==6}
+            or source.get("source_captured")!=len(captured)
+            or source.get("source_footprint_deferred_count")!=len(six_candidates)-len(chosen)):
+        raise ValueError("source footprint selection coverage mismatch")
     lock=Path("tools/meteora_damm_v2_reference/Cargo.lock")
     if signed.get("official_damm_sdk_lock_sha256")!=digest(lock.read_bytes()):
         raise ValueError("offline and independent SDK dependency locks differ")
@@ -665,6 +719,10 @@ def audit(source_dir,signed_dir):
             "net_profit_verified":False,
             "runner_accepted":signed["accepted"],"attempts":[],**SAFE}
     report["rejected_attempts"]=[]
+    report["six_hop_footprints_recomputed"]=len(six_candidates)
+    report["six_hop_footprint_selected_ids"]=chosen
+    report["six_hop_footprint_candidates"]=[{"id":r["id"],"selected":r["id"] in chosen,
+        "footprint":r["source_account_footprint"]} for r in six_candidates]
     for attempt in signed["attempts"]:
         if attempt["status"]!="SIGNED_N_LEG_ATOMIC_AND_ROLLBACK_VERIFIED":
             rejected={"id":attempt["id"],"amount":attempt["amount"],"status":attempt["status"],
@@ -705,6 +763,11 @@ def audit(source_dir,signed_dir):
             if digest(fixture_raw)!=row["fixture_sha256"] or digest(receipt_raw)!=attempt["receipt_sha256"]:
                 raise ValueError("source or receipt digest mismatch")
             item["audit"]=audit_receipt(json.loads(receipt_raw),json.loads(fixture_raw),row,attempt["amount"])
+            estimate=(row.get("source_account_footprint") or {}).get("resolved_account_key_estimate")
+            if type(estimate) is int:
+                actual=item["audit"]["resolved_account_key_count"]
+                item["audit"]["unsigned_footprint_comparison"]={"estimated_keys":estimate,
+                    "signed_resolved_keys":actual,"delta":estimate-actual,**SAFE}
             report["audited"]+=1
         except (ValueError,RuntimeError,KeyError,TypeError,OSError) as exc:
             item.update(error_class=type(exc).__name__,diagnostic=str(exc)[:300])
@@ -715,6 +778,7 @@ def audit(source_dir,signed_dir):
     report["modeled_grid_sample_count"]=sum(len(p["samples"]) for p in plans.values())
     report["positive_modeled_net_grid_samples"]=sum(p["positive_estimated_net_count"] for p in plans.values())
     report["native_pricing_summary"]=pricing_summary(report["attempts"])
+    report["execution_clock_pricing_summary"]=execution_pricing_summary(report["attempts"])
     report["estimated_economics_by_input"]=rank_estimated_economics(report["attempts"])
     write(root/"multihop-audit.json",report)
     return report
@@ -737,6 +801,21 @@ def pricing_summary(attempts):
             if isinstance(comparison,dict) and comparison.get("scenario_count",0)>0:
                 c["fee_scenario_comparisons"]+=1
                 c["fee_scenario_match_samples"]+=int(comparison["matching_scenario_count"]>0)
+    return counts
+
+
+def execution_pricing_summary(attempts):
+    counts={}
+    for row in attempts:
+        for sample in row.get("audit",{}).get("native_leg_samples",[]):
+            c=counts.setdefault(sample["venue"],{"samples":0,"predicted":0,"matches":0,"blocked":0})
+            c["samples"]+=1
+            comparison=sample.get("execution_clock_leg_comparison") or {}
+            if type(comparison.get("modeled_output")) is int:
+                c["predicted"]+=1
+                c["matches"]+=int(comparison["delta"]==0)
+            else:
+                c["blocked"]+=1
     return counts
 
 

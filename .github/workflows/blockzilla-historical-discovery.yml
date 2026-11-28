@@ -27,6 +27,7 @@ on:
       - "arb/blockzilla_pair_trials.py"
       - "arb/blockzilla_pair_evidence.py"
       - "arb/blockzilla_multihop.py"
+      - "arb/blockzilla_source_footprint.py"
       - "arb/blockzilla_size_plan.py"
       - "arb/meteora_dlmm_source_bin_decoder.py"
       - "arb/pumpswap_source_fee_envelope.py"

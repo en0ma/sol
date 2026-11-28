@@ -388,3 +388,5 @@ Blockzilla #21 46122097907 24/24 signed/independent complete models, 108/108 leg
 Blockzilla #22 46123078593 32/32 signed/independent,144/144 leg matches including12 PumpSwap preselected,62/64 grid complete; pair8/8, no positive net. Primary #304 46123078610 121/140,66/75 starts,117/135 pools. Fresh redundant-cliff capture deferral, static Orca 64-crossing budget and new archive window pending CI.
 
 Blockzilla #23 46137863094 4 fresh pools,24/28 signed and24 independent,99/100 deterministic plus8/8 scenario matches,20/24 execution-clock terminal matches; pair8/8. Strict creator-free WSOL flat-fee model, Orca execution-time per-leg recheck and independently resolved rejected packets pending CI.
+
+Blockzilla #24 46140142941 64/64 complete grids,28/32 signed,28/28 independent execution-clock terminal matches,4 rejected 73-key packets independently audited. 12/12 PumpSwap preselected matches. New source-bound unsigned footprint prioritization and all-venue execution-clock leg comparison pending CI.

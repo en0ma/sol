@@ -154,4 +154,31 @@ class MultihopTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,"source or status"):
                 audit_account_lock_rejection({"status":"UNVERIFIED"},{"state_account_manifest_sha256":"x"},
                     {"hops":6,"source_slot":1},100000)
+    def test_unsigned_footprint_deduplicates_program_and_shared_accounts(self):
+        from arb.blockzilla_source_footprint import instruction_footprint
+        from solders.instruction import AccountMeta
+        payer=Pubkey.new_unique();program=Pubkey.new_unique()
+        a,b,c=[Pubkey.new_unique() for _ in range(3)]
+        ixs=[Instruction(program,b"x",[AccountMeta(a,False,True),AccountMeta(b,False,True)]),
+             Instruction(program,b"y",[AccountMeta(b,False,True),AccountMeta(c,False,True)])]
+        self.assertEqual(instruction_footprint(ixs,payer),5)
+    def test_footprint_selection_preserves_fallback_and_unknown(self):
+        from arb.blockzilla_source_footprint import select_six_hop_sources,SAFE
+        def row(rid,n):
+            return {"id":rid,"source_account_footprint":{"resolved_account_key_estimate":n,
+                "status":"SOURCE_UNSIGNED_INSTRUCTION_KEY_UNION" if n is not None else
+                    "SOURCE_FOOTPRINT_RUNTIME_ACCOUNTS_UNAVAILABLE",**SAFE}}
+        a,b,c,d=row("a",73),row("b",63),row("c",None),row("d",59)
+        self.assertEqual(select_six_hop_sources([a,b,c,d]),["b","d"])
+        self.assertEqual(select_six_hop_sources([a,b,c]),["b","c"])
+        self.assertEqual(select_six_hop_sources([a,b]),["b","a"])
+        a["source_account_footprint"]["broadcast"]=True
+        with self.assertRaises(ValueError):select_six_hop_sources([a,b])
+    def test_execution_summary_distinguishes_missing_and_mismatch(self):
+        from arb.blockzilla_multihop import execution_pricing_summary
+        samples=[{"venue":"orca","execution_clock_leg_comparison":{"modeled_output":100,"delta":0}},
+                 {"venue":"orca","execution_clock_leg_comparison":{"modeled_output":100,"delta":-1}},
+                 {"venue":"orca","execution_clock_leg_comparison":None}]
+        self.assertEqual(execution_pricing_summary([{"audit":{"native_leg_samples":samples}}])["orca"],
+            {"samples":3,"predicted":2,"matches":1,"blocked":1})
 if __name__=="__main__":unittest.main()
