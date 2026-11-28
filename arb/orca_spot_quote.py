@@ -124,3 +124,40 @@ def maximum_bounded_input(state, mint_in, *, lower_sqrt_x64, upper_sqrt_x64,
             "quote":best,"probes":probes,
             "search_converged":lo==hi,
             "actionable":False,"executable_quote":False}
+
+
+def quote_inside_observed_absent_array(state,mint_in,amount_in,*,pool,fixture):
+    """Static-fee research only; original null PDA is not a synthetic tick array."""
+    from arb.whirlpool_ticks import verify_sparse_tick_fixture,start_tick,MAX_TICK,ARRAY_TICKS
+    from arb.orca_tick_math import sqrt_price_from_tick_index
+    from arb.fixture_quote_execution_pipeline import extract_pool_states
+    if any(fixture.get(k) is not False for k in ("actionable","broadcast","live_execution_approved")):
+        raise ValueError("unsafe sparse Whirlpool quote fixture")
+    verify_sparse_tick_fixture(fixture)
+    rows=extract_pool_states(fixture)
+    matches=[(i,row) for i,row in enumerate(rows) if row["address"]==pool and row["venue"]=="orca"]
+    if len(matches)!=1:
+        raise ValueError("sparse Whirlpool pool identity ambiguous")
+    i,row=matches[0]
+    if row["decoded_pool_state"]!=state or fixture["route_mints"][i]!=mint_in:
+        raise ValueError("sparse Whirlpool decoded pool/direction differs")
+    proof=fixture["leg_evidence_by_index"][i]["auxiliary"].get("sparse_tick_source")
+    if (not isinstance(proof,dict) or proof["ordered_arrays"][0] not in proof["absent_arrays"]
+            or state["fee_tier_index_seed"]!=state["tick_spacing"]):
+        raise ValueError("static sparse current array absence required")
+    spacing=state["tick_spacing"];current=state["tick_current_index"]
+    start=start_tick(current,spacing)
+    low=max(-MAX_TICK,start)
+    high=min(MAX_TICK,start+(ARRAY_TICKS-1)*spacing)
+    if not low<high:
+        raise ValueError("empty sparse array has no bounded price interval")
+    # Keep the final price strictly inside the current observed array. No
+    # assumption about another array, tick crossing or adaptive fee update.
+    lower=sqrt_price_from_tick_index(low);upper=sqrt_price_from_tick_index(high)
+    native=quote_bounded_single_tick(state,mint_in,amount_in,
+        lower_sqrt_x64=lower,upper_sqrt_x64=upper)
+    return {**native,"source":"OBSERVED_ABSENT_CURRENT_ARRAY_STATIC_BOUNDED",
+        "ticks_crossed":0,"sparse_source_coverage":{"source_slot":row["snapshot_slot"],
+            "present_contiguous_array_starts":[],"observed_absent_arrays":proof["absent_arrays"],
+            "current_array_start":start,"bounded_tick_interval":[low,high],
+            "absent_arrays_crossed":False,"protocol_exact_verified":False}}

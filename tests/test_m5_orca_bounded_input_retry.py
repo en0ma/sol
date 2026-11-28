@@ -389,6 +389,8 @@ class BoundedOfflineOrcaInputTests(unittest.TestCase):
         self.assertTrue(sizes)
         self.assertTrue(all(0<s<100000 for s in sizes))
         self.assertEqual(bounded_active_bin_input_candidates({**b,"amount_y":0},**kw),[])
+        self.assertEqual(bounded_active_bin_input_candidates(
+            {**b,"open_order_amount":1},**{**kw,"limit_order_support":True}),[])
 
 
 if __name__ == "__main__":

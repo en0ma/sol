@@ -114,10 +114,14 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix,
                         if ix not in by_start or orca_array_addresses(pool,[ix])[0] not in sparse["present_arrays"]:
                             break
                         prefix.append(by_start[ix])
-                    if not prefix:
-                        raise ValueError("Orca sparse current array absent; native quote blocked")
                     decoded_arrays=prefix
-            if decoded_arrays:
+            if sparse is not None and not decoded_arrays:
+                if orca_fee_oracle is not None:
+                    raise ValueError("adaptive Orca sparse current array absent; native quote blocked")
+                from arb.orca_spot_quote import quote_inside_observed_absent_array
+                native=quote_inside_observed_absent_array(state,leg["input_mint"],amount_in,
+                    pool=pool,fixture=fixture)
+            elif decoded_arrays:
                 if orca_fee_oracle is not None:
                     from arb.orca_adaptive_fee_source import quote_adaptive_from_arrays
                     native=quote_adaptive_from_arrays(
@@ -132,7 +136,7 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix,
                     raise ValueError("adaptive Whirlpool must have authenticated tick arrays")
                 native=quote_bounded_single_tick(state,leg["input_mint"],amount_in,
                     lower_sqrt_x64=lower,upper_sqrt_x64=upper)
-            if sparse is not None:
+            if sparse is not None and "sparse_source_coverage" not in native:
                 native["sparse_source_coverage"]={"source_slot":sparse["source_slot"],
                     "present_contiguous_array_starts":[a["start_tick"] for a in decoded_arrays],
                     "observed_absent_arrays":sparse["absent_arrays"],

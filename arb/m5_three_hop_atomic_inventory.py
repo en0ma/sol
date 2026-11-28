@@ -685,7 +685,8 @@ def offline_simulate(rpc,directory,*,amount=100000,shard_index=0,shard_count=1):
                         if size_plan is not None:
                             row["source_size_plan"]=size_plan
                             row["source_size_plan_trigger"]=str(error)[:950]
-                            retry_amounts.extend(size_plan["candidate_amounts"])
+                            if size_plan["candidate_amounts"]:
+                                retry_amounts[:]=[amount,*size_plan["candidate_amounts"]]
                         # Preserve earlier retry controls when no source-derived
                         # candidate exists. Never relax the output floor.
                         if size_plan is None or not size_plan["candidate_amounts"]:

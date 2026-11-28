@@ -210,6 +210,11 @@ def bounded_active_bin_input_candidates(bin_record,*,amount_in,x_to_y,fee_on_inp
         raise ValueError("invalid source active-bin capacity")
     if capacity<2:
         return []
+    # Do not silently ignore matching order liquidity even on a partial
+    # MM fill: the hint is explicitly scoped to market-maker-only bins.
+    if limit_order_support and bool(bin_record["limit_order_ask_side"])!=x_to_y and (
+            bin_record["open_order_amount"] or bin_record["processed_order_remaining_amount"]):
+        return []
     q=1<<64
     numerator,denominator=(price,q) if x_to_y else (q,price)
     if amount_in*numerator//denominator<=capacity:

@@ -276,3 +276,29 @@ class ExactCurrentBoundaryTests(unittest.TestCase):
             quote_multitick(state,"a",10000,[{**ticks[0],"liquidity_net":10**12},ticks[1]])
         with self.assertRaisesRegex(ValueError,"crossing budget"):
             quote_multitick(state,"a",10000,ticks,max_crossings=0)
+
+
+class ObservedAbsentArrayTests(unittest.TestCase):
+    def test_static_absent_array_model_is_bounded_and_not_synthetic(self):
+        from unittest.mock import patch
+        from arb.orca_tick_math import sqrt_price_from_tick_index
+        from arb.orca_spot_quote import quote_inside_observed_absent_array
+        state={"token_mint_a":"a","token_mint_b":"b","tick_current_index":15,
+            "tick_spacing":1,"fee_tier_index_seed":1,"liquidity":10**12,
+            "sqrt_price_x64":str(sqrt_price_from_tick_index(15)),
+            "fee_rate_hundredths_bps":3000}
+        proof={"ordered_arrays":["x","y","z"],"absent_arrays":["x","y","z"]}
+        f={"route_mints":["a","b","a"],"leg_evidence_by_index":[{"auxiliary":{"sparse_tick_source":proof}}],
+            "actionable":False,"broadcast":False,"live_execution_approved":False}
+        row={"venue":"orca","address":"pool","decoded_pool_state":state,"snapshot_slot":123}
+        with patch("arb.whirlpool_ticks.verify_sparse_tick_fixture",return_value=["x","y","z"]),patch(
+                "arb.fixture_quote_execution_pipeline.extract_pool_states",return_value=[row]):
+            q=quote_inside_observed_absent_array(state,"a",10000,pool="pool",fixture=f)
+            self.assertEqual(q["ticks_crossed"],0)
+            self.assertEqual(q["sparse_source_coverage"]["bounded_tick_interval"],[0,87])
+            self.assertFalse(q["sparse_source_coverage"]["absent_arrays_crossed"])
+            self.assertFalse(q["executable_quote"])
+            with self.assertRaisesRegex(ValueError,"reach or cross"):
+                quote_inside_observed_absent_array(state,"a",10**12,pool="pool",fixture=f)
+            with self.assertRaisesRegex(ValueError,"direction"):
+                quote_inside_observed_absent_array(state,"b",10000,pool="pool",fixture=f)
