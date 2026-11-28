@@ -176,6 +176,10 @@ def capture(rpc,graph,route_index,output,*,venue_cache=None,allow_hint_graph=Fal
     if allow_sparse_orca:
         from arb.whirlpool_ticks import verify_sparse_tick_fixture
         verify_sparse_tick_fixture(result)
+    from arb.raydium_clmm_ticks import verify_extended_direction
+    for i,proof in enumerate(evidence):
+        if proof["venue"]=="raydium_clmm":
+            verify_extended_direction(proof["pool"],mints[i],proof["auxiliary"],result)
     Path(output).write_text(json.dumps(result,sort_keys=True,indent=2)+"\n")
     return {"status":"AUTHENTICATED_FOUR_TO_SIX_HOP_SOURCE_FIXTURE",
             "hops":len(legs),"source_slot":slot,"state_account_count":len(addresses),**SAFE}

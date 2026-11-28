@@ -76,6 +76,10 @@ def source_footprint(fixture):
         if venue=="raydium_clmm":
             aux.update(clmm_direction_evidence(state,mints[i],
                 aux.get("tick_arrays_by_direction"),fixture["accounts"]))
+            from arb.raydium_clmm_ticks import verify_extended_direction
+            extension=verify_extended_direction(pool,mints[i],aux,fixture)
+            if extension is not None:
+                aux["authenticated_clmm_bitmap_extension"]=extension
         states[key]=state;evidence[key]=aux
         legs.append({"venue":venue,"pool":pool,"input_mint":mints[i],"output_mint":mints[i+1]})
     try:

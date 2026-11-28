@@ -641,6 +641,10 @@ def run_four_to_six_venue(rpc,fixture,*,amount_in=100_000,program_cache=None,
         if venue=="raydium_clmm":
             proof.update(clmm_direction_evidence(
                 state,mints[i],proof.get("tick_arrays_by_direction"),fixture["accounts"]))
+            from arb.raydium_clmm_ticks import verify_extended_direction
+            extension=verify_extended_direction(pool,mints[i],proof,fixture)
+            if extension is not None:
+                proof["authenticated_clmm_bitmap_extension"]=extension
         states[(venue,pool)]=state
         evidence[(venue,pool)]=proof
         route.append({"venue":venue,"pool":pool,

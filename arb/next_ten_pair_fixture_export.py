@@ -147,13 +147,28 @@ def venue_accounts(rpc, venue, pool, mints, *, directional_only=False):
                   "directional_bin_source":source_direction,
                   "active_bin_array_index":preflight["active_bin_array_index"]}
     elif venue=="raydium_clmm":
-        from arb.raydium_clmm_ticks import inspect
+        from arb.raydium_clmm_ticks import inspect,inspect_extended
         state=__import__("arb.raydium_clmm",fromlist=["decode"]).decode(raw)
         extras += [state["token_vault_0"],state["token_vault_1"],
                    state["amm_config"],state["observation_key"]]
         directions={}
+        extended=None
         for zero_for_one in (True,False):
-            result=inspect(rpc,pool,zero_for_one=zero_for_one)
+            try:
+                result=inspect(rpc,pool,zero_for_one=zero_for_one)
+            except ValueError as exc:
+                if not directional_only or str(exc) not in (
+                        "CLMM tick bitmap extension required",
+                        "no initialized CLMM tick array in default bitmap direction"):
+                    raise
+                # Only the actual input direction needs the extended fallback.
+                if zero_for_one!=(mints[0]==state["token_mint_0"]):
+                    continue
+                extended=inspect_extended(rpc,pool,zero_for_one)
+                direction="0_to_1" if zero_for_one else "1_to_0"
+                directions[direction]=extended["ordered_arrays"]
+                extras.extend([extended["address"],*extended["ordered_arrays"]])
+                continue
             # Raydium accepts one to five authenticated tick arrays. Do not
             # require three when the source pool only has a shorter contiguous
             # initialized prefix. The signed fork still proves swap execution.
@@ -169,6 +184,8 @@ def venue_accounts(rpc, venue, pool, mints, *, directional_only=False):
         if not directions:
             raise ValueError("no authenticated CLMM tick array direction")
         evidence={"tick_arrays_by_direction":directions}
+        if extended is not None:
+            evidence["extended_tick_source"]=extended
     elif venue=="raydium_amm_v4":
         from arb.raydium_amm_v4_preflight import verify_pool_market
         from arb.raydium_amm_v4 import decode

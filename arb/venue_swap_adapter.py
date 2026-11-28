@@ -88,8 +88,15 @@ def build_leg(venue,pool,state,evidence,owner,src,dst,
         arrays=evidence.get("tick_arrays")
         if evidence.get("tick_arrays_authenticated") is not True or not isinstance(arrays,list) or not arrays:
             raise ValueError("authenticated CLMM tick arrays unavailable")
+        extension=evidence.get("authenticated_clmm_bitmap_extension")
+        if extension is not None:
+            from arb.raydium_clmm_bitmap_extension_source import bitmap_pda
+            claim=evidence.get("extended_tick_source")
+            if (not isinstance(claim,dict) or claim.get("address")!=extension
+                    or extension!=bitmap_pda(pool) or claim.get("ordered_arrays")!=arrays):
+                raise ValueError("unbound CLMM bitmap extension")
         return build(pool,state,owner,src,dst,amount,floor,arrays,
-                     input_is_token_0=mint_in==a,is_base_input=True)
+                     input_is_token_0=mint_in==a,is_base_input=True,bitmap_extension=extension)
     if venue=="raydium_amm_v4":
         from arb.raydium_amm_v4_swap import build_swap
         a,b=state["base_mint"],state["quote_mint"]

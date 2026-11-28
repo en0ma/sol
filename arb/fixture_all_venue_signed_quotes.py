@@ -96,6 +96,9 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix,
                 seen_starts.add(start)
                 decoded_arrays.append({"start_tick":start,"ticks":records,
                     "status":"FIXED_VALID" if is_fixed else "DYNAMIC_VALID"})
+            for proof in fixture.get("leg_evidence_by_index",[]):
+                if proof.get("pool")==pool and proof.get("auxiliary",{}).get("sparse_tick_source") is not None:
+                    raise ValueError("Orca sparse source arrays require separate native traversal proof")
             if decoded_arrays:
                 if orca_fee_oracle is not None:
                     from arb.orca_adaptive_fee_source import quote_adaptive_from_arrays
@@ -158,11 +161,18 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix,
             # bitmap rather than assuming an absent array is empty.
             pool_raw=base64.b64decode(fixture["accounts"][pool]["data"][0],validate=True)
             bitmap=pool_raw[POOL_BITMAP_OFFSET:POOL_BITMAP_OFFSET+POOL_BITMAP_BYTES]
+            extension_raw=None
+            for proof in fixture.get("leg_evidence_by_index",[]):
+                if proof.get("pool")==pool and proof.get("venue")==v:
+                    from arb.raydium_clmm_ticks import verify_extended_direction,extension_bytes
+                    extension=verify_extended_direction(pool,leg["input_mint"],proof["auxiliary"],fixture)
+                    if extension is not None:
+                        extension_raw=extension_bytes(pool,extension,fixture["accounts"][extension])
             native=quote_across_initialized_ticks(
                 {**state,"authenticated_tick_array_starts":array_starts},
                 leg["input_mint"],amount_in,fee,candidates,
                 max_crossings=32,fee_on_input=selected_fee_on_input,
-                default_bitmap_bytes=bitmap)
+                default_bitmap_bytes=bitmap,extension_bitmap_bytes=extension_raw)
             q={**leg,"amount_in":amount_in,
                "amount_out":native["amount_out"],
                "snapshot_slot":row["snapshot_slot"]}

@@ -27,3 +27,18 @@ class ClmmTickTests(unittest.TestCase):
     def test_validation(self):
         for spacing in (0,-1,32768):
             with self.assertRaises(ValueError):start_tick(3,spacing)
+
+    def test_official_extension_positive_negative_word_order(self):
+        from arb.raydium_clmm_ticks import bitmap_bit,extended_tick_starts
+        from arb.raydium_clmm_bitmap_extension_source import LENGTH,DISC
+        ext=bytearray(LENGTH);ext[:8]=DISC
+        # Positive array 512 starts at word zero; negative -513 is high bit.
+        ext[40]=1;ext[40+14*64+63]=128;ext[40+14*64+64]=1
+        ext=bytes(ext);default=bytes(128)
+        self.assertTrue(bitmap_bit(default,512,ext))
+        self.assertTrue(bitmap_bit(default,-513,ext))
+        self.assertTrue(bitmap_bit(default,-1536,ext))
+        self.assertFalse(bitmap_bit(default,-514,ext))
+        self.assertEqual(extended_tick_starts(bytes(1544),ext,-30780,1,True,arrays=2),[-30780,-92160])
+        with self.assertRaisesRegex(ValueError,"extension required"):
+            bitmap_bit(default,-513)

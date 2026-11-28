@@ -29,7 +29,7 @@ def advance_sqrt(liquidity,at,net,zero_for_one):
         return ceil_div(liquidity*Q*at,liquidity*Q+net*at)
     return at+net*Q//liquidity
 
-def bitmap_coverage(starts,spacing,current_tick,bitmap_bytes):
+def bitmap_coverage(starts,spacing,current_tick,bitmap_bytes,extension_raw=None):
     """Check the default PoolState bitmap; never infer absence from a missing PDA.
 
     The bytes must originate from the same authenticated pool snapshot as
@@ -42,12 +42,11 @@ def bitmap_coverage(starts,spacing,current_tick,bitmap_bytes):
         raise ValueError("CLMM default bitmap bytes missing or malformed")
     span=60*spacing
     anchor=current_tick//span*span
-    bitmap=int.from_bytes(bitmap_bytes,"little")
+    from arb.raydium_clmm_ticks import bitmap_bit
     def initialized(start):
-        index=start//span+512
-        if start%span or not 0<=index<1024:
-            raise ValueError("CLMM tick bitmap extension required for source coverage")
-        return bool(bitmap>>index&1)
+        if start%span:
+            raise ValueError("CLMM bitmap array start misaligned")
+        return bitmap_bit(bitmap_bytes,start//span,extension_raw)
     if any(not initialized(start) for start in starts):
         raise ValueError("CLMM captured array contradicts source bitmap")
     if initialized(anchor) and anchor not in starts:
@@ -66,7 +65,7 @@ def bitmap_coverage(starts,spacing,current_tick,bitmap_bytes):
 
 def quote_across_initialized_ticks(state,mint_in,amount_in,fee_rate_ppm,ticks,
                                   *,max_crossings=32,fee_on_input=True,
-                                  default_bitmap_bytes=None):
+                                  default_bitmap_bytes=None,extension_bitmap_bytes=None):
     """Simulate crossing source-initialized ticks, respecting per-tick liquidity net.
 
     Fee rounding is per swap step. A limit-cross requires enough gross input to
@@ -113,7 +112,7 @@ def quote_across_initialized_ticks(state,mint_in,amount_in,fee_rate_ppm,ticks,
             if start%span:
                 raise ValueError("CLMM tick array range not aligned")
         if default_bitmap_bytes is not None:
-            coverage=bitmap_coverage(starts,spacing,tick,default_bitmap_bytes)
+            coverage=bitmap_coverage(starts,spacing,tick,default_bitmap_bytes,extension_bitmap_bytes)
         elif anchor not in starts:
             raise ValueError("CLMM active tick array missing from authenticated range")
     by_index={}
