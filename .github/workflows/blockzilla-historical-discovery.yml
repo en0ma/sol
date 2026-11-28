@@ -37,6 +37,8 @@ on:
       - "arb/fixture_config_quote_projection.py"
       - "tests/test_pumpswap_directional_fee_scenarios.py"
       - "arb/fixture_all_venue_signed_quotes.py"
+      - "arb/orca_multitick_quote.py"
+      - "tests/test_orca_multitick_quote.py"
       - "arb/raydium_clmm_cross_tick_quote.py"
       - "arb/fixture_quote_execution_pipeline.py"
       - "tests/test_raydium_clmm_bitmap_coverage.py"
@@ -75,6 +77,7 @@ jobs:
           bash -n ci/build_blockzilla_reader.sh
           python3 -m py_compile arb/blockzilla_discovery.py arb/blockzilla_native_archive.py arb/blockzilla_ci_gate.py arb/blockzilla_rpc_comparison.py arb/blockzilla_pair_trials.py arb/blockzilla_pair_evidence.py
           python3 -m unittest discover -s tests -p 'test_blockzilla*.py' -v
+          python3 -m unittest discover -s tests -p 'test_orca_multitick_quote.py' -v
           python3 -m unittest discover -s tests -p 'test_meteora_dlmm*quote*.py' -v
           python3 -m unittest discover -s tests -p 'test_meteora_dlmm_source_fee_envelope.py' -v
           python3 -m unittest discover -s tests -p 'test_raydium_amm_v4_fee_ceiling.py' -v
@@ -146,7 +149,7 @@ jobs:
         timeout-minutes: 20
         env:
           ARCHIVE_EPOCH: ${{ inputs.archive_epoch || '1094' }}
-          FIRST_BLOCK: ${{ inputs.archive_first_block || '0' }}
+          FIRST_BLOCK: ${{ inputs.archive_first_block || '8' }}
         run: |
           python3 -m arb.blockzilla_native_archive read \
             --binary upstream-blockzilla/target/debug/blockzilla \

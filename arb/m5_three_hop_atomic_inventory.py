@@ -256,6 +256,52 @@ def capture_attempt_order(routes, by_start, starts, captured_starts, attempted, 
             return index
     return None
 
+def source_cliff_hints(fixture):
+    """Fresh direction-specific observations, never signed rejection verdicts.
+
+    Only an authenticated first downward initialized tick with zero
+    remaining liquidity and no lower initialized ticks in the three
+    captured arrays qualifies. Do not infer a cliff on the reverse swap.
+    The first captured route per start mint remains in the primary sample.
+    """
+    from arb.whirlpool_ticks import authenticated_downward_liquidity_cliff
+    hints=[]
+    errors=[]
+    for i,venue in enumerate(fixture.get("route_venues",[])):
+        if venue!="orca":
+            continue
+        try:
+            observation=authenticated_downward_liquidity_cliff(fixture,i)
+            if (isinstance(observation,dict) and
+                    observation.get("status")=="SOURCE_AUTHENTICATED_FIRST_DOWNWARD_TICK_DEPLETES_LIQUIDITY" and
+                    observation.get("liquidity_after_first_crossing")=="0" and
+                    observation.get("additional_initialized_ticks_below_in_three_arrays")==0 and
+                    all(observation.get(k) is False for k in SAFE)):
+                hints.append({"leg_index":i,**observation})
+        except (ValueError,KeyError,TypeError,RuntimeError,OSError) as exc:
+            errors.append({"leg_index":i,"error_class":type(exc).__name__})
+    return hints,errors
+
+
+def capture_selection(rows,deferred,*,target):
+    """Retain exact primary count using authenticated fallback fixtures.
+
+    Deferred rows were captured, not rejected or signed. Restore them in
+    original order only when other source candidates cannot fill target.
+    """
+    if type(target) is not int or target<1 or len(rows)>target:
+        raise ValueError("invalid primary capture selection target")
+    if len({r["id"] for r in rows+deferred})!=len(rows)+len(deferred):
+        raise ValueError("duplicate primary source capture identity")
+    if any(r.get("source_status")!="CAPTURED" for r in rows+deferred):
+        raise ValueError("uncaptured primary selection row")
+    needed=target-len(rows)
+    restored=deferred[:needed]
+    for row in restored:
+        row["source_selection"]="CAPTURED_CLIFF_FALLBACK_FOR_FIXED_TARGET"
+    return rows+restored,deferred[needed:]
+
+
 def source_capture(rpc, graph, directory, *, shard_index=0, shard_count=1, target=None):
     from arb.m5_four_to_six_source_capture import capture
     root=Path(directory)
@@ -264,6 +310,7 @@ def source_capture(rpc, graph, directory, *, shard_index=0, shard_count=1, targe
         raise ValueError("authenticated graph required")
     rows=[]
     blocked=[]
+    deferred=[]
     venue_cache={}
     selected=[(i,r) for i,r in enumerate(graph["routes"]) if r.get("hops")==3]
     if (type(shard_index)is not int or type(shard_count)is not int
@@ -315,19 +362,58 @@ def source_capture(rpc, graph, directory, *, shard_index=0, shard_count=1, targe
             entry["source_status"]="CAPTURE_BLOCKED"
             entry["diagnostic"]=str(exc)[:1000]
         if entry["source_status"]=="CAPTURED":
-            rows.append(entry)
-            captured_starts.add(route["start_mint"])
+            hints=[];errors=[]
+            if shard_count==1 and target is not None:
+                try:
+                    hints,errors=source_cliff_hints(json.loads(fixture.read_text()))
+                except (ValueError,KeyError,TypeError,RuntimeError,OSError) as exc:
+                    errors=[{"error_class":type(exc).__name__}]
+            entry["source_cliff_hints"]=hints
+            entry["source_cliff_hint_errors"]=errors
+            if hints and route["start_mint"] in captured_starts:
+                entry["source_selection"]="CAPTURED_REDUNDANT_START_CLIFF_DEFERRED"
+                deferred.append(entry)
+            else:
+                entry["source_selection"]="CAPTURED_PRIMARY_CANDIDATE"
+                rows.append(entry)
+                captured_starts.add(route["start_mint"])
         else:
             blocked.append(entry)
         (root/"three-hop-inventory.json").write_text(json.dumps(
             {"status":"SOURCE_THREE_HOP_INVENTORY",
              "cycle_count":len(selected),"shard_index":shard_index,
              "shard_count":shard_count,"shard_cycle_count":len(rows),
-             "attempted_source_captures":len(rows)+len(blocked),
+             "attempted_source_captures":len(rows)+len(blocked)+len(deferred),
+             "captured_but_not_selected_routes":deferred,
+             "captured_but_not_selected_count":len(deferred),
+             "source_cliff_selection_is_heuristic":True,
              "selected_graph_start_mints":len(starts),
              "source_captured_start_mints":len(captured_starts),
              "uncaptured_graph_start_mints":sorted(set(starts)-captured_starts),
-             "source_capture_policy":"HISTORICAL_SIGNED_HINT_PER_MINT_THEN_DIRECTIONAL_NOVELTY_RETRY_THREE_THEN_FILL",
+             "source_capture_policy":"HISTORICAL_SIGNED_HINT_PER_MINT_THEN_DIRECTIONAL_NOVELTY_AND_REDUNDANT_CLIFF_DEFER",
+             "historically_signed_route_hints_matched":historical_priority_matches,
+             "historical_hint_not_current_verification":True,
+             "blocked_source_routes":blocked,
+             "cached_distinct_pool_directions":len(venue_cache),
+            "three_hop_truncated":graph.get("cycle_coverage_by_hops",{}).get("3",{}).get("truncated"),
+             "routes":rows,**SAFE},indent=2)+"\n")
+    if shard_count==1 and target is not None:
+        rows,deferred=capture_selection(rows,deferred,target=target)
+        captured_starts={r["mints"][0] for r in rows}
+        # Persist final selected and deferred inventories even if the target
+        # could not be met. Keep each original graph route identity unchanged.
+        (root/"three-hop-inventory.json").write_text(json.dumps(
+            {"status":"SOURCE_THREE_HOP_INVENTORY",
+             "cycle_count":len(selected),"shard_index":shard_index,
+             "shard_count":shard_count,"shard_cycle_count":len(rows),
+             "attempted_source_captures":len(rows)+len(blocked)+len(deferred),
+             "captured_but_not_selected_routes":deferred,
+             "captured_but_not_selected_count":len(deferred),
+             "source_cliff_selection_is_heuristic":True,
+             "selected_graph_start_mints":len(starts),
+             "source_captured_start_mints":len(captured_starts),
+             "uncaptured_graph_start_mints":sorted(set(starts)-captured_starts),
+             "source_capture_policy":"HISTORICAL_SIGNED_HINT_PER_MINT_THEN_DIRECTIONAL_NOVELTY_AND_REDUNDANT_CLIFF_DEFER",
              "historically_signed_route_hints_matched":historical_priority_matches,
              "historical_hint_not_current_verification":True,
              "blocked_source_routes":blocked,

@@ -196,3 +196,19 @@ class MultitickIndicativeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"crossing budget exceeded"):
             quote_from_decoded_arrays(state,"a",100000000000,
                 [{"start_tick":0,"status":"DYNAMIC_VALID","ticks":[]}])
+
+    def test_full_authenticated_budget_beyond_twelve_crossings(self):
+        from arb.orca_tick_math import sqrt_price_from_tick_index
+        state={**self.state(),"tick_spacing":1,"tick_current_index":0,
+               "sqrt_price_x64":str(Q),"fee_rate_hundredths_bps":0,
+               "liquidity":"1000000"}
+        arrays=[{"start_tick":0,"status":"FIXED_VALID",
+                 "ticks":[{"tick_index":i,"liquidity_net":"0"} for i in range(1,41)]}]
+        with self.assertRaisesRegex(ValueError,"crossing budget"):
+            quote_from_decoded_arrays(state,"b",900,arrays,max_crossings=12)
+        result=quote_from_decoded_arrays(state,"b",900,arrays,max_crossings=64)
+        self.assertGreater(result["ticks_crossed"],12)
+        self.assertEqual(sum(step["input"] for step in result["steps"]),900)
+        self.assertFalse(result["executable_quote"])
+        self.assertFalse(result["actionable"])
+

@@ -105,7 +105,7 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix,
                 else:
                     native=quote_from_decoded_arrays(
                         state,leg["input_mint"],amount_in,
-                        decoded_arrays,max_crossings=12)
+                        decoded_arrays,max_crossings=64)
             else:
                 if orca_fee_oracle is not None:
                     raise ValueError("adaptive Whirlpool must have authenticated tick arrays")

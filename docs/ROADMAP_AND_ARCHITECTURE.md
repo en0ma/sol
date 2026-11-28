@@ -331,3 +331,5 @@ Bounded pre-sign native sizing must retain original controls, rank only complete
 Independent size-plan audit rebuilds the official SDK from the sizing runner's retained dependency lock, not its executable. Rejected attempts retain separate digest-checked receipt evidence when available; missing execution cannot be promoted.
 
 Capture diverse alternate 4/5-hop pool sets within separate bounded budgets. Calculate all source size plans and comparable denomination/input rankings before any signed trial; preserve source-slot ranges and independently recompute. Pair source and execution-clock quote parity remain separate evidence.
+
+Primary capture retains the first fixture per starting mint and may defer redundant fresh source-authenticated downward Orca cliff observations, restoring captured fallbacks when necessary to preserve exact target. Do not equate cliff with proven failure. Use existing static Whirlpool64-crossing bounded model and vary archive block windows without widening authentication budgets.

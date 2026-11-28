@@ -384,3 +384,5 @@ Blockzilla #19 46118938733 all 12 signed/independent and terminal source/executi
 Blockzilla #20 46120596545 failed old mocked DLMM source fee envelope missing function_type after 38+16 tests passed. Corrected strict decoder/mock, locked independent SDK build resolution and rejected-attempt binding; fresh CI pending. No new signed size evidence.
 
 Blockzilla #21 46122097907 24/24 signed/independent complete models, 108/108 leg matches (8 PumpSwap preselected), 47/48 grid complete, no positive net. Pair 6/8 source-time native samples; new clock/event comparison and diverse 4/5-hop capture, pre-sign comparable ranking pending CI.
+
+Blockzilla #22 46123078593 32/32 signed/independent,144/144 leg matches including12 PumpSwap preselected,62/64 grid complete; pair8/8, no positive net. Primary #304 46123078610 121/140,66/75 starts,117/135 pools. Fresh redundant-cliff capture deferral, static Orca 64-crossing budget and new archive window pending CI.

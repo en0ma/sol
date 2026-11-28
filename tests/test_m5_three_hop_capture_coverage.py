@@ -246,6 +246,42 @@ class ThreeHopSourceCoverageTests(unittest.TestCase):
                     source_capture("http://127.0.0.1:8899", graph,
                                    directory, target=2)
 
+    def test_redundant_cliff_capture_preserves_first_start_and_target(self):
+        import tempfile,json
+        from pathlib import Path
+        from unittest.mock import patch
+        from arb.m5_three_hop_atomic_inventory import source_capture
+        graph={"status":"SOURCE_AUTHENTICATED_ROUTE_DISCOVERY_ONLY",
+               "routes":[route("A","a1"),route("A","a2"),route("B","b1"),
+                         route("B","b2"),route("C","c1")]}
+        seen=[]
+        def fake_capture(rpc,g,index,path,**kwargs):
+            seen.append(index)
+            Path(path).write_text(json.dumps({"index":index}))
+        def hints(fixture):
+            return ([{"status":"synthetic-cliff"}],[]) if fixture["index"] in (0,1) else ([],[])
+        with tempfile.TemporaryDirectory() as directory:
+            with patch("arb.m5_four_to_six_source_capture.capture",side_effect=fake_capture), \
+                 patch("arb.m5_three_hop_atomic_inventory.source_cliff_hints",side_effect=hints):
+                accepted=source_capture("http://127.0.0.1:8899",graph,directory,target=4)
+            report=json.loads((Path(directory)/"three-hop-inventory.json").read_text())
+        self.assertEqual(len(accepted),4)
+        self.assertEqual({r["mints"][0] for r in accepted},{"A","B","C"})
+        self.assertIn(0,[r["graph_route_index"] for r in accepted])
+        self.assertNotIn(1,[r["graph_route_index"] for r in accepted])
+        self.assertEqual(report["captured_but_not_selected_count"],1)
+        self.assertEqual(report["attempted_source_captures"],5)
+    def test_cliff_fallback_cannot_invent_capture_or_change_identity(self):
+        from arb.m5_three_hop_atomic_inventory import capture_selection
+        a={"id":"3H-01","source_status":"CAPTURED"}
+        b={"id":"3H-02","source_status":"CAPTURED"}
+        rows,left=capture_selection([a],[b],target=2)
+        self.assertEqual([r["id"] for r in rows],["3H-01","3H-02"])
+        self.assertEqual(left,[])
+        self.assertEqual(b["source_selection"],"CAPTURED_CLIFF_FALLBACK_FOR_FIXED_TARGET")
+        with self.assertRaises(ValueError):
+            capture_selection([a],[a],target=2)
+
 
 if __name__ == "__main__":
     unittest.main()
