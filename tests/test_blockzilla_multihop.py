@@ -42,6 +42,19 @@ class MultihopTests(unittest.TestCase):
             self.assertEqual(result[0]["status"],"HINT_ONLY_UNQUOTED")
         with self.assertRaisesRegex(ValueError,"required first pool"):
             cycles(rows,hint_only=True,required_first_pool=("unknown","pool"))
+    def test_six_hop_pressure_is_heuristic_not_acceptance(self):
+        mints=[key() for _ in range(6)]
+        venues=["raydium_cpmm","orca","meteora_damm_v2",
+                "orca","raydium_cpmm","raydium_clmm"]
+        rows=[{"venue":v,"address":key(),"mints":[mints[i],mints[(i+1)%6]]}
+              for i,v in enumerate(venues)]
+        alternative={**rows[1],"venue":"pumpswap","address":key()}
+        picked,_=candidate_routes(rows[1:]+[alternative],[{**rows[0],"source_verified_only":True}])
+        self.assertEqual(len(picked[6]),2)
+        self.assertLess(picked[6][0]["heuristic_venue_lock_pressure"],
+                        picked[6][1]["heuristic_venue_lock_pressure"])
+        self.assertTrue(picked[6][0]["topology_only"])
+        self.assertFalse(picked[6][0]["simulation_verified"])
     def test_legacy_packet_crypto_and_digest(self):
         payer=Keypair()
         tx=Transaction.new_signed_with_payer([Instruction(Pubkey.new_unique(),b"x",[])],

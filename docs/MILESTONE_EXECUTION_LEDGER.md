@@ -364,3 +364,5 @@ Blockzilla #46078021778: 4/4 independent packet audits, 8/8 exact sample outputs
 Blockzilla #10 46079627951: 8/8 exact leg outputs and 4/4 complete modeled terminal matches with independent source recomputation; all gross negative. Added bounded archive-derived 4–6-hop source/quote/sign/audit experiment, no empirical result yet.
 
 Blockzilla #11 46081825787 failed at regression test (23 tests, 1 error); downstream skipped and evidence gate rejected. Corrected no-anchor contract, seed-first graph enumeration and signed attempt reconciliation. No new multihop acceptance.
+
+Primary #294 46083652902 123/140 signed,66/74 starts,117/133 pools. Blockzilla #12 46083652900 four 4/5-hop independent audits, 6-hop 76 resolved keys rejected. Added AMM v4 ceiling fee fixture model and lock-aware bounded candidate alternatives. No positive net or six-hop acceptance.

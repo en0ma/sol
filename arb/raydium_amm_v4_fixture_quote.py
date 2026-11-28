@@ -28,13 +28,20 @@ def quote_from_fixture(fixture,*,pool,input_mint,amount_in,observed_unix):
         raise ValueError("AMM v4 native fee and adjusted reserves not authenticated")
     native=quote_native_fraction(row["effective_reserves_base_units"],row["mints"],
         input_mint,amount_in,row["native_fee_numerator"],row["native_fee_denominator"])
+    # Raydium AMM processor SwapBaseIn computes ceil(amount * swap_fee /
+    # denominator) before applying the integer constant-product calculation.
+    # Retain the rational scenario for diagnostic comparisons only.
+    predicted=native["protocol_fee_ceiling_amount_out"]
+    if type(predicted) is not int or predicted<=0:
+        raise ValueError("AMM v4 rounded swap fee leaves no output")
     leg={"venue":"raydium_amm_v4","pool":pool,
         "input_mint":input_mint,"output_mint":b if input_mint==a else a}
     quoted={"venue":"raydium_amm_v4","pool":pool,
         "input_mint":input_mint,"output_mint":leg["output_mint"],
-        "amount_in":amount_in,"amount_out":native["amount_out"],
+        "amount_in":amount_in,"amount_out":predicted,
+        "rational_fee_reference_amount_out":native["amount_out"],
         "snapshot_slot":row["slot"],"observed_unix":observed_unix,
-        "quote_model":"AMM_V4_NATIVE_FRACTION_ADJUSTED_RESERVE_INDICATIVE",
+        "quote_model":"AMM_V4_NATIVE_CEIL_FEE_ADJUSTED_RESERVE_INDICATIVE",
         "protocol_exact_quote_verified":False}
     # Retain an independently computed ppm-model cross-check whenever
     # the chain fraction is exactly representable in the existing provider.
@@ -55,7 +62,7 @@ def quote_from_fixture(fixture,*,pool,input_mint,amount_in,observed_unix):
             raise ValueError("AMM v4 source snapshot rejected")
         previous=provider(leg,amount_in)
         quoted["legacy_ppm_model_amount_out"]=previous["amount_out"]
-        quoted["legacy_ppm_model_difference_base_units"]=native["amount_out"]-previous["amount_out"]
+        quoted["legacy_ppm_model_difference_base_units"]=predicted-previous["amount_out"]
     return {"status":"AMM_V4_ACCOUNT_DERIVED_INDICATIVE_QUOTE",
         "quote":quoted,"snapshot_slot":row["slot"],
         "native_fee_fraction_reference":native,

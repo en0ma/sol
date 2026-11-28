@@ -20,7 +20,13 @@ from arb.m5_signed_start_mint_economics import WSOL
 
 AMOUNTS=(100000, 1000000)
 MAX_CAPTURE_PER_HOPS=2
-MAX_ROUTES=3
+MAX_SIX_HOP_CAPTURE_ATTEMPTS=4
+MAX_SIX_HOP_CAPTURED=2
+MAX_ROUTES=4
+# Coarse venue-account pressure estimates used ONLY to prioritize six-hop
+# hints; actual signed message keys and SVM acceptance remain authoritative.
+VENUE_LOCK_PRESSURE={"raydium_cpmm":8,"orca":9,"meteora_damm_v2":10,
+    "raydium_clmm":11,"meteora_dlmm":12,"raydium_amm_v4":14,"pumpswap":18}
 MAX_GRAPH_CYCLES=600
 
 
@@ -70,7 +76,10 @@ def candidate_routes(baseline,new_pools):
     by_hops={}
     for hops in (4,5,6):
         rows=[r for r in found.values() if r["hops"]==hops]
+        for row in rows:
+            row["heuristic_venue_lock_pressure"]=sum(VENUE_LOCK_PRESSURE[l["venue"]] for l in row["legs"])
         rows.sort(key=lambda r:(-len(r["novel_pool_identities"]),r["start_mint"]!=WSOL,
+                  r["heuristic_venue_lock_pressure"] if hops==6 else 0,
                   -len(r["venues"]),tuple((l["venue"],l["pool"]) for l in r["legs"])))
         # Prefer an independent pool set for the second capture attempt,
         # rather than a rotation of an already failing fixture.
@@ -81,7 +90,7 @@ def candidate_routes(baseline,new_pools):
             if pool_set in seen_sets:
                 continue
             selected.append(row);seen_sets.add(pool_set)
-            if len(selected)>=MAX_CAPTURE_PER_HOPS:
+            if len(selected)>=(MAX_SIX_HOP_CAPTURE_ATTEMPTS if hops==6 else MAX_CAPTURE_PER_HOPS):
                 break
         by_hops[hops]=selected
     return by_hops,windows
@@ -114,6 +123,8 @@ def prepare(rpc, evidence_dir, directory, baseline, route):
             "bounded_candidates_by_hops":{str(k):len(v) for k,v in choices.items()},
             "routes":[],"source_captured":0,**SAFE}
     for hops, rows in choices.items():
+        captured_for_hops=0
+        cap=MAX_SIX_HOP_CAPTURED if hops==6 else 1
         for index,row in enumerate(rows):
             item={**row,"id":f"BZ{hops}-{index+1:02d}","capture_status":"NOT_CAPTURED"}
             report["routes"].append(item)
@@ -126,6 +137,7 @@ def prepare(rpc, evidence_dir, directory, baseline, route):
                 item.update(capture_status="CAPTURED",fixture_sha256=digest(path.read_bytes()),
                             source_slot=fixture["state_accounts_observed_slot"])
                 report["source_captured"]+=1
+                captured_for_hops+=1
                 clock=source_clock(rpc);item["source_clock"]=clock
                 quotes=[]
                 for amount in AMOUNTS:
@@ -135,10 +147,11 @@ def prepare(rpc, evidence_dir, directory, baseline, route):
                 quote_path=root/(item["id"]+"-quotes.json")
                 write(quote_path,quotes)
                 item["quote_sha256"]=digest(quote_path.read_bytes())
-                break
+                if captured_for_hops>=cap:
+                    break
             except (ValueError,RuntimeError,KeyError,TypeError,OSError) as exc:
                 item.update(error_class=type(exc).__name__,diagnostic=str(exc)[:300])
-                if item["capture_status"]=="CAPTURED":
+                if captured_for_hops>=cap:
                     break
             finally:
                 write(root/"multihop-source.json",report)
@@ -184,7 +197,9 @@ def offline(rpc,directory):
                         fixture=fixture,observed_unix=row["source_clock"]["unix_timestamp"])
                 name=f'{row["id"]}-{amount}-receipt.json'
                 write(root/name,receipt)
-                item.update(status=receipt["status"],receipt=name,receipt_sha256=digest((root/name).read_bytes()))
+                item.update(status=receipt["status"],receipt=name,receipt_sha256=digest((root/name).read_bytes()),
+                            resolved_account_key_count=receipt.get("resolved_account_key_count"),
+                            runtime_account_lock_rejected=receipt.get("runtime_account_lock_rejected") is True)
                 if receipt.get("signed_atomic_simulation_verified") is True:
                     report["accepted"]+=1
             except (ValueError,RuntimeError,KeyError,TypeError,OSError) as exc:
@@ -247,6 +262,8 @@ def audit_receipt(receipt,fixture,row,amount):
     negative,_,bad_keys=decode_packet(receipt["negative_signed_transaction_wire_base64"],
         receipt["negative_signed_transaction_sha256"],receipt["negative_signed_transaction_signature"],evidence["isolated_lookup_account"])
     accounts=evidence["ephemeral_token_accounts"];owner=evidence["ephemeral_authority"]
+    if receipt.get("resolved_account_key_count")!=len(keys):
+        raise ValueError("compiled resolved key count differs from recorded receipt")
     if (len(accounts)!=n+1 or len(set(accounts))!=n+1 or str(keys[0])!=owner
             or keys!=bad_keys or positive.message.recent_blockhash!=negative.message.recent_blockhash
             or positive.signatures[0]==negative.signatures[0]
@@ -281,12 +298,33 @@ def audit_receipt(receipt,fixture,row,amount):
         raise ValueError("recorded rollback reconciliation failed")
     model=research_chain(fixture,amount_in=amount,observed_unix=row["source_clock"]["unix_timestamp"],
                          allow_modeled_dlmm=True)
+    # Diagnose each venue independently using actual signed inputs. A single
+    # blocked or mismatched upstream model must not hide downstream evidence.
+    from arb.fixture_all_venue_signed_quotes import quote_leg
+    actual_outputs=amounts[1:]+[post[-1]]
+    leg_samples=[]
+    for i,(actual_in,actual_out) in enumerate(zip(amounts,actual_outputs)):
+        q=quote_leg(fixture,leg_index=i,amount_in=actual_in,
+                    observed_unix=row["source_clock"]["unix_timestamp"])
+        if (q.get("pool")!=fixture["route_pool_addresses"][i] or q.get("venue")!=venues[i]
+                or q.get("source_slot")!=row["source_slot"] or any(q.get(k) is not False for k in SAFE)):
+            raise ValueError("multihop native model source identity mismatch")
+        prediction=q.get("predicted_output_base_units")
+        if venues[i]=="meteora_dlmm" and type(prediction) is not int:
+            env=q.get("native_fee_envelope") or {}
+            prediction=(env.get("source_derived_dynamic_fee_quote") or {}).get("amount_out")
+        leg_samples.append({"venue":venues[i],"pool":q["pool"],"leg_index":i,
+            "input":actual_in,"signed_output":actual_out,"modeled_output":prediction,
+            "delta":prediction-actual_out if type(prediction) is int else None,
+            "quote_status":q.get("quote_status"),"reason":q.get("reason"),
+            "protocol_exact_verified":False,**SAFE})
     economics=signed_net_economics(receipt,start_mint=mints[0],source_slot=row["source_slot"],
                                   fixture=fixture,observed_unix=row["source_clock"]["unix_timestamp"])
     if economics!=receipt["signed_start_mint_economics"]:
         raise ValueError("signed economics recomputation differs")
     return {"status":"N_LEG_PACKET_AND_RECORDED_RESPONSE_RECHECKED","cpi":cpi,
             "balances":balances,"source_model":model,"signed_economics":economics,
+            "resolved_account_key_count":len(keys),"native_leg_samples":leg_samples,
             "model_matches_terminal":model.get("output_base_units")==post[-1],
             "rpc_response_cryptographically_attested":False,"net_profit_verified":False,**SAFE}
 

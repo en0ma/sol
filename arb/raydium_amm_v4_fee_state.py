@@ -46,6 +46,8 @@ def quote_native_fraction(reserves,mints,input_mint,amount_in,numerator,denomina
     floor_fee_output=cpmm_after_fee(fee_floor)
     ceil_fee_output=cpmm_after_fee(fee_ceil)
     return {"amount_out":output,
+            "protocol_fee_ceiling_amount_out":ceil_fee_output,
+            "rational_fee_reference_amount_out":output,
             "integer_fee_floor_quote_output":floor_fee_output,
             "integer_fee_ceil_quote_output":ceil_fee_output,
             "fee_rounding_output_interval_base_units":[ceil_fee_output,floor_fee_output],

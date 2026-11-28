@@ -162,6 +162,9 @@ def sign_adaptive_n_leg_offline(rpc,instructions,signer,*,programs,intermediates
         if key_index not in compiled[i].accounts or key_index not in compiled[i+1].accounts:
             raise ValueError("intermediate SPL account not linked across hops "+str(i+1))
     return tx,lookup,{"instruction_order_verified":True,
+                      "resolved_account_key_count":len(keys),
+                      "static_account_key_count":len(tx.message.account_keys),
+                      "lookup_account_key_count":len(keys)-len(tx.message.account_keys),
                       "intermediate_account_linkage_verified":True,
                       "legs":n,"actionable":False,
                       "live_execution_approved":False,"broadcast":False}
@@ -416,6 +419,9 @@ def simulate_adaptive_n_leg_offline(rpc, legs, tokens, states, evidence, owner,
              "signed_prefix_observations":planned.get("observations",[]),
              "initial_balances_base_units":list(before),
              "signed_packet_bytes":packet,
+             "resolved_account_key_count":order["resolved_account_key_count"],
+             "static_account_key_count":order["static_account_key_count"],
+             "lookup_account_key_count":order["lookup_account_key_count"],
              "signed_transaction_sha256":signed_digest,
              "signed_transaction_wire_base64":base64.b64encode(bytes(tx)).decode("ascii"),
              "signed_transaction_signature":signed_signature,
@@ -426,6 +432,11 @@ def simulate_adaptive_n_leg_offline(rpc, legs, tokens, states, evidence, owner,
              "signed_atomic_simulation_verified":False,"quote_accuracy_verified":False,
              "actionable":False,"live_execution_approved":False,"broadcast":False}
     if positive.get("err") is not None:
+        if positive["err"]=="TooManyAccountLocks":
+            receipt["status"]="SIGNED_ACCOUNT_LOCK_LIMIT_REJECTED"
+            receipt["runtime_account_lock_rejected"]=True
+        if retain_audit_evidence:
+            receipt["recorded_rejected_positive_response"]=positive
         return receipt
     try:
         receipt["positive_units_consumed"]=verify_signed_compute_budget(
