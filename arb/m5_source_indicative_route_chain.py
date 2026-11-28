@@ -7,8 +7,9 @@ execution-ready. Reuses existing all-seven signed native quote dispatcher.
 from arb.fixture_quote_execution_pipeline import extract_pool_states
 from arb.fixture_all_venue_signed_quotes import quote_leg
 SAFE={"actionable":False,"live_execution_approved":False,"broadcast":False}
-def research_chain(fixture, *, amount_in, observed_unix, allow_modeled_dlmm=False):
-    if type(allow_modeled_dlmm) is not bool:
+def research_chain(fixture, *, amount_in, observed_unix, allow_modeled_dlmm=False,
+                   allow_modeled_pumpswap=False):
+    if type(allow_modeled_dlmm) is not bool or type(allow_modeled_pumpswap) is not bool:
         raise ValueError("explicit modeled quote opt-in required")
     rows=extract_pool_states(fixture)
     if any(fixture.get(k) is not False for k in SAFE):
@@ -54,6 +55,18 @@ def research_chain(fixture, *, amount_in, observed_unix, allow_modeled_dlmm=Fals
             next_amount=effective.get("amount_out")
             modeled=True
             modeled_legs+=1
+        if (allow_modeled_pumpswap and row["venue"]=="pumpswap"
+                and status=="NATIVE_QUOTE_SELECTED_FEE_MODE_NOT_EXACT"):
+            from arb.pumpswap_source_fee_envelope import selected_directional_model
+            chosen=selected_directional_model(result.get("native_fee_envelope"))
+            if chosen is not None:
+                if (chosen["pool"]!=row["address"] or chosen["source_slot"]!=fixture["state_accounts_observed_slot"]
+                        or chosen["input_mint"]!=mints[index] or chosen["output_mint"]!=mints[index+1]
+                        or chosen["amount_in"]!=current or any(chosen.get(k) is not False for k in SAFE)):
+                    raise ValueError("PumpSwap modeled quote source identity mismatch")
+                next_amount=chosen["amount_out"]
+                modeled=True
+                modeled_legs+=1
         if status!="SOURCE_BOUND_INDICATIVE" and not modeled:
             return {"status":"NATIVE_ROUTE_INDICATIVE_BLOCKED",
                     "blocked_leg_index":index,"blocked_venue":row["venue"],

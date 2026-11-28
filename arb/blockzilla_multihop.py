@@ -311,7 +311,8 @@ def prepare(rpc, evidence_dir, directory, baseline, route):
                 quotes=[]
                 for amount in AMOUNTS:
                     result=research_chain(fixture,amount_in=amount,
-                        observed_unix=clock["unix_timestamp"],allow_modeled_dlmm=True)
+                        observed_unix=clock["unix_timestamp"],allow_modeled_dlmm=True,
+                        allow_modeled_pumpswap=True)
                     quotes.append({"amount":amount,"quote":result})
                 quote_path=root/(item["id"]+"-quotes.json")
                 write(quote_path,quotes)
@@ -466,7 +467,11 @@ def audit_receipt(receipt,fixture,row,amount):
     if balances["status"]!="N_LEG_BALANCES_AND_ROLLBACK_RECONCILED":
         raise ValueError("recorded rollback reconciliation failed")
     model=research_chain(fixture,amount_in=amount,observed_unix=row["source_clock"]["unix_timestamp"],
-                         allow_modeled_dlmm=True)
+                         allow_modeled_dlmm=True,allow_modeled_pumpswap=True)
+    from arb.meteora_dlmm_signed_event_audit import stable_execution_timestamp,audit_swap_event
+    execution_unix=stable_execution_timestamp(evidence)
+    execution_model=(research_chain(fixture,amount_in=amount,observed_unix=execution_unix,
+        allow_modeled_dlmm=True,allow_modeled_pumpswap=True) if execution_unix is not None else None)
     # Diagnose each venue independently using actual signed inputs. A single
     # blocked or mismatched upstream model must not hide downstream evidence.
     from arb.fixture_all_venue_signed_quotes import quote_leg
@@ -482,24 +487,47 @@ def audit_receipt(receipt,fixture,row,amount):
         if venues[i]=="meteora_dlmm" and type(prediction) is not int:
             env=q.get("native_fee_envelope") or {}
             prediction=(env.get("source_derived_dynamic_fee_quote") or {}).get("amount_out")
+        dlmm_comparison=None
+        if venues[i]=="meteora_dlmm":
+            dlmm_comparison=audit_swap_event(pr,keys,positive.message.instructions[i],q["pool"],owner,i,actual_in,actual_out)
+            if execution_unix is not None:
+                eq=quote_leg(fixture,leg_index=i,amount_in=actual_in,observed_unix=execution_unix)
+                effective=(eq.get("native_fee_envelope") or {}).get("source_derived_dynamic_fee_quote") or {}
+                ep=effective.get("amount_out")
+                dlmm_comparison["execution_clock_modeled_output"]=ep
+                dlmm_comparison["execution_clock_delta"]=ep-actual_out if type(ep) is int else None
+                dlmm_comparison["execution_clock_fee_input_units"]=effective.get("fee_input_base_units")
+                dlmm_comparison["execution_clock_fee_output_units"]=effective.get("fee_output_base_units")
         pump_comparison=None
         if venues[i]=="pumpswap":
             from arb.pumpswap_source_fee_envelope import compare_directional_scenarios
             pump_comparison=compare_directional_scenarios(q.get("native_fee_envelope"),actual_out)
             from arb.pumpswap_signed_event_audit import audit_event
             pump_comparison["event_and_cpi"]=audit_event(fixture,positive,pr,keys,accounts,i,actual_in,actual_out)
+            from arb.pumpswap_source_fee_envelope import selected_directional_model
+            chosen=selected_directional_model(q.get("native_fee_envelope"))
+            pump_comparison["preselected_source_model"]=chosen
+            pump_comparison["preselected_model_matches"]=chosen is not None and chosen["amount_out"]==actual_out
         leg_samples.append({"venue":venues[i],"pool":q["pool"],"leg_index":i,
             "input":actual_in,"signed_output":actual_out,"modeled_output":prediction,
             "delta":prediction-actual_out if type(prediction) is int else None,
             "quote_status":q.get("quote_status"),"reason":q.get("reason"),
             "pumpswap_scenario_comparison":pump_comparison,
+            "dlmm_execution_clock_comparison":dlmm_comparison,
             "protocol_exact_verified":False,**SAFE})
     economics=signed_net_economics(receipt,start_mint=mints[0],source_slot=row["source_slot"],
                                   fixture=fixture,observed_unix=row["source_clock"]["unix_timestamp"])
     if economics!=receipt["signed_start_mint_economics"]:
         raise ValueError("signed economics recomputation differs")
+    from arb.signed_cpi_native_funding import audit_funding
+    funding=audit_funding(pr,keys,owner,economics)
     return {"status":"N_LEG_PACKET_AND_RECORDED_RESPONSE_RECHECKED","cpi":cpi,
             "balances":balances,"source_model":model,"signed_economics":economics,
+            "observed_system_funding":funding,"execution_clock_unix":execution_unix,
+            "execution_clock_before":evidence.get("positive_execution_clock_before"),
+            "execution_clock_after":evidence.get("positive_execution_clock_after"),
+            "execution_clock_model":execution_model,
+            "execution_clock_model_matches_terminal":execution_model is not None and execution_model.get("output_base_units")==post[-1],
             "resolved_account_key_count":len(keys),"native_leg_samples":leg_samples,
             "model_matches_terminal":model.get("output_base_units")==post[-1],
             "rpc_response_cryptographically_attested":False,"net_profit_verified":False,**SAFE}
@@ -592,6 +620,8 @@ def rank_estimated_economics(attempts):
             "estimated_cost":econ["estimated_cost_start_mint_base_units"],
             "estimated_net_delta":econ["estimated_net_delta_start_mint_base_units"],
             "model_matches_terminal":evidence["model_matches_terminal"],
+            "observed_creation_funding_lamports":evidence.get("observed_system_funding",{}).get("observed_creation_funding_lamports"),
+            "estimated_net_after_observed_funding":evidence.get("observed_system_funding",{}).get("estimated_net_after_observed_funding_wsol_units"),
             "net_profit_verified":False,**SAFE})
     return [{"start_mint":mint,"input_base_units":amount,
         "status":"SIGNED_LOCAL_ESTIMATED_NET_RANKING_ONLY",

@@ -410,7 +410,13 @@ def simulate_adaptive_n_leg_offline(rpc, legs, tokens, states, evidence, owner,
         rpc,planned["instructions"],signer,programs=programs,intermediates=accounts[1:-1])
     from arb.m5_signed_message_fee_estimate import estimate_signed_message_fee
     estimate=estimate_signed_message_fee(rpc,tx)
+    clock_before=clock_after=None
+    if retain_audit_evidence:
+        from arb.next_ten_fork_pool_probe import source_clock
+        clock_before=source_clock(rpc)
     positive,packet=_simulate(rpc,tx,accounts)
+    if retain_audit_evidence:
+        clock_after=source_clock(rpc)
     import hashlib
     import base64
     signed_digest=hashlib.sha256(bytes(tx)).hexdigest()
@@ -508,6 +514,8 @@ def simulate_adaptive_n_leg_offline(rpc, legs, tokens, states, evidence, owner,
         receipt["recorded_n_leg_audit_evidence"]={
             "ephemeral_token_accounts":list(accounts),"ephemeral_authority":owner,
             "positive_response":positive,"negative_response":failure,
+            "positive_execution_clock_before":clock_before,
+            "positive_execution_clock_after":clock_after,
             "persistent_before":list(before),"persistent_after_negative":persistent_after,
             "isolated_lookup_account":lookup_evidence}
     receipt.update(negative_error=str(error),negative_failure_instruction_index=idx,negative_packet_bytes=bad_packet,

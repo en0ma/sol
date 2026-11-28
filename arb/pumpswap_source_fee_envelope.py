@@ -162,6 +162,46 @@ def compare_directional_scenarios(envelope,signed_output):
         "protocol_exact_verified":False,**SAFE}
 
 
+def selected_directional_model(envelope):
+    """Preselect a research model without observing the execution output.
+
+    Limited to the ordinary canonical WSOL tier case tested in isolated
+    execution. Do not infer other pool modes or choose the closest model
+    after observing signed output. Budget residue blocks full-input chaining.
+    """
+    if not isinstance(envelope,dict) or envelope.get("fee_mode_selected_from_source") is not True:
+        return None
+    if (envelope.get("status")!="PUMPSWAP_SOURCE_FEE_TIER_SCENARIOS_NOT_EXHAUSTIVE"
+            or any(envelope.get(k) is not False for k in SAFE)):
+        return None
+    tier=envelope.get("canonical_source_tier_selection") or {}
+    if (tier.get("status")!="PUMP_CANONICAL_SOURCE_MARKET_CAP_TIER_SELECTED"
+            or tier.get("quote_asset")!="WSOL"
+            or tier.get("source_tier_account_authenticated") is not True):
+        return None
+    rows=envelope.get("candidates",[])
+    if len(rows)!=1 or rows[0].get("tier")!="selected_onchain_source_tier":
+        return None
+    direction=envelope.get("direction")
+    expected={"BUY_WITH_QUOTE":"BUY_NET_QUOTE_PLUS_COMPONENT_CEIL_MINUS_ONE",
+              "SELL_BASE":"SELL_QUOTE_OUTPUT_COMPONENT_CEIL"}.get(direction)
+    if not expected:
+        return None
+    selected=[r for r in rows[0].get("directional_fee_scenarios",[]) if r.get("scenario")==expected]
+    if len(selected)!=1 or selected[0].get("input_budget_unspent_base_units")!=0:
+        return None
+    result=selected[0]
+    amount=result.get("modeled_output_base_units")
+    if type(amount) is not int or not 0<amount<2**64:
+        return None
+    return {"status":"PUMPSWAP_SOURCE_SELECTED_DIRECTIONAL_RESEARCH_MODEL",
+            "scenario":expected,"amount_out":amount,"pool":envelope["pool"],
+            "source_slot":envelope["source_slot"],"input_mint":envelope["input_mint"],
+            "output_mint":envelope["output_mint"],"amount_in":envelope["amount_in"],
+            "fee_components_bps":tier["fees"],"fee_quote_base_units":result["fee_quote_base_units"],
+            "protocol_exact_verified":False,"effective_fee_verified":False,**SAFE}
+
+
 def quote_fee_candidates(fixture,*,pool,mint_in,amount_in):
     if type(amount_in)is not int or not 0<amount_in<2**64 or any(fixture.get(k)is not False for k in SAFE):
         raise ValueError("safe integer source amount required")
@@ -273,7 +313,8 @@ def quote_fee_candidates(fixture,*,pool,mint_in,amount_in):
                 "effective_fee_verified":False,"protocol_exact_verified":False,**SAFE}
     return {"status":"PUMPSWAP_SOURCE_FEE_TIER_SCENARIOS_NOT_EXHAUSTIVE",
             "source_slot":fixture["state_accounts_observed_slot"],"pool":pool,
-            "input_mint":mint_in,"amount_in":amount_in,
+            "input_mint":mint_in,"output_mint":quote_mint if from_base else base_mint,
+            "amount_in":amount_in,
             "direction":"SELL_BASE" if from_base else "BUY_WITH_QUOTE",
             "source_reserves":{"base":base,"quote_vault":quote,"virtual_quote":virtual,
                 "quote_spendable":spent_quote,"accrued_quote_fee_liabilities":accrued},
