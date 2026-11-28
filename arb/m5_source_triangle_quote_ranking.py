@@ -43,7 +43,8 @@ def rank(fixtures, *, amount_in, observed_unix, maximum=30,
                 if (not isinstance(result,dict)
                         or result.get("quote_status")!="SOURCE_BOUND_INDICATIVE"
                         or type(result.get("predicted_output_base_units"))is not int
-                        or result["predicted_output_base_units"]<=0
+                        or not 0<result["predicted_output_base_units"]<2**64
+                        or any(result.get(k) is not False for k in SAFE)
                         or result.get("venue")!=venues[leg_index]
                         or result.get("pool")!=fixture["route_pool_addresses"][leg_index]
                         or result.get("source_slot")!=fixture["state_accounts_observed_slot"]):
@@ -73,8 +74,32 @@ def rank(fixtures, *, amount_in, observed_unix, maximum=30,
                 row,cost_evidence_by_index.get(index),
                 observed_unix=observed_unix)
         rows.append(row)
-    ranked=sorted((r for r in rows if r["status"]=="GROSS_INDICATIVE_ONLY"),
-                  key=lambda r:r["gross_delta_start_mint_base_units"],reverse=True)
+    from collections import defaultdict
+    groups=defaultdict(list)
+    for row in rows:
+        if row["status"]=="GROSS_INDICATIVE_ONLY":
+            groups[(row["start_mint"],row["input_base_units"])].append(row)
+    ranked_groups=[]
+    for (mint,size),items in sorted(groups.items()):
+        ordered=sorted(items,key=lambda r:(-r["gross_delta_start_mint_base_units"],r["index"]))
+        net=[r for r in ordered if r.get("net_cost_evaluation",{}).get(
+            "status","").startswith("ESTIMATED_NET_")]
+        net.sort(key=lambda r:(-r["net_cost_evaluation"]["estimated_net_delta_start_mint_base_units"],r["index"]))
+        ranked_groups.append({"start_mint":mint,"input_base_units":size,
+            "gross_ranked_indices":[r["index"] for r in ordered],
+            "estimated_net_ranked_indices":[r["index"] for r in net],
+            "source_slot_range":[min(r["quotes"][0]["source_slot"] for r in ordered),
+                max(r["quotes"][0]["source_slot"] for r in ordered)],
+            "same_slot_attested":False,"net_profitability_confirmed":False,**SAFE})
+        groups[(mint,size)]=ordered
+    # A stable round-robin selection across incomparable mint denominations,
+    # not a global gross ranking. Keep the legacy ranked field for callers.
+    ranked=[]
+    ordered_groups=[groups[k] for k in sorted(groups)]
+    for depth in range(max((len(g) for g in ordered_groups),default=0)):
+        for group in ordered_groups:
+            if depth<len(group):
+                ranked.append(group[depth])
     return {"status":"GROSS_SOURCE_BOUND_RANKING_ONLY",
         "fixtures_considered":len(rows),"fully_quoted":len(ranked),
         "blocked":len(rows)-len(ranked),
@@ -87,4 +112,7 @@ def rank(fixtures, *, amount_in, observed_unix, maximum=30,
             r.get("net_cost_evaluation",{}).get("status","").startswith("ESTIMATED_NET_")
             for r in ranked),
         "ranked":ranked[:maximum],
+        "ranking_policy":"WITHIN_START_MINT_AND_INPUT_THEN_ROUND_ROBIN",
+        "comparable_ranked_groups":ranked_groups,
+        "cross_mint_economic_ranking":False,
         "all_results":rows,**SAFE}

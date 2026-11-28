@@ -105,5 +105,21 @@ class QuoteRankingTests(unittest.TestCase):
         self.assertEqual(result["blocked"],1)
 
 
+    @patch("arb.m5_source_triangle_quote_ranking.quote_leg")
+    def test_different_mints_never_share_raw_gross_ranking(self,quote):
+        fixtures=[FIXTURE,{**FIXTURE,"route_mints":["Z","B","C","Z"]},
+                  {**FIXTURE,"route_mints":["Z","B","C","Z"]}]
+        def modeled(fixture,*,leg_index,amount_in,observed_unix):
+            increment=100000 if fixture is fixtures[1] else 20
+            return {"venue":fixture["route_venues"][leg_index],
+                "pool":fixture["route_pool_addresses"][leg_index],"source_slot":123,
+                "quote_status":"SOURCE_BOUND_INDICATIVE",
+                "predicted_output_base_units":amount_in+increment,**SAFE}
+        quote.side_effect=modeled
+        result=rank(fixtures,amount_in=100,observed_unix=1,maximum=2)
+        self.assertEqual([r["start_mint"] for r in result["ranked"]],["A","Z"])
+        self.assertEqual(result["comparable_ranked_groups"][1]["gross_ranked_indices"],[1,2])
+        self.assertFalse(result["cross_mint_economic_ranking"])
+
 if __name__=="__main__":
     unittest.main()

@@ -200,6 +200,78 @@ def starting_mint_coverage_pool_subset(entries, *, maximum_per_venue=24,
             "signed_simulation_verified":False,
             **SAFE}
 
+def resilience_bridge_targets(entries,*,maximum=24):
+    """Bound source discovery toward starts dependent on a single pool.
+
+    Work on mint-pair triangles rather than enumerating all combinations
+    of parallel pool addresses. A pool is critical only if its pair occurs
+    in every triangle through the start and there is just one such pool.
+    This is topology, not an assertion about price or executable liquidity.
+    """
+    if type(maximum) is not int or not 1<=maximum<=72 or len(entries)>768:
+        raise ValueError("invalid bounded resilience target budget")
+    graph=topology(entries)
+    neighbors={m:set(n) for m,n in graph["mint_neighbors"].items()}
+    by_pair=defaultdict(list)
+    for row in entries:
+        by_pair[tuple(sorted(row["mints"]))].append((row["venue"],row["address"]))
+    def pair(a,b):
+        return tuple(sorted((a,b)))
+    fragile={}
+    proposals=defaultdict(set)
+    alternatives=defaultdict(set)
+    for mint in graph["three_hop_start_mints"]:
+        if mint in HUBS:
+            continue
+        common=None
+        # All distinct token triangles; parallel edges cannot be mandatory
+        # when a second pool on the same pair can replace the first.
+        for first in sorted(neighbors[mint]):
+            for second in sorted(neighbors[first]&neighbors[mint]):
+                if first>=second:
+                    continue
+                edges={pair(mint,first),pair(first,second),pair(second,mint)}
+                single={edge for edge in edges if len(by_pair[edge])==1}
+                common=single if common is None else common&single
+                if not common:
+                    break
+            if common is not None and not common:
+                break
+        if not common:
+            continue
+        fragile[mint]=[{"pair":list(edge),"venue":by_pair[edge][0][0],
+            "pool":by_pair[edge][0][1]} for edge in sorted(common)]
+        # Search parallel-pool alternatives to unavoidable dependencies.
+        for edge in common:
+            proposals[edge].add(mint)
+        # A new closure using two existing edges can bypass a dependency.
+        # Rank by how many existing critical pairs are avoided, not by
+        # unverified liquidity or raw token amounts.
+        for first in sorted(neighbors[mint]):
+            for last in sorted(neighbors[first]-neighbors[mint]-{mint}):
+                closure=pair(mint,last)
+                used={pair(mint,first),pair(first,last)}
+                avoided=common-used
+                if avoided:
+                    proposals[closure].add(mint)
+                    alternatives[closure].add(mint)
+    ranked=sorted(proposals,key=lambda edge:(
+        -len(proposals[edge]),-len(alternatives[edge]),
+        -int(any(m in HUBS for m in edge)),edge))
+    targets=[]
+    for edge in ranked[:maximum]:
+        a,b=edge
+        targets.append({"mint":a,"missing_hub":b,"pair":[a,b],
+            "reason":"FRAGILE_START_PARALLEL_POOL_OR_ALTERNATE_CLOSURE",
+            "affected_start_mints":sorted(proposals[edge]),
+            "alternate_closure_start_mints":sorted(alternatives[edge]),
+            "existing_pair":edge in by_pair})
+    return {"status":"TOPOLOGY_FRAGILITY_HINTS_ONLY","fragile_start_mints":fragile,
+            "targets":targets,"candidate_pair_count":len(ranked),
+            "truncated":len(ranked)>maximum,"source_authenticated":False,
+            "signed_simulation_verified":False,**SAFE}
+
+
 def derive_orca_bridge_addresses(rpc,entries,targets,*,spacings=(1,2,4,8,16,32,64,128,256)):
     """Derive Whirlpool PDAs using source-fetched config keys; no GPA scans.
 
@@ -564,13 +636,26 @@ def multi_venue_bridge_scout(rpc, entries, *, maximum_pairs=12,
 
 
 
-def scout(rpc,entries,*,maximum=360,venues=DEFAULT_VENUES):
+def scout(rpc,entries,*,maximum=360,venues=DEFAULT_VENUES,resilience_maximum=0):
+    if (type(maximum) is not int or not 1<=maximum<=360
+            or type(resilience_maximum) is not int
+            or not 0<=resilience_maximum<=min(72,maximum-1)):
+        raise ValueError("invalid combined bridge search budget")
     suggestions=bridge_targets(entries,maximum=maximum)
-    pairs=[tuple(x["pair"]) for x in suggestions["targets"]]
+    resilience=(resilience_bridge_targets(entries,maximum=resilience_maximum)
+                if resilience_maximum else None)
+    # Preserve the overall pair budget. Reserve only genuine distinct
+    # resilience targets not already searched by new-mint discovery.
+    original=suggestions["targets"]
+    original_pairs={tuple(sorted(row["pair"])) for row in original}
+    extra=[r for r in (resilience or {}).get("targets",[])
+           if tuple(sorted(r["pair"])) not in original_pairs]
+    chosen=original[:maximum-len(extra)]+extra
+    pairs=[tuple(x["pair"]) for x in chosen]
     if not pairs:raise ValueError("no topology bridge suggestions")
     if tuple(venues)!=("orca",):
         raise ValueError("direct PDA source scout supports Orca only")
-    discovery=derive_orca_bridge_addresses(rpc,entries,suggestions["targets"])
+    discovery=derive_orca_bridge_addresses(rpc,entries,chosen)
     existing={(p["venue"],p["address"]) for p in entries}
     new=[{"venue":p["venue"],"address":p["address"],"mints":p["mints"],
           "source_verified_slot":p.get("slot"),"source_verified_only":True}
@@ -586,7 +671,12 @@ def scout(rpc,entries,*,maximum=360,venues=DEFAULT_VENUES):
             "additional_candidate_start_mints":sorted(set(after["three_hop_start_mints"])-
                 set(before["three_hop_start_mints"])),
             "minimum_target_start_mints":40,"target_met_on_source_topology":after["three_hop_start_mint_count"]>=40,
-            "exploration_policy":"ALL_LEAF_TOKENS_BOTH_REMAINING_LIQUID_HUBS",
+            "exploration_policy":("NEW_MINTS_AND_BOUNDED_FRAGILE_START_ALTERNATIVES"
+                if resilience_maximum else "ALL_LEAF_TOKENS_BOTH_REMAINING_LIQUID_HUBS"),
+            "resilience_hints":resilience,
+            "resilience_pairs_searched":[r["pair"] for r in extra],
+            "resilience_new_source_verified_pools":[r for r in new
+                if tuple(sorted(r["mints"])) in {tuple(sorted(t["pair"])) for t in extra}],
             "target_met_on_signed_simulations":False,
             "searched_bridge_pairs":pairs,"source_search_venues":["orca"],
             "derived_orca_pd_as_checked":discovery["candidate_pd_as_checked"],

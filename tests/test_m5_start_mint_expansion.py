@@ -391,3 +391,28 @@ class StartMintExpansionTests(unittest.TestCase):
         self.assertNotIn("new",topology(rows)["three_hop_start_mints"])
 
 if __name__=="__main__":unittest.main()
+
+
+class ResilienceBridgeTests(unittest.TestCase):
+    def test_identifies_single_pool_dependency_and_parallel_alternative(self):
+        from arb.m5_start_mint_expansion import resilience_bridge_targets
+        rows=[{"venue":"orca","address":"ab","mints":["A","B"]},
+              {"venue":"raydium_cpmm","address":"bc","mints":["B","C"]},
+              {"venue":"orca","address":"ca","mints":["C","A"]},
+              {"venue":"orca","address":"ad","mints":["A","D"]},
+              {"venue":"raydium_cpmm","address":"de","mints":["D","E"]}]
+        result=resilience_bridge_targets(rows)
+        self.assertEqual({r["pool"] for r in result["fragile_start_mints"]["A"]},
+                         {"ab","bc","ca"})
+        self.assertTrue(any(r["pair"]==["A","E"] and "A" in r["affected_start_mints"]
+                            for r in result["targets"]))
+        self.assertFalse(result["source_authenticated"])
+        rows.append({"venue":"raydium_cpmm","address":"ab2","mints":["A","B"]})
+        result=resilience_bridge_targets(rows)
+        self.assertNotIn("ab",{r["pool"] for r in result["fragile_start_mints"]["A"]})
+
+    def test_independent_triangles_remove_single_pool_dependency(self):
+        from arb.m5_start_mint_expansion import resilience_bridge_targets
+        rows=[{"venue":"orca","address":a+b,"mints":[a,b]}
+              for a,b in (("A","B"),("B","C"),("C","A"),("A","D"),("D","E"),("E","A"))]
+        self.assertNotIn("A",resilience_bridge_targets(rows)["fragile_start_mints"])
