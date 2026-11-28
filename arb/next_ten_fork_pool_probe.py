@@ -329,15 +329,17 @@ def authenticated_distinct_venue_triangles(authenticated_pools, *, limit=30):
     by_input={}
     for edge in edges:
         by_input.setdefault(edge[0],[]).append(edge)
+    by_direction={}
+    for edge in edges:
+        by_direction.setdefault((edge[0],edge[1]),[]).append(edge)
     output=[]
     seen=set()
     for first in edges:
         for second in by_input.get(first[1],[]):
             if second[2]==first[2] or second[1] in (first[0],first[1]):
                 continue
-            for third in by_input.get(second[1],[]):
-                if (third[1]!=first[0] or
-                        len({first[2],second[2],third[2]})!=3 or
+            for third in by_direction.get((second[1],first[0]),[]):
+                if (len({first[2],second[2],third[2]})!=3 or
                         len({first[3],second[3],third[3]})!=3):
                     continue
                 identity=((first[2],first[3],first[0],first[1]),
@@ -422,20 +424,30 @@ def probe(rpc, registry, *, batch=BATCH_10, maximum_per_venue=12,
                 failures.append({"venue":venue,"pool":pool,
                                  "error_class":type(exc).__name__,
                                  "diagnostic":str(exc)[:120]})
+    # Count all pair candidates without materializing the Cartesian
+    # product of large parallel-pool sets. The ten samples are diagnostic.
+    pairs_by_venue={}
+    for venue,records in pools.items():
+        by_pair={}
+        for row in records:
+            by_pair.setdefault(tuple(sorted(row["mints"])),[]).append(row)
+        pairs_by_venue[venue]=by_pair
     routes=[]
     for first,second in batch:
         combinations=[]
+        candidate_count=0
         for a in pools[first]:
-            for b in pools[second]:
-                if set(a["mints"])==set(b["mints"]):
-                    combinations.append({"first_pool":a["pool"],
-                                         "second_pool":b["pool"],
-                                         "mint_pair":a["mints"],
-                                         "first_slot":a["slot"],
-                                         "second_slot":b["slot"]})
+            matches=pairs_by_venue[second].get(tuple(sorted(a["mints"])),[])
+            candidate_count+=len(matches)
+            for b in matches[:max(0,10-len(combinations))]:
+                combinations.append({"first_pool":a["pool"],
+                                     "second_pool":b["pool"],
+                                     "mint_pair":a["mints"],
+                                     "first_slot":a["slot"],
+                                     "second_slot":b["slot"]})
         routes.append({"first_venue":first,"second_venue":second,
-                       "authenticated_pool_pair_candidates":combinations[:10],
-                       "candidate_count":len(combinations),
+                       "authenticated_pool_pair_candidates":combinations,
+                       "candidate_count":candidate_count,
                        "signed_atomic_simulation_verified":False,
                        "rollback_failure_case_verified":False,**SAFETY})
     triangles=select_distinct_triangle_coverage(authenticated_distinct_venue_triangles(pools,limit=100),maximum=30)
@@ -447,7 +459,8 @@ def probe(rpc, registry, *, batch=BATCH_10, maximum_per_venue=12,
             "source_pool_count_limit":None if maximum_per_venue is None else 200,
             "source_pool_per_venue_limit":maximum_per_venue,
             "source_pool_attempts_by_venue":{v:len(entries[v]) for v in sorted(relevant)},
-            "source_pool_inventory_complete_for_selected_hints":True,
+            "all_selected_pool_hints_attempted":True,
+            "source_authenticated_pool_counts_by_venue":{v:len(rows) for v,rows in pools.items()},
             "route_candidates":routes,"failed_pool_checks":failures,
             "source_swap_eligibility_rejections":rejected_swap_pools,
             "source_clock_for_swap_gate":clock,

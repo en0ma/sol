@@ -800,8 +800,9 @@ def audit_primary_shard(directory):
         if row.get("simulation_status")!="SIGNED_SIMULATION_AND_ROLLBACK_VERIFIED":
             continue
         rid=row["id"];name=row["fixture"]
-        if (not re.fullmatch(r"3H-[0-9]{2,4}",rid)
-                or not re.fullmatch(r"source-[0-9]{2,4}\.json",name)
+        if (not re.fullmatch(r"3H-[0-9]{2,}",rid)
+                or not re.fullmatch(r"source-[0-9]{2,}\.json",name)
+                or int(rid.split("-")[1])!=int(name[7:-5])+1
                 or row.get("source_status")!="CAPTURED"
                 or row.get("atomic_build_status")!="SIGNED_ATOMIC_PACKET_BUILT"
                 or any(row.get(k) is not False for k in SAFE)):

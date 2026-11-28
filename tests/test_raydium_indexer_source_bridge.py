@@ -133,3 +133,27 @@ class IndexedBridgeTests(unittest.TestCase):
 
 if __name__=="__main__":
     unittest.main()
+
+
+class UnlimitedRaydiumVerificationTests(unittest.TestCase):
+    def test_verify_every_decoded_candidate_not_first_96(self):
+        hints=[{"venue":"raydium_cpmm","address":str(i).zfill(32)} for i in range(105)]
+        raw=base64.b64encode(b"pool").decode()
+        calls=[]
+        def fetch(rpc,method,params):
+            self.assertLessEqual(len(params[0]),100)
+            return {"value":[{"owner":PROGRAM,"executable":False,"data":[raw,"base64"]}
+                            for _ in params[0]]}
+        def verify(rpc,venue,address,state):
+            calls.append(address)
+            return {"venue":venue,"address":address,"mints":["A","B"],"slot":123,
+                    "swap_simulated":False}
+        with patch("arb.raydium_indexer_source_bridge.local_rpc_only"),patch(
+                "arb.raydium_indexer_source_bridge.decode",
+                return_value={"token_0_mint":"A","token_1_mint":"B"}):
+            result=discover(RPC,[],pages=2,page_size=100,maximum_verify=None,
+                index_fn=lambda **kw:hints,call_fn=fetch,verify_fn=verify)
+        self.assertEqual(len(calls),105)
+        self.assertEqual(result["verified_new_pool_count"],105)
+        self.assertIsNone(result["source_verification_pool_limit"])
+        self.assertEqual(result["unattempted_decoded_pool_count"],0)

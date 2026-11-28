@@ -71,7 +71,8 @@ def cycles(pools,anchors=None,max_hops=MAX_HOPS,max_cycles=MAX_CYCLES,truncate=F
     class BoundedDiscoveryComplete(Exception):pass
     def visit(start,current,path,used,visited):
         nonlocal edge_visits,stop_reason
-        options=closing.get((current,start),[]) if len(path)==max_hops-1 else edges[current]
+        options=(closing.get((current,start),[]) if maximum_pools is None and
+                 len(path)==max_hops-1 else edges[current])
         for e in options:
             if max_edge_visits is not None and edge_visits>=max_edge_visits:
                 stop_reason="EDGE_VISIT_LIMIT"

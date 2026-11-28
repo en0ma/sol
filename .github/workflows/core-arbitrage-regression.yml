@@ -43,6 +43,10 @@ jobs:
             test_raydium_cpmm_pda_bridge.py \
             test_raydium_indexer_source_bridge.py \
             test_m5_registry_capacity.py \
+            test_opportunity_graph.py \
+            test_next_ten_fork_pool_probe.py \
+            test_m5_seven_venue_route_scan.py \
+            test_m5_unrestricted_pool_discovery.py \
             test_meteora_indexed_source_bridge.py \
             test_m5_isolated_recent_signed_probe.py \
             test_m5_source_capture_gap_summary.py \

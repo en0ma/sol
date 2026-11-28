@@ -96,8 +96,14 @@ def campaign(rpc,entries,*,target=150,max_add=200,max_pages=10,pace=0.5,
         if expired():
             stop="TIME_BUDGET_REACHED"
             break
-        feed,_,_=FEEDS[index//PUBLIC_MAX_PAGE]
-        page=index%PUBLIC_MAX_PAGE+1
+        if all_discovered:
+            # Give every available feed a first-page opportunity before
+            # paging deeper on any one feed.
+            feed,_,_=FEEDS[index%len(FEEDS)]
+            page=index//len(FEEDS)+1
+        else:
+            feed,_,_=FEEDS[index//PUBLIC_MAX_PAGE]
+            page=index%PUBLIC_MAX_PAGE+1
         if feed in blocked_feeds:
             continue
         if pool_limit_reached():
@@ -161,11 +167,13 @@ def campaign(rpc,entries,*,target=150,max_add=200,max_pages=10,pace=0.5,
                    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"}
         mint_venues={}
         mint_degree=Counter()
-        for entry in entries:
+        for entry in (list(old.values()) if all_discovered else entries):
             for mint in entry.get("mints",[]):
                 mint_venues.setdefault(mint,set()).add(entry["venue"])
                 mint_degree[mint]+=1
-        prioritized=sorted((mint for mint in known_mints if mint not in hub_mints),
+        secondary_mints=({m for row in old.values() for m in row.get("mints",[])}
+                         if all_discovered else known_mints)
+        prioritized=sorted((mint for mint in secondary_mints if mint not in hub_mints),
             key=lambda m:(len(mint_venues.get(m,())),mint_degree[m],m),reverse=True)
         # Cap API usage; untrusted indexed rankings are never verification evidence.
         for position,mint in enumerate(prioritized[:secondary_mint_limit]):
@@ -226,7 +234,8 @@ def campaign(rpc,entries,*,target=150,max_add=200,max_pages=10,pace=0.5,
             if pace:time.sleep(pace)
 
     if stop=="PAGE_LIMIT":
-        stop="CONFIGURED_INDEX_SEARCH_COMPLETED" if all_discovered else "INDEX_FEEDS_EXHAUSTED"
+        stop=("TIME_BUDGET_REACHED" if expired() else
+              "CONFIGURED_INDEX_SEARCH_COMPLETED" if all_discovered else "INDEX_FEEDS_EXHAUSTED")
     all_pools=list(old.values())
     after_mints={m for p in all_pools for m in p.get("mints",[])}
     return {"status":("COMPLETE" if stop=="CONFIGURED_INDEX_SEARCH_COMPLETED" and not errors
@@ -234,6 +243,8 @@ def campaign(rpc,entries,*,target=150,max_add=200,max_pages=10,pace=0.5,
             "stop_reason":stop,"target_new_pools":None if all_discovered else target,
             "pool_count_limit":None if all_discovered else max_add,
             "configured_feed_page_budget":max_pages,"secondary_mint_limit":secondary_mint_limit,
+            "blocked_index_feeds":sorted(blocked_feeds),
+            "global_pool_enumeration_exhaustive":False,
             "authenticated_new_pool_count":len(new),
             "existing_pool_count":len(entries),"candidate_registry_pool_count":len(all_pools),
             "new_token_mints":sorted(after_mints-known_mints),

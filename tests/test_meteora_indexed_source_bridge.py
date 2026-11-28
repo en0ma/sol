@@ -289,3 +289,28 @@ class MeteoraIndexerTests(unittest.TestCase):
 
 if __name__=="__main__":
     unittest.main()
+
+
+class UnlimitedMeteoraVerificationTests(unittest.TestCase):
+    def test_verify_every_decoded_candidate_not_first_64(self):
+        hints=[{"venue":VENUE,"address":str(i).zfill(32)} for i in range(105)]
+        raw=base64.b64encode(b"pool").decode()
+        calls=[]
+        def fetch(rpc,method,params):
+            self.assertLessEqual(len(params[0]),100)
+            return {"value":[{"owner":PROGRAMS[VENUE],"executable":False,"data":[raw,"base64"]}
+                            for _ in params[0]]}
+        def verify(rpc,venue,address,state):
+            calls.append(address)
+            return {"venue":venue,"address":address,"mints":["A","B"],"slot":123,
+                    "swap_simulated":False}
+        with patch("arb.meteora_indexed_source_bridge.local_rpc_only"),patch.dict(
+                "arb.meteora_indexed_source_bridge.DECODERS",
+                {VENUE:lambda raw:{"token_a_mint":"A","token_b_mint":"B"}}):
+            result=discover(RPC,[],venues=(VENUE,),pages=2,page_size=100,
+                maximum_verify_per_venue=None,index_fn=lambda *a,**kw:hints,
+                call_fn=fetch,verify_fn=verify)
+        self.assertEqual(len(calls),105)
+        self.assertEqual(result["verified_new_pool_count"],105)
+        self.assertIsNone(result["venue_reports"][VENUE]["source_verification_pool_limit"])
+        self.assertEqual(result["venue_reports"][VENUE]["unattempted_decoded_pool_count"],0)

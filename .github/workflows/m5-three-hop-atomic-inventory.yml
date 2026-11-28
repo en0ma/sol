@@ -46,7 +46,7 @@ permissions:
   contents: read
 concurrency:
   group: m5-three-hop-inventory-${{ github.event.pull_request.head.ref || github.ref_name }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
   primary-native-sdk:
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
@@ -136,7 +136,7 @@ jobs:
           other=multi["source_verified_new_pools"]
           registry["pools"].extend(other)
           available=len(other)
-          # Fill remaining source-pool budget using deterministic PDAs for
+          # Find additional source pools using deterministic PDAs for
           # missing non-hub edges, without invoking rate-limited GPA search.
           nonhub=nonhub_orca_bridge_scout(
               rpc,registry["pools"],maximum_pairs=24)
@@ -178,8 +178,8 @@ jobs:
           # every accepted DAMM v2 / DLMM pool must be independently
           # decoded and vault-verified using source-fork RPC accounts.
           from arb.meteora_indexed_source_bridge import discover as indexed_meteora
-          # Proven control: four TVL pages per venue. Newest-pool hints
-          # must never consume its 48 authenticated verification slots.
+          # All decoded candidates from the configured TVL pages are verified.
+          # The separate recent-pool control remains independent.
           meteora=indexed_meteora(
               rpc,registry["pools"],pages=int(os.environ["METEORA_INDEX_PAGES"]),page_size=100,
               maximum_verify_per_venue=None,
@@ -230,13 +230,30 @@ jobs:
           broad_admission=admit(registry["pools"],broad_rows,maximum=None)
           registry["pools"].extend(broad_admission["admitted"])
           (root/"expanded-pool-inventory.json").write_text(json.dumps(registry,indent=2)+"\n")
-          graph=diversified_three_hop_graph(probe(rpc,registry,
+          readiness=probe(rpc,registry,
                         batch=tuple((a,b) for a in ORDER for b in ORDER if a!=b),
                         maximum_per_venue=None,
                         require_dlmm_swap_eligible=True,
-                        prefer_start_mint_coverage=True,historical_recovery=True),
+                        prefer_start_mint_coverage=True,historical_recovery=True)
+          assert readiness["source_pool_count_limit"] is None
+          assert readiness["source_pool_per_venue_limit"] is None
+          assert readiness["all_selected_pool_hints_attempted"] is True
+          attempted=sum(readiness["source_pool_attempts_by_venue"].values())
+          verified=sum(map(len,readiness["authenticated_pools"].values()))
+          assert attempted==verified+len(readiness["failed_pool_checks"])+len(readiness["source_swap_eligibility_rejections"]), "source pool coverage not reconciled"
+          (root/"full-authenticated-pool-inventory.json").write_text(json.dumps(readiness,indent=2)+"\n")
+          graph=diversified_three_hop_graph(readiness,
                         maximum=max(200,3*topology(registry["pools"])["three_hop_start_mint_count"]),
                         allow_start_rotations=True,recovery_ordering=True)
+          graph["full_pool_discovery"]={
+              "attempted":attempted,"authenticated":verified,
+              "per_venue_attempted":readiness["source_pool_attempts_by_venue"],
+              "per_venue_authenticated":readiness["source_authenticated_pool_counts_by_venue"],
+              "authentication_failures":len(readiness["failed_pool_checks"]),
+              "activation_rejections":len(readiness["source_swap_eligibility_rejections"]),
+              "pool_count_limit":None,"signed_control_target":140,
+              "cycle_search_exhaustive":False,
+              "actionable":False,"broadcast":False,"live_execution_approved":False}
           graph["source_bridge_discovery"]={
               "new_verified_pool_identities":len(new)+min(len(other),available)+min(len(extra),room)+min(len(cpmm_new),cpmm_room)+index_admission["admitted_count"]+meteora_admission["admitted_count"]+broad_admission["admitted_count"],
               "meteora_indexed_source_verified_new_pools":meteora_admission["admitted_count"],
@@ -291,6 +308,9 @@ jobs:
                             "selected_distinct_start_mints":graph["three_hop_distinct_start_mints"],
                             "required_verified_start_mints":40,
                             "source_bridge_discovery":graph["source_bridge_discovery"],
+                            "full_pool_discovery":graph["full_pool_discovery"],
+                            "candidate_start_mints":graph["three_hop_candidate_start_mints"],
+                            "per_start_search_truncated":len(graph["three_hop_per_start_search_truncated_mints"]),
                             "selected_distinct_pools":graph["three_hop_distinct_selected_pools"],
                             "dlmm_swap_activation_rejections":graph["source_swap_eligibility_rejection_count"],
                             "selection_policy":graph["three_hop_sample_policy"]}))
