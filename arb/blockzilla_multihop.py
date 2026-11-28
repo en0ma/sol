@@ -99,30 +99,40 @@ def candidate_routes(baseline,new_pools):
                "cycle_counts_by_hops":{},"cycle_limit_reached_by_hops":{}}
         windows.append(stats)
         for hops in (4,5,6):
-            window,window_stats=seed_window(all_rows,seed,hops=hops)
-            search={}
-            paths=cycles(window,anchors=anchors,max_hops=hops,min_hops=hops,
-                         max_cycles=MAX_GRAPH_CYCLES,truncate=True,hint_only=True,
-                         required_first_pool=(seed["venue"],seed["address"]),
-                         max_edge_visits=MAX_EDGE_VISITS,search_stats=search)
-            stats["windows_by_hops"][str(hops)]={**window_stats,**search}
-            stats["cycle_counts_by_hops"][str(hops)]=len(paths)
-            stats["cycle_limit_reached_by_hops"][str(hops)]=search["stop_reason"]=="CYCLE_LIMIT"
-            for row in paths:
-                identities={(l["venue"],l["pool"]) for l in row["legs"]}
-                if not identities & new or len({l["pool"] for l in row["legs"]})!=hops:
-                    continue
-                if len(row["venues"])<2:
-                    continue
-                legs=row["legs"]
-                # Rotate to WSOL where possible for direct fee denomination.
-                if any(l["input"]==WSOL for l in legs):
-                    idx=next(i for i,l in enumerate(legs) if l["input"]==WSOL)
-                    legs=legs[idx:]+legs[:idx]
-                key=tuple((l["venue"],l["pool"],l["input"]) for l in legs)
-                found[key]={**row,"legs":legs,"start_mint":legs[0]["input"],
-                            "novel_pool_identities":[list(k) for k in sorted(identities & new)],
-                            "topology_only":True,**SAFE}
+            # Search an independent no-Orca window as well as the normal
+            # window. A result cap in the normal window must not starve
+            # alternatives that do not depend on missing Whirlpool arrays.
+            variants=[("ALL_VENUES",all_rows)]
+            if hops==6 and seed["venue"]!="orca":
+                variants.append(("NO_ORCA",[p for p in all_rows if p["venue"]!="orca"]))
+            stats["windows_by_hops"][str(hops)]={}
+            stats["cycle_counts_by_hops"][str(hops)]=0
+            stats["cycle_limit_reached_by_hops"][str(hops)]=False
+            for label,variant in variants:
+                window,window_stats=seed_window(variant,seed,hops=hops)
+                search={}
+                paths=cycles(window,anchors=anchors,max_hops=hops,min_hops=hops,
+                             max_cycles=MAX_GRAPH_CYCLES,truncate=True,hint_only=True,
+                             required_first_pool=(seed["venue"],seed["address"]),
+                             max_edge_visits=MAX_EDGE_VISITS,search_stats=search)
+                stats["windows_by_hops"][str(hops)][label]={**window_stats,**search}
+                stats["cycle_counts_by_hops"][str(hops)]+=len(paths)
+                stats["cycle_limit_reached_by_hops"][str(hops)] |= search["stop_reason"]=="CYCLE_LIMIT"
+                for row in paths:
+                    identities={(l["venue"],l["pool"]) for l in row["legs"]}
+                    if not identities & new or len({l["pool"] for l in row["legs"]})!=hops:
+                        continue
+                    if len(row["venues"])<2:
+                        continue
+                    legs=row["legs"]
+                    # Rotate to WSOL where possible for direct fee denomination.
+                    if any(l["input"]==WSOL for l in legs):
+                        idx=next(i for i,l in enumerate(legs) if l["input"]==WSOL)
+                        legs=legs[idx:]+legs[:idx]
+                    key=tuple((l["venue"],l["pool"],l["input"]) for l in legs)
+                    found[key]={**row,"legs":legs,"start_mint":legs[0]["input"],
+                                "novel_pool_identities":[list(k) for k in sorted(identities & new)],
+                                "topology_only":True,**SAFE}
     by_hops={}
     for hops in (4,5,6):
         rows=[r for r in found.values() if r["hops"]==hops]
@@ -133,17 +143,43 @@ def candidate_routes(baseline,new_pools):
                   -len(r["venues"]),tuple((l["venue"],l["pool"]) for l in r["legs"])))
         # Prefer an independent pool set for the second capture attempt,
         # rather than a rotation of an already failing fixture.
-        selected=[]
-        seen_sets=set()
-        for row in rows:
-            pool_set=frozenset((l["venue"],l["pool"]) for l in row["legs"])
-            if pool_set in seen_sets:
-                continue
-            selected.append(row);seen_sets.add(pool_set)
-            if len(selected)>=(MAX_SIX_HOP_CAPTURE_ATTEMPTS if hops==6 else MAX_CAPTURE_PER_HOPS):
-                break
-        by_hops[hops]=selected
+        by_hops[hops]=diverse_candidates(rows,new,hops=hops)
     return by_hops,windows
+
+
+def diverse_candidates(rows,new,*,hops):
+    """Select distinct sets and minimize repeated non-seed dependencies.
+
+    Keep the first ranked choice; the second six-hop choice prefers an
+    Orca-free route if available. Later choices minimize repeated Whirlpool
+    dependencies, then repeated other pool identities. This is not a claim
+    of liquidity or source availability.
+    """
+    remaining=[]
+    seen_sets=set()
+    for row in rows:
+        ids=frozenset((l["venue"],l["pool"]) for l in row["legs"])
+        if ids not in seen_sets:
+            seen_sets.add(ids)
+            remaining.append((row,ids))
+    chosen=[]
+    used=defaultdict(int)
+    maximum=MAX_SIX_HOP_CAPTURE_ATTEMPTS if hops==6 else MAX_CAPTURE_PER_HOPS
+    while remaining and len(chosen)<maximum:
+        def score(item):
+            row,ids=item
+            repeated=ids-new
+            orca=sum(used[k] for k in repeated if k[0]=="orca")
+            overlap=sum(used[k] for k in repeated)
+            no_orca_penalty=int("orca" in row["venues"]) if hops==6 and len(chosen)==1 else 0
+            return (no_orca_penalty,orca,overlap,remaining.index(item)) if hops==6 and chosen else (remaining.index(item),)
+        selected=min(remaining,key=score)
+        remaining.remove(selected)
+        row,ids=selected
+        chosen.append(row)
+        for k in ids-new:
+            used[k]+=1
+    return chosen
 
 
 def fixture_identity(fixture,row):

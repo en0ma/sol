@@ -34,6 +34,12 @@ def quote_pool_account(account,*,mint_in,amount_in,fork_unix_timestamp,
     if result.returncode:
         raise ValueError("official Meteora SDK rejected source pool: "+result.stderr[-250:])
     reply=json.loads(result.stdout)
+    if (not isinstance(reply,dict) or reply.get("status")!="OFFICIAL_METEORA_DAMM_V2_EXACT_INPUT"
+            or reply.get("official_repository_revision")!="5398b5c7c534de014091132da37c6478cce671a8"
+            or type(reply.get("amount_in")) is not int or reply["amount_in"]!=amount_in
+            or type(reply.get("amount_left")) is not int or reply["amount_left"]!=0
+            or any(reply.get(k) is not False for k in ("actionable","broadcast","live_execution_approved"))):
+        raise ValueError("official Meteora SDK result incomplete or inconsistent")
     amount=reply.get("amount_out")
     if type(amount)is not int or not 0<amount<2**64:
         raise ValueError("official Meteora SDK returned invalid amount")

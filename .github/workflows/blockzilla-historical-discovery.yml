@@ -27,6 +27,11 @@ on:
       - "arb/blockzilla_pair_trials.py"
       - "arb/blockzilla_pair_evidence.py"
       - "arb/blockzilla_multihop.py"
+      - "arb/fixture_all_venue_signed_quotes.py"
+      - "arb/meteora_damm_v2_native_quote.py"
+      - "arb/meteora_damm_v2_source_scenarios.py"
+      - "tools/meteora_damm_v2_reference/**"
+      - "ci/build_meteora_damm_v2_reference.sh"
       - "arb/raydium_amm_v4_fee_state.py"
       - "arb/raydium_amm_v4_fixture_quote.py"
       - "arb/opportunity_graph.py"
@@ -61,6 +66,7 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_meteora_dlmm*quote*.py' -v
           python3 -m unittest discover -s tests -p 'test_meteora_dlmm_source_fee_envelope.py' -v
           python3 -m unittest discover -s tests -p 'test_raydium_amm_v4_fee_ceiling.py' -v
+          python3 -m unittest discover -s tests -p 'test_damm_sdk_source_result.py' -v
   http-probe:
     needs: unit
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
@@ -369,12 +375,18 @@ jobs:
   independent-multihop-evidence:
     needs: isolated-multihop-offline
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
       - run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Build existing revision-pinned official DAMM SDK reference (no RPC secrets)
+        id: damm-sdk
+        continue-on-error: true
+        timeout-minutes: 20
+        run: bash ci/build_meteora_damm_v2_reference.sh "$RUNNER_TEMP/damm-sdk-build"
+
       - uses: actions/download-artifact@v4
         with:
           name: blockzilla-multihop-source
@@ -388,9 +400,14 @@ jobs:
         if: always()
         with:
           name: blockzilla-multihop-independent-audit
-          path: ${{ runner.temp }}/multihop-signed/multihop-audit.json
+          path: |
+            ${{ runner.temp }}/multihop-signed/multihop-audit.json
+            ${{ runner.temp }}/damm-sdk-build/
           if-no-files-found: warn
           retention-days: 7
+      - name: Require official SDK build to succeed
+        if: always()
+        run: test "${{ steps.damm-sdk.outcome }}" = success
   independent-pair-evidence:
     needs: isolated-pair-offline
     runs-on: ubuntu-latest

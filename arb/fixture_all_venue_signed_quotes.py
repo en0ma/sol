@@ -202,17 +202,21 @@ def quote_leg(fixture,*,leg_index,amount_in,observed_unix,
                     candidate=scenario_envelope(fixture,pool=pool,
                         mint_in=leg["input_mint"],amount_in=amount_in,
                         observed_unix=observed_unix)
+                    if (candidate.get("status")!="DAMM_V2_OFFICIAL_RUST_NATIVE_QUOTE"
+                            or candidate.get("pool")!=pool
+                            or candidate.get("source_slot")!=row["snapshot_slot"]
+                            or candidate.get("input_mint")!=leg["input_mint"]
+                            or candidate.get("input_base_units")!=amount_in
+                            or type(candidate.get("amount_out")) is not int
+                            or candidate["amount_out"]<=0
+                            or any(candidate.get(k) is not False for k in SAFE)):
+                        raise ValueError("DAMM SDK source result identity mismatch")
                     return {"venue":v,"pool":pool,"leg_index":leg_index,
                         "source_slot":row["snapshot_slot"],
-                        "predicted_output_base_units":None,
-                        "quote_status":("NATIVE_QUOTE_SOURCE_BASE_FEE_NOT_EXACT"
-                            if isinstance(candidate.get("source_pool_fee_schedule"),dict)
-                            and candidate["source_pool_fee_schedule"].get("status")==
-                                "SOURCE_DAMM_BASE_FEE_ONLY_NOT_PROTOCOL_EXACT"
-                            and candidate["source_pool_fee_schedule"].get("dynamic_fee_initialized") is False
-                            else "SOURCE_BOUND_FEE_MODE_SCENARIO_NOT_EXACT"),
+                        "predicted_output_base_units":candidate["amount_out"],
+                        "quote_status":"SOURCE_BOUND_INDICATIVE",
                         "native_fee_envelope":candidate,
-                        "reason":"DAMM v2 effective dynamic fee or curve parity unverified",
+                        "reason":"official SDK source-clock scenario; execution parity unverified",
                         "protocol_exact_verified":False,**SAFE}
                 raise ValueError("MISSING_NATIVE_AUXILIARY_STATE: "+v+
                     " source-verified effective fees, reserves and/or bin arrays")

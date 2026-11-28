@@ -28,4 +28,7 @@ def scenario_envelope(fixture,*,pool,mint_in,amount_in,
             "amount_out":result["amount_out"],
             "native_pricing_engine":"OFFICIAL_METEORA_RUST_SDK",
             "protocol_exact_reference":True,
+            "source_clock_scenario":{"unix_timestamp":observed_unix,
+                "slot_used":fixture["state_accounts_observed_slot"],
+                "same_slot_clock_attested":False,"isolated_execution_clock_attested":False},
             "signed_execution_parity_verified":False,**SAFE}

@@ -368,3 +368,5 @@ Blockzilla #11 46081825787 failed at regression test (23 tests, 1 error); downst
 Primary #294 46083652902 123/140 signed,66/74 starts,117/133 pools. Blockzilla #12 46083652900 four 4/5-hop independent audits, 6-hop 76 resolved keys rejected. Added AMM v4 ceiling fee fixture model and lock-aware bounded candidate alternatives. No positive net or six-hop acceptance.
 
 Primary #295 46088719280 repeats 123/140 signed,66/74 starts,117/133 pools. Blockzilla #13 46088719256 failed six-hop graph regression (0 candidates vs 2); corrected return-path distance window and bounded DFS edge visits. No fresh native or signed evidence.
+
+Blockzilla #14 46110307072 14/14 available signed multihop model leg matches, four DAMM SDK unavailable; 4/4 independent audits, no six-hop capture. Official SDK audit build and diversity integration pending CI.

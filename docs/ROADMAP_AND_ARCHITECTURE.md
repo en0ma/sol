@@ -315,3 +315,5 @@ Bound archive-seeded cycles by forcing the novel identity as first edge before r
 Use integer ceiling of AMM v4 swap fee before invariant math; retain rational fee scenario for comparison only. ALT compression is not account-lock reduction; preserve runtime rejections, rank alternate candidates by clearly labeled heuristic and report actual resolved key count. Recompute each signed leg even when full modeled chain is blocked.
 
 For archive seed-edge cycles, filter pool hints using distances between seed endpoints after removing that edge. Per-hop bounded windows and graph edge-visit budget must expose truncation; topology does not guarantee an executable route.
+
+Build pinned DAMM SDK only on uncredentialed audit runner and retain build resolution/hash. Source-clock SDK quote is indicative, never auto-promoted. Diversify six-hop alternatives across shared dependencies, including bounded no-Orca window.

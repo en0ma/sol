@@ -5,7 +5,7 @@ from solders.hash import Hash
 from solders.instruction import Instruction
 from solders.transaction import Transaction
 import base64
-from arb.blockzilla_multihop import candidate_routes,decode_packet,digest,seed_window
+from arb.blockzilla_multihop import candidate_routes,decode_packet,digest,seed_window,diverse_candidates
 from arb.opportunity_graph import cycles
 
 def key():return str(Pubkey.new_unique())
@@ -83,6 +83,17 @@ class MultihopTests(unittest.TestCase):
         self.assertFalse(stats["complete"])
         with self.assertRaisesRegex(ValueError,"edge visit budget"):
             cycles(rows,anchors=[a],hint_only=True,max_edge_visits=1)
+    def test_six_hop_alternatives_avoid_shared_orca_dependencies(self):
+        novel=("raydium_cpmm","seed")
+        def row(pools):
+            legs=[{"venue":v,"pool":p} for v,p in [novel]+pools]
+            return {"legs":legs,"venues":sorted({l["venue"] for l in legs})}
+        shared=[("orca","missing"),("orca","second")]
+        a=row(shared+[("raydium_cpmm","a"),("raydium_cpmm","b"),("raydium_cpmm","c")])
+        b=row(shared+[("raydium_cpmm","a"),("raydium_cpmm","b"),("raydium_cpmm","d")])
+        c=row([("meteora_dlmm","e"),("raydium_cpmm","f"),("raydium_cpmm","g"),
+               ("raydium_clmm","h"),("meteora_damm_v2","i")])
+        self.assertEqual(diverse_candidates([a,b,c],{novel},hops=6),[a,c,b])
     def test_legacy_packet_crypto_and_digest(self):
         payer=Keypair()
         tx=Transaction.new_signed_with_payer([Instruction(Pubkey.new_unique(),b"x",[])],
