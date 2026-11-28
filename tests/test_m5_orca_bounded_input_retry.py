@@ -364,6 +364,32 @@ class BoundedOfflineOrcaInputTests(unittest.TestCase):
         self.assertEqual(result["routes"][0]["simulation_status"],
                          "NOT_ATTEMPTED_OR_ABORTED_DURING_PREPARATION")
 
+    def test_source_damm_dust_sizes_use_real_price_and_bounded_reserve(self):
+        from arb.meteora_damm_v2_native_quote import bounded_dust_input_candidates
+        # Primary #310 source-05, slot 474981954, C2C8RFRL pool.
+        price=12181181513744145
+        sizes=bounded_dust_input_candidates(sqrt_price=price,input_is_a=True,
+            amount_in=100000,input_vault_balance=14893286255086409)
+        self.assertEqual(len(sizes),2)
+        self.assertEqual([s*price*price//2**128 for s in sizes],[16,32])
+        self.assertTrue(all(100000<s<=100000000 for s in sizes))
+        self.assertEqual(bounded_dust_input_candidates(sqrt_price=price,input_is_a=True,
+            amount_in=100000,input_vault_balance=100000000),[])
+        self.assertEqual(bounded_dust_input_candidates(sqrt_price=price,input_is_a=False,
+            amount_in=100000,input_vault_balance=14893286255086409),[])
+
+    def test_source_dlmm_active_capacity_sizing(self):
+        from arb.meteora_dlmm_source_bin_decoder import bounded_active_bin_input_candidates
+        # Primary #310 source-35, active -904: five output units, no orders.
+        b={"bin_id":-904,"price_q64":2287693419720123,
+            "amount_x":17671375563766,"amount_y":5,"open_order_amount":0,
+            "processed_order_remaining_amount":0,"limit_order_ask_side":0}
+        kw=dict(amount_in=100000,x_to_y=True,fee_on_input=True,limit_order_support=False)
+        sizes=bounded_active_bin_input_candidates(b,**kw)
+        self.assertTrue(sizes)
+        self.assertTrue(all(0<s<100000 for s in sizes))
+        self.assertEqual(bounded_active_bin_input_candidates({**b,"amount_y":0},**kw),[])
+
 
 if __name__ == "__main__":
     unittest.main()

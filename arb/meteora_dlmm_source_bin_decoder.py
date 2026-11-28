@@ -190,3 +190,81 @@ def bitmap_directional_bins(fixture,*,pool,active_id,x_to_y,proof,maximum_arrays
             "verified_empty_arrays":skipped,"coverage_status":stop,
             "source_slot":fixture["state_accounts_observed_slot"],"source_bitmap_verified":True,
             "protocol_exact_verified":False,**SAFE}
+
+
+def bounded_active_bin_input_candidates(bin_record,*,amount_in,x_to_y,fee_on_input,limit_order_support):
+    """Pick smaller controls strictly inside one genuine funded MM bin.
+
+    Zero-fee sizing limits output capacity; the existing native bin engine
+    checks complete fills at both zero and maximum fee. This is not an
+    assertion of effective fee or executable liquidity.
+    """
+    from arb.meteora_dlmm_bin_quote import quote_bins
+    from arb.meteora_dlmm_source_fee_decoder import MAX_FEE_NUMERATOR
+    if (type(amount_in) is not int or not 0<amount_in<2**64 or type(x_to_y) is not bool
+            or type(fee_on_input) is not bool or type(limit_order_support) is not bool):
+        raise ValueError("invalid active-bin research size input")
+    capacity=bin_record["amount_y" if x_to_y else "amount_x"]
+    price=bin_record["price_q64"]
+    if type(capacity) is not int or not 0<=capacity<2**64 or type(price) is not int or not 0<price<2**128:
+        raise ValueError("invalid source active-bin capacity")
+    if capacity<2:
+        return []
+    q=1<<64
+    numerator,denominator=(price,q) if x_to_y else (q,price)
+    if amount_in*numerator//denominator<=capacity:
+        return []
+    result=[]
+    for target in sorted({max(1,capacity//2),max(1,capacity*3//4)}):
+        candidate=(target*denominator+numerator-1)//numerator
+        if not 0<candidate<amount_in or candidate in result:
+            continue
+        try:
+            outcomes=[quote_bins(amount_in=candidate,swap_x_for_y=x_to_y,bins=[bin_record],
+                        total_fee_rate=rate,max_bins=1,fee_on_input=fee_on_input,
+                        limit_order_support=limit_order_support)
+                      for rate in (0,MAX_FEE_NUMERATOR)]
+        except ValueError:
+            continue
+        if all(0<o["amount_out"]<capacity and o["exact_input_filled"] for o in outcomes):
+            result.append(candidate)
+    return result
+
+
+def source_active_bin_size_plan(fixture,*,amount_in):
+    from arb.fixture_quote_execution_pipeline import extract_pool_states
+    from arb.meteora_dlmm_bin_preflight import (active_bin_array_index,
+        verified_bitmap_extension_address,verify_directional_bin_snapshot)
+    from arb.meteora_dlmm_source_fee_decoder import static_parameters,limit_order_supported
+    rows=extract_pool_states(fixture)
+    if not rows or rows[0]["venue"]!="meteora_dlmm" or any(fixture.get(k) is not False for k in SAFE):
+        raise ValueError("first-leg authenticated DLMM source required")
+    row=rows[0];pool=row["address"];state=row["decoded_pool_state"]
+    mint=fixture["route_mints"][0]
+    direction=mint==state["token_x_mint"]
+    if mint not in (state["token_x_mint"],state["token_y_mint"]):
+        raise ValueError("DLMM active-bin size mint mismatch")
+    proof=fixture["leg_evidence_by_index"][0]["auxiliary"]
+    if (proof.get("bitmap_extension_source",{}).get("status")!="SOURCE_BITMAP_EXTENSION_ABSENT"
+            or verified_bitmap_extension_address(pool,proof,fixture) is not None):
+        raise ValueError("DLMM active-bin sizing requires observed extension absence")
+    source=proof["directional_bin_source"]
+    active=state["active_id"];index=active_bin_array_index(active)
+    if source["input_is_x"] is not direction or source["active_bin_array_index"]!=index:
+        raise ValueError("DLMM active-bin sizing source direction mismatch")
+    verify_directional_bin_snapshot(pool,source,fixture["accounts"])
+    decoded=decode_from_fixture(fixture,pool=pool,array_index=index)
+    bin_record=decoded["bins"][active%70]
+    raw=base64.b64decode(fixture["accounts"][pool]["data"][0],validate=True)
+    mode=static_parameters(raw)["collect_fee_mode"]
+    if mode not in (0,1):
+        raise ValueError("unsupported DLMM fee collection mode")
+    candidates=bounded_active_bin_input_candidates(bin_record,amount_in=amount_in,
+        x_to_y=direction,fee_on_input=(mode==0 or not direction),
+        limit_order_support=limit_order_supported(raw))
+    return {"status":"SOURCE_DLMM_ACTIVE_BIN_SIZE_HINT_ONLY","pool":pool,
+        "source_slot":row["snapshot_slot"],"manifest_sha256":fixture["state_account_manifest_sha256"],
+        "input_mint":mint,"input_base_units":amount_in,"active_bin_id":active,
+        "active_bin_array":decoded["bin_array_pda"],"price_q64":str(bin_record["price_q64"]),
+        "output_capacity":bin_record["amount_y" if direction else "amount_x"],
+        "candidate_amounts":candidates,"protocol_exact_verified":False,**SAFE}

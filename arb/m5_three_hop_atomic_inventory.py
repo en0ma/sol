@@ -603,6 +603,22 @@ def damm_v2_slippage_input_retries(error,venues,amount):
             if 0<candidate<2**64 and candidate!=amount]
 
 
+def first_leg_source_size_plan(fixture,error,amount):
+    if not isinstance(error,ValueError) or "signed prefix simulation failed" not in str(error):
+        return None
+    venues=fixture.get("route_venues",[]);pools=fixture.get("route_pool_addresses",[])
+    context=failed_instruction_context({"venues":venues,"pools":pools},str(error))
+    if context.get("failed_instruction_index")!=0:
+        return None
+    if context.get("failed_venue")=="meteora_damm_v2" and context.get("program_error_code")==6002:
+        from arb.meteora_damm_v2_native_quote import source_dust_size_plan
+        return source_dust_size_plan(fixture,amount_in=amount)
+    if context.get("failed_venue")=="meteora_dlmm" and context.get("program_error_code")==6036:
+        from arb.meteora_dlmm_source_bin_decoder import source_active_bin_size_plan
+        return source_active_bin_size_plan(fixture,amount_in=amount)
+    return None
+
+
 def offline_simulate(rpc,directory,*,amount=100000,shard_index=0,shard_count=1):
     from arb.pumpswap_local_simulation import local_rpc_only
     from arb.next_ten_signed_atomic_offline import run_four_to_six_venue
@@ -661,8 +677,21 @@ def offline_simulate(rpc,directory,*,amount=100000,shard_index=0,shard_count=1):
                             error,row["venues"],amount))
                         retry_amounts.extend(raydium_amm_v4_slippage_input_retries(
                             error,row["venues"],amount))
-                        retry_amounts.extend(damm_v2_slippage_input_retries(
-                            error,row["venues"],amount))
+                        try:
+                            size_plan=first_leg_source_size_plan(fixture,error,amount)
+                        except (ValueError,KeyError,TypeError,ArithmeticError) as exc:
+                            size_plan=None
+                            row["source_size_plan_blocker"]=str(exc)[:180]
+                        if size_plan is not None:
+                            row["source_size_plan"]=size_plan
+                            row["source_size_plan_trigger"]=str(error)[:950]
+                            retry_amounts.extend(size_plan["candidate_amounts"])
+                        # Preserve earlier retry controls when no source-derived
+                        # candidate exists. Never relax the output floor.
+                        if size_plan is None or not size_plan["candidate_amounts"]:
+                            retry_amounts.extend(damm_v2_slippage_input_retries(
+                                error,row["venues"],amount))
+                        retry_amounts[:]=list(dict.fromkeys(retry_amounts))
                     if amount_index==len(retry_amounts)-1:
                         raise
             (root/("receipt-"+row["id"]+".json")).write_text(
@@ -758,6 +787,16 @@ def audit_primary_shard(directory):
             "legs":[{"venue":v,"pool":p,"input":mints[i],"output":mints[i+1]}
                     for i,(v,p) in enumerate(zip(venues,pools))]}
         audit=audit_signed_core(receipt,fixture,source_row,amount)
+        if row.get("source_size_plan") is not None:
+            plan=row["source_size_plan"]
+            first=row["signed_exact_input_attempts"][0]
+            recomputed=first_leg_source_size_plan(fixture,ValueError(row["source_size_plan_trigger"]),
+                first["amount_base_units"])
+            if recomputed!=plan:
+                raise ValueError("primary source size plan differs from original bytes")
+            if plan["candidate_amounts"] and amount not in plan["candidate_amounts"]:
+                raise ValueError("accepted source-size input not in authenticated plan")
+            audit["source_size_plan"]=recomputed
         if fixture.get("contextual_source_clock") is not None:
             from arb.m5_source_indicative_route_chain import contextual_economic_model
             from arb.m5_signed_start_mint_economics import signed_net_economics
