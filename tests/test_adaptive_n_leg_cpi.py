@@ -37,4 +37,20 @@ class Tests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 audit_n_leg_cpi(FakeTx(),{"innerInstructions":[{"index":0,"instructions":[]}]},
                                  ["A","B","C"],[100,90])
+    def test_independent_audit_checks_all_boundary_transfers(self):
+        rows={"innerInstructions":[
+            {"index":0,"instructions":[("A","pool",100),("pool","B",90)]},
+            {"index":1,"instructions":[("B","pool",90),("pool","C",81)]},
+            {"index":2,"instructions":[("C","pool",81),("pool","D",70)]}]}
+        with patch("solders.pubkey.Pubkey",FakePub),patch("arb.token_vaults.TOKEN_PROGRAM","token"),patch(
+            "arb.damm_cpmm_atomic_offline._inner_token_transfer",side_effect=lambda row,keys,token:tuple(row)):
+            result=audit_n_leg_cpi(FakeTx(),rows,["A","B","C","D"],[100,90,81],terminal_output=70)
+            self.assertTrue(result["all_boundary_transfers_verified"])
+            self.assertEqual([x["input_debited_base_units"] for x in result["leg_boundary_transfers"]],[100,90,81])
+            self.assertEqual([x["output_credited_base_units"] for x in result["leg_boundary_transfers"]],[90,81,70])
+            with self.assertRaisesRegex(ValueError,"boundary amount mismatch"):
+                audit_n_leg_cpi(FakeTx(),rows,["A","B","C","D"],[100,90,81],terminal_output=69)
+            rows["innerInstructions"][0]["instructions"].append(("pool","D",1))
+            with self.assertRaisesRegex(ValueError,"unexpected boundary transfer"):
+                audit_n_leg_cpi(FakeTx(),rows,["A","B","C","D"],[100,90,81],terminal_output=70)
 if __name__=="__main__":unittest.main()

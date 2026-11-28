@@ -169,7 +169,7 @@ def sign_adaptive_n_leg_offline(rpc,instructions,signer,*,programs,intermediates
                       "legs":n,"actionable":False,
                       "live_execution_approved":False,"broadcast":False}
 
-def audit_n_leg_cpi(tx,response,accounts,amounts,*,lookup=None):
+def audit_n_leg_cpi(tx,response,accounts,amounts,*,lookup=None,terminal_output=None):
     """Independently reconcile each intermediate SPL transfer from signed CPI.
 
     Reuses the existing SPL transfer decoder and loaded v0 keys. A final
@@ -202,26 +202,51 @@ def audit_n_leg_cpi(tx,response,accounts,amounts,*,lookup=None):
         groups[index]=entry["instructions"]
     if len(groups)!=n:
         raise ValueError("signed leg CPI groups incomplete")
+    flows={}
+    for outer,instructions in groups.items():
+        decoded=[]
+        for instruction in instructions:
+            flow=_inner_token_transfer(instruction,keys,token_index)
+            if flow is not None:
+                decoded.append(flow)
+        flows[outer]=decoded
     hops=[]
     for i in range(1,n):
         account=accounts[i]
-        received=consumed=0
-        for outer in (i-1,i):
-            for instruction in groups[outer]:
-                flow=_inner_token_transfer(instruction,keys,token_index)
-                if flow is None:
-                    continue
-                src,dst,quantity=flow
-                if outer==i-1 and dst==account:
-                    received+=quantity
-                if outer==i and src==account:
-                    consumed+=quantity
+        received=sum(q for src,dst,q in flows[i-1] if dst==account)
+        consumed=sum(q for src,dst,q in flows[i] if src==account)
         if received!=amounts[i] or consumed!=amounts[i]:
             raise ValueError("signed CPI full intermediate consumption mismatch hop "+str(i))
         hops.append({"hop":i,"account":account,
                      "received_base_units":received,"consumed_base_units":consumed,
                      "planned_input_base_units":amounts[i]})
+    boundaries=[]
+    if terminal_output is not None:
+        if type(terminal_output) is not int or not 0<terminal_output<2**64:
+            raise ValueError("invalid terminal signed SPL output")
+        if token_index is None or any(Pubkey.from_string(a) not in keys for a in accounts):
+            raise ValueError("signed CPI boundary accounts absent from compiled message")
+        boundary_set=set(accounts)
+        outputs=list(amounts[1:])+[terminal_output]
+        for outer in range(n):
+            source,destination=accounts[outer:outer+2]
+            spent=received=0
+            for src,dst,quantity in flows[outer]:
+                if (src in boundary_set and src!=source) or (
+                        dst in boundary_set and dst!=destination):
+                    raise ValueError("signed CPI unexpected boundary transfer at leg "+str(outer))
+                if src==source:
+                    spent+=quantity
+                if dst==destination:
+                    received+=quantity
+            if spent!=amounts[outer] or received!=outputs[outer]:
+                raise ValueError("signed CPI exact boundary amount mismatch leg "+str(outer))
+            boundaries.append({"leg_index":outer,"source_account":source,
+                "destination_account":destination,"input_debited_base_units":spent,
+                "output_credited_base_units":received})
     return {"status":"N_LEG_SIGNED_CPI_RECONCILED","hops":hops,
+            "all_boundary_transfers_verified":terminal_output is not None,
+            "leg_boundary_transfers":boundaries,
             "signed_cpi_per_leg_verified":True,
             "actionable":False,"live_execution_approved":False,"broadcast":False}
 

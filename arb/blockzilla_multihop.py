@@ -694,7 +694,8 @@ def audit_signed_core(receipt,fixture,row,amount):
     post=signed_n_leg_post_balances(pr,accounts,mints,owner)
     if post!=receipt["positive_post_balances_base_units"]:
         raise ValueError("recorded post balances differ")
-    cpi=audit_n_leg_cpi(positive,pr,accounts,amounts,lookup=lookup)
+    cpi=audit_n_leg_cpi(positive,pr,accounts,amounts,lookup=lookup,
+        terminal_output=post[-1])
     balances=audit_n_leg_balances(amounts,evidence["persistent_before"],post,
         rollback_balances=evidence["persistent_after_negative"],later_instruction_failed=True)
     if balances["status"]!="N_LEG_BALANCES_AND_ROLLBACK_RECONCILED":
