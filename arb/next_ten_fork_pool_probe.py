@@ -64,12 +64,14 @@ def source_clock(rpc):
     return decode_source_clock_account(info)
 
 
-def contextual_route_clock(fixture):
+def contextual_route_clock(fixture,*,allow_one_slot_ahead_model=False):
     """Recompute contextual Clock from retained bytes, never hydrate a sysvar.
 
     Historical fixtures and explicit unavailable observations have no exact
     context Clock. A malformed present record is not silently downgraded.
     """
+    if type(allow_one_slot_ahead_model) is not bool:
+        raise ValueError("explicit near-context clock model opt-in required")
     proof=fixture.get("contextual_source_clock")
     if proof is None:
         return None
@@ -89,7 +91,26 @@ def contextual_route_clock(fixture):
     expected="SOURCE_CONTEXT_CLOCK_MATCHED" if clock["slot"]==proof["context_slot"] else "SOURCE_CONTEXT_CLOCK_SLOT_DIVERGED"
     if proof.get("status")!=expected or proof.get("decoded")!=clock:
         raise ValueError("source Clock claim differs from retained account")
-    return clock if expected=="SOURCE_CONTEXT_CLOCK_MATCHED" else None
+    if expected=="SOURCE_CONTEXT_CLOCK_MATCHED":
+        return clock
+    # The current source fork reports Clock.slot=context+1 in the SAME
+    # response. Model that observation without pretending it matches the
+    # context slot, or altering either source account or clock.
+    if allow_one_slot_ahead_model and clock["slot"]==proof["context_slot"]+1:
+        return clock
+    return None
+
+
+def contextual_pricing_clock(fixture):
+    clock=contextual_route_clock(fixture,allow_one_slot_ahead_model=True)
+    if clock is None:
+        return None
+    delta=clock["slot"]-fixture["state_accounts_observed_slot"]
+    return {"clock":clock,"source_slot":fixture["state_accounts_observed_slot"],
+        "clock_slot_delta":delta,"same_slot_attested":delta==0,
+        "provenance":("CONTEXTUAL_SOURCE_CLOCK_MATCHED" if delta==0
+                       else "CONTEXTUAL_SOURCE_CLOCK_ONE_SLOT_AHEAD_MODEL"),
+        **SAFETY}
 
 
 def snapshot(rpc, pool, venue):

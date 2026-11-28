@@ -138,6 +138,24 @@ class ContextClockTests(unittest.TestCase):
         self.assertIsNone(contextual_route_clock({**fixture,"contextual_source_clock":{
             **proof,"status":"SOURCE_CONTEXT_CLOCK_UNAVAILABLE","account":None}}))
 
+    def test_one_slot_ahead_never_promoted_to_exact_context(self):
+        from arb.next_ten_fork_pool_probe import contextual_route_clock,contextual_pricing_clock,CLOCK_SYSVAR,SAFETY
+        raw=bytearray(40);raw[:8]=(124).to_bytes(8,"little")
+        raw[32:40]=(456).to_bytes(8,"little",signed=True)
+        acct={"owner":"Sysvar1111111111111111111111111111111111111",
+            "executable":False,"data":[base64.b64encode(raw).decode(),"base64"]}
+        proof={"address":CLOCK_SYSVAR,"context_slot":123,"account":acct,
+            "status":"SOURCE_CONTEXT_CLOCK_SLOT_DIVERGED","decoded":{"slot":124,"unix_timestamp":456},**SAFETY}
+        fixture={"state_accounts_observed_slot":123,"accounts":{},
+            "state_account_addresses":[],"contextual_source_clock":proof}
+        self.assertIsNone(contextual_route_clock(fixture))
+        model=contextual_pricing_clock(fixture)
+        self.assertEqual(model["clock_slot_delta"],1)
+        self.assertFalse(model["same_slot_attested"])
+        self.assertEqual(model["provenance"],"CONTEXTUAL_SOURCE_CLOCK_ONE_SLOT_AHEAD_MODEL")
+        fixture["state_accounts_observed_slot"]=122;proof["context_slot"]=122
+        self.assertIsNone(contextual_pricing_clock(fixture))
+
 
 if __name__ == "__main__":
     unittest.main()

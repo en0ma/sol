@@ -293,7 +293,7 @@ def fixture_identity(fixture,row):
 
 def prepare(rpc, evidence_dir, directory, baseline, route):
     from arb.m5_four_to_six_source_capture import capture
-    from arb.next_ten_fork_pool_probe import source_clock,contextual_route_clock
+    from arb.next_ten_fork_pool_probe import source_clock,contextual_pricing_clock
     from arb.m5_source_indicative_route_chain import research_chain
     local_rpc_only(rpc)
     root=Path(directory);root.mkdir(parents=True,exist_ok=True)
@@ -327,12 +327,14 @@ def prepare(rpc, evidence_dir, directory, baseline, route):
                         capture_context_clock=True)
                 fixture=json.loads(path.read_text())
                 fixture_identity(fixture,item)
-                clock=contextual_route_clock(fixture)
-                if clock is None:
+                pricing_clock=contextual_pricing_clock(fixture)
+                if pricing_clock is None:
                     clock=source_clock(rpc)
                     item["source_clock_provenance"]="POST_CAPTURE_CLOCK_NOT_SAME_SLOT_ATTESTED"
                 else:
-                    item["source_clock_provenance"]="CONTEXTUAL_SOURCE_CLOCK_MATCHED"
+                    clock=pricing_clock["clock"]
+                    item["source_clock_provenance"]=pricing_clock["provenance"]
+                    item["source_pricing_clock"]=pricing_clock
                 item["source_clock"]=clock
                 item.update(capture_status="CAPTURED",fixture_sha256=digest(path.read_bytes()),
                             source_slot=fixture["state_accounts_observed_slot"])
@@ -425,16 +427,21 @@ def source_signing_inventory(source,root,*,recorded_plans=None):
         fixture=json.loads(raw);fixture_identity(fixture,row)
         if row["hops"]==6 and source_footprint(fixture)!=row["source_account_footprint"]:
             raise ValueError("independent unsigned source footprint differs")
-        from arb.next_ten_fork_pool_probe import contextual_route_clock
-        contextual=contextual_route_clock(fixture)
+        from arb.next_ten_fork_pool_probe import contextual_pricing_clock
+        contextual=contextual_pricing_clock(fixture)
         provenance=row.get("source_clock_provenance")
-        if contextual is not None:
-            if provenance!="CONTEXTUAL_SOURCE_CLOCK_MATCHED" or row["source_clock"]!=contextual:
+        if contextual is not None and row.get("source_pricing_clock") is not None:
+            if (row["source_pricing_clock"]!=contextual or provenance!=contextual["provenance"]
+                    or row["source_clock"]!=contextual["clock"]):
+                raise ValueError("candidate source Clock differs from contextual account")
+        elif contextual is not None and contextual["same_slot_attested"]:
+            # Historical exact-slot captures predate the pricing-clock record.
+            if provenance!="CONTEXTUAL_SOURCE_CLOCK_MATCHED" or row["source_clock"]!=contextual["clock"]:
                 raise ValueError("candidate source Clock differs from contextual account")
         elif fixture.get("contextual_source_clock") is not None:
-            if provenance!="POST_CAPTURE_CLOCK_NOT_SAME_SLOT_ATTESTED":
+            if provenance!="POST_CAPTURE_CLOCK_NOT_SAME_SLOT_ATTESTED" or row.get("source_pricing_clock") is not None:
                 raise ValueError("candidate source Clock fallback provenance missing")
-        elif provenance is not None:
+        elif provenance is not None or row.get("source_pricing_clock") is not None:
             raise ValueError("candidate source Clock claim has no captured record")
         clock=row["source_clock"]["unix_timestamp"]
         plans[rid]=(size_plan(fixture,observed_unix=clock) if recorded_plans is None
