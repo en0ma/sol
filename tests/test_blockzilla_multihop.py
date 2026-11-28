@@ -209,4 +209,44 @@ class MultihopTests(unittest.TestCase):
                  {"venue":"orca","execution_clock_leg_comparison":None}]
         self.assertEqual(execution_pricing_summary([{"audit":{"native_leg_samples":samples}}])["orca"],
             {"samples":3,"predicted":2,"matches":1,"blocked":1})
+    def test_accepted_metadata_reconciles_and_rejects_malformed_fields(self):
+        from arb.blockzilla_multihop import accepted_receipt_metadata,SAFE
+        from copy import deepcopy
+        err={"InstructionError":[2,{"Custom":6003}]}
+        raw=base64.b64encode(b"packet").decode()
+        receipt={"status":"SIGNED_N_LEG_ATOMIC_AND_ROLLBACK_VERIFIED",
+            "execution_environment":"ISOLATED_SURFPOOL_OFFLINE",
+            "signed_packet_crypto_bound":True,"signed_atomic_simulation_verified":True,
+            "signed_cpi_per_leg_verified":True,"rollback_failure_case_verified":True,
+            "initial_balances_base_units":[100,0,0,0],"negative_failure_instruction_index":2,
+            "positive_error":"None","negative_error":str(err),"positive_units_consumed":1000,
+            "signed_transaction_wire_base64":raw,"negative_signed_transaction_wire_base64":raw,
+            "signed_packet_bytes":6,"negative_packet_bytes":6,
+            "recorded_n_leg_audit_evidence":{"persistent_before":[100,0,0,0],
+                "positive_response":{"err":None,"unitsConsumed":1000},
+                "negative_response":{"err":err}},**SAFE}
+        result=accepted_receipt_metadata(receipt,hops=3,amount=100)
+        self.assertEqual(result["positive_units_consumed"],1000)
+        self.assertFalse(result["actionable"])
+        for key,value in (("signed_cpi_per_leg_verified",False),("positive_units_consumed",True),
+                          ("negative_failure_instruction_index",1),("signed_packet_bytes",7),
+                          ("broadcast",True),("negative_error","None"),
+                          ("execution_environment","MAINNET")):
+            altered=deepcopy(receipt);altered[key]=value
+            with self.subTest(key=key),self.assertRaises(ValueError):
+                accepted_receipt_metadata(altered,hops=3,amount=100)
+
+    def test_replayed_positive_or_negative_packet_rejected(self):
+        from arb.blockzilla_multihop import reserve_receipt_signatures
+        seen=set()
+        reserve_receipt_signatures({"signed_transaction_signature":"A",
+            "negative_signed_transaction_signature":"B"},seen)
+        for a,b in (("A","C"),("C","B"),("B","D"),("E","E"),("","F")):
+            with self.subTest(a=a,b=b),self.assertRaisesRegex(ValueError,"signature"):
+                reserve_receipt_signatures({"signed_transaction_signature":a,
+                    "negative_signed_transaction_signature":b},seen)
+        self.assertEqual(seen,{"A","B"})
+        reserve_receipt_signatures({"signed_transaction_signature":"C",
+            "negative_signed_transaction_signature":"D"},seen)
+        self.assertEqual(len(seen),4)
 if __name__=="__main__":unittest.main()

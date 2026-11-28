@@ -569,6 +569,59 @@ def audit_account_lock_rejection(receipt,fixture,row,amount):
         "rpc_response_cryptographically_attested":False,**SAFE}
 
 
+def accepted_receipt_metadata(receipt,*,hops,amount):
+    """Check the runner's declared acceptance against its retained raw evidence.
+
+    This is supplementary to independent signature decoding, CPI, SPL and
+    rollback checks; it cannot establish execution by itself.
+    """
+    if (type(hops) is not int or not 3<=hops<=6
+            or type(amount) is not int or not 0<amount<2**64):
+        raise ValueError("invalid accepted receipt route budget")
+    if (receipt.get("status")!="SIGNED_N_LEG_ATOMIC_AND_ROLLBACK_VERIFIED"
+            or receipt.get("execution_environment")!="ISOLATED_SURFPOOL_OFFLINE"
+            or any(receipt.get(k) is not False for k in SAFE)
+            or any(receipt.get(k) is not True for k in (
+                "signed_packet_crypto_bound","signed_atomic_simulation_verified",
+                "signed_cpi_per_leg_verified","rollback_failure_case_verified"))):
+        raise ValueError("accepted receipt flags or execution environment inconsistent")
+    if (receipt.get("initial_balances_base_units")!=[amount]+[0]*hops
+            or type(receipt.get("negative_failure_instruction_index")) is not int
+            or receipt["negative_failure_instruction_index"]!=hops-1):
+        raise ValueError("accepted receipt exact input or rollback declaration mismatch")
+    evidence=receipt["recorded_n_leg_audit_evidence"]
+    positive=evidence["positive_response"];negative=evidence["negative_response"]
+    units=positive.get("unitsConsumed")
+    if (positive.get("err") is not None or receipt.get("positive_error")!="None"
+            or type(units) is not int or not 0<units<=1400000
+            or type(receipt.get("positive_units_consumed")) is not int
+            or receipt["positive_units_consumed"]!=units
+            or receipt.get("negative_error")!=str(negative.get("err"))
+            or evidence.get("persistent_before")!=receipt["initial_balances_base_units"]):
+        raise ValueError("accepted receipt recorded response metadata mismatch")
+    packet_lengths=[]
+    for prefix in ("signed","negative_signed"):
+        raw=base64.b64decode(receipt[prefix+"_transaction_wire_base64"],validate=True)
+        length_key="signed_packet_bytes" if prefix=="signed" else "negative_packet_bytes"
+        if not 1<=len(raw)<=1232 or type(receipt.get(length_key)) is not int or receipt[length_key]!=len(raw):
+            raise ValueError("accepted receipt packet size mismatch")
+        packet_lengths.append(len(raw))
+    return {"status":"ACCEPTED_RECEIPT_METADATA_RECONCILED",
+            "positive_units_consumed":units,"positive_packet_bytes":packet_lengths[0],
+            "negative_packet_bytes":packet_lengths[1],"recorded_exact_input":amount,
+            "recorded_failure_instruction_index":hops-1,**SAFE}
+
+
+def reserve_receipt_signatures(receipt,seen):
+    """Disallow replaying either positive or rollback packet across trials."""
+    signatures=(receipt.get("signed_transaction_signature"),
+                receipt.get("negative_signed_transaction_signature"))
+    if (any(not isinstance(sig,str) or not sig for sig in signatures)
+            or len(set(signatures))!=2 or any(sig in seen for sig in signatures)):
+        raise ValueError("duplicate or missing accepted trial signature")
+    seen.update(signatures)
+
+
 def audit_receipt(receipt,fixture,row,amount):
     from arb.atomic_graph_coordinator import audit_n_leg_cpi,audit_n_leg_balances,signed_n_leg_post_balances
     from arb.next_ten_signed_atomic_offline import top_level_events
@@ -576,6 +629,7 @@ def audit_receipt(receipt,fixture,row,amount):
     from arb.m5_signed_start_mint_economics import signed_net_economics
     fixture_identity(fixture,row)
     n=row["hops"];mints=fixture["route_mints"];venues=fixture["route_venues"]
+    metadata=accepted_receipt_metadata(receipt,hops=n,amount=amount)
     if (receipt.get("status")!="SIGNED_N_LEG_ATOMIC_AND_ROLLBACK_VERIFIED"
             or any(receipt.get(k) is not False for k in SAFE)
             or receipt["state_account_manifest_sha256"]!=fixture["state_account_manifest_sha256"]
@@ -589,8 +643,13 @@ def audit_receipt(receipt,fixture,row,amount):
     negative,_,bad_keys=decode_packet(receipt["negative_signed_transaction_wire_base64"],
         receipt["negative_signed_transaction_sha256"],receipt["negative_signed_transaction_signature"],evidence["isolated_lookup_account"])
     accounts=evidence["ephemeral_token_accounts"];owner=evidence["ephemeral_authority"]
-    if receipt.get("resolved_account_key_count")!=len(keys):
-        raise ValueError("compiled resolved key count differs from recorded receipt")
+    static_count=len(positive.message.account_keys)
+    counts=(receipt.get("resolved_account_key_count"),receipt.get("static_account_key_count"),
+            receipt.get("lookup_account_key_count"))
+    if (any(type(count) is not int for count in counts)
+            or counts!=(len(keys),static_count,len(keys)-static_count)
+            or len(keys)!=len(set(keys))):
+        raise ValueError("compiled resolved/static/lookup key counts differ from recorded receipt")
     if (len(accounts)!=n+1 or len(set(accounts))!=n+1 or str(keys[0])!=owner
             or keys!=bad_keys or positive.message.recent_blockhash!=negative.message.recent_blockhash
             or positive.signatures[0]==negative.signatures[0]
@@ -712,7 +771,7 @@ def audit_receipt(receipt,fixture,row,amount):
     from arb.signed_cpi_native_funding import audit_funding
     funding=audit_funding(pr,keys,owner,economics)
     return {"status":"N_LEG_PACKET_AND_RECORDED_RESPONSE_RECHECKED","cpi":cpi,
-            "balances":balances,"source_model":model,"signed_economics":economics,
+            "receipt_metadata":metadata,"balances":balances,"source_model":model,"signed_economics":economics,
             "observed_system_funding":funding,"execution_clock_unix":execution_unix,
             "execution_clock_before":evidence.get("positive_execution_clock_before"),
             "execution_clock_after":evidence.get("positive_execution_clock_after"),
@@ -766,6 +825,7 @@ def audit(source_dir,signed_dir):
             "net_profit_verified":False,
             "runner_accepted":signed["accepted"],"attempts":[],**SAFE}
     report["rejected_attempts"]=[]
+    accepted_signatures=set()
     report["six_hop_footprints_recomputed"]=len(six_candidates)
     report["six_hop_footprint_selected_ids"]=chosen
     report["six_hop_footprint_candidates"]=[{"id":r["id"],"selected":r["id"] in chosen,
@@ -809,7 +869,13 @@ def audit(source_dir,signed_dir):
             receipt_raw=(root/expected_name).read_bytes()
             if digest(fixture_raw)!=row["fixture_sha256"] or digest(receipt_raw)!=attempt["receipt_sha256"]:
                 raise ValueError("source or receipt digest mismatch")
-            item["audit"]=audit_receipt(json.loads(receipt_raw),json.loads(fixture_raw),row,attempt["amount"])
+            receipt=json.loads(receipt_raw)
+            if (attempt.get("resolved_account_key_count")!=receipt.get("resolved_account_key_count")
+                    or attempt.get("runtime_account_lock_rejected") is not False):
+                raise ValueError("accepted attempt metadata differs from receipt")
+            audited=audit_receipt(receipt,json.loads(fixture_raw),row,attempt["amount"])
+            reserve_receipt_signatures(receipt,accepted_signatures)
+            item["audit"]=audited
             estimate=(row.get("source_account_footprint") or {}).get("resolved_account_key_estimate")
             if type(estimate) is int:
                 actual=item["audit"]["resolved_account_key_count"]
@@ -818,6 +884,9 @@ def audit(source_dir,signed_dir):
             report["audited"]+=1
         except (ValueError,RuntimeError,KeyError,TypeError,OSError) as exc:
             item.update(error_class=type(exc).__name__,diagnostic=str(exc)[:300])
+    report["distinct_accepted_packet_signatures"]=len(accepted_signatures)
+    if len(accepted_signatures)!=2*report["audited"]:
+        raise ValueError("accepted packet replay inventory does not reconcile")
     report["size_plan_recomputed_count"]=len(plans)
     report["candidate_size_plan_recomputed_count"]=len(candidate_plans)
     report["candidate_modeled_grid_sample_count"]=sum(len(p["samples"]) for p in candidate_plans.values())
