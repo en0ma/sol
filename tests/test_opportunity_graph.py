@@ -60,3 +60,59 @@ class UnrestrictedGraphTests(unittest.TestCase):
         found=cycles(pools,anchors=["A"],min_hops=3,max_hops=3,maximum_pools=None)
         self.assertEqual(len(found),2)
         self.assertTrue(all(len(row["legs"])==3 for row in found))
+
+class SharedAnchorGraphTests(unittest.TestCase):
+    @staticmethod
+    def pool(venue,address,a,b):
+        return {"venue":venue,"address":address,"mints":[a,b],"verified":True}
+
+    def test_each_anchor_preserves_routes_order_and_independent_limits(self):
+        pools=[self.pool("orca","ab","A","B"),
+               self.pool("raydium_cpmm","bc","B","C"),
+               self.pool("meteora_dlmm","ca","C","A"),
+               self.pool("pumpswap","ab2","A","B")]
+        anchors=["C","A","B","missing"]
+        for maximum in (None,200):
+            for limit in (1,20):
+                for visits in (None,7):
+                    options=dict(min_hops=3,max_hops=3,max_cycles=limit,
+                                 truncate=True,maximum_pools=maximum,
+                                 max_edge_visits=visits)
+                    for anchor,routes,stats in cycles(pools,anchors=anchors,
+                            per_anchor=True,**options):
+                        expected_stats={}
+                        expected=cycles(pools,anchors=[anchor],
+                                        search_stats=expected_stats,**options)
+                        self.assertEqual(routes,expected)
+                        self.assertEqual(stats,expected_stats)
+
+    def test_uncapped_index_built_once_and_yielded_legs_isolated(self):
+        class CountingPools(list):
+            passes=0
+            def __iter__(self):
+                self.passes+=1
+                return super().__iter__()
+        pools=CountingPools(self.pool("orca","leaf"+str(i),"A","leaf"+str(i))
+                             for i in range(300))
+        pools.extend(self.pool("raydium_cpmm",a+b,a,b)
+                     for a,b in (("A","B"),("B","C"),("C","A")))
+        options=dict(min_hops=3,max_hops=3,maximum_pools=None)
+        stream=cycles(pools,anchors=["A","B","C"],per_anchor=True,**options)
+        self.assertEqual(pools.passes,1)
+        anchor,routes,stats=next(stream)
+        self.assertEqual((anchor,len(routes)),("A",2))
+        routes[0]["legs"][0]["output"]="tampered"
+        for anchor,routes,stats in stream:
+            self.assertEqual(len(routes),2)
+            self.assertTrue(all(leg["output"]!="tampered"
+                                for route in routes for leg in route["legs"]))
+        self.assertEqual(pools.passes,1)
+
+    def test_grouped_search_options_are_fail_closed(self):
+        pools=[self.pool("orca","ab","A","B")]
+        with self.assertRaises(ValueError):
+            cycles(pools,per_anchor=1)
+        with self.assertRaises(ValueError):
+            cycles(pools,per_anchor=True,search_stats={})
+        with self.assertRaises(ValueError):
+            cycles(pools,per_anchor=True,anchors=[])

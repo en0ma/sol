@@ -94,12 +94,12 @@ def diversified_three_hop_graph(readiness, maximum=100, *,
     unique_identities=set()
     full_inventory=readiness.get("source_pool_count_limit",200) is None
     search_truncated_starts=[]
-    for anchor in sorted({m for p in pools for m in p["mints"]}):
-        stats={}
-        for route in cycles(pools,anchors=[anchor],min_hops=3,max_hops=3,
-                            max_cycles=1000,truncate=True,
-                            maximum_pools=None if full_inventory else 200,
-                            search_stats=stats):
+    anchors=sorted({m for p in pools for m in p["mints"]})
+    for anchor,anchor_routes,stats in cycles(
+            pools,anchors=anchors,min_hops=3,max_hops=3,
+            max_cycles=1000,truncate=True,
+            maximum_pools=None if full_inventory else 200,per_anchor=True):
+        for route in anchor_routes:
             variants=[route]
             if anchor in recovery_starts:
                 variants.append(reverse_triangle(route))

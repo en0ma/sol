@@ -16,7 +16,16 @@ MAX_POOLS=200
 MAX_CYCLES=2000
 
 def cycles(pools,anchors=None,max_hops=MAX_HOPS,max_cycles=MAX_CYCLES,truncate=False,min_hops=2,hint_only=False,required_first_pool=None,
-           max_edge_visits=None,search_stats=None,venue_priority=None,maximum_pools=MAX_POOLS):
+           max_edge_visits=None,search_stats=None,venue_priority=None,maximum_pools=MAX_POOLS,
+           per_anchor=False):
+    """Discover cycles; optionally stream independent search results per anchor.
+
+    In per-anchor mode, each yielded (anchor, routes, stats) has its own
+    cycle/edge budget and identity set. All searches reuse one authenticated
+    graph index. Default mode retains the existing aggregate search contract.
+    """
+    if type(per_anchor) is not bool or (per_anchor and search_stats is not None):
+        raise ValueError("invalid per-anchor search mode")
     if venue_priority is not None and (not isinstance(venue_priority,dict)
             or set(venue_priority)!=set(TARGET_VENUES)
             or any(type(v) is not int or not 0<=v<=100 for v in venue_priority.values())):
@@ -66,52 +75,65 @@ def cycles(pools,anchors=None,max_hops=MAX_HOPS,max_cycles=MAX_CYCLES,truncate=F
             closing[(src,edge["output"])].append(edge)
     anchors=set(anchors) if anchors is not None else set(edges)
     if not anchors:raise ValueError("empty anchors")
-    found=[];identities=set()
-    edge_visits=0;stop_reason=None
-    class BoundedDiscoveryComplete(Exception):pass
-    def visit(start,current,path,used,visited):
-        nonlocal edge_visits,stop_reason
-        options=(closing.get((current,start),[]) if maximum_pools is None and
-                 len(path)==max_hops-1 else edges[current])
-        for e in options:
-            if max_edge_visits is not None and edge_visits>=max_edge_visits:
-                stop_reason="EDGE_VISIT_LIMIT"
-                if truncate:raise BoundedDiscoveryComplete()
-                raise ValueError("graph edge visit budget exceeded")
-            edge_visits+=1
-            if not path and required_first_pool is not None and (e["venue"],e["pool"])!=tuple(required_first_pool):
-                continue
-            if (e["venue"],e["pool"]) in used:continue
-            nxt=e["output"]
-            new=path+[e]
-            if nxt==start:
-                if len(new)<min_hops:continue
-                identity=tuple((x["venue"],x["pool"],x["input"]) for x in new)
-                if identity in identities:continue
-                identities.add(identity)
-                found.append({
-                    "start_mint":start,"hops":len(new),
-                    "legs":new,"venues":sorted(set(x["venue"] for x in new)),
-                    "same_venue":len(set(x["venue"] for x in new))==1,
-                    "status":"HINT_ONLY_UNQUOTED" if hint_only else "UNQUOTED","net_profit_lamports":None,
-                    "simulation_verified":False,"opportunity_confirmed":False})
-                if len(found)>=max_cycles:
-                    if truncate:
-                        stop_reason="CYCLE_LIMIT"
-                        raise BoundedDiscoveryComplete()
-                    if len(found)>max_cycles:raise ValueError("cycle budget exceeded")
-            elif nxt not in visited and len(new)<max_hops:
-                visit(start,nxt,new,used|{(e["venue"],e["pool"])},visited|{nxt})
-    try:
-        for anchor in sorted(anchors & set(edges)):
-            visit(anchor,anchor,[],set(),{anchor})
-    except BoundedDiscoveryComplete:
-        pass
-    if search_stats is not None:
-        search_stats.update(edge_visits=edge_visits,stop_reason=stop_reason,
-                            complete=stop_reason is None,returned_cycles=len(found),
-                            venue_priority_traversal=venue_priority is not None)
-    return found
+    def search(anchor_set,stats):
+        found=[];identities=set()
+        edge_visits=0;stop_reason=None
+        class BoundedDiscoveryComplete(Exception):pass
+        def visit(start,current,path,used,visited):
+            nonlocal edge_visits,stop_reason
+            options=(closing.get((current,start),[]) if maximum_pools is None and
+                     len(path)==max_hops-1 else edges[current])
+            for e in options:
+                if max_edge_visits is not None and edge_visits>=max_edge_visits:
+                    stop_reason="EDGE_VISIT_LIMIT"
+                    if truncate:raise BoundedDiscoveryComplete()
+                    raise ValueError("graph edge visit budget exceeded")
+                edge_visits+=1
+                if not path and required_first_pool is not None and (e["venue"],e["pool"])!=tuple(required_first_pool):
+                    continue
+                if (e["venue"],e["pool"]) in used:continue
+                nxt=e["output"]
+                new=path+[e]
+                if nxt==start:
+                    if len(new)<min_hops:continue
+                    identity=tuple((x["venue"],x["pool"],x["input"]) for x in new)
+                    if identity in identities:continue
+                    identities.add(identity)
+                    found.append({
+                        "start_mint":start,"hops":len(new),
+                        "legs":new,"venues":sorted(set(x["venue"] for x in new)),
+                        "same_venue":len(set(x["venue"] for x in new))==1,
+                        "status":"HINT_ONLY_UNQUOTED" if hint_only else "UNQUOTED","net_profit_lamports":None,
+                        "simulation_verified":False,"opportunity_confirmed":False})
+                    if len(found)>=max_cycles:
+                        if truncate:
+                            stop_reason="CYCLE_LIMIT"
+                            raise BoundedDiscoveryComplete()
+                        if len(found)>max_cycles:raise ValueError("cycle budget exceeded")
+                elif nxt not in visited and len(new)<max_hops:
+                    visit(start,nxt,new,used|{(e["venue"],e["pool"])},visited|{nxt})
+        try:
+            for anchor in sorted(anchor_set & set(edges)):
+                visit(anchor,anchor,[],set(),{anchor})
+        except BoundedDiscoveryComplete:
+            pass
+        if stats is not None:
+            stats.update(edge_visits=edge_visits,stop_reason=stop_reason,
+                                complete=stop_reason is None,returned_cycles=len(found),
+                                venue_priority_traversal=venue_priority is not None)
+        return found
+    if per_anchor:
+        def stream():
+            for anchor in sorted(anchors):
+                stats={}
+                routes=search({anchor},stats)
+                # Search results share index edge objects. Isolate yielded
+                # route legs so downstream callers cannot mutate the index.
+                for route in routes:
+                    route["legs"]=[dict(leg) for leg in route["legs"]]
+                yield anchor,routes,stats
+        return stream()
+    return search(anchors,search_stats)
 
 def scan(rpc,registry,extra_pairs=(),anchors=None,max_cycles=MAX_CYCLES):
     if len(registry)>MAX_POOLS:raise ValueError("registry budget exceeded")
