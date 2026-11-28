@@ -30,6 +30,31 @@ class OfflineClockTests(unittest.TestCase):
             permissioned_dlmm_slot_requirement(fixture(source_slot=99))
         with self.assertRaisesRegex(ValueError,"non-slot"):
             permissioned_dlmm_slot_requirement(fixture(activation_type=1))
+    def test_customizable_permissionless_source_activation(self):
+        # Source artifact 15263237974, pool 3msAL8G7Kq4C9GGASVjp5F5QjpvJuBZyyXNV2nsegQUD,
+        # 3H-35 / 3H-124, program error 6042. Pair type 2, activation type 0.
+        source=fixture(pair_type=2,activation_point=425552357,source_slot=474950167)
+        self.assertEqual(permissioned_dlmm_slot_requirement(source),
+            (474950167,[{"pool":POOL,"activation_point":425552357}]))
+        with self.assertRaisesRegex(ValueError,"predates"):
+            permissioned_dlmm_slot_requirement(fixture(pair_type=2,
+                activation_point=425552357,source_slot=425552356))
+        with self.assertRaisesRegex(ValueError,"non-slot"):
+            permissioned_dlmm_slot_requirement(fixture(pair_type=2,activation_type=1))
+
+    @patch("arb.source_snapshot_manifest.verify",return_value=True)
+    @patch("arb.dlmm_offline_clock.source_clock",side_effect=[
+        {"slot":35,"unix_timestamp":1795867000},
+        {"slot":474950167,"unix_timestamp":1912089841}])
+    @patch("arb.dlmm_offline_clock.call")
+    def test_customizable_slot_alignment_is_forward_only(self,rpc,clock,verify):
+        source=fixture(pair_type=2,activation_point=425552357,source_slot=474950167)
+        result=align_permissioned_dlmm_clock("http://127.0.0.1:8899",source)
+        rpc.assert_called_once_with("http://127.0.0.1:8899","surfnet_timeTravel",
+                                    [{"absoluteSlot":474950167}])
+        self.assertEqual(result["offline_after"]["slot"],474950167)
+        self.assertFalse(result["source_clock_timestamp_parity_claimed"])
+
     def test_nonpermissioned_does_not_need_alignment(self):
         self.assertEqual(permissioned_dlmm_slot_requirement(fixture(pair_type=0)),(200,[]))
     @patch("arb.source_snapshot_manifest.verify",return_value=True)

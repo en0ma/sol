@@ -1,7 +1,7 @@
 """Fail-closed offline Clock alignment for authenticated permissioned DLMM swaps.
 
 Never alters source pool data, never broadcasts, and never uses wall-clock time.
-Only slot-activated permissioned LbPairs are supported by this path.
+Supports slot-activated permissioned and customizable permissionless LbPairs.
 """
 import base64
 from arb.meteora_dlmm import decode,PROGRAM
@@ -33,10 +33,10 @@ def permissioned_dlmm_slot_requirement(fixture):
             raise ValueError("source DLMM owner missing or mismatched")
         raw=base64.b64decode(record["data"][0],validate=True)
         state=decode(raw)
-        if state["pair_type"]!=1:
+        if state["pair_type"] not in (1,2):
             continue
         if state["status"]!=0 or state["activation_type"]!=0:
-            raise ValueError("permissioned DLMM pool disabled or non-slot activation unsupported")
+            raise ValueError("permissioned/customizable DLMM pool disabled or non-slot activation unsupported")
         if source_slot<state["activation_point"]:
             raise ValueError("source snapshot predates permissioned DLMM activation")
         restricted.append({"pool":pool,"activation_point":state["activation_point"]})
