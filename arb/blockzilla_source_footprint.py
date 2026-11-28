@@ -68,6 +68,11 @@ def source_footprint(fixture):
         key=(venue,pool)
         state=row["decoded_pool_state"]
         aux=dict(proof["auxiliary"])
+        if venue=="meteora_dlmm":
+            from arb.meteora_dlmm_bin_preflight import verified_bitmap_extension_address
+            extension=verified_bitmap_extension_address(pool,aux,fixture)
+            if extension is not None:
+                aux["authenticated_bitmap_extension"]=extension
         if venue=="raydium_clmm":
             aux.update(clmm_direction_evidence(state,mints[i],
                 aux.get("tick_arrays_by_direction"),fixture["accounts"]))

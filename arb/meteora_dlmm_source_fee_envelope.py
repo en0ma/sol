@@ -29,6 +29,16 @@ def quote_fee_envelope(fixture, *, pool, mint_in, amount_in, observed_unix,
     if mint_in not in (x,y):
         raise ValueError("DLMM source input mint mismatch")
     direction=mint_in==x
+    # A quote may not silently use an extension claim that diverges from
+    # captured original bytes. The existing contiguous-bin model is unchanged.
+    extension_evidence=None
+    for proof in fixture.get("leg_evidence_by_index",[]):
+        if proof.get("venue")=="meteora_dlmm" and proof.get("pool")==pool:
+            aux=proof.get("auxiliary") or {}
+            if aux.get("bitmap_extension_source") is not None:
+                from arb.meteora_dlmm_bin_preflight import verified_bitmap_extension_address
+                verified_bitmap_extension_address(pool,aux,fixture)
+                extension_evidence=aux["bitmap_extension_source"]
     active=state["active_id"]
     center=active_bin_array_index(active)
     indices=[center+(-i if direction else i) for i in range(maximum_arrays)]
@@ -119,6 +129,7 @@ def quote_fee_envelope(fixture, *, pool, mint_in, amount_in, observed_unix,
             "decoded_bin_count":sum(x["bin_count"] for x in arrays),
             "walked_bin_count":len(bins),
             "missing_arrays":missing,
+            "bitmap_extension_source":extension_evidence,
             "fee_bounds":outcomes,
             "source_derived_dynamic_fee_quote":effective,
             "fee_precision":FEE_PRECISION,"fee_on_input":fee_on_input,

@@ -60,6 +60,11 @@ def capture(rpc,graph,route_index,output,*,venue_cache=None,allow_hint_graph=Fal
     if current!=mints[0] or len({leg["pool"] for leg in legs})!=len(legs):
         raise ValueError("four-to-six route must be closed with distinct pools")
     addresses=list(dict.fromkeys(addresses))
+    required_addresses=set(addresses)
+    from arb.meteora_dlmm_bin_preflight import bitmap_extension_pda,contextual_bitmap_extension
+    optional_bitmap_addresses={bitmap_extension_pda(l["pool"])
+        for l in legs if l["venue"]=="meteora_dlmm"}
+    addresses.extend(sorted(optional_bitmap_addresses-required_addresses))
     if not addresses or len(addresses)>100:
         raise ValueError("source auxiliary inventory exceeds getMultipleAccounts 100-key limit")
     response=call(rpc,"getMultipleAccounts",[addresses,{"encoding":"base64","commitment":"confirmed"}])
@@ -68,7 +73,8 @@ def capture(rpc,graph,route_index,output,*,venue_cache=None,allow_hint_graph=Fal
     if (type(slot)is not int or slot<0 or not isinstance(values,list) or
             len(values)!=len(addresses)):
         raise ValueError("single-slot multi-hop source response malformed")
-    missing=[address for address,value in zip(addresses,values) if value is None]
+    missing=[address for address,value in zip(addresses,values)
+             if value is None and address in required_addresses]
     if missing:
         # An absent source account is not an offline permission to fabricate
         # it. Preserve bounded identities and roles for reproducible triage.
@@ -85,9 +91,10 @@ def capture(rpc,graph,route_index,output,*,venue_cache=None,allow_hint_graph=Fal
         raise ValueError("single-slot missing required source accounts: "+
                          json.dumps({"total":len(missing),"first":detail},
                                     separators=(",",":")))
-    if any(not isinstance(value,dict) for value in values):
+    if any(value is not None and not isinstance(value,dict) for value in values):
         raise ValueError("single-slot multi-hop source account data invalid")
-    accounts=dict(zip(addresses,values))
+    accounts={address:value for address,value in zip(addresses,values) if value is not None}
+    addresses=[address for address in addresses if address in accounts]
     for i,leg in enumerate(legs):
         account=accounts[leg["pool"]]
         venue=leg["venue"]
@@ -100,6 +107,8 @@ def capture(rpc,graph,route_index,output,*,venue_cache=None,allow_hint_graph=Fal
         if set(state[k] for k in MINT_KEYS[venue])!={mints[i],mints[i+1]}:
             raise ValueError("source pool changed mint identity")
         if venue=="meteora_dlmm":
+            evidence[i]["auxiliary"]={**evidence[i]["auxiliary"],
+                "bitmap_extension_source":contextual_bitmap_extension(leg["pool"],accounts)}
             directional=evidence[i]["auxiliary"].get("directional_bin_source")
             if directional is not None:
                 from arb.meteora_dlmm_bin_preflight import (

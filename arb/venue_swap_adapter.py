@@ -69,9 +69,17 @@ def build_leg(venue,pool,state,evidence,owner,src,dst,
         enriched=dict(state,input_mint=mint_in,output_mint=mint_out,
                       active_bin_array_index=index,
                       directional_bin_source=directional)
+        extension=evidence.get("authenticated_bitmap_extension")
+        if extension is not None:
+            from arb.meteora_dlmm_bin_preflight import bitmap_extension_pda
+            claim=evidence.get("bitmap_extension_source")
+            if (not isinstance(claim,dict) or claim.get("pool")!=pool
+                    or claim.get("status")!="SOURCE_BITMAP_EXTENSION_AUTHENTICATED"
+                    or claim.get("address")!=extension or extension!=bitmap_extension_pda(pool)):
+                raise ValueError("unbound DLMM bitmap extension account")
         return build_swap(pool,enriched,owner,src,dst,state["oracle"],bins,
                           amount,floor,input_is_x=mint_in==x,
-                          bitmap_extension=state.get("bitmap_extension"))
+                          bitmap_extension=extension)
     if venue=="raydium_clmm":
         from arb.raydium_clmm_swap import build
         a,b=state["token_mint_0"],state["token_mint_1"]

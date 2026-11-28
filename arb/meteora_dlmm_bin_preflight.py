@@ -28,6 +28,67 @@ def bin_array_pda(pool, index):
     return str(Pubkey.find_program_address([
         b"bin_array",bytes(pair),index.to_bytes(8,"little",signed=True)],program)[0])
 
+BITMAP_EXTENSION_DISC=bytes([80,111,124,113,55,237,18,5])
+BITMAP_EXTENSION_SIZE=8+32+2*12*8*8
+
+def bitmap_extension_pda(pool):
+    """Canonical PDA from MeteoraAg/dlmm-sdk commons/src/pda.rs and seeds.rs."""
+    program=Pubkey.from_string(PROGRAM)
+    return str(Pubkey.find_program_address([b"bitmap",bytes(Pubkey.from_string(pool))],program)[0])
+
+def decode_bitmap_extension(pool,address,account):
+    """Validate real BinArrayBitmapExtension bytes, not a synthesized bitmap."""
+    if address!=bitmap_extension_pda(pool):
+        raise ValueError("DLMM bitmap extension PDA mismatch")
+    if (not isinstance(account,dict) or account.get("owner")!=PROGRAM
+            or account.get("executable") is not False):
+        raise ValueError("DLMM bitmap extension owner/executable mismatch")
+    data=account.get("data")
+    if not isinstance(data,list) or len(data)!=2 or data[1]!="base64":
+        raise ValueError("DLMM bitmap extension encoding mismatch")
+    raw=base64.b64decode(data[0],validate=True)
+    if (len(raw)!=BITMAP_EXTENSION_SIZE or raw[:8]!=BITMAP_EXTENSION_DISC
+            or str(Pubkey.from_bytes(raw[8:40]))!=pool):
+        raise ValueError("DLMM bitmap extension layout or parent mismatch")
+    positive=int.from_bytes(raw[40:808],"little")
+    negative=int.from_bytes(raw[808:1576],"little")
+    return {"address":address,"pool":pool,"status":"SOURCE_BITMAP_EXTENSION_AUTHENTICATED",
+            "positive_initialized_array_count":positive.bit_count(),
+            "negative_initialized_array_count":negative.bit_count(),
+            "byte_length":len(raw),"actionable":False,"broadcast":False,
+            "live_execution_approved":False}
+
+def contextual_bitmap_extension(pool,accounts):
+    address=bitmap_extension_pda(pool)
+    if address not in accounts:
+        return {"address":address,"pool":pool,"status":"SOURCE_BITMAP_EXTENSION_ABSENT",
+                "actionable":False,"broadcast":False,"live_execution_approved":False}
+    return decode_bitmap_extension(pool,address,accounts[address])
+
+def verified_bitmap_extension_address(pool,proof,fixture):
+    """Recompute present/absent evidence using the existing source manifest inventory.
+
+    Historical fixtures have no extension claim; they retain their original
+    optional-account behavior. A fresh present claim must bind a captured key.
+    The outer caller verifies the source manifest before invoking this helper.
+    """
+    claim=proof.get("bitmap_extension_source")
+    if claim is None:
+        return None
+    accounts=fixture["accounts"]
+    actual=contextual_bitmap_extension(pool,accounts)
+    if actual!=claim:
+        raise ValueError("DLMM bitmap extension source claim differs from contextual bytes")
+    address=actual["address"]
+    if actual["status"]=="SOURCE_BITMAP_EXTENSION_AUTHENTICATED":
+        if address not in fixture["state_account_addresses"]:
+            raise ValueError("DLMM bitmap extension outside authenticated source manifest")
+        return address
+    if address in fixture["state_account_addresses"]:
+        raise ValueError("absent DLMM bitmap extension listed as captured source")
+    return None
+
+
 def inspect_adjacent_bin_arrays(rpc, pool, active_index):
     """Read-only authentication for nearby arrays; presence is not a quote."""
     require_loopback_rpc(rpc)

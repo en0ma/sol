@@ -631,6 +631,11 @@ def run_four_to_six_venue(rpc,fixture,*,amount_in=100_000,program_cache=None,
         if not isinstance(aux,dict):
             raise ValueError("four-to-six-hop source venue builder evidence missing")
         proof.update(aux)
+        if venue=="meteora_dlmm":
+            from arb.meteora_dlmm_bin_preflight import verified_bitmap_extension_address
+            extension=verified_bitmap_extension_address(pool,proof,fixture)
+            if extension is not None:
+                proof["authenticated_bitmap_extension"]=extension
         if venue=="raydium_clmm":
             proof.update(clmm_direction_evidence(
                 state,mints[i],proof.get("tick_arrays_by_direction"),fixture["accounts"]))
