@@ -16,7 +16,7 @@ MAX_POOLS=200
 MAX_CYCLES=2000
 
 def cycles(pools,anchors=None,max_hops=MAX_HOPS,max_cycles=MAX_CYCLES,truncate=False,min_hops=2,hint_only=False,required_first_pool=None,
-           max_edge_visits=None,search_stats=None,venue_priority=None):
+           max_edge_visits=None,search_stats=None,venue_priority=None,maximum_pools=MAX_POOLS):
     if venue_priority is not None and (not isinstance(venue_priority,dict)
             or set(venue_priority)!=set(TARGET_VENUES)
             or any(type(v) is not int or not 0<=v<=100 for v in venue_priority.values())):
@@ -37,7 +37,9 @@ def cycles(pools,anchors=None,max_hops=MAX_HOPS,max_cycles=MAX_CYCLES,truncate=F
         raise ValueError("invalid minimum cycle length")
     if type(max_cycles) is not int or not 1<=max_cycles<=10000:
         raise ValueError("invalid cycle limit")
-    if len(pools)>MAX_POOLS:raise ValueError("pool budget exceeded")
+    if maximum_pools is not None and (type(maximum_pools) is not int or maximum_pools<1
+            or len(pools)>maximum_pools):
+        raise ValueError("pool budget exceeded")
     edges=defaultdict(list)
     seen=set()
     for p in pools:
@@ -56,6 +58,12 @@ def cycles(pools,anchors=None,max_hops=MAX_HOPS,max_cycles=MAX_CYCLES,truncate=F
             edges[token].sort(key=lambda e:(e["output"],e["venue"],e["pool"]))
         else:
             edges[token].sort(key=lambda e:(venue_priority[e["venue"]],e["output"],e["venue"],e["pool"]))
+    # Index closing edges by pair rather than scanning every hub edge
+    # for the last hop of each possible path.
+    closing=defaultdict(list)
+    for src,items in edges.items():
+        for edge in items:
+            closing[(src,edge["output"])].append(edge)
     anchors=set(anchors) if anchors is not None else set(edges)
     if not anchors:raise ValueError("empty anchors")
     found=[];identities=set()
@@ -63,7 +71,8 @@ def cycles(pools,anchors=None,max_hops=MAX_HOPS,max_cycles=MAX_CYCLES,truncate=F
     class BoundedDiscoveryComplete(Exception):pass
     def visit(start,current,path,used,visited):
         nonlocal edge_visits,stop_reason
-        for e in edges[current]:
+        options=closing.get((current,start),[]) if len(path)==max_hops-1 else edges[current]
+        for e in options:
             if max_edge_visits is not None and edge_visits>=max_edge_visits:
                 stop_reason="EDGE_VISIT_LIMIT"
                 if truncate:raise BoundedDiscoveryComplete()

@@ -77,7 +77,8 @@ def diversified_three_hop_graph(readiness, maximum=100, *,
     from collections import defaultdict, deque
     from arb.m5_seven_venue_route_scan import analyze, ORDER, SAFE
     from arb.opportunity_graph import cycles
-    if type(maximum)is not int or not 1<=maximum<=200:
+    if type(maximum)is not int or maximum<1 or (maximum>200
+            and readiness.get("source_pool_count_limit",200) is not None):
         raise ValueError("invalid cycle budget")
     if type(allow_start_rotations) is not bool or type(recovery_ordering) is not bool:
         raise ValueError("invalid start-token rotation policy")
@@ -91,9 +92,14 @@ def diversified_three_hop_graph(readiness, maximum=100, *,
     candidates=defaultdict(deque)
     seen_by_start=defaultdict(set)
     unique_identities=set()
+    full_inventory=readiness.get("source_pool_count_limit",200) is None
+    search_truncated_starts=[]
     for anchor in sorted({m for p in pools for m in p["mints"]}):
+        stats={}
         for route in cycles(pools,anchors=[anchor],min_hops=3,max_hops=3,
-                            max_cycles=1000,truncate=True):
+                            max_cycles=1000,truncate=True,
+                            maximum_pools=None if full_inventory else 200,
+                            search_stats=stats):
             variants=[route]
             if anchor in recovery_starts:
                 variants.append(reverse_triangle(route))
@@ -105,6 +111,8 @@ def diversified_three_hop_graph(readiness, maximum=100, *,
                     continue
                 seen_by_start[anchor].add(identity)
                 candidates[anchor].append((identity,variant))
+        if stats.get("stop_reason"):
+            search_truncated_starts.append(anchor)
     result=[]
     selected_identities=set()
     used_pools=set()
@@ -149,6 +157,9 @@ def diversified_three_hop_graph(readiness, maximum=100, *,
         source_swap_eligibility_rejections=readiness.get("source_swap_eligibility_rejections",[]),
         source_swap_eligibility_rejection_count=len(readiness.get("source_swap_eligibility_rejections",[])),
         three_hop_candidate_identities_considered=len(unique_identities),
+        three_hop_candidate_start_mints=len(candidates),
+        three_hop_unselected_candidate_start_mints=sorted(set(candidates)-{r["start_mint"] for r in result}),
+        three_hop_per_start_search_truncated_mints=search_truncated_starts,
         three_hop_distinct_token_paths=len({tuple([r["start_mint"]]+[leg["output"] for leg in r["legs"][:2]]) for r in result}),
         three_hop_distinct_start_mints=len({r["start_mint"] for r in result}),
         three_hop_distinct_selected_pools=len(used_pools),
@@ -160,7 +171,8 @@ def diversified_three_hop_graph(readiness, maximum=100, *,
         three_hop_sample_policy=("START_MINT_ROUND_ROBIN_PER_START_POOL_NOVELTY_256_ROTATIONS" if allow_start_rotations else
                                  "START_MINT_ROUND_ROBIN_PER_START_POOL_NOVELTY_256_ROTATION_DEDUP"),
         cycle_coverage_by_hops={"3":{"returned":len(result),
-            "budget":maximum,"truncated":len(unique_identities)>len(result)}})
+            "budget":maximum,"truncated":bool(search_truncated_starts) or len(unique_identities)>len(result)
+                or len(candidates)>len({r["start_mint"] for r in result})}})
     return graph
 
 def capture_priority_indices(routes, *, retries_per_start=3):

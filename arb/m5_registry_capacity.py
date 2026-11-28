@@ -12,8 +12,8 @@ MAX_REGISTRY_POOLS=768
 
 def admit(existing,candidates,*,maximum=MAX_REGISTRY_POOLS):
     if (not isinstance(existing,list) or not isinstance(candidates,list)
-            or type(maximum)is not int or not 1<=maximum<=MAX_REGISTRY_POOLS
-            or len(existing)>maximum):
+            or (maximum is not None and (type(maximum)is not int
+                or not 1<=maximum<=MAX_REGISTRY_POOLS or len(existing)>maximum))):
         raise ValueError("invalid bounded source pool registry")
     seen=set()
     for row in existing:
@@ -41,7 +41,7 @@ def admit(existing,candidates,*,maximum=MAX_REGISTRY_POOLS):
         seen.add(key)
         remaining.append(row)
     candidate_count=len(remaining)
-    count=min(maximum-len(existing),candidate_count)
+    count=candidate_count if maximum is None else min(maximum-len(existing),candidate_count)
     # First retain pools completing NEW three-hop start tokens. With more
     # room than candidates, avoid costly topology recomputation entirely.
     if count==len(remaining):

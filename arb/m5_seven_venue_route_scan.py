@@ -53,17 +53,23 @@ def analyze(readiness, *, max_cycles=200):
     found=[]
     coverage={}
     truncated=False
+    full_inventory=readiness.get("source_pool_count_limit",200) is None
     for hops,budget in budgets.items():
         if budget==0:
             coverage[str(hops)]={"returned":0,"budget":0,"truncated":True}
             truncated=True
             continue
+        search_stats={}
         sample=cycles(pools,max_hops=hops,min_hops=hops,
-                      max_cycles=budget+1,truncate=True) if pools else []
-        length_truncated=len(sample)>budget
+                      max_cycles=budget+1,truncate=True,
+                      maximum_pools=None if full_inventory else 200,
+                      max_edge_visits=2_000_000 if full_inventory else None,
+                      search_stats=search_stats) if pools else []
+        length_truncated=len(sample)>budget or search_stats.get("stop_reason")=="EDGE_VISIT_LIMIT"
         found.extend(sample[:budget])
         coverage[str(hops)]={"returned":min(len(sample),budget),
-                             "budget":budget,"truncated":length_truncated}
+                             "budget":budget,"truncated":length_truncated,
+                             "search_stop_reason":search_stats.get("stop_reason")}
         truncated=truncated or length_truncated
     routes=found
     from arb.m5_graph_topology_diagnostic import audit
@@ -78,6 +84,8 @@ def analyze(readiness, *, max_cycles=200):
             "phase": "DISCOVERY_TO_GRAPH",
             "venue_coverage": {venue: len(source[venue]) for venue in ORDER},
             "authenticated_pool_count": len(pools),
+            "source_pool_count_limit":None if full_inventory else 200,
+            "source_pool_attempts_by_venue":readiness.get("source_pool_attempts_by_venue"),
             "connected_cycles": len(rows),
             "cycle_inventory_truncated": truncated,
             "cycle_coverage_by_hops": coverage,

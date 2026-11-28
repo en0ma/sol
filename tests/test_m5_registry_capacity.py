@@ -56,3 +56,13 @@ class RegistryCapacityTests(unittest.TestCase):
 
 if __name__=="__main__":
     unittest.main()
+
+class UnrestrictedRegistryTests(unittest.TestCase):
+    def test_all_source_verified_pools_admitted_beyond_old_cap(self):
+        rows=[verified("raydium_cpmm",str(i),"A","M"+str(i)) for i in range(1001)]
+        report=admit([],rows,maximum=None)
+        self.assertEqual(report["admitted_count"],1001)
+        self.assertIsNone(report["registry_capacity"])
+        self.assertEqual(report["unadmitted_count"],0)
+        with self.assertRaises(ValueError):
+            admit([],rows+[old("orca","bad","A","B")],maximum=None)

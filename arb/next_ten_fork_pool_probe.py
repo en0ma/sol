@@ -198,7 +198,7 @@ def prioritized_probe_addresses(registry, addresses, batch, *, maximum=12,
     pool, and snapshot() still independently checks the actual program owner,
     decoder, mint identity and reserves before route consideration.
     """
-    if type(maximum) is not int or not 1<=maximum<=48:
+    if maximum is not None and (type(maximum) is not int or not 1<=maximum<=48):
         raise ValueError("bounded paired source pool probes required")
     if (type(prefer_start_mint_coverage) is not bool or type(historical_recovery) is not bool
             or historical_recovery and not prefer_start_mint_coverage):
@@ -207,6 +207,14 @@ def prioritized_probe_addresses(registry, addresses, batch, *, maximum=12,
     if not isinstance(entries,list) or not isinstance(addresses,dict):
         raise ValueError("malformed pool probe inventory")
     relevant={venue for route in batch for venue in route}
+    if maximum is None:
+        result={}
+        for venue in sorted(relevant):
+            options=addresses.get(venue,[])
+            if not isinstance(options,list) or any(not isinstance(p,str) or not p for p in options):
+                raise ValueError("malformed full source pool inventory")
+            result[venue]=list(dict.fromkeys(options))
+        return result
     peers={venue:set() for venue in relevant}
     for a,b in batch:
         peers[a].add(b)
@@ -363,7 +371,8 @@ def probe(rpc, registry, *, batch=BATCH_10, maximum_per_venue=12,
           require_dlmm_swap_eligible=False,prefer_start_mint_coverage=False,
           historical_recovery=False):
     local_rpc_only(rpc)
-    if type(maximum_per_venue) is not int or not 1<=maximum_per_venue<=48:
+    if maximum_per_venue is not None and (type(maximum_per_venue) is not int
+            or not 1<=maximum_per_venue<=48):
         raise ValueError("invalid source probe venue budget")
     if type(require_dlmm_swap_eligible) is not bool:
         raise ValueError("invalid DLMM eligibility option")
@@ -373,7 +382,7 @@ def probe(rpc, registry, *, batch=BATCH_10, maximum_per_venue=12,
                                          maximum=maximum_per_venue,
                                          prefer_start_mint_coverage=prefer_start_mint_coverage,
                                          historical_recovery=historical_recovery)
-    if sum(map(len,entries.values()))>200:
+    if maximum_per_venue is not None and sum(map(len,entries.values()))>200:
         raise ValueError("source pool graph exceeds 200 identities; tighten token-diverse selection")
     relevant={v for pair in batch for v in pair}
     pools={}
@@ -382,7 +391,7 @@ def probe(rpc, registry, *, batch=BATCH_10, maximum_per_venue=12,
     rejected_swap_pools=[]
     for venue in sorted(relevant):
         pools[venue]=[]
-        for pool in entries[venue][:maximum_per_venue]:
+        for pool in entries[venue]:
             try:
                 authenticated=snapshot(rpc,pool,venue)
                 if require_dlmm_swap_eligible and venue=="meteora_dlmm":
@@ -409,7 +418,7 @@ def probe(rpc, registry, *, batch=BATCH_10, maximum_per_venue=12,
                     if activation["pair_type"]==1:
                         authenticated["offline_slot_alignment_required"]=True
                 pools[venue].append(authenticated)
-            except (ValueError,KeyError,TypeError) as exc:
+            except (ValueError,KeyError,TypeError,RuntimeError,OSError) as exc:
                 failures.append({"venue":venue,"pool":pool,
                                  "error_class":type(exc).__name__,
                                  "diagnostic":str(exc)[:120]})
@@ -435,6 +444,10 @@ def probe(rpc, registry, *, batch=BATCH_10, maximum_per_venue=12,
             "authenticated_distinct_venue_three_leg_candidate_count":len(triangles),
             "source":"READ_ONLY_MAINNET_BACKED_SURFPOOL",
             "route_count":len(routes),"authenticated_pools":pools,
+            "source_pool_count_limit":None if maximum_per_venue is None else 200,
+            "source_pool_per_venue_limit":maximum_per_venue,
+            "source_pool_attempts_by_venue":{v:len(entries[v]) for v in sorted(relevant)},
+            "source_pool_inventory_complete_for_selected_hints":True,
             "route_candidates":routes,"failed_pool_checks":failures,
             "source_swap_eligibility_rejections":rejected_swap_pools,
             "source_clock_for_swap_gate":clock,

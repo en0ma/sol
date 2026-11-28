@@ -69,3 +69,11 @@ class ForkCandidateTests(unittest.TestCase):
         self.assertEqual(len(PROGRAMS),7)
 if __name__=="__main__":
     unittest.main()
+
+class UnrestrictedProbeSelectionTests(unittest.TestCase):
+    def test_all_venue_addresses_retained(self):
+        from arb.next_ten_fork_pool_probe import prioritized_probe_addresses
+        rows={"orca":["pool"+str(i) for i in range(1000)],"raydium_cpmm":["cp"]}
+        result=prioritized_probe_addresses({"pools":[]},rows,
+            [("orca","raydium_cpmm")],maximum=None)
+        self.assertEqual(result,rows)

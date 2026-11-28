@@ -32,26 +32,23 @@ def topology(entries):
             raise ValueError("duplicate pool identity")
         seen.add((venue,address))
         for mint in mints:by_mint[mint].append(p)
+    # Distinct token triangles cannot reuse a pool, because each of their
+    # three unordered mint pairs is different. Collapse parallel pools
+    # before intersecting neighbors so broad inventories scale by pairs.
+    neighbors={mint:{row["mints"][0] if row["mints"][1]==mint else row["mints"][1]
+                    for row in rows} for mint,rows in by_mint.items()}
     cyclic=set()
-    for start,first_edges in by_mint.items():
-        for a in first_edges:
-            middle=a["mints"][0] if a["mints"][1]==start else a["mints"][1]
-            for b in by_mint[middle]:
-                if b["address"]==a["address"] and b["venue"]==a["venue"]:continue
-                last=b["mints"][0] if b["mints"][1]==middle else b["mints"][1]
-                if last==start or last==middle:continue
-                for c in by_mint[last]:
-                    if start not in c["mints"]:continue
-                    ids={(x["venue"],x["address"]) for x in (a,b,c)}
-                    if len(ids)==3:
-                        cyclic.add(start)
-                        break
-                if start in cyclic:break
-            if start in cyclic:break
-    return {"distinct_mints":len(by_mint),"three_hop_start_mints":sorted(cyclic),
+    for mint,adjacent in neighbors.items():
+        for other in adjacent:
+            common=adjacent&neighbors[other]
+            if common:
+                cyclic.add(mint)
+                cyclic.add(other)
+                cyclic.update(common)
+    return {"distinct_mints":len(neighbors),"three_hop_start_mints":sorted(cyclic),
             "three_hop_start_mint_count":len(cyclic),
-            "mint_neighbors":{m:sorted({p["mints"][0] if p["mints"][1]==m else p["mints"][1]
-                for p in edges}) for m,edges in by_mint.items()}}
+            "mint_neighbors":{mint:sorted(peers) for mint,peers in neighbors.items()}}
+
 
 def bridge_targets(entries, *, maximum=360):
     if type(maximum)is not int or not 1<=maximum<=360:
@@ -265,7 +262,7 @@ def resilience_bridge_targets(entries,*,maximum=24,historical_recovery=False):
     in every triangle through the start and there is just one such pool.
     This is topology, not an assertion about price or executable liquidity.
     """
-    if (type(maximum) is not int or not 1<=maximum<=72 or len(entries)>768
+    if (type(maximum) is not int or not 1<=maximum<=72
             or type(historical_recovery) is not bool):
         raise ValueError("invalid bounded resilience target budget")
     graph=topology(entries)

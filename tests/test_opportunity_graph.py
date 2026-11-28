@@ -49,3 +49,14 @@ class OpportunityGraphTests(unittest.TestCase):
            self.pool("raydium_cpmm","b","SOL","USDC")]
         with self.assertRaises(ValueError):
             cycles(p,anchors=["SOL"],max_cycles=1)
+
+class UnrestrictedGraphTests(unittest.TestCase):
+    def test_pool_beyond_previous_limit_closes_triangle(self):
+        from arb.opportunity_graph import cycles
+        pools=[{"venue":"orca","address":"p"+str(i),"mints":["A","leaf"+str(i)],"verified":True}
+               for i in range(300)]
+        pools.extend({"venue":"raydium_cpmm","address":a+b,"mints":[a,b],"verified":True}
+                     for a,b in (("A","B"),("B","C"),("C","A")))
+        found=cycles(pools,anchors=["A"],min_hops=3,max_hops=3,maximum_pools=None)
+        self.assertEqual(len(found),2)
+        self.assertTrue(all(len(row["legs"])==3 for row in found))
