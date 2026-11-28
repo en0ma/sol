@@ -101,6 +101,60 @@ def research_chain(fixture, *, amount_in, observed_unix, allow_modeled_dlmm=Fals
             "quoted_legs":trace,"signed_simulation_verified":False,
             "net_profit_verified":False,**SAFE}
 
+def contextual_economic_model(fixture,*,amount_in):
+    """Bound the pre-sign estimate to the original, nonhydrated Clock bytes.
+
+    A missing SDK, blocked venue or divergent Clock must not prevent a
+    separate genuine signed control attempt. Never promote modeled net.
+    """
+    from arb.next_ten_fork_pool_probe import contextual_pricing_clock
+    from arb.source_snapshot_manifest import verify
+    from arb.m5_signed_start_mint_economics import WSOL
+    verify(fixture)
+    if (any(fixture.get(k) is not False for k in SAFE)
+            or type(amount_in) is not int or not 0<amount_in<2**64):
+        raise ValueError("safe source fixture and integer research amount required")
+    mints=fixture["route_mints"]
+    if not isinstance(mints,list) or not 3<=len(mints)<=7 or mints[0]!=mints[-1]:
+        raise ValueError("closed source economic route required")
+    clock=contextual_pricing_clock(fixture)
+    base={"status":"PRIMARY_SOURCE_ECONOMICS_UNAVAILABLE","input_base_units":amount_in,
+        "source_slot":fixture["state_accounts_observed_slot"],
+        "manifest_sha256":fixture["state_account_manifest_sha256"],"start_mint":mints[0],
+        "pricing_clock":clock,"output_base_units":None,"gross_delta":None,
+        "estimated_message_fee_base_units":None,"estimated_net_delta":None,
+        "priority_cost_included":False,"account_funding_included":False,
+        "net_profit_verified":False,**SAFE}
+    if clock is None:
+        return {**base,"reason":"CONTEXTUAL_CLOCK_MODEL_UNAVAILABLE"}
+    try:
+        chain=research_chain(fixture,amount_in=amount_in,
+            observed_unix=clock["clock"]["unix_timestamp"],
+            allow_modeled_dlmm=True,allow_modeled_pumpswap=True)
+    except (ValueError,RuntimeError,KeyError,TypeError,ArithmeticError,OSError) as exc:
+        return {**base,"reason":"NATIVE_ROUTE_MODEL_UNAVAILABLE","error_class":type(exc).__name__}
+    if not isinstance(chain,dict) or any(chain.get(k) is not False for k in SAFE):
+        raise ValueError("unsafe contextual native economic model")
+    if chain.get("status") not in ("SOURCE_BOUND_MODELED_CHAIN_NOT_EXECUTION_VERIFIED",
+                                   "SOURCE_BOUND_INDICATIVE_CHAIN_NOT_EXECUTION_VERIFIED"):
+        return {**base,"reason":"NATIVE_ROUTE_MODEL_BLOCKED","blocked_leg":chain.get("blocked_leg_index"),
+                "blocked_venue":chain.get("blocked_venue"),"native_chain":chain}
+    output=chain.get("output_base_units")
+    if (type(output) is not int or not 0<output<2**64
+            or chain.get("input_base_units")!=amount_in
+            or chain.get("gross_delta_start_mint_base_units")!=output-amount_in
+            or chain.get("signed_simulation_verified") is not False
+            or chain.get("net_profit_verified") is not False):
+        raise ValueError("invalid contextual native economic output")
+    # Same explicit research fee assumption as existing Blockzilla grid.
+    from arb.blockzilla_size_plan import MESSAGE_FEE_SCENARIO
+    fee=MESSAGE_FEE_SCENARIO if mints[0]==WSOL else None
+    return {**base,"status":"PRIMARY_SOURCE_ECONOMIC_MODEL_ONLY",
+        "native_chain":chain,"output_base_units":output,"gross_delta":output-amount_in,
+        "estimated_message_fee_base_units":fee,
+        "estimated_net_delta":output-amount_in-fee if fee is not None else None}
+
+
 def main():
     import argparse,json
     from pathlib import Path

@@ -231,7 +231,7 @@ jobs:
                             "dlmm_swap_activation_rejections":graph["source_swap_eligibility_rejection_count"],
                             "selection_policy":graph["three_hop_sample_policy"]}))
           PY
-          python3 -m arb.m5_three_hop_atomic_inventory --phase source --graph "$RUNNER_TEMP/triangles/graph.json" --directory "$RUNNER_TEMP/triangles" --source-target 140 --allow-sparse-orca
+          python3 -m arb.m5_three_hop_atomic_inventory --phase source --graph "$RUNNER_TEMP/triangles/graph.json" --directory "$RUNNER_TEMP/triangles" --source-target 140 --allow-sparse-orca --capture-context-clock
           python3 - <<'PY'
           import json,os
           from pathlib import Path

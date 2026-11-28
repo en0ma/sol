@@ -308,7 +308,8 @@ def capture_selection(rows,deferred,*,target):
     return rows+restored,deferred[needed:]
 
 
-def source_capture(rpc, graph, directory, *, shard_index=0, shard_count=1, target=None,allow_sparse_orca=False):
+def source_capture(rpc, graph, directory, *, shard_index=0, shard_count=1, target=None,
+                   allow_sparse_orca=False,capture_context_clock=False):
     from arb.m5_four_to_six_source_capture import capture
     root=Path(directory)
     root.mkdir(parents=True,exist_ok=True)
@@ -362,6 +363,8 @@ def source_capture(rpc, graph, directory, *, shard_index=0, shard_count=1, targe
         fixture=root/("source-%02d.json"%j)
         try:
             options={'allow_sparse_orca':True} if allow_sparse_orca else {}
+            if capture_context_clock:
+                options["capture_context_clock"]=True
             capture(rpc,graph,index,fixture,venue_cache=venue_cache,**options)
             entry["source_status"]="CAPTURED"
             entry["fixture"]=fixture.name
@@ -636,6 +639,10 @@ def offline_simulate(rpc,directory,*,amount=100000,shard_index=0,shard_count=1):
                 try:
                     attempt={"amount_base_units":exact_input,"status":"RUNNING"}
                     row["signed_exact_input_attempts"].append(attempt)
+                    if fixture.get("contextual_source_clock") is not None:
+                        from arb.m5_source_indicative_route_chain import contextual_economic_model
+                        attempt["pre_sign_source_economics"]=contextual_economic_model(
+                            fixture,amount_in=exact_input)
                     receipt=run_four_to_six_venue(
                         rpc,fixture,amount_in=exact_input,
                         ephemeral_source_registry=True,retain_audit_evidence=True)
@@ -751,6 +758,23 @@ def audit_primary_shard(directory):
             "legs":[{"venue":v,"pool":p,"input":mints[i],"output":mints[i+1]}
                     for i,(v,p) in enumerate(zip(venues,pools))]}
         audit=audit_signed_core(receipt,fixture,source_row,amount)
+        if fixture.get("contextual_source_clock") is not None:
+            from arb.m5_source_indicative_route_chain import contextual_economic_model
+            from arb.m5_signed_start_mint_economics import signed_net_economics
+            selected=[a for a in row["signed_exact_input_attempts"]
+                      if a["amount_base_units"]==amount and a["status"]=="RECEIPT_RETURNED"]
+            model=contextual_economic_model(fixture,amount_in=amount)
+            if len(selected)!=1 or selected[0].get("pre_sign_source_economics")!=model:
+                raise ValueError("primary pre-sign source economic model differs on recomputation")
+            clock=model.get("pricing_clock")
+            economics=signed_net_economics(receipt,start_mint=mints[0],
+                source_slot=source_row["source_slot"],fixture=fixture,
+                observed_unix=clock["clock"]["unix_timestamp"] if clock is not None else None)
+            audit["source_economic_model"]=model
+            audit["signed_economics"]=economics
+            predicted=model.get("output_base_units")
+            audit["source_model_matches_terminal"]=(predicted==audit["positive_post_balances"][-1]
+                if type(predicted) is int else None)
         reserve_receipt_signatures(receipt,seen)
         accepted.append({"id":rid,"start_mint":mints[0],"pools":pools,
             "source_slot":source_row["source_slot"],"amount":amount,
@@ -774,6 +798,7 @@ def main():
     p.add_argument("--amount",type=int,default=100000)
     p.add_argument("--source-target",type=int,default=None)
     p.add_argument("--allow-sparse-orca",action="store_true")
+    p.add_argument("--capture-context-clock",action="store_true")
     p.add_argument("--shard-index",type=int,default=0)
     p.add_argument("--shard-count",type=int,default=1)
     args=p.parse_args()
@@ -781,7 +806,8 @@ def main():
         if not args.graph: p.error("--graph required for source")
         result=source_capture(args.rpc,json.loads(Path(args.graph).read_text()),args.directory,
                               shard_index=args.shard_index,shard_count=args.shard_count,target=args.source_target,
-                              allow_sparse_orca=args.allow_sparse_orca)
+                              allow_sparse_orca=args.allow_sparse_orca,
+                              capture_context_clock=args.capture_context_clock)
         print(json.dumps({"three_hop_capture_attempts":len(result),
                           "source_captured":sum(r["source_status"]=="CAPTURED" for r in result)}))
     else:

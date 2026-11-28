@@ -156,6 +156,27 @@ class ContextClockTests(unittest.TestCase):
         fixture["state_accounts_observed_slot"]=122;proof["context_slot"]=122
         self.assertIsNone(contextual_pricing_clock(fixture))
 
+    def test_contextual_economics_blocked_without_clock_and_non_sol_cost_unconverted(self):
+        from arb.m5_source_indicative_route_chain import contextual_economic_model
+        safe={"actionable":False,"live_execution_approved":False,"broadcast":False}
+        fixture={"route_mints":["A","B","A"],"state_accounts_observed_slot":123,
+            "state_account_manifest_sha256":"test",**safe}
+        with patch("arb.source_snapshot_manifest.verify"),patch(
+                "arb.next_ten_fork_pool_probe.contextual_pricing_clock",return_value=None):
+            self.assertEqual(contextual_economic_model(fixture,amount_in=100)["reason"],
+                             "CONTEXTUAL_CLOCK_MODEL_UNAVAILABLE")
+        clock={"clock":{"slot":124,"unix_timestamp":456},"same_slot_attested":False}
+        chain={"status":"SOURCE_BOUND_INDICATIVE_CHAIN_NOT_EXECUTION_VERIFIED",
+            "input_base_units":100,"output_base_units":101,"gross_delta_start_mint_base_units":1,
+            "signed_simulation_verified":False,"net_profit_verified":False,**safe}
+        with patch("arb.source_snapshot_manifest.verify"),patch(
+                "arb.next_ten_fork_pool_probe.contextual_pricing_clock",return_value=clock),patch(
+                "arb.m5_source_indicative_route_chain.research_chain",return_value=chain):
+            model=contextual_economic_model(fixture,amount_in=100)
+            self.assertEqual(model["gross_delta"],1)
+            self.assertIsNone(model["estimated_net_delta"])
+            self.assertFalse(model["net_profit_verified"])
+
 
 if __name__ == "__main__":
     unittest.main()
