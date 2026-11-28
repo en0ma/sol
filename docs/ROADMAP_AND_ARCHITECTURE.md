@@ -1,0 +1,375 @@
+# Sol — Agreed architecture, acceptance criteria and milestone roadmap
+
+**Status:** design intent and engineering targets, not a claim of production readiness.  
+**Last consolidated:** 2026-10-25.  
+**Applies to:** all subsequent contributors, coding agents and conversations. Read with root [AGENTS.md](../AGENTS.md).
+
+## Active overriding M5 delivery priority — 2026-10-26
+
+**M5 — Working Seven-Venue Arbitrage Opportunity Discovery and Offline Verification.** This is the user's primary next outcome, above incremental C01/C02 fee-perfecting tasks or additional reporting-only work. Keep the existing seven-venue architecture and all established acceptance/safety checks. Audit the complete codebase and latest CI before selecting implementation tasks. Join the existing discovery, source-state registry, token/pool graph, venue-owned quoting, opportunity ranking, and independent signed isolated Surfpool verification into one repeatable end-to-end research run. Emit concrete candidate/rejection counts and source-backed signed evidence, including an honest empty result. Do not label opportunities as executable or profitable merely from quotes; SOL fee payer remains separate. No broadcast/live execution.
+
+**Delivery discipline:** batch broad, meaningful vertical-slice changes with tests; normally at least three substantive commits per engineering push rather than narrow single-fix pushes. Existing modules must be audited and reused, not recreated. Update the ledger for evidence and missing integrations. CI-green or more model diagnostics alone does not complete M5.
+
+## Three-milestone delivery discipline and active engineering targets — 2026-10-27
+
+The user explicitly requires each engineering batch to advance three independent M5 targets in parallel: **(1) real seven-venue amount-aware source-native quote evidence**, **(2) authenticated four-to-six-hop capture and common-start-mint economics**, and **(3) isolated signed Surfpool execution with independent CPI/SPL/rollback audit**. Three commits addressing one narrow defect do **not** satisfy this standard. Use the existing discovery, adapters, compiler, signer, and independent auditor; preserve nonbroadcast safety flags.
+
+New work connects real four-to-six-hop graph leads to single-context source-fixture capture and existing manifest decoding, introduces three-leg source-native indicative amount propagation, and records why four-to-six-hop signed execution is not independently verified. These are **partial integrations**, not completed milestone acceptance. The signed auditor and full effective quote models remain outstanding; report partial / blocked / verified states for each of the three targets with current-HEAD CI and artifact evidence.
+
+## Current engineering checklist — 2026-10-25
+
+**Primary active work tracking:** [MILESTONE_EXECUTION_LEDGER.md](MILESTONE_EXECUTION_LEDGER.md). This ledger audits completed venue adapters, atomic execution, historical 42/42 evidence and generic compiler; it tracks outstanding adaptive multi-leg coordination, per-venue effective pricing, observed costs, and CI acceptance. Do not redo completed infrastructure. This section supersedes any older roadmap phrasing suggesting the primary adapters or atomic engine are still missing.
+
+## Scope decision — 2026-10-23 (supersedes earlier eight-venue requirements)
+
+**User-approved active scope: seven venues.** Orca deprecated its original Token Swap v1/standard pools and migrated its supported liquidity focus to Whirlpools. Retire `orca_token_swap_v1` from mandatory discovery, fork authentication, standalone signed execution, and atomic pair acceptance. Preserve its existing adapter and optional legacy tests for reference, but **do not count it as an active eighth venue** or spend active CI/API budget seeking v1 pools. Deprecation does not establish that no old onchain pools exist.
+
+**Active set:** `orca` (Whirlpool), `raydium_cpmm`, `raydium_clmm`, `meteora_dlmm`, `meteora_damm_v2`, `pumpswap`, `raydium_amm_v4`.
+
+**Revised acceptance:** 7 pool decoder and builder implementations, seven onchain-authenticated venue snapshots, seven signed standalone local-fork swap proofs, and **42 ordered cross-venue atomic directions** (21 unordered pairs), each subject to shared-token route feasibility, successful X→Y→Z evidence, and negative rollback tests. Missing compatible routes must be reported distinctly from broken adapters. Do not upgrade historical success or mocked unit-test gates.
+
+Earlier sections below describing **eight** venues, **56** ordered pairs, or Orca v1 mandatory discovery are **historical superseded requirements**. The source of truth for active targets is `arb/execution_target_matrix.py`. All work stays simulation-only with `actionable=false`, `live_execution_approved=false`, `broadcast=false`.
+
+## Milestone transition — 2026-10-25
+
+**M4 completed:** Signed, isolated Surfpool execution and independent rollback evidence
+were accepted for all 42 active ordered venue pairs in a single CI run
+([strict full regression #40147853880](https://github.com/en0ma/sol/actions/runs/40147853880)).
+This is simulation-only and not live profitability evidence.
+
+**M5 now active — opportunity research, not execution.**
+Build fresh mint-agnostic pool candidate coverage, amount-aware quotes per venue,
+common-start-mint fee/compute/slippage cost conversion, stale quote rejection,
+depth/price-impact checks, and compare quoted outcomes with fresh atomic simulation
+before accepting *research candidates*. The initial `arb/opportunity_research.py`
+is a conservative, pure boundary checker: it cannot originate real quotes,
+does not prove profitability, and refuses incomplete or mismatched cost units.
+A positive declared-cost estimate is NOT execution approval.
+No mainnet transaction broadcasts or funded execution wallets.
+
+**M6 remains deferred:** stronger RPC and production indexing must follow M5
+evidence and an explicit budget/authorization decision.
+
+## Agreed operating pipeline — 2026-10-25
+
+Maintain these **distinct**, cooperating engines in this order:
+1. Pool discovery engine (all seven active venue feeds, bounded and mint-agnostic).
+2. Live pool-state registry (source-authenticated pools, token mints, liquidity, fees, reserves, prices, ticks/bins, slots and freshness).
+3. Graph and route builder (tokens as vertices, specific pools as directed edges, connected cycles).
+4. Atomic swap engine (venue-specific instruction builders; shared legacy/v0 transaction packing).
+5. Signed simulation and independent verification (SPL balances, fees, compute, slippage, ordered top-level invocation and rollback).
+6. Execution decision (deliberately **disabled** under current simulation-only authorization).
+7. Continuous discovery, refresh and research evaluation (later monitored service).
+
+**Pre-atomic research stage:** amount-aware venue quotes and conservative common-mint
+net-cost screening rank candidates *before* invoking the expensive signed
+simulation stage. Quote ranking is not execution authorization.
+
+**Separate market-state and quote boundaries:** `arb/market_state_registry.py`
+rejects stale, unauthenticated, duplicated or cross-slot-skewed snapshots.
+`arb/venue_quote_contract.py` enforces exact-input quotes with same-slot
+provenance, fee, depth and price-impact fields. These are validation boundaries,
+not yet connected to real venue-wide feed collectors or quote mathematics.
+
+**Current implementation boundary:** `arb/research_engine_pipeline.py` is
+an offline dependency-injected integration skeleton over authenticated snapshots,
+`arb.opportunity_graph`, quote screening and the existing independent receipt
+assessor. It does not claim real-time feeds, persistent registry, all-venue
+quotes, continuous monitoring, or profitable opportunities. Do not promote
+mocked providers into production evidence. Full venue integration and data
+freshness remain the active M5 work.
+
+## M5 seven-venue quote dispatch — October 25, 2026
+
+Seven active venue branches now support indicative exact-input snapshot quote screening. Newly added: DLMM authenticated single-bin, DAMM v2 authenticated fixed-liquidity price segment, and AMM v4 OpenBook/PnL-adjusted net-reserve CPMM. These are strictly bounded models, not verified protocol-exact pricing or live authenticated refresh. All three fail closed without independently authenticated state, fees and directional limits. Actual cross-venue accuracy and profitability remain unverified until signed simulation reconciliation.
+
+## M5 quote-to-simulation accuracy gate — October 25, 2026
+
+`arb/quote_simulation_reconciliation.py` checks indicative exact-input route quotes against an independently accepted signed Surfpool atomic/rollback receipt. It requires exact venue/pool/mint identities, same source snapshot slot and actual SPL input and output deltas. Missing source-bound pool identities in older 42/42 receipts are **not** silently promoted into quote accuracy evidence. The current tests exercise synthetic but strict receipts only; real source-bound quote-vs-swap accuracy is still pending. Indicative screening does not imply profitability or live execution.
+
+## M5 signed-receipt source binding — October 25, 2026
+
+The offline signed atomic runner now preserves the two exact pool addresses
+in each signed receipt, making route identity inspectable alongside independently
+verified SPL deltas and rollback. The existing source fixture exporter does
+**not yet** retain a cryptographically or RPC-context authenticated common
+source snapshot slot; receipts explicitly set `source_snapshot_slot:null` and
+`quote_accuracy_verified:false`. Consequently the strict M5 quote-to-swap
+reconciler **must reject** these receipts until synchronized source account
+capture and authentic quote derivation are implemented. Historical 42/42 proof
+remains valid *for atomicity*, never quote accuracy. No broadcast.
+
+## M5 source account contextual checks — October 25, 2026
+
+The source fixture exporter now additionally reads both selected pool accounts
+in one read-only `getMultipleAccounts` response, checks its context slot,
+and verifies both account replies match the existing authenticated account
+inventory. It records `paired_pool_observed_slot`; this is **not** a
+complete same-slot quote snapshot because companion accounts and program data
+were fetched independently. Signed receipts carry the pool-pair observation,
+but `source_snapshot_slot` remains null, so the independent quote-to-simulation
+checker still refuses an unsupported full provenance claim.
+
+## M5 companion account state context — October 25, 2026
+
+The source exporter now cross-checks **all selected non-program pool,
+vault, oracle, tick/bin and market accounts** in a single contextual
+`getMultipleAccounts` response (up to the bounded 64-address inventory).
+Every returned account must exactly match the independently preflighted
+exported bytes. `state_accounts_observed_slot` and
+`state_account_count` are recorded in source fixtures and signed receipts.
+
+Upgradeable program-data accounts are still separately fetched, and the
+complete source-state quote input is not yet independently generated and
+bound to a quote. Therefore `source_snapshot_slot` remains null and
+quote reconciliation still fails closed. This is source consistency
+hardening, not measured quote-vs-execution accuracy.
+
+## M5 source-state manifest integrity — October 25, 2026
+
+A deterministic SHA-256 digest now binds the exported source-state account inventory and observed contextual slot. Offline hydration verifies the manifest before applying any source accounts. This checks fixture integrity, **not** the upstream RPC's authenticity or the missing protocol-exact quote accuracy. Older pre-manifest fixtures remain usable only as historical atomic evidence. Signed receipts carry the manifest checksum; no mainnet transaction is sent.
+
+## M5 manifest-bound indicative quote identity — October 25, 2026
+
+\`arb/fixture_quote_binding.py\` now demands that each indicative quote's directional venue, pool, mint identities and snapshot slot match the manifest-verified source fixture exactly, including quote amount continuity. This is a **binding/checking interface**; source account bytes have not yet been decoded into the shared seven-venue quote models here. Neither authenticated chain provenance nor signed swap-output accuracy follows from the check alone.
+
+## M5 source fixture -> quote -> signed output orchestration — October 25, 2026
+
+New \`arb/fixture_quote_execution_pipeline.py\` verifies source manifest, decodes native pool layouts for each of seven venues, requires independent fee/liquidity/tick/bin derivation from captured accounts, runs the seven-venue shared indicative quote dispatcher, binds both legs to the fixture, and invokes independent signed Surfpool SPL-delta reconciliation. Because raw seven-venue auxiliary pricing decoders and observed quote-vs-signed executions are not yet complete, the decoder is required as an explicit injected dependency and output disclaims full pricing-source verification. Legacy signed receipts without matching source snapshot provenance are rejected; this change does NOT establish seven-venue measured price accuracy.
+
+## M5 native source-account reserve extraction — October 25, 2026
+
+\`arb/fixture_pool_fundamentals.py\` now decodes both native classic SPL vaults for **all seven venue types** from the contextual manifest-verified account inventory, verifies mint, owner, authority and positive reserves, and extracts existing pool-native fee/price/liquidity fundamentals for Orca, CLMM, DAMM v2, DLMM, PumpSwap and AMM v4. This does **not** authenticate complete effective fees from separate configuration accounts, DLMM active bin contents, DAMM dynamic fee, PumpSwap fee program, AMM v4 OpenBook balances or exact seven-venue swap math. Until those account-specific decoders and signed reconciliation run, quote accuracy remains unverified. No mainnet broadcast.
+
+## M5 seven-venue auxiliary pricing checklist — October 25, 2026
+
+New \`arb/seven_venue_aux_pricing_requirements.py\` explicitly records missing authenticated fee, tick/bin, virtual-reserve, and OpenBook/PnL extraction prerequisites for **each of seven** quote models. This is a typed coverage and research safety integration, **not** those still-unimplemented auxiliary decoders. Every venue remains blocked for full account-derived quote accuracy until its prerequisites are independently decoded from manifest-captured accounts and signed Surfpool output parity is measured.
+
+## M5 captured config-account fee decoding — October 25, 2026
+
+\`arb/fixture_aux_fee_decoder.py\` now decodes Raydium CPMM AmmConfig and Raydium CLMM AmmConfig from already context-captured accounts, checks owner, pool-linked config address, protocol discriminator, trading fee bounds, and CLMM tick spacing. A nonzero CPMM creator fee blocks complete effective-fee claims because fee placement is not independently verified. These are account-backed components, not full seven-venue auxiliary decoding or swap accuracy proof. Five venue auxiliary fee decoders and all signed quote comparisons remain pending.
+
+## M5 Raydium AMM v4 OpenOrders reserve derivation — October 25, 2026
+
+\`arb/raydium_amm_v4_open_orders_reserves.py\` extracts Serum/OpenBook v3 OpenOrders free and total base/quote balances from manifest-captured bytes, validates the linked market and authority, and derives net CPMM reserves as vault + OpenOrders totals - AMM pending PnL. This is bounded to legacy v3 layout; OpenOrders authority is independently derived from the pool nonce and fixed AMM program PDA rather than accepted from a caller, as must market-role account correctness. It is not validated swap-price parity nor broad live state ingestion.
+
+## M5 pricing decoding vs source-derived quote validation — October 25, 2026
+
+The seven **pool decoders** were completed earlier: these parse pool-account identity and native fields, not all referenced tick arrays, bin arrays, fee configuration or OpenOrders accounts. The new \`arb/fixture_concentrated_ticks.py\` reuses existing Orca fixed tick and Raydium CLMM tick-array parsers against a manifest-bound captured fixture and cross-checks pool identities and array starts, without asserting complete directional coverage or swap accuracy. Priority 1 is signed exact-amount quote parity; Priority 2 is missing auxiliary-account pricing extraction. Both proceed in parallel. Neither constitutes live-trading approval.
+
+## Parallel M5 validation workstreams — October 25, 2026
+
+Priority 1: \`arb/signed_quote_parity_portfolio.py\` batches observed two-leg quote deviations against signed isolated receipts, groups distinct source manifests and includes mandatory common-mint cost budgets for indicative risk screening. It reports zero validated quote-accuracy samples until state/source attestation exists. Priority 2: \`arb/fixture_tick_coverage.py\` audits contiguous captured Orca and Raydium CLMM arrays and records missing array starts, never inferring nonexistent liquidity. Priority 3: risk-cost modeling is re-used through \`arb/opportunity_research.py\`; no profitability certification or mainnet broadcasting.
+
+## Three-priority integrated research — October 25, 2026
+
+Priority 1: signed offline quote diagnostic portfolio is correlated with per-route observed SPL deltas. Priority 2: \`fixture_missing_tick_arrays\` enumerates bounded missing Orca/CLMM tick-array starts, **not** fabricated bins or decoded liquidity. Priority 3: \`observed_signed_risk\` and \`signed_parity_risk_report\` calculate offline gross return and net of mandatory user-supplied same-start-mint costs; they do not verify actual compute charges, execution probability, profitable trading or source RPC authenticity. All approval/broadcast gates remain false.
+
+## M5 three priorities and current CI regression — October 25, 2026
+
+CI run 40189091912 failed **independent-amm-v4-audit** at 11/12; \`meteora_dlmm__raydium_amm_v4\` reported POSITIVE_SIGNED_ATOMIC_FAILED while the other four jobs passed. This is a **real regression**, not successful 12/12 evidence; investigate the signed receipt's original error and logs before claiming coverage restored. Newly persisted \`positive_units_consumed\` and \`positive_failure_diagnostic\` aid next-run triage. Priority 2 parses captured PumpSwap FeeConfig via the existing parser, without guessing its effective mode/PDA. Priority 3 computes observed-PnL sensitivity to additional adverse output slippage. Priority 1 remains signed source-consistent quote parity, not demonstrated. Safety gates stay false.
+
+## M5 focused signed regression recovery, parity and risk gates — October 25, 2026
+
+Run 40189576841 **passed all five jobs**, including 12/12 independent AMM v4 signed atomic acceptance; this recovers the preceding run's 11/12 flake but does not imply full 42/42 freshly repeated nor quote parity. The risk report now rejects PnL inferred solely from unsigned or unverified before/after balances; tick coverage enumerates **every** missing intermediate array start rather than only one per gap. Source-authenticated quote parity, full bin/dynamic-fee coverage and real profitability remain outstanding.
+
+## M5 consolidated signed experiment assessment — October 25, 2026
+
+\`arb/m5_experiment_acceptance.py\` combines existing signed amount-parity diagnostics, captured concentrated-liquidity coverage and downside risk on the **same experiment**. It blocks risk output on failed signed evidence, incomplete cost declarations or missing SPL balances. Even apparently matching reports do not validate independent source/receipt provenance or permit trading. CI run 40190968965 passed all five jobs (12/12 focused route audit). The next validation milestone is a genuinely generated fixture-to-signed-quote matched dataset, not more scaffolding.
+
+## M5 actual account-derived two-leg pricing experiment — October 25, 2026
+
+\`arb/cpmm_ammv4_signed_experiment.py\` now invokes existing source-captured native CPMM and AMM-v4 quote adapters for a complete **CPMM↔AMM v4** closed two-leg cycle. The second leg uses exactly the first quote's integer output. It compares to an independently supplied signed Surfpool receipt and optionally computes declared-cost offline PnL only when signed evidence passes. No runtime fixture/receipt dataset was generated in this commit; raw source authentication, signed quote accuracy and live profitability remain unverified. CI run 40191710198 passed all five jobs at prior HEAD.
+
+## 1. Mission and non-goals
+
+Build a Solana **simulation-only** research and verification system capable of discovering pools across seven active DEX venue implementations, authenticating their on-chain state, decoding them, constructing valid swap instructions, verifying each venue's signed standalone swap simulation, and proving **atomic, ordered, two-venue swaps** on a local Surfpool mainnet fork. Eventually use fresh pool coverage to study arbitrage opportunities, but **profitable discovery, trade execution, and live broadcasting are not acceptance criteria for the current implementation phase**.
+
+Do not broadcast real transactions, use funded execution wallets, or treat simulated profitability as live-trading approval. All output defaults: `actionable=false`, `live_execution_approved=false`, `broadcast=false`. Explicit future authorization and a separate risk/security review would be required to change that boundary.
+
+## 2. Original eight-venue scope (historical; superseded by seven-venue decision above)
+
+The seven required active protocol adapters are:
+
+1. `orca` — Orca Whirlpool
+2. `raydium_cpmm` — Raydium CPMM
+3. `raydium_clmm` — Raydium CLMM
+4. `meteora_dlmm` — Meteora DLMM
+5. `meteora_damm_v2` — Meteora DAMM v2
+6. `pumpswap` — PumpSwap
+7. `raydium_amm_v4` — Raydium legacy AMM v4
+**Archived optional adapter:** `orca_token_swap_v1` — Orca legacy Token Swap v1 (deprecated in 2023; excluded from mandatory discovery and execution).
+
+Do not conflate a venue family with an instruction format; protocol-specific accounts, authority derivation, fee models, token-program handling and instruction builders differ. `arb/execution_target_matrix.py` defines the ordered target list. Raydium AMM v4 remains required; deprecated Orca Token Swap v1 does not expand the active target or block completion.
+
+**Updated scope, October 23, 2026:** User confirmed **seven active venues; 21 unordered and 42 ordered atomic venue pair tests**. Orca legacy Token Swap v1 is archived optional support. Existing source/tests remain available but its public API discovery and onchain owner screening are removed from mandatory CI. The original historical 8-venue observations below are retained as background only and must not be treated as current acceptance targets. Bundle substantial, coherent work before each CI push rather than committing narrow changes that repeatedly restart expensive forks. Signed standalone execution with real token deltas and ordered atomic execution/rollback remain incomplete and mandatory for the seven active venues.
+
+## 3. Pool discovery: venue-wide, fresh and token-agnostic
+
+**Agreed direction:** never restrict discovery to hardcoded SOL/USDC, other predetermined mint pairs, or a static pool registry. New tokens and pools should become discoverable as they launch.
+
+- Enumerate available pools **per venue** using the venue's public API or a reputable index that supports **venue-wide listing**, preferably sorted by liquidity or recent creation; paginate with bounded requests, rate limiting, timeouts, retry/backoff and deduplication. Do not silently substitute a mint-pair lookup for venue-wide enumeration. Some APIs are incomplete or delayed: record source, fetch time, pagination coverage and truncation.
+- Filter for expected program ID/venue, structurally valid distinct mint keys, nonzero liquidity, and a **configurable USD liquidity floor**; rank by liquidity and/or recency. A $10,000 default is an initial testing heuristic, **not** a universal token-legitimacy rule. Preserve discoverability of new low-liquidity pools through a separate recent-pool queue or configurable lower threshold, rather than permanently excluding launches.
+- Check pool activity, initialized status, token-program compatibility, vault mints and authorities, reserves, protocol-specific configuration, account owners and (where relevant) OpenBook market state and PDAs. Treat public metadata, USD TVL, price and fee estimates as **untrusted hints** until reconciled with local-fork on-chain data.
+- Use discovered pool IDs to fetch **specific on-chain accounts** through Surfpool, avoiding expensive unrestricted `getProgramAccounts` scans under the current free-tier RPC. On-chain account authentication is still required for execution verification; only **exhaustive on-chain pool discovery** is deferred.
+- Build independent discovery adapters for **all seven active** venues, or explicitly document missing/limited public API support and use a bounded third-party index/fallback. Normalize into a common candidate schema: venue, program ID, pool ID, token mints, liquidity estimate, source, discovered/fetched timestamp, validation status and reason codes. Deduplicate by (venue, pool ID), persist candidate provenance, and periodically refresh.
+- API list endpoints may not provide immediate full coverage of launches; eventually combine listing, recently-created pool feeds, incremental cursors and on-chain program events. Never promise exhaustive or real-time coverage without measured evidence.
+- **RPC upgrade later:** after implementation and credible opportunity research, upgrade to stronger RPC and add program-specific on-chain discovery, subscriptions/indexing and backfill. Reconcile API vs chain coverage and preserve the same verification gates. Do not block implementation waiting for that upgrade.
+
+**Current implementation:** `arb/raydium_public_pool_discovery.py` lists Raydium AMM v4 pools without mint restrictions, with bounded pagination, liquidity filtering and program/mint checks; `arb/raydium_public_pool_candidates.py` supplies candidate IDs to `arb/eight_venue_onchain_probe.py`. The existing registry may contain manually curated **unverified candidates**, never a fixed discovery universe. The equivalent venue-wide API/index adapters for the other six active venues are future work; do not mark them complete. The read-only eight-venue probe can additionally ingest an untrusted Orca Token Swap v1 candidate-address JSON file (`--public-orca-legacy-candidates`) from a suitable index. The venue-wide GeckoTerminal adapter (`arb/orca_legacy_public_index.py`) can enumerate a selected Solana DEX's pools without token filters, with USD-reserve screening. **GeckoTerminal DEX labels are not a protocol-v1 guarantee**: CI now defaults to GeckoTerminal's observed Solana DEX catalog ID `orca` (confirmed in Surfpool CI #1836), with optional `ORCA_LEGACY_GECKO_DEX_ID` override. This enumerates **Orca-labeled** pools across tokens; the label does **not** establish Token Swap v1 ownership and results may predominantly be Whirlpool pools. The local-fork owner check against `DjVE6JNiYqPL2QXyCUUh8rNjHrbz9hXHNYt99MQ59qw1` is mandatory before counting a candidate. A configured index feed improves discovery but cannot guarantee v1 pools exist or are included. CI #1842 subsequently confirmed the indexed Orca cohort returned **16 untrusted candidates** and **all 16 had non-v1 on-chain program owners** (0 missing, 0 matching v1); read-only decoder verification remained **7/8**. The index adapter now supports a configurable broader cohort (up to 64 by default, up to eight index pages), and owner preflight reads accounts in batches of at most 16 before the full legacy verifier; these broader settings are not yet confirmed by a CI artifact. The subsequent `arb/orca_legacy_owner_preflight.py` batches account-owner reads against the **local Surfpool fork** and passes only exact Token Swap v1-owned accounts onward to the full decoder/vault verifier. Its JSON artifact distinguishes missing accounts, mismatched owners, and matching program owners. Program ownership alone is **not** a verified pool decoder or signed execution. Any selected pool still must match the **Orca Token Swap v1 program owner** on the local fork. An authenticated v1 pool is **not yet available**. Orca's archived legacy SDK is a potentially useful historical hint, **not** evidence of fresh/live pool listings. Do not conflate Orca Whirlpool listings with Orca Token Swap v1. No fresh Orca v1 pool is verified by this input capability alone.
+
+## 4. Standalone venue acceptance gates (each of 8)
+
+For every venue, separately demonstrate and retain evidence for:
+
+1. **Decoder implemented:** decode authentic pool bytes with strict length, discriminator/layout, owner, version and protocol-specific invariant checks; unit tests include malformed accounts.
+2. **On-chain pool authenticated:** real program-owned pool, valid mints, vaults, authorities, token-program variants, reserves and required companion accounts verified from Surfpool-fork RPC at a documented slot. Public API listing alone is insufficient.
+3. **Swap builder implemented:** construct the correct program ID, ordered accounts, writable/signer flags, direction, amount mode, slippage/min-output constraints and remaining accounts. Unit-test serialized instruction bytes.
+4. **Signed standalone execution verified:** build a transaction, sign **for local simulation only**, call `simulateTransaction` on Surfpool, prove expected program invocation and successful transaction, inspect pre/post token account balances and verify input decrease and output increase in correct token mints. Require nonzero meaningful deltas, proper account ownership, expected fees and failure diagnostics.
+5. **Negative controls:** wrong owner, wrong mint, invalid authority, insufficient balance, malformed account/amount, missing required tick/bin/market accounts, slippage failure or similar applicable conditions fail closed. Never infer success from a builder importing or a transaction merely compiling.
+
+Historical isolated evidence must be labeled historical and cannot be silently promoted to **current CI run** execution proof. Retain a per-venue JSON evidence record with status and reasons, artifact name, pool/slot, program, signed simulation success/error, token deltas and safety flags.
+
+## 5. Cross-venue atomic acceptance (56 ordered combinations)
+
+An atomic test is **two swap instructions in one signed transaction**: venue A swaps X→Y, then venue B consumes **that same intermediate Y** and swaps Y→Z. X and Z may be different. **Do not require a closed cycle** (X=Z) to pass the atomic execution test; cycles and profitability are separate later studies.
+
+For all 8 venues, there are **28 unordered pairs and 56 ordered A→B combinations**. Each order is a separate gate: success for A→B does not prove B→A. Start testing ready venue pairs immediately; no need to wait for all eight.
+
+For each order:
+- Select authenticated pools with a genuinely shared intermediate mint Y and compatible token programs/accounts; do not assume every pair has a suitable route at a given time. Record **NO_ROUTE** separately from implementation failure.
+- Build both instructions with compatible intermediate token account, amounts, min-outs and required signers/compute budget, preserving instruction order and atomic transaction boundaries.
+- Run **one signed local-fork simulation**, verify transaction success, invocation traces, instruction order, X input and Z output deltas, and **intra-transaction continuity**: the first swap actually produces Y that the second consumes. Merely observing the two programs in logs or net-zero Y after simulation does not establish that continuity; use instruction-level token balance traces or another defensible proof.
+- Test a forced failure of the second leg and verify **transaction rollback** (no first-leg state committed). A failed transaction alone does not prove rollback without appropriate state/balance evidence.
+- Report route, two program IDs, pool IDs, mints X/Y/Z, slot, signed transaction simulation result, ordered instructions, token deltas, continuity proof, rollback evidence and artifact link.
+- Distinguish **not tested**, **no compatible route**, **simulation failed**, and **verified**. Do not count an unordered historical pairing as proof of both orders.
+
+`arb/cross_venue_atomic_simulation.py` currently has explicit false flags for intermediate consumption, order and rollback; these must remain false until independently demonstrated. `arb/execution_target_matrix.py` must continue to report the 56-order target honestly.
+
+## 6. Evidence, CI and truthful status
+
+CI must test decoder/builder units, discovery pagination and filters, API failure modes, wrong-owner/wrong-mint negative controls, local-fork authentication, signed standalone swaps, ordered atomic success, and second-leg rollback as these become implemented. Upload JSON artifacts **even when RPC errors prevent verification**; the eight-venue probe, JSON schema/safety-flag validation and evidence upload must be mandatory so green CI cannot mask failed generation or a missing artifact. Distinguish an infrastructure/rate-limit failure from a protocol failure.
+
+As of 2026-10-23, Surfpool CI run **#1819** (commit `5ccd848`) produced an inspected artifact showing **7/8 on-chain decoder validations**, **8/8 builder modules detected**, and **0 newly signed-builder executions verified by that read-only probe**. Raydium AMM v4 was authenticated using API-discovered candidates; Orca Token Swap v1 was the single pending on-chain decoder (0 candidate pools in the artifact). Historical signed-swap and pairwise evidence exists but is not interchangeable with current-run proof. This snapshot is not live status; inspect the latest workflow, step logs and artifacts before updating it.
+
+Capability registries such as `arb/venue_capabilities.py` and `arb/onchain_pool_discovery.py` may not yet enumerate all eight implemented adapters; reconcile registries and actual modules with explicit evidence levels rather than silently inflating readiness counts. The execution target matrix now independently inventories all eight decoder and builder modules (8/8 each) while keeping historical signed evidence separate and **current-run signed execution 0** until proved; the older `SWAP_BUILDERS` capability set intentionally remains scoped to historically integrated runners. CI #1846 indexed **19 Orca-labeled pools**, all 19 had owners other than Orca Token Swap v1; widening the same catalog is not guaranteed to resolve the legacy protocol gap. The owner-preflight artifact now includes per-program ownership counts to identify which programs dominate the public index.
+
+**Builder validation improvement (2026-10-23):** the pairwise capability audit now installs `solders==0.26.0` so real instruction serialization tests are not silently skipped due to missing runtime dependencies. PumpSwap's local signed simulation post-state verifier also requires received output to meet the exact minimum-output threshold passed to the builder, in addition to signature verification, invocation and positive token deltas. These are **test and verification harness improvements**, not new successful standalone signed swap execution evidence. Confirm the latest CI run before treating its tests as passed.
+
+**Signed-runner wiring regression (2026-10-23):** `tests/test_pumpswap_signed_runner.py` now exercises real `solders` transaction signing/serialization with mocked pool preflight, instruction construction and RPC simulation, checks forwarding of the minimum-output threshold to the post-state verifier, and asserts that unverified pools fail before signing. CI now runs this test. This is **unit-level wiring evidence only**: mocked simulation must never be counted as a successfully simulated real PumpSwap swap. The runner explicitly returns `actionable=false`, `live_execution_approved=false`, and `broadcast=false`.
+
+**Signed atomic instruction preflight (2026-10-23):** `arb/signed_atomic_instruction_preflight.py` now inspects the actual serialized, signed legacy Solana transaction to prove the two specified venue program instructions occur in order, exactly once, and both reference the same candidate intermediate token account. Its isolated tests include reversed order, duplicate venue instructions, absent shared account, malformed bytes, and wrong program. This is **structural transaction evidence only**, not proof the first leg produces intermediate tokens, the second leg consumes them, either leg executes on Surfpool, or failed second-leg rollback. It is now wired into `verify_signed_atomic`, which calls `Transaction.verify()` on the serialized legacy signed bytes and requires the two venue instructions to share the supplied intermediate account. The verifier may mark **only** `instruction_order_verified=true` after structural validation and successful simulation logs/post-state, while `signed_atomic_simulation_verified`, `intermediate_intra_transaction_consumption_verified`, and `rollback_failure_case_verified` remain false. Unit tests include a tampered-signature rejection and a mocked RPC success response; **mocked responses never establish real fork execution**. Any address-lookup-table v0 transaction requires separate resolved-key handling before it can be trusted.
+
+**DAMM v2 pre-signing reauthentication:** The runner now calls `arb/damm_v2_signed_preflight.authenticate_pool` against the local Surfpool fork immediately before signing. It rejects caller-supplied evidence that lacks a pool identity/slot/mint match, checks the current pool account's program owner and decoded state against the builder input, re-verifies synchronized vaults and checks non-stale evidence slots. A successful unit test of this guard is **not** proof of actual signed swap execution. The post-state simulator remains the authoritative signed-execution gate.
+
+**DAMM v2 standalone signed runner (2026-10-23):** `arb/meteora_damm_v2_signed_runner.py` now requires onchain-authenticated DAMM v2 pool evidence, performs user-token mint/authority/balance preflight, builds and signs the exact-input swap2 instruction, then calls a generic local-fork `simulateTransaction` verifier. `arb/signed_standalone_swap_verifier.py` cryptographically verifies the serialized signature, one specified venue instruction **referencing both user input and output accounts**, program invocation and success, and actual two-account SPL token balance deltas meeting max-input/min-output. Negative tests cover forged signatures, wrong programs, insufficient output, remote RPC, and unauthenticated DAMM pools. These are **code paths and mocked-RPC unit tests**: no DAMM v2 real signed swap result is claimed until a successful authenticated Surfpool simulation artifact is produced.
+
+**Standalone signed-instruction strictness (2026-10-23):** the SPL standalone post-state verifier now rejects any signed transaction containing more than the single explicitly selected venue instruction, or where either user token account is not writable. This prevents unrelated signed operations from being counted as a standalone swap proof. A new DAMM v2 runner test runs its actual `build_swap2` function and cryptographically verifies a signed serialized 14-account instruction with the expected discriminator, input and minimum-output amounts. The RPC simulation is still mocked; these tests do **not** prove a successful real DAMM v2 swap. Future legitimate compute-budget/setup instructions require an audited explicit allowlist rather than weakening this guard.
+
+## 7. Milestones and order of work
+
+**M1 — Discovery coverage.** Complete venue-wide, mint-agnostic, bounded API/index discovery for all eight venues where available; normalize candidates, liquidity/recent-pool queues, provenance, deduplication, refresh and failure handling. Public API discovery is allowed immediately. Document any venue without a suitable listing feed.
+
+**M2 — Authenticate all eight.** Verify real pools and companion accounts in the local fork, including Raydium AMM v4 and Orca Token Swap v1. Prefer direct pool lookups from API IDs over program-wide scans. Do not confuse no candidate with no protocol.
+
+**M3 — Eight standalone swaps.** Verify each decoder + builder + **signed execution** with token deltas and negative controls. Build missing execution harnesses and account fixtures. Start with available authentic pools; M2 and M3 can progress concurrently by venue.
+
+**M4 — Ordered atomic verification.** For every available route among 56 ordered pairs, prove X→Y→Z in one signed simulation, instruction order, intermediate token continuity, output deltas and rollback. Track missing routes separately and continue expanding candidate coverage until each order has verifiable evidence or a documented blocking reason.
+
+**M5 — Opportunity research, not execution.** Once implementations work, study token-agnostic cross-venue quote coverage, pool liquidity/depth, fees, slippage, compute cost, stale data, price impact and net expected value. No simulated opportunity implies a profitable executable trade. Do not require profitability for M2–M4 acceptance.
+
+**M6 — Stronger RPC / production-quality discovery (deferred).** After implementation and opportunity research, adopt upgraded RPC, exhaustive filtered on-chain discovery, incremental pool-event indexing, freshness/latency measurements, API reconciliation, reliability and performance controls. Any subsequent live-trading capability would require a new explicit user decision and independent risk/security milestones.
+
+## 8. Agent handoff and documentation rules
+
+On every substantial change: update this roadmap if direction/acceptance changes; add focused tests and CI coverage; commit actual changes; provide branch, SHA, run ID, artifact, verified/unverified gates and blockers. Avoid hardcoded token pair constraints in new discovery adapters. Preserve safety flags and simulation-only operation. Prefer incremental verified progress over broad unsupported claims.
+
+**Known implementation caveats to revisit:** confirm Raydium API list response shape and pagination with observed payloads; verify legacy AMM market PDA/nonce and OpenBook layout against real accounts; verify Orca Token Swap v1 layout and active pool availability; inspect CI step-level failures despite overall success; ensure cross-venue proof goes beyond terminal balances and invocation logs. Do not silently change status flags to make reports green.
+
+## Blockzilla historical discovery experiment — 2026-11-27
+
+An optional bounded archive HTTP reader may seed existing registry authentication. Historical transaction account roles are untrusted until existing venue decoders and vault verification succeed. Finalized independent RPC sample comparison, byte/request budgets and separate topology evidence are required. Existing source-state RPC, registry, graph, pricing and isolated signed Surfpool gates remain unchanged. Do not make Blockzilla mandatory or claim savings, source-native quote parity, verified profit or execution coverage until measured.
+
+When the HTTP gateway returns no independently matched blocks, the optional experiment can use a pinned upstream Compact V2 program-dump on a separate uncredentialed runner. Its signature leads require finalized independent membership/program/status checks before account hints, then existing source verification. It does not establish archive packet-byte parity or replace the current source-state RPC.
+
+The experimental workflow must fail on missing route selection, skipped expected jobs, or missing/inconsistent evidence. A successful zero-pool measurement is distinct from unavailable data; no positive benefit follows from workflow green alone.
+
+The pinned reader must be built and run on the same uncredentialed runner with the documented native CPU flags; preserve build inputs and diagnostics even when compilation fails. Do not claim archive access from build success alone.
+
+Native archive control files may exceed the output cap. Bound stdout/stderr independently; retain explicit per-file cache, sampled aggregate cache, disk floor and deadline constraints. Do not report cache size as network usage or partial output as successful archive evidence.
+
+For comparative evaluation, read direct finalized RPC full blocks over the same observed successful archive slots, share per-venue sample/candidate/source-verification budgets, measure pair and triangle topology separately, preserve incomplete control results and distinguish logical calls/result JSON bytes from real network/billing. No archive-derived identity is automatically admitted.
+
+If archive-derived identities share a token pair, test the existing two-leg source fixture/quote/adaptive signed pipeline in a separately isolated job. Prefer two novel identities, preserve source hash and direction, and never credit this to the primary inventory or equate signed gross change with fee-converted net gain. Incomplete RPC controls do not establish exclusive discovery or cost savings.
+
+Retain ephemeral isolated legacy positive/negative packet bytes and recorded local simulation response only for the bounded experimental pair trials. Recheck signatures, instruction accounts/order, CPI and balance/rollback from artifacts separately; do not confuse RPC response recheck with independent replay or attestation. Compare native model against actual signed leg amounts without promoting source-clock scenarios to exact pricing.
+
+Native DLMM market-maker bin exhaustion must use upward inverse-price capacity input, fee on net capacity, and capped output, not floor-output binary search. Preserve actual per-bin consumption and source/isolated Clock distinctions. No automatic protocol-exact promotion from finite sample agreement.
+
+DLMM OnlyY fees must be charged on output for X→Y and input for Y→X. Keep denomination-specific fee totals, MM-only scope, and modeled chain separate from executable pricing. Recompute artifact quotes from original source fixture bytes on a separate runner rather than trusting saved quote output alone.
+
+Use explicit hint-only existing graph enumeration for archive-seeded multihop candidates; reauthenticate all legs before capture, preserve 4–6-hop artifacts separately and verify positive/negative packets and recorded CPI/rollback with actual isolated lookup readback. No primary admission or profitability assertion.
+
+Bound archive-seeded cycles by forcing the novel identity as first edge before result truncation. Report zero accepted separately from evidence success and require every captured route/amount attempt to reconcile.
+
+Use integer ceiling of AMM v4 swap fee before invariant math; retain rational fee scenario for comparison only. ALT compression is not account-lock reduction; preserve runtime rejections, rank alternate candidates by clearly labeled heuristic and report actual resolved key count. Recompute each signed leg even when full modeled chain is blocked.
+
+For archive seed-edge cycles, filter pool hints using distances between seed endpoints after removing that edge. Per-hop bounded windows and graph edge-visit budget must expose truncation; topology does not guarantee an executable route.
+
+Build pinned DAMM SDK only on uncredentialed audit runner and retain build resolution/hash. Source-clock SDK quote is indicative, never auto-promoted. Diversify six-hop alternatives across shared dependencies, including bounded no-Orca window.
+
+CLMM native quote traversal may skip only default PoolState bitmap-proven empty ranges; reject any missing set-bit array, bitmap conflict or extension range. No physical empty array fabrication. Six-hop signed acceptance achieved in bounded experiment, not full M5 or profit proof.
+
+Preserve fixed 4–6-hop budget and use separate WSOL-rooted novel-pool triangle trials for PumpSwap in opposite directions. Record hypothetical fee placement/rounding comparisons separately from deterministic native parity. Group retrospective signed estimated economics by identical input mint and size; no profit certification.
+
+PumpSwap V2 event-prefix fee components and actual SPL movements are distinct from fee-mode hypotheses. Preserve buy curve one-unit adjustment as sample-derived hypothesis until broader independent evidence. Estimated message fee economics excludes account-creation rent unless separately reconciled.
+
+Separate source-clock and stable isolated execution-clock DLMM pricing, retain both. Preselect ordinary canonical WSOL PumpSwap model without signed output selection; never promote scenario to protocol certification. Distinguish observed system account funding and estimated message fees from actual wallet economics.
+
+Bounded pre-sign native sizing must retain original controls, rank only complete source models and independently recompute the plan against original fixture/SDK dependency resolution. DLMM may traverse up to three contiguous captured arrays; do not skip matching unmodeled limit-order liquidity or unknown gaps. No promotion of modeled profit.
+
+Independent size-plan audit rebuilds the official SDK from the sizing runner's retained dependency lock, not its executable. Rejected attempts retain separate digest-checked receipt evidence when available; missing execution cannot be promoted.
+
+Capture diverse alternate 4/5-hop pool sets within separate bounded budgets. Calculate all source size plans and comparable denomination/input rankings before any signed trial; preserve source-slot ranges and independently recompute. Pair source and execution-clock quote parity remain separate evidence.
+
+Primary capture retains the first fixture per starting mint and may defer redundant fresh source-authenticated downward Orca cliff observations, restoring captured fallbacks when necessary to preserve exact target. Do not equate cliff with proven failure. Use existing static Whirlpool64-crossing bounded model and vary archive block windows without widening authentication budgets.
+
+Ordinary noncanonical creator-free WSOL PumpSwap flat-fee scenarios may enter the preselected research model only with authenticated mode and fee selection. Preserve separate source and execution-time Orca samples. Rejected lock-limit messages require signed packet and ALT readback recheck, never successful execution or rollback evidence.
+
+For six-hop archive selection reuse existing builders to compile unsigned source-bound account unions with distinct public placeholders. Prefer a bounded research key budget without treating estimates as runtime proof; retain deferred authenticated candidates and recompute selection independently. Preserve source versus execution-clock native leg counts.
+
+Six-hop candidate search may use separate low-pressure venue-prioritized graph windows, preserving original traversal defaults and per-window bounds. Capture up to eight alternatives but keep at most two selected and stop early when two preferred source footprints are available. Reauthenticate contextual source accounts despite reuse of direction-specific discovery metadata.
+
+Static Whirlpool quotes may use the existing current-array stop boundary if the fully decoded authenticated current array has no initialized ticks in the swap direction, even when opposite-side ticks exist. Never cross that stop boundary or skip missing source accounts. Retain the selected boundary provenance in route research and independent signed comparison; sample parity is not protocol certification.
+
+After bounded six-hop source capture, the isolated SDK-enabled runner may select two from all authenticated alternatives using footprint class then completed native control/grid coverage, without any signed output or cross-mint economic comparison. Retain the original footprint-only choice and all pre-sign plans; independent audit recomputes selection before accepting packets. Accepted packet metadata must reconcile recorded response/compute/size and resolved keys, and positive and negative signatures cannot be reused across trials. No change to runtime lock limits or offline-only controls.
+
+For slot-activated customizable permissionless DLMM pools, reuse existing forward-only isolated clock alignment; never fabricate activation or rewrite pool state. Capture genuine optional canonical bitmap extension in the contextual source inventory and revalidate its original bytes before native quote or signed builder use; absence is explicit, not manufactured. DAMM v2 slippage retry changes only input size, never min-output or rollback acceptance.
+
+Fast core regression includes slot-activation and bitmap-extension identity tests in addition to the existing directional capture and bounded input retry tests. Empirical acceptance remains subject to exact-head source, signed and independent audit artifacts.
+
+For freshly captured directional DLMM bitmap evidence, allow bounded traversal across only clear bitmap positions, never missing initialized arrays or unsupported limit orders. Source discovery may reserve up to 24 existing 360 direct-PDA targets for alternate pool/closure hints on single-pool-dependent mints. Group economic comparisons by starting mint and exact input, not raw cross-mint deltas. Primary offline shards retain raw packets and reuse common independent packet/CPI/SPL/rollback audit before global counts; require unique positive and negative signatures across shards.
+
+Capture a nonhydrated Clock sidecar in the same contextual route read where bounded account budget permits; only exact Clock.slot=context slot qualifies as contextual, retain explicit post-capture fallback and independently rederive native pricing clock. Bind primary fixture bytes at source phase and independently reconcile each signed leg's full boundary debit and credit, including first/last, rejecting unrelated ephemeral-account transfers.
+
+Primary #310 46152355722 source-preparation succeeded; artifact 15267262270 contains 140 selected fixtures, 181 attempts, 36 source failures (32 missing tick-array accounts and four CLMM extension preflight), 89 graph starts, 75 captured starts, 202 newly verified pool identities. Twelve of 14 uncaptured starts have Orca missing-array blockers, two CLMM. Upstream Orca programs/whirlpool/src/util/sparse_swap.rs and instructions/swap.rs support canonical uninitialized tick-array PDAs with empty system account semantics. Candidate adds opt-in primary capture of null canonical arrays, verifies present accounts, rejects shifted/edge layouts, requires actual isolated null readback and independently checks signed leg accounts; no fabricated account or native sparse quote promotion. Fresh signed acceptance pending. No push while primary shards run.
+
+2026-11-28 primary #310 completed: 125/140 signed+rollback, 66/75 verified starts, 117/135 pools, all six e3208cea workflows successful. DLMM 6042->6036 on two routes; all three DLMM failures now 6036, DAMM6002 unchanged despite bounded retries. Source artifact 15267262270 shows four CLMM extension capture failures affecting two starts, pools HZ7SArP5PDJ2EyEqkc53sdXnRACoQCRY8jk3phnPvp7d and 697oAPKpfeDCRSJLGwr1zfMtfBukfmjX1UENCANWPwVv. Implement official Raydium TickArrayBitmapExtension bit mapping (negative groups ascending bit order), authenticated directional fallback, same-context recheck, existing swap_v2 builder extension wiring, footprint and native quote coverage. Absent or changed extension fails closed; no empirical extension acceptance yet. Sparse Orca capture remains explicitly blocked from native quotes. No M5 promotion.
+
+2026-11-28 #29 exact 1417a00e: 32/32 independent signed, 64/64 selected grid, 12 candidate plans, 32/32 source and execution terminal, 144/144 execution-clock legs, pair 8/8 native and 4/4 terminal. Local replay artifacts 15268466621 and 15267934361 verified 32 receipt hashes, 64 Ed25519 signatures and 144 audited CPI boundaries. Source artifact 15268097489 all 12 context Clock records are exactly one slot ahead of the context; all used later fallback (15–27 slots). Do not attribute parity to exact contextual capture. Candidate selects retained one-slot-ahead timestamp explicitly as nonexact research model; independent recomputation preserves strict exact-slot status. Static Whirlpool current initialized tick equality uses zero-input liquidity crossing, rejects depleted liquidity; sparse native quotes may use only captured contiguous prefix and never cross missing arrays. Primary opt-in context clock, pre-sign amount-bound economics and independent replay for accepted input, costs unknown outside WSOL unless independently modeled from signed fee. No new acceptance claim, source preparation #311 running; candidate unpushed. Native fee, sparse crossing, primary economics and full dependency CI remain unverified.
+
+Primary #311 exact 1417a00e source job 141014976021 successful: 89/89 source-captured graph starts (previous 75/89), 143 attempts, 140 selected, three captured deferred, zero capture failures. Artifact 15268533546 local recheck all 140 source hashes, slots 474996232–475001171, 420 legs (DAMM101, Orca91, v4 62, DLMM53, Pump38, CPMM38, CLMM37), 27 sparse Orca legs in 25 routes, 10 absent current arrays, three CLMM extended legs (3H-02/62/91) in two genuine pools. Candidate bounded static absent-current-array quote reuses existing single-tick arithmetic and independently revalidated null PDA; strict within-array price bound, no fabricated arrays, no adaptive empty-array support. First-leg DAMM dust sizes and DLMM funded active-bin controls derive from original price/reserves; source-specific candidates replace blind retries when present; matching order liquidity remains blocked. Independent accepted-size plan recomputation, no weakened signed floor. Shards still running; no push, no M5 promotion. Full regression pending.
+
+2026-11-28 primary #311 46156750004 exact 1417a00e all six workflows green; final global 141026549273: 122/140 independent accepted, 78/89 starting mints, 140/162 pools, 18 failures (11 Orca, four DAMM, three DLMM). Compared all ten actual metrics artifacts to source inventory: 244 unique signature strings; 21/27 sparse Orca legs on accepted routes, 3/3 CLMM extension legs accepted. Local wire audit of shard 1 and 8 artifacts 15269029440/15268739057 verifies 23 receipt hashes and 46 Ed25519 packets; all 69 recorded CPI boundaries passed shared audit. Three extension-dependent accepted routes 3H-02 slot474996295 terminal38090, 3H-62 slot474999069 terminal46446, 3H-91 slot475000355 terminal38338 (each 100000 input). Source slot 474996822 route 3H-12 Orca/DAMM/Orca returned 100560 on 100000 starting mint 5NJfQ6UQ1LJTxtKLrsZQcbiSUWequSD6aZLNJaN7Zviv; gross +560, 5000 lamport message estimate unconverted (no WSOL in route); not net profit. New forward same-source WSOL conversion suffix model only when route contains WSOL and supported directional quote legs; no reverse or separate-slot conversion. Shared independent signed audit rederives exact message digest for recorded fee estimate, not independent RPC fee value. New candidate regression and signed acceptance pending; no milestone completion. Correct sparse current absence recount is 11 (7 static and 4 adaptive), not 10. Candidate batch below required per-milestone source-line threshold.
+
+2026-11-28 exact d6ce14f4 Blockzilla #30 46164278557 independent job 141041020280: 32/32 signed, 64/64 selected grid, 96/96 candidate grid, 32/32 source and execution terminal; 144/144 execution-clock leg matches (132 direct native and 12 selected PumpSwap scenarios), no positive observed gross or modeled net. Artifacts 15271835223 / 15271387072 / 15270449790 locally verified 64 Ed25519 packets and 32 signed message fee digests. All 144 instruction amounts/floors decoded independently; negative final only raises floor 1 to u64::MAX. Nine of 12 captures used one-slot-ahead contextual model; remaining three same-response deltas +9,+5,+3, later fallback. Two-hop 8/8 native leg and 4/4 terminal. Core/clock/bridge/graph green; primary #312 SDK build passed, source preparation running. Historical #311 source 15268533546 four adaptive absent-current legs at FHMPTSCoiV5nqJijmkzV7RY72gukBRQaUd4eS2ej5FL2 (3H-12,39,128,101) have original source liquidity and captured Oracle. Candidate uses existing adaptive integer fee/group engine with authenticated strict interval; no synthetic arrays or crossing absent array edge. Independent exact-input ABI and final rollback floor check for seven venues, reusing signed payloads; source fee conversion common implementation also accepts official DAMM indicative results and explicit pre-sign scenario, not paid fees or guaranteed acquisition cost. New candidate unpushed, fresh integration unverified, no profit promotion. Largest remaining gap primary source-model/fee coverage and 11 unverified starting mints; no separate-slot conversion for 3H-12.
+
+2026-11-28 primary #312 exact d6ce14f4 source job 141038239628 complete, 196 fresh source-verified pool identities, 89 topology starts, 85 authenticated graph starts, 85/85 source captured, 143 attempts, 140 selected, zero capture failures. Source artifact 15272202551: all 140 fixture hashes verified locally, source slots 475020767–475025705; Clock deltas +1 on 136 and +2 on four (no exact same-slot claim); 29 sparse Orca legs, 11 absent current arrays (7 static/4 adaptive), three CLMM extended legs. Isolated recent signed job 141048015272 6/6, one additional start excluded from primary inventory. Actual #311 source and gap artifacts show all 11 unverified starts failed first mint->USDC leg and none of their sampled graph routes reversed that failed direction. #312 graph includes nine of these starts and still no avoiding direction; two absent. Orca 48/48 authenticated pool cap, other venues have headroom. Candidate recovery adds distinct reverse orientations from existing genuine triangles, historical failure only as ordering hint, prioritizes known matching fragile pairs and closure hints, and selects complete alternate-pool triangles within 198 pool hints plus two legacy controls (200 cap, 48 per venue). No registry mutation, current source reauthentication required. Previous three candidate commits for sparse adaptive quote, exact instruction ABI and source cost conversion remain staged; fresh signed acceptance pending. Primary shards active; do not cancel via new push. Scope below required per-milestone production line count; no M5 completion.
+
+2026-11-28 user directive: remove the pool boundary and discover as much as possible to improve the chance of finding genuine positive net opportunities. Primary discovery must admit and independently reauthenticate every discovered eligible pool, without the former 768 registry, 48 per-venue or 200 graph pool ceilings. `None` opts out of those numerical limits and of Raydium/Meteora post-decode verification-count caps; historical bounded control APIs remain backward-compatible. Primary workflow defaults to 10 Raydium pages, eight Meteora pages per venue (both user-configurable up to 20), additional all-seven cross-venue public index search with 20-minute default time budget (configurable 1–60 minutes), and 240-minute source job timeout. Public feeds are nonexhaustive and rate-limited; preserve stop reasons, rejection counts and full source inventory artifact. No change to 100-account RPC batch, packet/transaction account limits, source manifest or signed/rollback acceptance. Candidate cycle sampling and the 140 signed-control workload are separate from pool inventory; report actual unselected and truncated candidate coverage. No fixed pool count limit may be reintroduced on the active primary path without user authorization. No registry persistence, mainnet signing, broadcasting or trading approval. Wider discovery is not proof of profitability.
+
+Primary #312 exact d6ce14f4 run 46164278493 final global job 141050599066 succeeded, 129/140 independently accepted, 78/85 signed starts, 141/155 distinct signed pools, all 11 failures Orca (seven starts remain unverified). DAMM and DLMM failures eliminated from this bounded sample; this does not certify all pools. Actual downloaded economics artifact 15272616599: 129 unique routes, 114 complete source models, 112 exact terminal matches, 66 converted fee estimates, 63 unconverted, four positive observed gross controls. Local arithmetic/identity/safe flag check all 129 rows: 3H-123 +940 and 3H-97 +1978 units unconverted; 3H-45 +78 minus estimated cost47092 = -47014; 3H-48 +55 minus12337 = -12282. Zero positive estimated net, no profit certification. Actual gap artifact 15272596816 confirms 7 missing starts. Candidate uncapped discovery push explicitly user-authorized; new full source reauthentication and regression evidence pending, no claim of newly discovered pool counts until CI. This policy-only exception to normal scope is combined with previously staged implementation commits, below required 1000 production lines per milestone. Keep focused historical controls bounded independently; active primary graph no pool cap.
+
+## 2026-11-28 — primary #313 unrestricted source discovery and signed results
+
+Exact d2109e72ed876d311eaea94679d954323d187906 run 46168420182 completed successfully. Source job 141051083128: 2147 attempted, 2144 authenticated (DAMM 713, DLMM 599, Orca 211, PumpSwap 205, AMMv4 78, CLMM 99, CPMM 239), two authentication failures and one activation rejection. 1736 fresh verified identities, 1199 Meteora indexed (676 DAMM, 523 DLMM), 180 Raydium indexed, 297 broad public-index, 51 Orca and 9 CPMM PDA. All 1520 decoded Meteora candidates attempted, no unattempted decoded or unadmitted verified index pools; broad index stopped at time budget, 176 pages examined and 333 errors, upstream GPA rate limited. 438 sampled graph routes, 146 starts, 625 distinct selected graph pools, 27 per-start searches truncated, 140 starts source-captured in 143 attempts (six uncaptured, three not attempted). No fixed primary pool-count limit or exhaustive global search claim. Source artifact 15276602003, original inventory 15276796008. Global job 141082694502: 111/140 independently accepted signed routes, 111/140 starts, 295/370 distinct signed pools. Previous #312 129/140 signed, 78 starts, 141 pools; broader coverage but lower per-route acceptance. All ten shard logs inspected. 29 failures: DLMM 26 (6037 x11 CannotFindNonZeroLiquidityBinArrayId, 6036 x9 BitmapExtensionAccountIsNotProvided, 6039 x5 InsufficientOutAmount, 3005 x1), Orca 6038 x1, DAMM 6003 PoolDisabled x1, AMMv4 30 x1. Economics artifact 15276582960 and gap artifact 15276408769 published: logs report 88 complete source models, 86 matching terminals, 25 source cost models, 27 signed estimated costs converted, 84 unconverted, one positive observed gross, zero positive modeled or estimated net. No paid fee, guaranteed conversion or net profitability evidence. Artifact bytes not independently audited in this session; report based on completed job JSON logs. Primary execution remains isolated; all safety flags false. Existing staged d48998f, 9caf91b, 648693b retained. Add exact 6039 venue/log-bound size hypotheses (10x and 1/10x within u64), full fresh signed/rollback gate unchanged. Tests added; full new-head CI pending; no claim of recovery. 6036/6037 bitmap-aware directional capture remains largest technical blocker; no invented arrays or fee parameters. This is partial engineering and below required per-milestone production-line scope. No registry persistence, live approval or broadcast.

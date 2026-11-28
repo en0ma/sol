@@ -1,0 +1,202 @@
+"""Signed route source fixture must request only authenticated required accounts."""
+import base64
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+from arb.m5_four_to_six_source_capture import capture
+from arb.next_ten_pair_fixture_export import venue_accounts
+
+
+class DirectionalOrcaCaptureTests(unittest.TestCase):
+    def test_only_required_direction_arrays_in_multihop_fixture(self):
+        pool, mint_a, mint_b = "pool", "A", "B"
+        state = {"token_mint_a": mint_a, "token_mint_b": mint_b,
+                 "tick_spacing": 64, "fee_tier_index_seed": 64,
+                 "tick_current_index": 100,
+                 "token_vault_a": "vaultA", "token_vault_b": "vaultB"}
+        snapshot = {"mints": [mint_a, mint_b]}
+        paths = []
+
+        def arrays(pool_address, tick, spacing, forward):
+            paths.append(forward)
+            return ["forward1", "forward2", "forward3"] if forward else [
+                "backward1", "backward2", "backward3"]
+
+        with patch("arb.next_ten_fork_pool_probe.snapshot",
+                   return_value=snapshot), patch(
+                   "arb.next_ten_pair_fixture_export._fetch",
+                   return_value={pool: {"data": [base64.b64encode(b"state").decode()]}}), patch(
+                   "arb.orca_whirlpool.fetch_pool", return_value=state), patch(
+                   "arb.whirlpool_swap.select_tick_arrays", side_effect=arrays), patch(
+                   "arb.whirlpool_preflight.verify_oracle", return_value="oracle"), patch(
+                   "arb.next_ten_pair_fixture_export.call",
+                   return_value={"value": None}):
+            forward, forward_proof = venue_accounts(
+                "http://127.0.0.1:8899", "orca", pool, [mint_a, mint_b],
+                directional_only=True)
+            reverse, reverse_proof = venue_accounts(
+                "http://127.0.0.1:8899", "orca", pool, [mint_b, mint_a],
+                directional_only=True)
+            legacy, legacy_proof = venue_accounts(
+                "http://127.0.0.1:8899", "orca", pool, [mint_a, mint_b])
+
+        self.assertEqual(paths, [True, False, True, False])
+        self.assertEqual(set(forward_proof["tick_arrays"]),
+                         {"forward1", "forward2", "forward3"})
+        self.assertEqual(set(reverse_proof["tick_arrays"]),
+                         {"backward1", "backward2", "backward3"})
+        self.assertEqual(set(legacy_proof["tick_arrays"]),
+                         {"forward1", "forward2", "forward3",
+                          "backward1", "backward2", "backward3"})
+        self.assertNotIn("backward1", forward)
+        self.assertNotIn("forward1", reverse)
+        self.assertIn("backward1", legacy)
+        self.assertNotIn("oracle", forward)
+
+    def test_missing_required_source_account_fails_with_identity_and_role(self):
+        graph = {"status": "SOURCE_AUTHENTICATED_ROUTE_DISCOVERY_ONLY",
+                 "actionable": False, "live_execution_approved": False,
+                 "broadcast": False, "routes": [{
+                     "hops": 3, "start_mint": "A",
+                     "legs": [
+                         {"venue": "orca", "pool": "pool1",
+                          "input": "A", "output": "B"},
+                         {"venue": "orca", "pool": "pool2",
+                          "input": "B", "output": "C"},
+                         {"venue": "orca", "pool": "pool3",
+                          "input": "C", "output": "A"}]}]}
+
+        def source_proof(rpc, pool, venue):
+            pool_mints = {"pool1": ["A", "B"],
+                          "pool2": ["B", "C"], "pool3": ["C", "A"]}
+            return {"authenticated": True, "slot": 123,
+                    "mints": pool_mints[pool]}
+
+        def extras(rpc, venue, pool, mints, *, directional_only=False):
+            self.assertTrue(directional_only)
+            return [pool, *mints, "missing-array"], {
+                "tick_arrays": ["missing-array"]}
+
+        def contextual(rpc, method, params):
+            self.assertEqual(method, "getMultipleAccounts")
+            values = [{"owner": "any", "executable": False}
+                      if address != "missing-array" else None
+                      for address in params[0]]
+            return {"context": {"slot": 123}, "value": values}
+
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "fixture.json"
+            with patch("arb.m5_four_to_six_source_capture.snapshot",
+                       side_effect=source_proof), patch(
+                       "arb.m5_four_to_six_source_capture.venue_accounts",
+                       side_effect=extras), patch(
+                       "arb.m5_four_to_six_source_capture.call",
+                       side_effect=contextual):
+                with self.assertRaisesRegex(ValueError, "missing-array") as failure:
+                    capture("http://127.0.0.1:8899", graph, 0, output)
+            self.assertIn("tick_arrays", str(failure.exception))
+            self.assertFalse(output.exists())
+
+
+class SparseTickSourceTests(unittest.TestCase):
+    def test_observed_absence_not_synthetic_account(self):
+        from arb.whirlpool_ticks import contextual_sparse_tick_proof,verify_sparse_tick_offline
+        state={"token_mint_a":"A","token_mint_b":"B","tick_current_index":100,"tick_spacing":64}
+        aux={"tick_arrays":["x","y","z"]}
+        with patch("arb.whirlpool_swap.select_tick_arrays",return_value=["x","y","z"]):
+            proof=contextual_sparse_tick_proof("pool",state,"A",aux,{},123)
+            self.assertEqual(proof["absent_arrays"],["x","y","z"])
+            self.assertFalse(proof["protocol_exact_verified"])
+            with self.assertRaisesRegex(ValueError,"owner mismatch"):
+                contextual_sparse_tick_proof("pool",state,"A",aux,{"x":{"owner":"wrong"}},123)
+        with patch("arb.whirlpool_ticks.verify_sparse_tick_fixture",return_value=["x"]),patch(
+                "arb.whirlpool_ticks.call",return_value={"context":{"slot":1},"value":[{}]}):
+            with self.assertRaisesRegex(ValueError,"readback mismatch"):
+                verify_sparse_tick_offline("http://127.0.0.1:8899",{})
+
+
+class ContextClockTests(unittest.TestCase):
+    def test_context_clock_is_exact_or_explicitly_unavailable(self):
+        from arb.next_ten_fork_pool_probe import contextual_route_clock,CLOCK_SYSVAR,SAFETY
+        raw=bytearray(40);raw[:8]=(123).to_bytes(8,"little")
+        raw[32:40]=(456).to_bytes(8,"little",signed=True)
+        account={"owner":"Sysvar1111111111111111111111111111111111111",
+            "executable":False,"data":[base64.b64encode(raw).decode(),"base64"]}
+        proof={"address":CLOCK_SYSVAR,"context_slot":123,"account":account,
+            "status":"SOURCE_CONTEXT_CLOCK_MATCHED",
+            "decoded":{"slot":123,"unix_timestamp":456},**SAFETY}
+        fixture={"state_accounts_observed_slot":123,"accounts":{},
+            "state_account_addresses":[],"contextual_source_clock":proof}
+        self.assertEqual(contextual_route_clock(fixture),proof["decoded"])
+        with self.assertRaisesRegex(ValueError,"must not be hydrated"):
+            contextual_route_clock({**fixture,"accounts":{CLOCK_SYSVAR:account}})
+        with self.assertRaisesRegex(ValueError,"differs"):
+            contextual_route_clock({**fixture,"contextual_source_clock":{
+                **proof,"decoded":{"slot":123,"unix_timestamp":457}}})
+        self.assertIsNone(contextual_route_clock({**fixture,"contextual_source_clock":{
+            **proof,"status":"SOURCE_CONTEXT_CLOCK_UNAVAILABLE","account":None}}))
+
+    def test_one_slot_ahead_never_promoted_to_exact_context(self):
+        from arb.next_ten_fork_pool_probe import contextual_route_clock,contextual_pricing_clock,CLOCK_SYSVAR,SAFETY
+        raw=bytearray(40);raw[:8]=(124).to_bytes(8,"little")
+        raw[32:40]=(456).to_bytes(8,"little",signed=True)
+        acct={"owner":"Sysvar1111111111111111111111111111111111111",
+            "executable":False,"data":[base64.b64encode(raw).decode(),"base64"]}
+        proof={"address":CLOCK_SYSVAR,"context_slot":123,"account":acct,
+            "status":"SOURCE_CONTEXT_CLOCK_SLOT_DIVERGED","decoded":{"slot":124,"unix_timestamp":456},**SAFETY}
+        fixture={"state_accounts_observed_slot":123,"accounts":{},
+            "state_account_addresses":[],"contextual_source_clock":proof}
+        self.assertIsNone(contextual_route_clock(fixture))
+        model=contextual_pricing_clock(fixture)
+        self.assertEqual(model["clock_slot_delta"],1)
+        self.assertFalse(model["same_slot_attested"])
+        self.assertEqual(model["provenance"],"CONTEXTUAL_SOURCE_CLOCK_ONE_SLOT_AHEAD_MODEL")
+        fixture["state_accounts_observed_slot"]=122;proof["context_slot"]=122
+        self.assertIsNone(contextual_pricing_clock(fixture))
+
+    def test_contextual_economics_blocked_without_clock_and_non_sol_cost_unconverted(self):
+        from arb.m5_source_indicative_route_chain import contextual_economic_model
+        safe={"actionable":False,"live_execution_approved":False,"broadcast":False}
+        fixture={"route_mints":["A","B","A"],"state_accounts_observed_slot":123,
+            "state_account_manifest_sha256":"test",**safe}
+        with patch("arb.source_snapshot_manifest.verify"),patch(
+                "arb.next_ten_fork_pool_probe.contextual_pricing_clock",return_value=None):
+            self.assertEqual(contextual_economic_model(fixture,amount_in=100)["reason"],
+                             "CONTEXTUAL_CLOCK_MODEL_UNAVAILABLE")
+        clock={"clock":{"slot":124,"unix_timestamp":456},"same_slot_attested":False}
+        chain={"status":"SOURCE_BOUND_INDICATIVE_CHAIN_NOT_EXECUTION_VERIFIED",
+            "input_base_units":100,"output_base_units":101,"gross_delta_start_mint_base_units":1,
+            "signed_simulation_verified":False,"net_profit_verified":False,**safe}
+        with patch("arb.source_snapshot_manifest.verify"),patch(
+                "arb.next_ten_fork_pool_probe.contextual_pricing_clock",return_value=clock),patch(
+                "arb.m5_source_indicative_route_chain.research_chain",return_value=chain):
+            model=contextual_economic_model(fixture,amount_in=100)
+            self.assertEqual(model["gross_delta"],1)
+            self.assertIsNone(model["estimated_net_delta"])
+            self.assertFalse(model["net_profit_verified"])
+
+    def test_contextual_economics_uses_explicit_forward_source_fee_model(self):
+        from arb.m5_source_indicative_route_chain import contextual_economic_model
+        from arb.m5_signed_start_mint_economics import WSOL
+        safe={"actionable":False,"broadcast":False,"live_execution_approved":False}
+        fixture={"route_mints":["A",WSOL,"A"],"state_accounts_observed_slot":123,
+            "state_account_manifest_sha256":"test",**safe}
+        clock={"clock":{"slot":124,"unix_timestamp":456},"same_slot_attested":False}
+        chain={"status":"SOURCE_BOUND_INDICATIVE_CHAIN_NOT_EXECUTION_VERIFIED",
+            "input_base_units":100,"output_base_units":110,"gross_delta_start_mint_base_units":10,
+            "signed_simulation_verified":False,"net_profit_verified":False,**safe}
+        with patch("arb.source_snapshot_manifest.verify"),patch(
+                "arb.next_ten_fork_pool_probe.contextual_pricing_clock",return_value=clock),patch(
+                "arb.m5_source_indicative_route_chain.research_chain",return_value=chain),patch(
+                "arb.m5_signed_start_mint_economics.source_native_fee_conversion",
+                return_value=(7,{"model":True},"test")):
+            result=contextual_economic_model(fixture,amount_in=100)
+            self.assertEqual(result["estimated_net_delta"],3)
+            self.assertEqual(result["estimated_message_fee_base_units"],7)
+            self.assertFalse(result["net_profit_verified"])
+
+
+if __name__ == "__main__":
+    unittest.main()

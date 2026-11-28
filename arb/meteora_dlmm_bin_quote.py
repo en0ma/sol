@@ -1,0 +1,132 @@
+"""Meteora DLMM single-bin research quote using authenticated Q64 bin price.
+
+The caller must decode active-bin reserves and fee from the same actual
+fork state. This is a bounded one-bin model, NOT a complete DLMM swap.
+"""
+Q=1<<64
+DEN=1000000000
+
+def quote_one_bin(*,amount_in,swap_x_for_y,price_q64,bin_x,bin_y,total_fee_rate,
+                  active_bin_id,observed_bin_id):
+    fields=(amount_in,price_q64,bin_x,bin_y,total_fee_rate,active_bin_id,observed_bin_id)
+    if any(type(v)is not int for v in fields) or not 0<amount_in<2**64:
+        raise ValueError("invalid integer DLMM input")
+    if not 0<price_q64<1<<128 or bin_x<0 or bin_y<0 or not 0<=total_fee_rate<DEN:
+        raise ValueError("invalid bin price/reserves/fee")
+    if type(swap_x_for_y)is not bool or active_bin_id!=observed_bin_id:
+        raise ValueError("swap direction or active bin not authenticated")
+    fee=(amount_in*total_fee_rate+DEN-1)//DEN
+    effective=amount_in-fee
+    if effective<=0:raise ValueError("fees exhaust DLMM input")
+    output=effective*price_q64//Q if swap_x_for_y else effective*Q//price_q64
+    capacity=bin_y if swap_x_for_y else bin_x
+    if output<=0 or output>=2**64 or output>capacity:
+        raise ValueError("DLMM multi-bin traversal required; refusing partial quote")
+    return {"amount_out":output,"fee_input_base_units":fee,
+            "one_bin_only":True,"dynamic_fee_source_required":True,
+            "protocol_exact_verified":False,"actionable":False,
+            "live_execution_approved":False,"broadcast":False}
+
+def quote_bins(*,amount_in,swap_x_for_y,bins,total_fee_rate,max_bins=32,fee_on_input=True,limit_order_support=False):
+    """Price a bounded sequence of externally decoded DLMM bins.
+
+    Bins MUST be provided in directional walk order by a source-authenticated
+    bin-array decoder. Fee charged independently per consumed input per bin;
+    output liquidity capacity is enforced at every step. Refuse partial fills,
+    crossed unsupported fee regimes, or exhausted arrays.
+    """
+    if type(amount_in)is not int or not 0<amount_in<2**64:
+        raise ValueError("DLMM positive integer input required")
+    if type(swap_x_for_y)is not bool or type(total_fee_rate)is not int or not 0<=total_fee_rate<DEN:
+        raise ValueError("DLMM direction or fee invalid")
+    if not isinstance(bins,list) or not 1<=len(bins)<=max_bins<=560:
+        raise ValueError("DLMM bounded bins missing")
+    if type(fee_on_input) is not bool or type(limit_order_support) is not bool:
+        raise ValueError("explicit DLMM fee denomination required")
+    remaining=amount_in
+    output=fees=output_fees=0
+    consumed=[]
+    prior=None
+    for b in bins:
+        if not isinstance(b,dict) or any(type(b.get(k))is not int for k in
+                ("bin_id","price_q64","amount_x","amount_y")):
+            raise ValueError("DLMM decoded bin missing integer fields")
+        idx=b["bin_id"]
+        if prior is not None and (idx>=prior if swap_x_for_y else idx<=prior):
+            raise ValueError("DLMM bin walk direction invalid")
+        prior=idx
+        # Dynamic fees may evolve between bin crossings. When independently
+        # decoded per-bin rates are available, use each rather than assuming
+        # the initial active-bin fee remains valid throughout traversal.
+        rate=b.get("effective_fee_rate",total_fee_rate)
+        if type(rate)is not int or not 0<=rate<DEN:
+            raise ValueError("DLMM invalid per-bin effective fee rate")
+        capacity=b["amount_y"] if swap_x_for_y else b["amount_x"]
+        price=b["price_q64"]
+        if min(b["amount_x"],b["amount_y"])<0 or max(b["amount_x"],b["amount_y"])>=2**64:
+            raise ValueError("invalid authenticated bin inventory")
+        orders=0
+        if limit_order_support:
+            opened=b.get("open_order_amount");processing=b.get("processed_order_remaining_amount")
+            side=b.get("limit_order_ask_side")
+            if any(type(v) is not int or v<0 for v in (opened,processing,side)):
+                raise ValueError("DLMM limit-order inventory absent")
+            if bool(side)!=swap_x_for_y:
+                orders=opened+processing
+        if not capacity:
+            if orders:
+                raise ValueError("DLMM matching limit-order liquidity requires separate native model")
+            continue
+        if not 0<price<1<<128:
+            raise ValueError("invalid funded DLMM bin price")
+        # SDK Bin::get_amount_in(..., Rounding::Up), then compute_fee
+        # on the net capacity using denominator DEN-rate. Floor-output
+        # binary search is NOT equivalent: it can leave dust in a bin
+        # or overconsume input on a price plateau.
+        net_capacity=((capacity*Q+price-1)//price if swap_x_for_y
+                      else (capacity*price+Q-1)//Q)
+        # The current SDK OnlyY collection mode charges on gross Y output
+        # for X->Y, not on X input. Drain MM capacity before deducting
+        # output fee, and never add fees denominated in unlike tokens.
+        if fee_on_input:
+            capacity_fee=(net_capacity*rate+(DEN-rate)-1)//(DEN-rate)
+            gross_capacity=net_capacity+capacity_fee
+            if remaining>=gross_capacity:
+                used=gross_capacity
+                fee=capacity_fee
+                gross_out=capacity
+            else:
+                used=remaining
+                fee=(used*rate+DEN-1)//DEN
+                net=used-fee
+                gross_out=min(capacity,net*price//Q if swap_x_for_y else net*Q//price)
+            output_fee=0
+        else:
+            used=min(remaining,net_capacity)
+            fee=0
+            gross_out=(capacity if used==net_capacity else
+                min(capacity,used*price//Q if swap_x_for_y else used*Q//price))
+            output_fee=(gross_out*rate+DEN-1)//DEN
+        got=gross_out-output_fee
+        if (not 0<used<=remaining or not 0<=fee<=used
+                or not 0<=output_fee<=gross_out<=capacity):
+            raise ValueError("invalid DLMM capacity input or fee")
+        if got<=0:
+            raise ValueError("DLMM input cannot produce positive output in funded bin")
+        remaining-=used;output+=got;fees+=fee;output_fees+=output_fee
+        consumed.append({"bin_id":idx,"gross_input_base_units":used,
+                         "fee_input_base_units":fee,"output_base_units":got,
+                         "gross_output_base_units":gross_out,
+                         "fee_output_base_units":output_fee,
+                         "effective_fee_rate":rate})
+        if remaining==0:break
+        if orders:
+            raise ValueError("DLMM matching limit-order liquidity requires separate native model")
+    if remaining or not 0<output<2**64 or not 0<=fees<2**64 or not 0<=output_fees<2**64:
+        raise ValueError("DLMM bin inventory cannot fill bounded exact input/output")
+    return {"amount_out":output,"fee_input_base_units":fees,
+            "fee_output_base_units":output_fees,"fee_on_input":fee_on_input,
+            "liquidity_scope":"MARKET_MAKER_BINS_ONLY",
+            "bins_traversed":consumed,"exact_input_filled":True,
+            "protocol_exact_verified":False,"actionable":False,
+            "live_execution_approved":False,"broadcast":False}

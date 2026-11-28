@@ -7,6 +7,8 @@ import os
 import sys
 from arb.rpc import inspect_account
 
+UPGRADEABLE_LOADER = "BPFLoaderUpgradeab1e11111111111111111111111"
+
 PROGRAMS = {
     "Meteora DLMM": "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo",
     "Orca Whirlpools": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
@@ -25,16 +27,16 @@ def main():
     for name, address in PROGRAMS.items():
         acc = inspect_account(url, address)
         summary["programs"][name] = acc
-        if not acc["exists"] or not acc["executable"]:
-            failures.append("program missing or non-executable: " + name)
+        if not acc["exists"] or not acc["executable"] or acc["owner"] != UPGRADEABLE_LOADER:
+            failures.append("program missing, non-executable, or unexpected loader: " + name)
     for pool in pools:
         if pool["venue"] not in PROGRAMS:
             failures.append("unknown pool venue: " + pool["venue"])
             continue
         acc = inspect_account(url, pool["address"], PROGRAMS[pool["venue"]])
         summary["pools"].append({"name": pool["name"], **acc})
-        if not acc["exists"] or not acc["owner_matches"]:
-            failures.append("pool missing or wrong owner: " + pool["name"])
+        if not acc["exists"] or not acc["owner_matches"] or acc["executable"]:
+            failures.append("pool missing, executable, or wrong owner: " + pool["name"])
     summary["failures"] = failures
     print(json.dumps(summary, indent=2))
     return 1 if failures else 0

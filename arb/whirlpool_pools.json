@@ -1,0 +1,13 @@
+{
+  "note": "Candidate SOL/USDC Whirlpool from public open-source example. Must pass fork RPC pool/vault validation before considered verified.",
+  "pools": [
+    {
+      "address": "7qbRF6YsyGuLUVs6Y1q64bdVrfe4ZcUUz1JRdoVNUJnm",
+      "mints": [
+        "So11111111111111111111111111111111111111112",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      ],
+      "verify_vaults": true
+    }
+  ]
+}

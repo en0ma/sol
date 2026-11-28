@@ -1,0 +1,468 @@
+name: Blockzilla bounded historical discovery experiment
+on:
+  workflow_dispatch:
+    inputs:
+      start_slot:
+        description: "HTTP first slot; 0 = automatic"
+        type: string
+        default: "0"
+      blocks:
+        description: "HTTP slots (1–8)"
+        type: string
+        default: "6"
+      archive_epoch:
+        description: "Fallback public Compact V2 epoch"
+        type: string
+        default: "1094"
+      archive_first_block:
+        description: "Fallback first archive block row, not a slot"
+        type: string
+        default: "0"
+  pull_request:
+    paths:
+      - "arb/blockzilla_discovery.py"
+      - "arb/blockzilla_native_archive.py"
+      - "arb/blockzilla_ci_gate.py"
+      - "arb/blockzilla_rpc_comparison.py"
+      - "arb/blockzilla_pair_trials.py"
+      - "arb/blockzilla_pair_evidence.py"
+      - "arb/blockzilla_multihop.py"
+      - "arb/blockzilla_source_footprint.py"
+      - "arb/blockzilla_size_plan.py"
+      - "arb/meteora_dlmm_source_bin_decoder.py"
+      - "arb/pumpswap_source_fee_envelope.py"
+      - "arb/pumpswap_signed_event_audit.py"
+      - "arb/meteora_dlmm_signed_event_audit.py"
+      - "arb/signed_cpi_native_funding.py"
+      - "tests/test_blockzilla_clock_funding.py"
+      - "arb/fixture_config_quote_projection.py"
+      - "tests/test_pumpswap_directional_fee_scenarios.py"
+      - "arb/fixture_all_venue_signed_quotes.py"
+      - "arb/orca_multitick_quote.py"
+      - "tests/test_orca_multitick_quote.py"
+      - "arb/raydium_clmm_cross_tick_quote.py"
+      - "arb/fixture_quote_execution_pipeline.py"
+      - "tests/test_raydium_clmm_bitmap_coverage.py"
+      - "arb/meteora_damm_v2_native_quote.py"
+      - "arb/meteora_damm_v2_source_scenarios.py"
+      - "tools/meteora_damm_v2_reference/**"
+      - "ci/build_meteora_damm_v2_reference.sh"
+      - "arb/raydium_amm_v4_fee_state.py"
+      - "arb/raydium_amm_v4_fixture_quote.py"
+      - "arb/opportunity_graph.py"
+      - "arb/atomic_graph_coordinator.py"
+      - "arb/m5_four_to_six_source_capture.py"
+      - "arb/meteora_dlmm_bin_quote.py"
+      - "arb/meteora_dlmm_source_fee_decoder.py"
+      - "arb/m5_source_indicative_route_chain.py"
+      - "arb/meteora_dlmm_source_fee_envelope.py"
+      - "arb/next_ten_signed_atomic_offline.py"
+      - "ci/build_blockzilla_reader.sh"
+      - "tests/test_blockzilla*"
+      - ".github/workflows/blockzilla-historical-discovery.yml"
+permissions:
+  contents: read
+concurrency:
+  group: blockzilla-discovery-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: |
+          python3 -m pip install --disable-pip-version-check solders==0.26.0
+          bash -n ci/build_blockzilla_reader.sh
+          python3 -m py_compile arb/blockzilla_discovery.py arb/blockzilla_native_archive.py arb/blockzilla_ci_gate.py arb/blockzilla_rpc_comparison.py arb/blockzilla_pair_trials.py arb/blockzilla_pair_evidence.py
+          python3 -m unittest discover -s tests -p 'test_blockzilla*.py' -v
+          python3 -m unittest discover -s tests -p 'test_orca_multitick_quote.py' -v
+          python3 -m unittest discover -s tests -p 'test_meteora_dlmm*quote*.py' -v
+          python3 -m unittest discover -s tests -p 'test_meteora_dlmm_source_fee_envelope.py' -v
+          python3 -m unittest discover -s tests -p 'test_raydium_amm_v4_fee_ceiling.py' -v
+          python3 -m unittest discover -s tests -p 'test_damm_sdk_source_result.py' -v
+          python3 -m unittest discover -s tests -p 'test_raydium_clmm_bitmap_coverage.py' -v
+          python3 -m unittest discover -s tests -p 'test_pumpswap_directional_fee_scenarios.py' -v
+  http-probe:
+    needs: unit
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    outputs:
+      usable: ${{ steps.scan.outputs.usable }}
+    env:
+      SOLANA_RPC_MIN_INTERVAL_SECONDS: "0.5"
+      SOLANA_RPC_PACING_FILE: /tmp/blockzilla-rpc-pacing
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: |
+          mkdir -p "$RUNNER_TEMP/blockzilla-http"
+          python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Probe HTTP and independently cross-check finalized records
+        id: scan
+        env:
+          BLOCKZILLA_INDEPENDENT_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
+          START_SLOT: ${{ inputs.start_slot || '0' }}
+          BLOCKS: ${{ inputs.blocks || '6' }}
+        run: |
+          test -n "$BLOCKZILLA_INDEPENDENT_RPC_URL"
+          set +e
+          python3 -m arb.blockzilla_discovery scan --start-slot "$START_SLOT" \
+            --blocks "$BLOCKS" --output "$RUNNER_TEMP/blockzilla-http/historical-hints.json"
+          code=$?
+          set -e
+          python3 -m arb.blockzilla_ci_gate route \
+            --report "$RUNNER_TEMP/blockzilla-http/historical-hints.json" \
+            --exit-code "$code" --github-output "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: blockzilla-http-probe
+          path: ${{ runner.temp }}/blockzilla-http/*.json
+          if-no-files-found: warn
+          retention-days: 7
+  native-archive:
+    needs: [unit, http-probe]
+    if: needs.http-probe.outputs.usable == 'false'
+    runs-on: ubuntu-latest
+    timeout-minutes: 38
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: blockzilla-dev/blockzilla
+          ref: c8265ad3e61a36e8f8f2dee49020f6bb0f01f220
+          path: upstream-blockzilla
+          persist-credentials: false
+      - name: Build pinned public archive reader (no RPC secrets)
+        timeout-minutes: 14
+        run: |
+          mkdir -p "$RUNNER_TEMP/blockzilla-native"
+          python3 -m pip install --disable-pip-version-check solders==0.26.0
+          bash ci/build_blockzilla_reader.sh upstream-blockzilla "$RUNNER_TEMP/blockzilla-native"
+      - name: Scan bounded archive rows for seven venue programs
+        timeout-minutes: 20
+        env:
+          ARCHIVE_EPOCH: ${{ inputs.archive_epoch || '1094' }}
+          FIRST_BLOCK: ${{ inputs.archive_first_block || '8' }}
+        run: |
+          python3 -m arb.blockzilla_native_archive read \
+            --binary upstream-blockzilla/target/debug/blockzilla \
+            --directory "$RUNNER_TEMP/blockzilla-native" \
+            --epoch "$ARCHIVE_EPOCH" --first-block "$FIRST_BLOCK" --blocks 8
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: blockzilla-native-archive
+          path: ${{ runner.temp }}/blockzilla-native/
+          if-no-files-found: warn
+          retention-days: 7
+  source-authentication:
+    needs: [unit, http-probe, native-archive]
+    if: always() && needs.unit.result == 'success' && needs.http-probe.result == 'success' && (needs.http-probe.outputs.usable == 'true' || needs.native-archive.result == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 24
+    env:
+      SOLANA_RPC_MIN_INTERVAL_SECONDS: "0.5"
+      SOLANA_RPC_PACING_FILE: /tmp/blockzilla-rpc-pacing
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: |
+          mkdir -p "$RUNNER_TEMP/blockzilla"
+          python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - uses: actions/download-artifact@v4
+        if: needs.http-probe.outputs.usable == 'true'
+        with:
+          name: blockzilla-http-probe
+          path: ${{ runner.temp }}/blockzilla
+      - uses: actions/download-artifact@v4
+        if: needs.http-probe.outputs.usable == 'false'
+        with:
+          name: blockzilla-native-archive
+          path: ${{ runner.temp }}/blockzilla-native
+      - name: Verify native archive leads against finalized RPC
+        if: needs.http-probe.outputs.usable == 'false'
+        env:
+          BLOCKZILLA_INDEPENDENT_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
+        run: |
+          test -n "$BLOCKZILLA_INDEPENDENT_RPC_URL"
+          python3 -m arb.blockzilla_native_archive check \
+            --directory "$RUNNER_TEMP/blockzilla-native" \
+            --output "$RUNNER_TEMP/blockzilla/historical-hints.json"
+      - name: Start existing read-only source fork
+        env:
+          SURFPOOL_DATASOURCE_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
+        run: |
+          test -n "$SURFPOOL_DATASOURCE_RPC_URL"
+          bash ci/install_surfpool.sh
+          nohup "$HOME/.local/bin/surfpool" start --ci --rpc-url "$SURFPOOL_DATASOURCE_RPC_URL" --no-deploy > "$RUNNER_TEMP/blockzilla-source.log" 2>&1 < /dev/null &
+          echo $! > "$RUNNER_TEMP/blockzilla-source.pid"
+          python3 - <<'PY'
+          import time
+          from arb.rpc import call
+          for _ in range(80):
+              try:
+                  assert call("http://127.0.0.1:8899", "getLatestBlockhash", timeout=3, retries=0)["value"]["blockhash"]
+                  break
+              except (ValueError, RuntimeError, OSError, KeyError):
+                  time.sleep(1)
+          else:
+              raise SystemExit("source fork unavailable")
+          PY
+      - name: Authenticate novel pools and compare hint topology
+        run: |
+          python3 -m arb.blockzilla_discovery authenticate \
+            --hints "$RUNNER_TEMP/blockzilla/historical-hints.json" \
+            --output "$RUNNER_TEMP/blockzilla/source-authentication.json"
+      - name: Measure same-window direct RPC control (separate from archive acceptance)
+        if: needs.http-probe.outputs.usable == 'false'
+        env:
+          BLOCKZILLA_INDEPENDENT_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
+        run: |
+          python3 -m arb.blockzilla_rpc_comparison \
+            --archive-directory "$RUNNER_TEMP/blockzilla-native" \
+            --evidence-directory "$RUNNER_TEMP/blockzilla"
+      - name: Capture and quote isolated Blockzilla-derived paired source routes
+        env:
+          HTTP_ROUTE: ${{ needs.http-probe.outputs.usable }}
+        run: |
+          python3 -m arb.blockzilla_pair_trials --phase source \
+            --evidence-directory "$RUNNER_TEMP/blockzilla" \
+            --directory "$RUNNER_TEMP/blockzilla-pairs" --route "$HTTP_ROUTE"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: blockzilla-isolated-pair-source
+          path: ${{ runner.temp }}/blockzilla-pairs/
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Capture diverse bounded archive-derived 3–6-hop research fixtures
+        env:
+          HTTP_ROUTE: ${{ needs.http-probe.outputs.usable }}
+        run: |
+          python3 -m arb.blockzilla_multihop --phase source --evidence-directory "$RUNNER_TEMP/blockzilla" --directory "$RUNNER_TEMP/blockzilla-multihop" --route "$HTTP_ROUTE"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: blockzilla-multihop-source
+          path: ${{ runner.temp }}/blockzilla-multihop/
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Stop source fork
+        if: always()
+        run: |
+          if test -f "$RUNNER_TEMP/blockzilla-source.pid"; then
+            kill "$(cat "$RUNNER_TEMP/blockzilla-source.pid")" || true
+          fi
+      - name: Upload experimental evidence (never primary inventory)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: blockzilla-historical-discovery-evidence
+          path: ${{ runner.temp }}/blockzilla/*.json
+          if-no-files-found: warn
+          retention-days: 7
+  evidence-gate:
+    needs: [unit, http-probe, native-archive, source-authentication]
+    if: always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Require the selected retrieval path and source job to have completed
+        env:
+          HTTP_RESULT: ${{ needs.http-probe.result }}
+          HTTP_ROUTE: ${{ needs.http-probe.outputs.usable }}
+          NATIVE_RESULT: ${{ needs.native-archive.result }}
+          SOURCE_RESULT: ${{ needs.source-authentication.result }}
+        run: |
+          python3 -m arb.blockzilla_ci_gate jobs --http "$HTTP_RESULT" \
+            --route "$HTTP_ROUTE" --native "$NATIVE_RESULT" --source "$SOURCE_RESULT"
+      - uses: actions/download-artifact@v4
+        with:
+          name: blockzilla-historical-discovery-evidence
+          path: ${{ runner.temp }}/blockzilla-evidence
+      - name: Reconcile actual historical and source-authentication evidence
+        env:
+          HTTP_ROUTE: ${{ needs.http-probe.outputs.usable }}
+        run: |
+          python3 -m arb.blockzilla_ci_gate evidence \
+            --directory "$RUNNER_TEMP/blockzilla-evidence" --route "$HTTP_ROUTE"
+  isolated-pair-offline:
+    needs: [source-authentication, evidence-gate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SURFPOOL_EXPLICITLY_OFFLINE: "1"
+      SURFPOOL_DATASOURCE_RPC_URL: ""
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install offline Surfpool and signer
+        run: |
+          bash ci/install_surfpool.sh
+          python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - uses: actions/download-artifact@v4
+        with:
+          name: blockzilla-isolated-pair-source
+          path: ${{ runner.temp }}/blockzilla-pairs
+      - name: Execute bounded signed pair trials in isolated fork
+        run: |
+          test -z "$SURFPOOL_DATASOURCE_RPC_URL"
+          nohup "$HOME/.local/bin/surfpool" start --ci --offline --no-deploy > "$RUNNER_TEMP/blockzilla-pair-offline.log" 2>&1 < /dev/null &
+          python3 - <<'PY'
+          import time
+          from arb.rpc import call
+          for _ in range(80):
+              try:
+                  assert call("http://127.0.0.1:8899", "getLatestBlockhash", timeout=3, retries=0)["value"]["blockhash"]
+                  break
+              except (ValueError, RuntimeError, OSError, KeyError):
+                  time.sleep(1)
+          else:
+              raise SystemExit("offline fork unavailable")
+          PY
+          python3 -m arb.blockzilla_pair_trials --phase offline --directory "$RUNNER_TEMP/blockzilla-pairs"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: blockzilla-isolated-pair-signed
+          path: |
+            ${{ runner.temp }}/blockzilla-pairs/*-report.json
+            ${{ runner.temp }}/blockzilla-pairs/*-receipt.json
+            ${{ runner.temp }}/blockzilla-pairs/*-model-comparison.json
+            ${{ runner.temp }}/blockzilla-pair-offline.log
+          if-no-files-found: warn
+          retention-days: 7
+  isolated-multihop-offline:
+    needs: [source-authentication, evidence-gate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      SURFPOOL_EXPLICITLY_OFFLINE: "1"
+      SURFPOOL_DATASOURCE_RPC_URL: ""
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: |
+          bash ci/install_surfpool.sh
+          python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Build official DAMM SDK for pre-sign native sizing (no RPC credentials)
+        run: bash ci/build_meteora_damm_v2_reference.sh "$RUNNER_TEMP/damm-sdk-sizing"
+      - uses: actions/download-artifact@v4
+        with:
+          name: blockzilla-multihop-source
+          path: ${{ runner.temp }}/blockzilla-multihop
+      - name: Run existing adaptive N-leg signer against isolated source fixtures
+        run: |
+          test -z "$SURFPOOL_DATASOURCE_RPC_URL"
+          nohup "$HOME/.local/bin/surfpool" start --ci --offline --no-deploy > "$RUNNER_TEMP/blockzilla-multihop.log" 2>&1 < /dev/null &
+          python3 - <<'PY'
+          import time
+          from arb.rpc import call
+          for _ in range(80):
+              try:
+                  assert call("http://127.0.0.1:8899","getLatestBlockhash",timeout=3,retries=0)["value"]["blockhash"]
+                  break
+              except (ValueError,RuntimeError,OSError,KeyError):
+                  time.sleep(1)
+          else:
+              raise SystemExit("offline fork unavailable")
+          PY
+          python3 -m arb.blockzilla_multihop --phase offline --directory "$RUNNER_TEMP/blockzilla-multihop"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: blockzilla-multihop-signed
+          path: |
+            ${{ runner.temp }}/blockzilla-multihop/multihop-signed.json
+            ${{ runner.temp }}/blockzilla-multihop/*-receipt.json
+          if-no-files-found: warn
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: blockzilla-damm-sdk-sizing-build
+          path: ${{ runner.temp }}/damm-sdk-sizing/
+          if-no-files-found: warn
+          retention-days: 7
+  independent-multihop-evidence:
+    needs: isolated-multihop-offline
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - uses: actions/download-artifact@v4
+        with:
+          name: blockzilla-damm-sdk-sizing-build
+          path: ${{ runner.temp }}/damm-sdk-sizing-lock
+      - name: Independently build pinned DAMM SDK from sizing dependency lock (no RPC secrets)
+        id: damm-sdk
+        continue-on-error: true
+        timeout-minutes: 20
+        run: bash ci/build_meteora_damm_v2_reference.sh "$RUNNER_TEMP/damm-sdk-build" "$RUNNER_TEMP/damm-sdk-sizing-lock/Cargo.lock"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: blockzilla-multihop-source
+          path: ${{ runner.temp }}/multihop-source
+      - uses: actions/download-artifact@v4
+        with:
+          name: blockzilla-multihop-signed
+          path: ${{ runner.temp }}/multihop-signed
+      - run: python3 -m arb.blockzilla_multihop --phase audit --directory "$RUNNER_TEMP/multihop-signed" --source-directory "$RUNNER_TEMP/multihop-source"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: blockzilla-multihop-independent-audit
+          path: |
+            ${{ runner.temp }}/multihop-signed/multihop-audit.json
+            ${{ runner.temp }}/damm-sdk-build/
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Require official SDK build to succeed
+        if: always()
+        run: test "${{ steps.damm-sdk.outcome }}" = success
+  independent-pair-evidence:
+    needs: isolated-pair-offline
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - uses: actions/download-artifact@v4
+        with:
+          name: blockzilla-isolated-pair-signed
+          path: ${{ runner.temp }}/blockzilla-pair-evidence
+      - uses: actions/download-artifact@v4
+        with:
+          name: blockzilla-isolated-pair-source
+          path: ${{ runner.temp }}/blockzilla-pair-original-source
+      - name: Recheck signed packets, recorded CPI, rollback and recompute source pricing without RPC secrets
+        run: |
+          python3 -m arb.blockzilla_pair_evidence --directory "$RUNNER_TEMP/blockzilla-pair-evidence/blockzilla-pairs" --source-directory "$RUNNER_TEMP/blockzilla-pair-original-source"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: blockzilla-independent-pair-audit
+          path: ${{ runner.temp }}/blockzilla-pair-evidence/blockzilla-pairs/pair-independent-audit.json
+          if-no-files-found: warn
+          retention-days: 7

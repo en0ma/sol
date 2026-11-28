@@ -1,0 +1,443 @@
+"""Never count a reduced-input retry without a genuinely verified receipt."""
+import json
+import os
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+from arb.m5_three_hop_atomic_inventory import (
+    offline_simulate, orca_tick_array_input_retries,
+)
+
+ORCA_6038 = ("signed prefix simulation failed: "
+             "{'InstructionError': [0, {'Custom': 6038}]}")
+RAYDIUM_2505 = ("signed prefix simulation failed: "
+                "{'InstructionError': [0, {'Custom': 2505}]}")
+
+
+class BoundedOfflineOrcaInputTests(unittest.TestCase):
+    def report(self, folder):
+        root = Path(folder)
+        (root / "source-00.json").write_text(json.dumps({"fixture_kind": "test"}))
+        (root / "three-hop-inventory.json").write_text(json.dumps({
+            "status": "SOURCE_THREE_HOP_INVENTORY",
+            "routes": [{
+                "id": "3H-01",
+                "fixture": "source-00.json",
+                "source_status": "CAPTURED",
+                "venues": ["orca", "raydium_cpmm", "meteora_damm_v2"],
+                "pools": ["p1", "p2", "p3"],
+                "atomic_build_status": "NOT_ATTEMPTED",
+                "simulation_status": "NOT_ATTEMPTED",
+                "actionable": False,
+                "live_execution_approved": False,
+                "broadcast": False,
+            }],
+            "actionable": False,
+            "live_execution_approved": False,
+            "broadcast": False,
+        }))
+        return root
+
+    def signed_receipt(self):
+        return {
+            "status": "SIGNED_N_LEG_ATOMIC_AND_ROLLBACK_VERIFIED",
+            "signed_packet_crypto_bound": True,
+            "signed_transaction_signature": "test-cryptographic-evidence-placeholder",
+            "signed_atomic_simulation_verified": True,
+            "rollback_failure_case_verified": True,
+            "positive_error": None,
+        }
+
+    def simulate_mocked_route(self, fail, receipt):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.report(directory)
+            with patch.dict(os.environ, {
+                "SURFPOOL_EXPLICITLY_OFFLINE": "1",
+                "SURFPOOL_DATASOURCE_RPC_URL": "",
+            }), patch("arb.pumpswap_local_simulation.local_rpc_only"), patch(
+                "arb.dlmm_offline_clock.align_permissioned_dlmm_clock",
+                return_value={"status": "ALIGNED"}), patch(
+                "arb.next_ten_signed_atomic_offline.run_four_to_six_venue",
+                side_effect=[ValueError(fail), receipt]) as simulator:
+                result = offline_simulate("http://127.0.0.1:8899",
+                                          root, amount=100000)
+            return result, simulator.call_args_list
+
+    def test_only_isolated_orca_6038_receives_smaller_candidates(self):
+        self.assertEqual(
+            orca_tick_array_input_retries(
+                ValueError(ORCA_6038), ["orca", "raydium_cpmm"], 100000),
+            [10000, 1000])
+        self.assertEqual(
+            orca_tick_array_input_retries(
+                ValueError(RAYDIUM_2505), ["raydium_cpmm", "orca"], 100000),
+            [])
+        self.assertEqual(
+            orca_tick_array_input_retries(
+                ValueError(ORCA_6038), ["raydium_cpmm", "orca"], 100000),
+            [])
+        self.assertEqual(
+            orca_tick_array_input_retries(
+                ValueError("unauthenticated Orca tick array"),
+                ["orca"], 100000),
+            [])
+        self.assertEqual(
+            orca_tick_array_input_retries(
+                ValueError(ORCA_6038), ["orca"], 1),
+            [])
+
+    def test_reduced_signed_receipt_is_auditable(self):
+        result, calls = self.simulate_mocked_route(ORCA_6038, self.signed_receipt())
+        row = result["routes"][0]
+        self.assertEqual([c.kwargs["amount_in"] for c in calls], [100000, 10000])
+        self.assertEqual(row["signed_exact_input_base_units"], 10000)
+        self.assertEqual([x["amount_base_units"] for x in row["signed_exact_input_attempts"]],
+                         [100000, 10000])
+        self.assertIn("6038", row["signed_exact_input_attempts"][0]["diagnostic"])
+        self.assertEqual(row["simulation_status"],
+                         "SIGNED_SIMULATION_AND_ROLLBACK_VERIFIED")
+        self.assertFalse(row["broadcast"])
+
+    def test_unverified_retry_receipt_not_accepted(self):
+        receipt = self.signed_receipt()
+        receipt["rollback_failure_case_verified"] = False
+        result, _ = self.simulate_mocked_route(ORCA_6038, receipt)
+        self.assertEqual(result["simulations_verified"], 0)
+        self.assertEqual(result["routes"][0]["simulation_status"],
+                         "SIGNED_SIMULATION_NOT_VERIFIED")
+
+    def test_zero_output_large_input_retry_is_venue_and_code_bound(self):
+        from arb.m5_three_hop_atomic_inventory import zero_output_input_retries
+        orca = ("signed prefix simulation failed: "
+                "{'InstructionError': [0, {'Custom': 6036}]}")
+        cpmm = ("signed prefix simulation failed: "
+                "{'InstructionError': [0, {'Custom': 2505}]}; "
+                "program_log_tail=['Left: 0','Right: 0']")
+        self.assertEqual(zero_output_input_retries(
+            ValueError(orca), ["orca"], 100000), [1000000, 10000000])
+        self.assertEqual(zero_output_input_retries(
+            ValueError(cpmm), ["raydium_cpmm"], 100000), [1000000, 10000000])
+        self.assertEqual(zero_output_input_retries(
+            ValueError(cpmm), ["orca"], 100000), [])
+        self.assertEqual(zero_output_input_retries(
+            ValueError(cpmm.replace("Left: 0", "Left: 1")),
+            ["raydium_cpmm"], 100000), [])
+        self.assertEqual(zero_output_input_retries(
+            ValueError(ORCA_6038), ["orca"], 100000), [])
+        self.assertEqual(zero_output_input_retries(
+            ValueError(orca), ["orca"], 2**63), [])
+
+    def test_recovered_zero_output_still_requires_signed_rollback(self):
+        orca = ("signed prefix simulation failed: "
+                "{'InstructionError': [0, {'Custom': 6036}]}")
+        result,calls=self.simulate_mocked_route(orca,self.signed_receipt())
+        self.assertEqual([c.kwargs["amount_in"] for c in calls],
+                         [100000, 1000000])
+        row=result["routes"][0]
+        self.assertEqual(row["signed_exact_input_base_units"],1000000)
+        self.assertEqual(row["simulation_status"],
+                         "SIGNED_SIMULATION_AND_ROLLBACK_VERIFIED")
+        self.assertFalse(row["broadcast"])
+        result,_=self.simulate_mocked_route(
+            orca,dict(self.signed_receipt(),rollback_failure_case_verified=False))
+        self.assertEqual(result["simulations_verified"],0)
+
+    def test_liquidity_cliff_diagnostic_never_upgrades_6038(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=self.report(directory)
+            observed={"status":"SOURCE_AUTHENTICATED_FIRST_DOWNWARD_TICK_DEPLETES_LIQUIDITY",
+                      "causes_6038_proven":False,"actionable":False,
+                      "broadcast":False}
+            with patch.dict(os.environ, {
+                "SURFPOOL_EXPLICITLY_OFFLINE":"1",
+                "SURFPOOL_DATASOURCE_RPC_URL":"",
+            }), patch("arb.pumpswap_local_simulation.local_rpc_only"), patch(
+                "arb.dlmm_offline_clock.align_permissioned_dlmm_clock",
+                return_value={}), patch(
+                "arb.next_ten_signed_atomic_offline.run_four_to_six_venue",
+                side_effect=ValueError(ORCA_6038)) as sign, patch(
+                "arb.whirlpool_ticks.authenticated_downward_liquidity_cliff",
+                return_value=observed) as audit:
+                result=offline_simulate(
+                    "http://127.0.0.1:8899",root,amount=100000)
+        row=result["routes"][0]
+        self.assertEqual(sign.call_count,3)
+        audit.assert_called_once()
+        self.assertEqual(row["orca_source_liquidity_cliff"],observed)
+        self.assertEqual(result["simulations_verified"],0)
+        self.assertEqual(row["simulation_status"],
+                         "NOT_ATTEMPTED_OR_ABORTED_DURING_PREPARATION")
+        self.assertFalse(row["broadcast"])
+
+    def test_dlmm_3005_retry_requires_exact_bin_array_anchor_log(self):
+        from arb.m5_three_hop_atomic_inventory import dlmm_bin_array_input_retries
+        observed=("signed prefix simulation failed: "
+                  "{'InstructionError': [1, {'Custom': 3005}]}; "
+                  "program_log_tail=['AnchorError caused by account: bin_array. "
+                  "Error Code: AccountNotEnoughKeys. Error Number: 3005']")
+        self.assertEqual(
+            dlmm_bin_array_input_retries(
+                ValueError(observed), ["orca", "meteora_dlmm"], 100000),
+            [10000,1000])
+        self.assertEqual(dlmm_bin_array_input_retries(
+            ValueError(observed),["meteora_dlmm","orca"],100000),[])
+        self.assertEqual(dlmm_bin_array_input_retries(
+            ValueError(observed.replace("bin_array","oracle")),
+            ["orca","meteora_dlmm"],100000),[])
+        self.assertEqual(dlmm_bin_array_input_retries(
+            ValueError(observed.replace("AccountNotEnoughKeys","ConstraintSeeds")),
+            ["orca","meteora_dlmm"],100000),[])
+        self.assertEqual(dlmm_bin_array_input_retries(
+            ValueError(observed.replace("signed prefix simulation failed",
+                                       "unsourced claim")),
+            ["orca","meteora_dlmm"],100000),[])
+        self.assertEqual(dlmm_bin_array_input_retries(
+            ValueError(observed),["orca","meteora_dlmm"],1),[])
+
+    def test_dlmm_retry_still_requires_signed_and_rollback_verified(self):
+        observed=("signed prefix simulation failed: "
+                  "{'InstructionError': [1, {'Custom': 3005}]}; "
+                  "program_log_tail=['AnchorError caused by account: bin_array. "
+                  "Error Code: AccountNotEnoughKeys. Error Number: 3005']")
+        with tempfile.TemporaryDirectory() as directory:
+            root=self.report(directory)
+            report=json.loads((root/"three-hop-inventory.json").read_text())
+            report["routes"][0]["venues"]=["orca","meteora_dlmm","meteora_dlmm"]
+            (root/"three-hop-inventory.json").write_text(json.dumps(report))
+            with patch.dict(os.environ,{
+                "SURFPOOL_EXPLICITLY_OFFLINE":"1",
+                "SURFPOOL_DATASOURCE_RPC_URL":"",
+            }), patch("arb.pumpswap_local_simulation.local_rpc_only"), patch(
+                "arb.dlmm_offline_clock.align_permissioned_dlmm_clock",
+                return_value={}), patch(
+                "arb.next_ten_signed_atomic_offline.run_four_to_six_venue",
+                side_effect=[ValueError(observed),self.signed_receipt()]) as run:
+                output=offline_simulate("http://127.0.0.1:8899",
+                                        root,amount=100000)
+            self.assertEqual([c.kwargs["amount_in"] for c in run.call_args_list],
+                             [100000,10000])
+            self.assertEqual(output["simulations_verified"],1)
+            self.assertEqual(output["routes"][0]["signed_exact_input_base_units"],
+                             10000)
+            self.assertFalse(output["routes"][0]["broadcast"])
+
+        with tempfile.TemporaryDirectory() as directory:
+            root=self.report(directory)
+            report=json.loads((root/"three-hop-inventory.json").read_text())
+            report["routes"][0]["venues"]=["orca","meteora_dlmm","meteora_dlmm"]
+            (root/"three-hop-inventory.json").write_text(json.dumps(report))
+            incomplete=dict(self.signed_receipt(),
+                            rollback_failure_case_verified=False)
+            with patch.dict(os.environ,{
+                "SURFPOOL_EXPLICITLY_OFFLINE":"1",
+                "SURFPOOL_DATASOURCE_RPC_URL":"",
+            }), patch("arb.pumpswap_local_simulation.local_rpc_only"), patch(
+                "arb.dlmm_offline_clock.align_permissioned_dlmm_clock",
+                return_value={}), patch(
+                "arb.next_ten_signed_atomic_offline.run_four_to_six_venue",
+                side_effect=[ValueError(observed),incomplete]):
+                output=offline_simulate("http://127.0.0.1:8899",
+                                        root,amount=100000)
+            self.assertEqual(output["simulations_verified"],0)
+            self.assertEqual(output["routes"][0]["simulation_status"],
+                             "SIGNED_SIMULATION_NOT_VERIFIED")
+
+    def test_amm_v4_slippage_retry_needs_exact_signed_program_log(self):
+        from arb.m5_three_hop_atomic_inventory import (
+            raydium_amm_v4_slippage_input_retries)
+        observed=("signed prefix simulation failed: "
+                  "{'InstructionError': [1, {'Custom': 30}]}; "
+                  "program_log_tail=['AMM error: Exceeded desired slippage limit.']")
+        self.assertEqual(raydium_amm_v4_slippage_input_retries(
+            ValueError(observed),["orca","raydium_amm_v4"],100000),
+            [1000000,10000000])
+        self.assertEqual(raydium_amm_v4_slippage_input_retries(
+            ValueError(observed),["raydium_amm_v4","orca"],100000),[])
+        self.assertEqual(raydium_amm_v4_slippage_input_retries(
+            ValueError(observed.replace("Exceeded desired slippage limit.",
+                                        "invalid account")),
+            ["orca","raydium_amm_v4"],100000),[])
+        self.assertEqual(raydium_amm_v4_slippage_input_retries(
+            ValueError(observed.replace("signed prefix simulation failed",
+                                        "untrusted program error")),
+            ["orca","raydium_amm_v4"],100000),[])
+        self.assertEqual(raydium_amm_v4_slippage_input_retries(
+            ValueError(observed),["orca","raydium_amm_v4"],2**63),[])
+
+    def test_amm_v4_signed_recovery_still_requires_rollback(self):
+        observed=("signed prefix simulation failed: "
+                  "{'InstructionError': [1, {'Custom': 30}]}; "
+                  "program_log_tail=['AMM error: Exceeded desired slippage limit.']")
+        with tempfile.TemporaryDirectory() as directory:
+            root=self.report(directory)
+            report=json.loads((root/"three-hop-inventory.json").read_text())
+            report["routes"][0]["venues"]=["orca","raydium_amm_v4","meteora_damm_v2"]
+            (root/"three-hop-inventory.json").write_text(json.dumps(report))
+            with patch.dict(os.environ,{"SURFPOOL_EXPLICITLY_OFFLINE":"1",
+                                        "SURFPOOL_DATASOURCE_RPC_URL":""}),patch(
+                "arb.pumpswap_local_simulation.local_rpc_only"),patch(
+                "arb.dlmm_offline_clock.align_permissioned_dlmm_clock",
+                return_value={}),patch(
+                "arb.next_ten_signed_atomic_offline.run_four_to_six_venue",
+                side_effect=[ValueError(observed),self.signed_receipt()]) as sign:
+                output=offline_simulate("http://127.0.0.1:8899",
+                                        root,amount=100000)
+            self.assertEqual([c.kwargs["amount_in"] for c in sign.call_args_list],
+                             [100000,1000000])
+            self.assertEqual(output["simulations_verified"],1)
+            self.assertEqual(output["routes"][0]["signed_exact_input_base_units"],
+                             1000000)
+        with tempfile.TemporaryDirectory() as directory:
+            root=self.report(directory)
+            report=json.loads((root/"three-hop-inventory.json").read_text())
+            report["routes"][0]["venues"]=["orca","raydium_amm_v4","meteora_damm_v2"]
+            (root/"three-hop-inventory.json").write_text(json.dumps(report))
+            incomplete=dict(self.signed_receipt(),
+                            rollback_failure_case_verified=False)
+            with patch.dict(os.environ,{"SURFPOOL_EXPLICITLY_OFFLINE":"1",
+                                        "SURFPOOL_DATASOURCE_RPC_URL":""}),patch(
+                "arb.pumpswap_local_simulation.local_rpc_only"),patch(
+                "arb.dlmm_offline_clock.align_permissioned_dlmm_clock",
+                return_value={}),patch(
+                "arb.next_ten_signed_atomic_offline.run_four_to_six_venue",
+                side_effect=[ValueError(observed),incomplete]):
+                output=offline_simulate("http://127.0.0.1:8899",
+                                        root,amount=100000)
+            self.assertEqual(output["simulations_verified"],0)
+            self.assertEqual(output["routes"][0]["simulation_status"],
+                             "SIGNED_SIMULATION_NOT_VERIFIED")
+
+    def test_damm_v2_slippage_retry_is_venue_bound_and_bounded(self):
+        from arb.m5_three_hop_atomic_inventory import damm_v2_slippage_input_retries
+        error=ValueError("signed prefix simulation failed: "
+                         "{'InstructionError': [2, {'Custom': 6002}]}")
+        self.assertEqual(damm_v2_slippage_input_retries(error,
+            ["orca","raydium_cpmm","meteora_damm_v2"],100000),[1000000,10000])
+        self.assertEqual(damm_v2_slippage_input_retries(error,
+            ["orca","raydium_cpmm","meteora_dlmm"],100000),[])
+        self.assertEqual(damm_v2_slippage_input_retries(error,
+            ["orca","raydium_cpmm","meteora_damm_v2"],2**63),[(2**63)//10])
+        self.assertEqual(damm_v2_slippage_input_retries(ValueError(str(error).replace(
+            "signed prefix simulation failed","untrusted error")),
+            ["orca","raydium_cpmm","meteora_damm_v2"],100000),[])
+
+    def test_damm_v2_retry_does_not_relax_rollback_acceptance(self):
+        error="signed prefix simulation failed: {'InstructionError': [2, {'Custom': 6002}]}"
+        result,calls=self.simulate_mocked_route(error,self.signed_receipt())
+        self.assertEqual([c.kwargs["amount_in"] for c in calls],[100000,1000000])
+        self.assertEqual(result["simulations_verified"],1)
+        self.assertFalse(result["routes"][0]["broadcast"])
+        incomplete=dict(self.signed_receipt(),rollback_failure_case_verified=False)
+        result,_=self.simulate_mocked_route(error,incomplete)
+        self.assertEqual(result["simulations_verified"],0)
+
+    def test_primary_audit_rejects_missing_raw_receipt(self):
+        from arb.m5_three_hop_atomic_inventory import audit_primary_shard,SAFE
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            routes=[{"id":f"3H-{i+1:02d}","fixture":f"source-{i:02d}.json",
+                "source_status":"CAPTURED","atomic_build_status":"SIGNED_ATOMIC_PACKET_BUILT",
+                "simulation_status":"SIGNED_SIMULATION_AND_ROLLBACK_VERIFIED",**SAFE}
+                for i in range(14)]
+            (root/"three-hop-inventory.json").write_text(json.dumps({
+                "status":"OFFLINE_THREE_HOP_ATOMIC_BUILD_AND_SIMULATION_INVENTORY",
+                "routes":routes,"shard_index":0,"simulations_verified":14,**SAFE}))
+            with self.assertRaises(FileNotFoundError):
+                audit_primary_shard(root)
+
+    def test_other_venue_failure_does_not_trigger_retry(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.report(directory)
+            with patch.dict(os.environ, {"SURFPOOL_EXPLICITLY_OFFLINE": "1",
+                                         "SURFPOOL_DATASOURCE_RPC_URL": ""}), patch(
+                "arb.pumpswap_local_simulation.local_rpc_only"), patch(
+                "arb.dlmm_offline_clock.align_permissioned_dlmm_clock",
+                return_value={}), patch(
+                "arb.next_ten_signed_atomic_offline.run_four_to_six_venue",
+                side_effect=ValueError(RAYDIUM_2505)) as simulator:
+                result = offline_simulate("http://127.0.0.1:8899",
+                                          root, amount=100000)
+        self.assertEqual(simulator.call_count, 1)
+        self.assertEqual(result["simulations_verified"], 0)
+        self.assertEqual(result["routes"][0]["simulation_status"],
+                         "NOT_ATTEMPTED_OR_ABORTED_DURING_PREPARATION")
+
+    def test_source_damm_dust_sizes_use_real_price_and_bounded_reserve(self):
+        from arb.meteora_damm_v2_native_quote import bounded_dust_input_candidates
+        # Primary #310 source-05, slot 474981954, C2C8RFRL pool.
+        price=12181181513744145
+        sizes=bounded_dust_input_candidates(sqrt_price=price,input_is_a=True,
+            amount_in=100000,input_vault_balance=14893286255086409)
+        self.assertEqual(len(sizes),2)
+        self.assertEqual([s*price*price//2**128 for s in sizes],[16,32])
+        self.assertTrue(all(100000<s<=100000000 for s in sizes))
+        self.assertEqual(bounded_dust_input_candidates(sqrt_price=price,input_is_a=True,
+            amount_in=100000,input_vault_balance=100000000),[])
+        self.assertEqual(bounded_dust_input_candidates(sqrt_price=price,input_is_a=False,
+            amount_in=100000,input_vault_balance=14893286255086409),[])
+
+    def test_source_dlmm_active_capacity_sizing(self):
+        from arb.meteora_dlmm_source_bin_decoder import bounded_active_bin_input_candidates
+        # Primary #310 source-35, active -904: five output units, no orders.
+        b={"bin_id":-904,"price_q64":2287693419720123,
+            "amount_x":17671375563766,"amount_y":5,"open_order_amount":0,
+            "processed_order_remaining_amount":0,"limit_order_ask_side":0}
+        kw=dict(amount_in=100000,x_to_y=True,fee_on_input=True,limit_order_support=False)
+        sizes=bounded_active_bin_input_candidates(b,**kw)
+        self.assertTrue(sizes)
+        self.assertTrue(all(0<s<100000 for s in sizes))
+        self.assertEqual(bounded_active_bin_input_candidates({**b,"amount_y":0},**kw),[])
+        self.assertEqual(bounded_active_bin_input_candidates(
+            {**b,"open_order_amount":1},**{**kw,"limit_order_support":True}),[])
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+class DlmmInsufficientOutputRetryTests(unittest.TestCase):
+    report=BoundedOfflineOrcaInputTests.report
+    signed_receipt=BoundedOfflineOrcaInputTests.signed_receipt
+
+    def test_dlmm_6039_requires_exact_venue_log_and_u64(self):
+        from arb.m5_three_hop_atomic_inventory import dlmm_insufficient_output_input_retries as retry
+        msg=("signed prefix simulation failed: "
+             "{'InstructionError': [1, {'Custom': 6039}]}; "
+             "program_log_tail=['Error Code: InsufficientOutAmount. Error Number: 6039.']")
+        venues=["orca","meteora_dlmm","raydium_cpmm"]
+        self.assertEqual(retry(ValueError(msg),venues,100000),[1000000,10000])
+        self.assertEqual(retry(ValueError(msg),venues,2**63),[(2**63)//10])
+        self.assertEqual(retry(ValueError(msg),venues,1),[10])
+        for bad in (msg.replace("InsufficientOutAmount","PoolDisabled"),
+                    msg.replace("6039","6037"),
+                    msg.replace("signed prefix simulation failed","untrusted report")):
+            self.assertEqual(retry(ValueError(bad),venues,100000),[])
+        self.assertEqual(retry(ValueError(msg),["meteora_dlmm","orca"],100000),[])
+        self.assertEqual(retry(RuntimeError(msg),venues,100000),[])
+        self.assertEqual(retry(ValueError(msg),venues,True),[])
+
+    def test_dlmm_6039_retry_preserves_acceptance_gate(self):
+        msg=("signed prefix simulation failed: "
+             "{'InstructionError': [1, {'Custom': 6039}]}; "
+             "program_log_tail=['Error Code: InsufficientOutAmount. Error Number: 6039.']")
+        for rollback in (True,False):
+            with self.subTest(rollback=rollback),tempfile.TemporaryDirectory() as directory:
+                root=self.report(directory)
+                path=root/"three-hop-inventory.json"
+                report=json.loads(path.read_text())
+                report["routes"][0]["venues"]=["orca","meteora_dlmm","raydium_cpmm"]
+                path.write_text(json.dumps(report))
+                receipt=dict(self.signed_receipt(),rollback_failure_case_verified=rollback)
+                with patch.dict(os.environ,{"SURFPOOL_EXPLICITLY_OFFLINE":"1",
+                                            "SURFPOOL_DATASOURCE_RPC_URL":""}),patch(
+                    "arb.pumpswap_local_simulation.local_rpc_only"),patch(
+                    "arb.dlmm_offline_clock.align_permissioned_dlmm_clock",
+                    return_value={}),patch(
+                    "arb.next_ten_signed_atomic_offline.run_four_to_six_venue",
+                    side_effect=[ValueError(msg),receipt]) as signer:
+                    output=offline_simulate("http://127.0.0.1:8899",root,amount=100000)
+                self.assertEqual([c.kwargs["amount_in"] for c in signer.call_args_list],
+                                 [100000,1000000])
+                self.assertEqual(output["simulations_verified"],int(rollback))
+                self.assertFalse(output["routes"][0]["broadcast"])
