@@ -200,7 +200,7 @@ jobs:
                         batch=tuple((a,b) for a in ORDER for b in ORDER if a!=b),
                         maximum_per_venue=48,
                         require_dlmm_swap_eligible=True,
-                        prefer_start_mint_coverage=True),
+                        prefer_start_mint_coverage=True,historical_recovery=True),
                         maximum=200,allow_start_rotations=True,recovery_ordering=True)
           graph["source_bridge_discovery"]={
               "new_verified_pool_identities":len(new)+min(len(other),available)+min(len(extra),room)+min(len(cpmm_new),cpmm_room)+index_admission["admitted_count"]+meteora_admission["admitted_count"],

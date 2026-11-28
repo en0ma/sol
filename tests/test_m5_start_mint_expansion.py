@@ -431,3 +431,25 @@ class HistoricalRecoveryBridgeTests(unittest.TestCase):
         self.assertTrue(any(set(r["pair"])=={mint,RECOVERY_OUTPUT_MINT}
             and r["historical_recovery_hint"] for r in result["targets"]))
         self.assertFalse(result["source_authenticated"])
+
+
+class HistoricalRecoveryPoolBudgetTests(unittest.TestCase):
+    def test_complete_alternative_triangle_selected_without_excluding_original(self):
+        from arb.m5_historical_capture_priority import RECOVERY_FAILURES,RECOVERY_OUTPUT_MINT
+        from arb.m5_start_mint_expansion import starting_mint_coverage_pool_subset
+        mint,venue,pool,_=RECOVERY_FAILURES[0]
+        rows=[{"venue":venue,"address":pool,"mints":[mint,RECOVERY_OUTPUT_MINT]},
+              {"venue":"orca","address":"other","mints":[mint,RECOVERY_OUTPUT_MINT]},
+              {"venue":"raydium_cpmm","address":"middle","mints":[RECOVERY_OUTPUT_MINT,"Y"]},
+              {"venue":"raydium_amm_v4","address":"last","mints":["Y",mint]}]
+        result=starting_mint_coverage_pool_subset(rows,maximum_per_venue=2,
+            historical_recovery=True)
+        proof=result["historical_recovery_alternate_triangle_hints"][mint]
+        self.assertEqual({row["address"] for row in proof["pools"]},{"other","middle","last"})
+        self.assertFalse(result["source_authenticated"])
+        self.assertLessEqual(result["selected_pool_identity_count"],198)
+        self.assertEqual(result["selected_three_hop_start_mint_count"],3)
+        unavailable=starting_mint_coverage_pool_subset([r for r in rows if r["address"]!="other"],
+            maximum_per_venue=2,historical_recovery=True)
+        self.assertNotIn(mint,unavailable["historical_recovery_alternate_triangle_hints"])
+        self.assertIn(pool,unavailable["addresses"][venue])

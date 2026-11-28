@@ -191,7 +191,7 @@ def candidates(registry):
     return result
 
 def prioritized_probe_addresses(registry, addresses, batch, *, maximum=12,
-                                prefer_start_mint_coverage=False):
+                                prefer_start_mint_coverage=False,historical_recovery=False):
     """Prioritize *hinted* cross-venue pair overlap before source RPC reads.
 
     This is scheduling ONLY. Mint labels in registry cannot authenticate any
@@ -200,7 +200,8 @@ def prioritized_probe_addresses(registry, addresses, batch, *, maximum=12,
     """
     if type(maximum) is not int or not 1<=maximum<=48:
         raise ValueError("bounded paired source pool probes required")
-    if type(prefer_start_mint_coverage) is not bool:
+    if (type(prefer_start_mint_coverage) is not bool or type(historical_recovery) is not bool
+            or historical_recovery and not prefer_start_mint_coverage):
         raise ValueError("invalid three-hop token coverage policy")
     entries=registry.get("pools") if isinstance(registry,dict) else None
     if not isinstance(entries,list) or not isinstance(addresses,dict):
@@ -229,7 +230,8 @@ def prioritized_probe_addresses(registry, addresses, batch, *, maximum=12,
     if prefer_start_mint_coverage:
         from arb.m5_start_mint_expansion import starting_mint_coverage_pool_subset
         covered=starting_mint_coverage_pool_subset(entries,
-            maximum_per_venue=maximum,target_start_mints=100)["addresses"]
+            maximum_per_venue=maximum,target_start_mints=100,
+            historical_recovery=historical_recovery)["addresses"]
     result={}
     for venue in relevant:
         options=addresses.get(venue,[])
@@ -358,7 +360,8 @@ def permissioned_dlmm_clock_parity_unverified(activation, *, offline_clock_attes
     return activation["pair_type"]==1 and not offline_clock_attested
 
 def probe(rpc, registry, *, batch=BATCH_10, maximum_per_venue=12,
-          require_dlmm_swap_eligible=False,prefer_start_mint_coverage=False):
+          require_dlmm_swap_eligible=False,prefer_start_mint_coverage=False,
+          historical_recovery=False):
     local_rpc_only(rpc)
     if type(maximum_per_venue) is not int or not 1<=maximum_per_venue<=48:
         raise ValueError("invalid source probe venue budget")
@@ -368,7 +371,8 @@ def probe(rpc, registry, *, batch=BATCH_10, maximum_per_venue=12,
         raise ValueError("invalid source start-mint coverage option")
     entries=prioritized_probe_addresses(registry,candidates(registry),batch,
                                          maximum=maximum_per_venue,
-                                         prefer_start_mint_coverage=prefer_start_mint_coverage)
+                                         prefer_start_mint_coverage=prefer_start_mint_coverage,
+                                         historical_recovery=historical_recovery)
     if sum(map(len,entries.values()))>200:
         raise ValueError("source pool graph exceeds 200 identities; tighten token-diverse selection")
     relevant={v for pair in batch for v in pair}

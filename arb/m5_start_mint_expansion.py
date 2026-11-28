@@ -105,7 +105,7 @@ def bridge_targets(entries, *, maximum=360):
             "targets_are_unverified_hints":True,**SAFE}
 
 def starting_mint_coverage_pool_subset(entries, *, maximum_per_venue=24,
-                                       target_start_mints=100):
+                                       target_start_mints=100,historical_recovery=False):
     """Choose registry HINT addresses covering true 3-hop token triangles.
 
     Never authenticates these hints. The caller MUST revalidate each selected
@@ -114,7 +114,8 @@ def starting_mint_coverage_pool_subset(entries, *, maximum_per_venue=24,
     """
     from itertools import product
     if (type(maximum_per_venue)is not int or not 1<=maximum_per_venue<=48 or
-            type(target_start_mints)is not int or not 1<=target_start_mints<=100):
+            type(target_start_mints)is not int or not 1<=target_start_mints<=100
+            or type(historical_recovery) is not bool):
         raise ValueError("bounded triangle coverage targets required")
     graph=topology(entries)
     pool_by_pair=defaultdict(list)
@@ -140,6 +141,50 @@ def starting_mint_coverage_pool_subset(entries, *, maximum_per_venue=24,
     chosen={}
     counts=defaultdict(int)
     covered=set()
+    recovery={}
+    if historical_recovery:
+        from arb.m5_historical_capture_priority import RECOVERY_FAILURES
+        recovery={mint:(venue,pool) for mint,venue,pool,_ in RECOVERY_FAILURES}
+    # Preserve headroom for the two historical legacy pair controls appended
+    # by prioritized_probe_addresses. These are still source RPC hints.
+    pool_cap=198 if historical_recovery else 200
+
+    def bounded_options(edges,excluded=frozenset()):
+        options=[]
+        for poolset in edges:
+            by_venue=defaultdict(list)
+            for row in sorted(poolset,key=lambda row:(
+                    (row["venue"],row["address"]) not in chosen,
+                    counts[row["venue"]],row["venue"],row["address"])):
+                identity=(row["venue"],row["address"])
+                if identity in excluded:
+                    continue
+                if len(by_venue[row["venue"]])<2:
+                    by_venue[row["venue"]].append(row)
+            options.append([row for offset in range(2)
+                            for venue in sorted(by_venue)
+                            if len(by_venue[venue])>offset
+                            for row in by_venue[venue][offset:offset+1]][:8])
+        return options
+
+    def admissible_additions(candidate):
+        identities={(row["venue"],row["address"]) for row in candidate}
+        if len(identities)!=3:
+            return None
+        additions=[row for row in candidate if (row["venue"],row["address"]) not in chosen]
+        increments=defaultdict(int)
+        for row in additions:
+            increments[row["venue"]]+=1
+        if (any(counts[v]+inc>maximum_per_venue for v,inc in increments.items())
+                or len(chosen)+len(additions)>pool_cap):
+            return None
+        return additions
+
+    def admit(additions):
+        for row in additions:
+            chosen[(row["venue"],row["address"])]=row
+            counts[row["venue"]]+=1
+
     while len(covered)<target_start_mints:
         best=None
         best_score=None
@@ -149,43 +194,52 @@ def starting_mint_coverage_pool_subset(entries, *, maximum_per_venue=24,
             # Preserve alternative venues in each pair's candidate budget:
             # a straight first-six pool slice can all belong to an exhausted
             # venue and hide a valid triangle in another authenticated venue.
-            options=[]
-            for poolset in edges:
-                by_venue=defaultdict(list)
-                for p in sorted(poolset,key=lambda p:(
-                        (p["venue"],p["address"]) not in chosen,
-                        counts[p["venue"]],p["venue"],p["address"])):
-                    if len(by_venue[p["venue"]])<2:
-                        by_venue[p["venue"]].append(p)
-                # Round-robin venues before taking second identities, so
-                # the bounded combinatorial search stays cheap and diverse.
-                options.append([p for offset in range(2)
-                                for venue in sorted(by_venue)
-                                if len(by_venue[venue])>offset
-                                for p in by_venue[venue][offset:offset+1]][:8])
-            for candidate in product(*options):
-                identities={(p["venue"],p["address"]) for p in candidate}
-                if len(identities)!=3:continue
-                additions=[p for p in candidate if (p["venue"],p["address"]) not in chosen]
-                increments=defaultdict(int)
-                for row in additions:increments[row["venue"]]+=1
-                if (any(counts[v]+inc>maximum_per_venue for v,inc in increments.items())
-                        or sum(counts.values())+len(additions)>200):
+            for candidate in product(*bounded_options(edges)):
+                additions=admissible_additions(candidate)
+                if additions is None:
                     continue
                 # First maximize distinct reachable starts, then protect
                 # scarce starts with few remaining triangle alternatives.
                 rarity=sum(1/frequency[t] for t in tokens if t not in covered)
-                score=(new_mints,rarity,-len(additions),
-                       -sum(counts[p["venue"]] for p in candidate))
+                recovery_new=sum(t in recovery and t not in covered for t in tokens)
+                failed_identities={recovery[t] for t in tokens if t in recovery}
+                failed_count=sum((row["venue"],row["address"]) in failed_identities
+                                 for row in candidate)
+                score=(new_mints,recovery_new,rarity,-failed_count,-len(additions),
+                       -sum(counts[row["venue"]] for row in candidate))
                 if best_score is None or score>best_score:
                     best_score=score
                     best=(tokens,candidate,additions)
         if best is None:break
         tokens,candidate,additions=best
-        for row in additions:
-            chosen[(row["venue"],row["address"])]=row
-            counts[row["venue"]]+=1
+        admit(additions)
         covered.update(tokens)
+    # Use spare capacity to admit a complete distinct-pool triangle that
+    # excludes the historical failed pool, not disconnected single edges.
+    # Historical failures do not disqualify the original pool or direction.
+    recovery_alternatives={}
+    for mint,failed_identity in sorted(recovery.items()):
+        best=None
+        best_score=None
+        for tokens,edges in triples:
+            if mint not in tokens:
+                continue
+            for candidate in product(*bounded_options(edges,frozenset({failed_identity}))):
+                additions=admissible_additions(candidate)
+                if additions is None:
+                    continue
+                score=(len(additions),sum(counts[row["venue"]] for row in additions),
+                       tuple((row["venue"],row["address"]) for row in candidate))
+                if best_score is None or score<best_score:
+                    best_score=score
+                    best=(tokens,candidate,additions)
+        if best is not None:
+            tokens,candidate,additions=best
+            admit(additions)
+            covered.update(tokens)
+            recovery_alternatives[mint]={
+                "pools":[{"venue":row["venue"],"address":row["address"]} for row in candidate],
+                "new_pool_hint_count":len(additions)}
     selected=defaultdict(list)
     for (venue,address),row in chosen.items():
         selected[venue].append(address)
@@ -195,7 +249,10 @@ def starting_mint_coverage_pool_subset(entries, *, maximum_per_venue=24,
             "selected_three_hop_start_mints":sorted(covered),
             "unselected_topology_start_mints":sorted(set(graph["three_hop_start_mints"])-covered),
             "selected_pool_identity_count":len(chosen),
-            "selection_policy":"SCARCITY_WEIGHTED_DISTINCT_START_TRIANGLES_VENUE_DIVERSE_200_POOL_CAP",
+            "historical_recovery_alternate_triangle_hints":recovery_alternatives,
+            "historical_recovery_unserved_starts":sorted(set(recovery)-covered),
+            "selection_policy":("SCARCITY_WEIGHTED_TRIANGLES_WITH_BOUNDED_HISTORICAL_RECOVERY"
+                if historical_recovery else "SCARCITY_WEIGHTED_DISTINCT_START_TRIANGLES_VENUE_DIVERSE_200_POOL_CAP"),
             "source_authenticated":False,
             "signed_simulation_verified":False,
             **SAFE}
