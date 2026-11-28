@@ -309,6 +309,30 @@ class BoundedOfflineOrcaInputTests(unittest.TestCase):
             self.assertEqual(output["routes"][0]["simulation_status"],
                              "SIGNED_SIMULATION_NOT_VERIFIED")
 
+    def test_damm_v2_slippage_retry_is_venue_bound_and_bounded(self):
+        from arb.m5_three_hop_atomic_inventory import damm_v2_slippage_input_retries
+        error=ValueError("signed prefix simulation failed: "
+                         "{'InstructionError': [2, {'Custom': 6002}]}")
+        self.assertEqual(damm_v2_slippage_input_retries(error,
+            ["orca","raydium_cpmm","meteora_damm_v2"],100000),[1000000,10000])
+        self.assertEqual(damm_v2_slippage_input_retries(error,
+            ["orca","raydium_cpmm","meteora_dlmm"],100000),[])
+        self.assertEqual(damm_v2_slippage_input_retries(error,
+            ["orca","raydium_cpmm","meteora_damm_v2"],2**63),[(2**63)//10])
+        self.assertEqual(damm_v2_slippage_input_retries(ValueError(str(error).replace(
+            "signed prefix simulation failed","untrusted error")),
+            ["orca","raydium_cpmm","meteora_damm_v2"],100000),[])
+
+    def test_damm_v2_retry_does_not_relax_rollback_acceptance(self):
+        error="signed prefix simulation failed: {'InstructionError': [2, {'Custom': 6002}]}"
+        result,calls=self.simulate_mocked_route(error,self.signed_receipt())
+        self.assertEqual([c.kwargs["amount_in"] for c in calls],[100000,1000000])
+        self.assertEqual(result["simulations_verified"],1)
+        self.assertFalse(result["routes"][0]["broadcast"])
+        incomplete=dict(self.signed_receipt(),rollback_failure_case_verified=False)
+        result,_=self.simulate_mocked_route(error,incomplete)
+        self.assertEqual(result["simulations_verified"],0)
+
     def test_other_venue_failure_does_not_trigger_retry(self):
         with tempfile.TemporaryDirectory() as directory:
             root = self.report(directory)

@@ -53,6 +53,12 @@ def failed_instruction_context(row, error):
     if venues[index]=="meteora_dlmm" and code==6042:
         result["program_error_name"]="PoolDisabled"
         result["diagnostic_class"]="DLMM_SWAP_BLOCKED_BY_POOL_STATUS_OR_ACTIVATION"
+    elif venues[index]=="meteora_dlmm" and code==6036:
+        result["program_error_name"]="BitmapExtensionAccountIsNotProvided"
+        result["diagnostic_class"]="DLMM_BITMAP_EXTENSION_ACCOUNT_MISSING"
+    elif venues[index]=="meteora_damm_v2" and code==6002:
+        result["program_error_name"]="ExceededSlippage"
+        result["diagnostic_class"]="DAMM_V2_SIGNED_SLIPPAGE_REJECTION"
     elif venues[index]=="raydium_clmm" and code==6024:
         result["program_error_name"]="InvalidFirstTickArrayAccount"
         result["diagnostic_class"]="CLMM_FIRST_INITIALIZED_TICK_ARRAY_MISMATCH"
@@ -571,6 +577,26 @@ def raydium_amm_v4_slippage_input_retries(error, venues, amount):
 
 
 
+def damm_v2_slippage_input_retries(error,venues,amount):
+    """Try bounded independent sizes for the official DAMM v2 6002 error.
+
+    The existing prefix and full atomic simulator retains nonzero output
+    thresholds; a retry never changes slippage limits or proves liquidity.
+    Larger amounts can resolve integer dust, while a smaller amount can
+    fit bounded source liquidity. Neither hypothesis is acceptance.
+    """
+    message=str(error)
+    context=failed_instruction_context({"venues":venues,"pools":[""]*len(venues)},message)
+    if (not isinstance(error,ValueError)
+            or type(amount) is not int or not 0<amount<2**64
+            or "signed prefix simulation failed" not in message
+            or context.get("failed_venue")!="meteora_damm_v2"
+            or context.get("program_error_code")!=6002):
+        return []
+    return [candidate for candidate in (amount*10,amount//10)
+            if 0<candidate<2**64 and candidate!=amount]
+
+
 def offline_simulate(rpc,directory,*,amount=100000,shard_index=0,shard_count=1):
     from arb.pumpswap_local_simulation import local_rpc_only
     from arb.next_ten_signed_atomic_offline import run_four_to_six_venue
@@ -624,6 +650,8 @@ def offline_simulate(rpc,directory,*,amount=100000,shard_index=0,shard_count=1):
                         retry_amounts.extend(dlmm_bin_array_input_retries(
                             error,row["venues"],amount))
                         retry_amounts.extend(raydium_amm_v4_slippage_input_retries(
+                            error,row["venues"],amount))
+                        retry_amounts.extend(damm_v2_slippage_input_retries(
                             error,row["venues"],amount))
                     if amount_index==len(retry_amounts)-1:
                         raise
