@@ -27,7 +27,7 @@ def quote_one_bin(*,amount_in,swap_x_for_y,price_q64,bin_x,bin_y,total_fee_rate,
             "protocol_exact_verified":False,"actionable":False,
             "live_execution_approved":False,"broadcast":False}
 
-def quote_bins(*,amount_in,swap_x_for_y,bins,total_fee_rate,max_bins=32,fee_on_input=True):
+def quote_bins(*,amount_in,swap_x_for_y,bins,total_fee_rate,max_bins=32,fee_on_input=True,limit_order_support=False):
     """Price a bounded sequence of externally decoded DLMM bins.
 
     Bins MUST be provided in directional walk order by a source-authenticated
@@ -39,9 +39,9 @@ def quote_bins(*,amount_in,swap_x_for_y,bins,total_fee_rate,max_bins=32,fee_on_i
         raise ValueError("DLMM positive integer input required")
     if type(swap_x_for_y)is not bool or type(total_fee_rate)is not int or not 0<=total_fee_rate<DEN:
         raise ValueError("DLMM direction or fee invalid")
-    if not isinstance(bins,list) or not 1<=len(bins)<=max_bins<=70:
+    if not isinstance(bins,list) or not 1<=len(bins)<=max_bins<=210:
         raise ValueError("DLMM bounded bins missing")
-    if type(fee_on_input) is not bool:
+    if type(fee_on_input) is not bool or type(limit_order_support) is not bool:
         raise ValueError("explicit DLMM fee denomination required")
     remaining=amount_in
     output=fees=output_fees=0
@@ -65,7 +65,18 @@ def quote_bins(*,amount_in,swap_x_for_y,bins,total_fee_rate,max_bins=32,fee_on_i
         price=b["price_q64"]
         if min(b["amount_x"],b["amount_y"])<0 or max(b["amount_x"],b["amount_y"])>=2**64:
             raise ValueError("invalid authenticated bin inventory")
-        if not capacity:continue
+        orders=0
+        if limit_order_support:
+            opened=b.get("open_order_amount");processing=b.get("processed_order_remaining_amount")
+            side=b.get("limit_order_ask_side")
+            if any(type(v) is not int or v<0 for v in (opened,processing,side)):
+                raise ValueError("DLMM limit-order inventory absent")
+            if bool(side)!=swap_x_for_y:
+                orders=opened+processing
+        if not capacity:
+            if orders:
+                raise ValueError("DLMM matching limit-order liquidity requires separate native model")
+            continue
         if not 0<price<1<<128:
             raise ValueError("invalid funded DLMM bin price")
         # SDK Bin::get_amount_in(..., Rounding::Up), then compute_fee
@@ -109,6 +120,8 @@ def quote_bins(*,amount_in,swap_x_for_y,bins,total_fee_rate,max_bins=32,fee_on_i
                          "fee_output_base_units":output_fee,
                          "effective_fee_rate":rate})
         if remaining==0:break
+        if orders:
+            raise ValueError("DLMM matching limit-order liquidity requires separate native model")
     if remaining or not 0<output<2**64 or not 0<=fees<2**64 or not 0<=output_fees<2**64:
         raise ValueError("DLMM bin inventory cannot fill bounded exact input/output")
     return {"amount_out":output,"fee_input_base_units":fees,

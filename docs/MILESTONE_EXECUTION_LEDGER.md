@@ -378,3 +378,5 @@ Blockzilla #16 46113852671 42/42 multi-hop leg and 8/8 full-chain matches, 8/8 i
 Blockzilla #17 46115468678 12/12 independently audited multihop, PumpSwap 4/4 signed,2/4 previous scenario matches,42 deterministic matches,8 CPMM projection blocked. New event/CPI audit and buy curve net-minus-one hypothesis; fresh CI pending.
 
 Blockzilla #18 46116220241 12/12 independent,48/50 deterministic native samples,4/4 PumpSwap scenario/event matches, two DLMM discrepancies. Clock bracket, independent event and observed native funding audits plus opt-in preselected PumpSwap research chain pending CI.
+
+Blockzilla #19 46118938733 all 12 signed/independent and terminal source/execution-clock models match, 54/54 sample outputs including four preselected PumpSwap research models; no positive net. Bounded pre-sign grid, independently recomputed size selection, contiguous DLMM expansion and limit-order guard pending CI.

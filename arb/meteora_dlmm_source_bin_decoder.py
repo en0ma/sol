@@ -46,7 +46,10 @@ def decode_bin_array(raw, *, pool, index):
         bins.append({"bin_id":index*BIN_ARRAY_SIZE+i,
                      "amount_x":amount_x,"amount_y":amount_y,
                      "price_q64":price,
-                     "liquidity_supply":liquidity_supply})
+                     "liquidity_supply":liquidity_supply,
+                     "open_order_amount":number(112,8),
+                     "processed_order_remaining_amount":number(128,8),
+                     "limit_order_ask_side":number(140,1)})
     return {"pool":pool,"array_index":index,"array_version":raw[16],
             "bin_count":BIN_ARRAY_SIZE,"bins":bins,
             "active_bin_fee_verified":False,"protocol_exact_verified":False,**SAFE}
@@ -70,8 +73,9 @@ def decode_from_fixture(fixture, *, pool, array_index):
     return {**result,"source_slot":fixture["state_accounts_observed_slot"],
             "bin_array_pda":pda,"source_account_verified":True,**SAFE}
 
-def directional_bins(decoded_arrays, *, active_id, x_to_y):
-    if type(active_id)is not int or type(x_to_y)is not bool:
+def directional_bins(decoded_arrays, *, active_id, x_to_y, maximum_bins=70):
+    if (type(active_id)is not int or type(x_to_y)is not bool
+            or type(maximum_bins)is not int or not 1<=maximum_bins<=210):
         raise ValueError("invalid DLMM active bin direction")
     all_bins={}
     for decoded in decoded_arrays:
@@ -84,9 +88,10 @@ def directional_bins(decoded_arrays, *, active_id, x_to_y):
     direction=-1 if x_to_y else 1
     selected=[]
     current=active_id
-    while current in all_bins and len(selected)<70:
+    while current in all_bins and len(selected)<maximum_bins:
         b=all_bins[current]
-        selected.append({k:b[k] for k in ("bin_id","amount_x","amount_y","price_q64")})
+        selected.append({**{k:b[k] for k in ("bin_id","amount_x","amount_y","price_q64")},
+            **{k:b[k] for k in ("open_order_amount","processed_order_remaining_amount","limit_order_ask_side") if k in b}})
         current+=direction
     return {"bins":selected,"dynamic_fee_verified":False,
             "protocol_exact_verified":False,**SAFE}

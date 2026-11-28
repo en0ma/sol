@@ -1,0 +1,95 @@
+"""Bounded source-native size selection before signed simulation.
+
+Reuse the existing seven-venue route chain. Every trial is bound to the
+same captured fixture; no signed result is used to select its input.
+This is a discrete research grid, not a continuous optimizer or profit claim.
+"""
+from arb.source_snapshot_manifest import verify
+from arb.m5_source_indicative_route_chain import research_chain
+from arb.m5_signed_start_mint_economics import WSOL
+
+SAFE={"actionable":False,"broadcast":False,"live_execution_approved":False}
+CONTROL_AMOUNTS=(100000,1000000)
+GRID=(10000,30000,100000,300000,1000000,3000000,10000000,30000000)
+# A fixed research assumption, not a paid or independently quoted fee.
+MESSAGE_FEE_SCENARIO=5000
+MAX_EXTRA_PER_ROUTE=2
+COMPLETE={"SOURCE_BOUND_INDICATIVE_CHAIN_NOT_EXECUTION_VERIFIED",
+          "SOURCE_BOUND_MODELED_CHAIN_NOT_EXECUTION_VERIFIED"}
+
+def evaluate(fixture,*,observed_unix):
+    verify(fixture)
+    if any(fixture.get(k) is not False for k in SAFE):
+        raise ValueError("unsafe source size fixture")
+    mints=fixture.get("route_mints")
+    if not isinstance(mints,list) or not 4<=len(mints)<=7 or mints[0]!=mints[-1]:
+        raise ValueError("closed 3–6-hop size fixture required")
+    if type(observed_unix) is not int or observed_unix<0:
+        raise ValueError("source clock required")
+    results=[]
+    for amount in GRID:
+        row={"amount":amount,"status":"MODEL_BLOCKED","output":None,
+             "gross_delta":None,"estimated_message_fee":None,"estimated_net":None,
+             "net_profit_verified":False,**SAFE}
+        try:
+            q=research_chain(fixture,amount_in=amount,observed_unix=observed_unix,
+                             allow_modeled_dlmm=True,allow_modeled_pumpswap=True)
+        except (ValueError,RuntimeError,TypeError,KeyError) as exc:
+            row["reason"]=str(exc)[:180]
+            results.append(row)
+            continue
+        if not isinstance(q,dict) or any(q.get(k) is not False for k in SAFE):
+            raise ValueError("unsafe native size model")
+        row["quote_status"]=q.get("status")
+        if q["status"] in COMPLETE:
+            output=q.get("output_base_units")
+            if (q.get("input_base_units")!=amount or type(output) is not int or not 0<output<2**64
+                    or q.get("gross_delta_start_mint_base_units")!=output-amount
+                    or q.get("signed_simulation_verified") is not False
+                    or q.get("net_profit_verified") is not False
+                    or len(q.get("quoted_legs",[]))!=len(mints)-1):
+                raise ValueError("invalid complete size model")
+            fee=MESSAGE_FEE_SCENARIO if mints[0]==WSOL else None
+            row.update(status="COMPLETE_RESEARCH_MODEL",output=output,gross_delta=output-amount,
+                       estimated_message_fee=fee,estimated_net=output-amount-fee if fee is not None else None,
+                       modeled_leg_count=q.get("modeled_leg_count"))
+        else:
+            row.update(blocked_leg=q.get("blocked_leg_index"),blocked_venue=q.get("blocked_venue"),
+                       reason=q.get("reason"))
+        results.append(row)
+    selected=select_sizes(results)
+    return {"status":"SOURCE_NATIVE_BOUNDED_SIZE_PLAN","source_slot":fixture["state_accounts_observed_slot"],
+            "manifest_sha256":fixture["state_account_manifest_sha256"],"source_unix":observed_unix,
+            "start_mint":mints[0],"grid":list(GRID),"controls":list(CONTROL_AMOUNTS),
+            "samples":results,"selected":selected,"signed_amounts":list(CONTROL_AMOUNTS)+[r["amount"] for r in selected],
+            "complete_models":sum(r["status"]=="COMPLETE_RESEARCH_MODEL" for r in results),
+            "positive_modeled_gross_count":sum(type(r["gross_delta"]) is int and r["gross_delta"]>0 for r in results),
+            "positive_estimated_net_count":sum(type(r["estimated_net"]) is int and r["estimated_net"]>0 for r in results),
+            "grid_exhaustive_only":True,"priority_cost_included":False,"account_funding_included":False,
+            "net_profit_verified":False,**SAFE}
+
+def select_sizes(samples):
+    if [r.get("amount") for r in samples]!=list(GRID):
+        raise ValueError("size grid must be complete and ordered")
+    eligible=[r for r in samples if r.get("status")=="COMPLETE_RESEARCH_MODEL"
+              and r["amount"] not in CONTROL_AMOUNTS]
+    if not eligible:
+        return []
+    # A best estimated net candidate plus the largest complete candidate
+    # independently stress economic and liquidity boundaries. Never select
+    # a blocked model or use realized output for ranking.
+    def score(r):
+        net=r.get("estimated_net")
+        return (net if type(net) is int else r["gross_delta"],-r["amount"])
+    best=max(eligible,key=score)
+    largest=max(eligible,key=lambda r:r["amount"])
+    out=[{"amount":best["amount"],"reason":"BEST_MODELED_NET_OR_GROSS_GRID_SAMPLE"}]
+    if largest["amount"]!=best["amount"]:
+        out.append({"amount":largest["amount"],"reason":"LARGEST_COMPLETE_GRID_SAMPLE"})
+    return out
+
+def verify_plan(recorded,fixture,*,observed_unix):
+    recomputed=evaluate(fixture,observed_unix=observed_unix)
+    if recorded!=recomputed:
+        raise ValueError("recorded pre-sign size plan differs from independent recomputation")
+    return recomputed

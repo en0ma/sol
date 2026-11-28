@@ -18,7 +18,8 @@ from arb.pumpswap_local_simulation import local_rpc_only
 from arb.source_snapshot_manifest import verify
 from arb.m5_signed_start_mint_economics import WSOL
 
-AMOUNTS=(100000, 1000000)
+from arb.blockzilla_size_plan import CONTROL_AMOUNTS as AMOUNTS, evaluate as size_plan, verify_plan
+
 MAX_CAPTURE_PER_HOPS=2
 MAX_SIX_HOP_CAPTURE_ATTEMPTS=4
 MAX_SIX_HOP_CAPTURED=2
@@ -346,13 +347,19 @@ def offline(rpc,directory):
     report={"status":"BLOCKZILLA_MULTIHOP_SIGNED_RESEARCH","source_report_sha256":digest(raw),
             "excluded_from_primary_inventory":True,"attempts":[],"accepted":0,**SAFE}
     programs={}
+    report["size_plans"]={}
+    lock=Path("tools/meteora_damm_v2_reference/Cargo.lock")
+    report["official_damm_sdk_lock_sha256"]=digest(lock.read_bytes())
     for row in selected:
         path=root/(row["id"]+"-fixture.json")
         fixture_raw=path.read_bytes()
         if digest(fixture_raw)!=row["fixture_sha256"]:
             raise ValueError("multihop source fixture digest mismatch")
         fixture=json.loads(fixture_raw);fixture_identity(fixture,row)
-        for amount in AMOUNTS:
+        plan=size_plan(fixture,observed_unix=row["source_clock"]["unix_timestamp"])
+        report["size_plans"][row["id"]]=plan
+        write(root/"multihop-signed.json",report)
+        for amount in plan["signed_amounts"]:
             item={"id":row["id"],"amount":amount,"status":"BLOCKED"}
             report["attempts"].append(item)
             try:
@@ -546,7 +553,20 @@ def audit(source_dir,signed_dir):
     if signed["source_report_sha256"]!=digest(source_raw):
         raise ValueError("signed source report binding mismatch")
     rows={r["id"]:r for r in source["routes"]}
-    expected={(r["id"],amount) for r in rows.values() if r["capture_status"]=="CAPTURED" for amount in AMOUNTS}
+    captured={r["id"]:r for r in rows.values() if r["capture_status"]=="CAPTURED"}
+    lock=Path("tools/meteora_damm_v2_reference/Cargo.lock")
+    if signed.get("official_damm_sdk_lock_sha256")!=digest(lock.read_bytes()):
+        raise ValueError("offline and independent SDK dependency locks differ")
+    if set(signed.get("size_plans",{}))!=set(captured):
+        raise ValueError("missing or extra pre-sign size plan")
+    plans={}
+    for rid,row in captured.items():
+        raw=(src/(rid+"-fixture.json")).read_bytes()
+        if digest(raw)!=row["fixture_sha256"]:
+            raise ValueError("size plan source fixture digest mismatch")
+        fixture=json.loads(raw);fixture_identity(fixture,row)
+        plans[rid]=verify_plan(signed["size_plans"][rid],fixture,observed_unix=row["source_clock"]["unix_timestamp"])
+    expected={(rid,amount) for rid,plan in plans.items() for amount in plan["signed_amounts"]}
     attempts=[(a["id"],a["amount"]) for a in signed["attempts"]]
     if len(attempts)!=len(set(attempts)) or set(attempts)!=expected:
         raise ValueError("missing or duplicate signed size attempt")
@@ -573,6 +593,10 @@ def audit(source_dir,signed_dir):
             report["audited"]+=1
         except (ValueError,RuntimeError,KeyError,TypeError,OSError) as exc:
             item.update(error_class=type(exc).__name__,diagnostic=str(exc)[:300])
+    report["size_plan_recomputed_count"]=len(plans)
+    report["size_plans"]=plans
+    report["modeled_grid_sample_count"]=sum(len(p["samples"]) for p in plans.values())
+    report["positive_modeled_net_grid_samples"]=sum(p["positive_estimated_net_count"] for p in plans.values())
     report["native_pricing_summary"]=pricing_summary(report["attempts"])
     report["estimated_economics_by_input"]=rank_estimated_economics(report["attempts"])
     write(root/"multihop-audit.json",report)

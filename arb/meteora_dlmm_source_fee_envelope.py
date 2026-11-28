@@ -44,19 +44,27 @@ def quote_fee_envelope(fixture, *, pool, mint_in, amount_in, observed_unix,
         return {"status":"SOURCE_NATIVE_DLMM_BIN_ARRAY_BLOCKED",
                 "pool":pool,"source_slot":fixture["state_accounts_observed_slot"],
                 "missing_arrays":missing,"protocol_exact_verified":False,**SAFE}
-    selection=directional_bins(arrays,active_id=active,x_to_y=direction)
+    selection=directional_bins(arrays,active_id=active,x_to_y=direction,maximum_bins=maximum_arrays*70)
     bins=selection["bins"]
     rates=fee_bounds_from_fixture(fixture,pool=pool,observed_unix=observed_unix)
     mode=rates["static"]["collect_fee_mode"]
     if mode not in (0,1):
         raise ValueError("unsupported DLMM fee collection mode")
     fee_on_input=(mode==0 or not direction)
+    import base64
+    raw=base64.b64decode(fixture["accounts"][pool]["data"][0],validate=True)
+    function_type=rates["static"]["function_type"]
+    if function_type not in (0,1,2):
+        raise ValueError("unsupported DLMM function type")
+    # SDK: Undetermined supports limit orders only with no reward mints.
+    limit_order_support=function_type==2 or (function_type==0 and not any(raw[264:296]+raw[408:440]))
     outcomes=[]
     for name,rate in (("minimum_effective_fee",rates["minimum_total_fee_rate_numerator"]),
                       ("maximum_effective_fee",rates["maximum_total_fee_rate_numerator"])):
         try:
             priced=quote_bins(amount_in=amount_in,swap_x_for_y=direction,bins=bins,
-                              total_fee_rate=rate,max_bins=70,fee_on_input=fee_on_input)
+                              total_fee_rate=rate,max_bins=maximum_arrays*70,fee_on_input=fee_on_input,
+                              limit_order_support=limit_order_support)
             outcomes.append({"fee_bound":name,"fee_rate_numerator":rate,
                              "amount_out":priced["amount_out"],
                              "fee_input_base_units":priced["fee_input_base_units"],
@@ -87,8 +95,8 @@ def quote_fee_envelope(fixture, *, pool, mint_in, amount_in, observed_unix,
             enriched=[{**b,"effective_fee_rate":rate["effective_fee_rate"]}
                       for b,rate in zip(bins,schedule["rates"])]
             native=quote_bins(amount_in=amount_in,swap_x_for_y=direction,
-                bins=enriched,total_fee_rate=rates["base_fee_rate_numerator"],max_bins=70,
-                fee_on_input=fee_on_input)
+                bins=enriched,total_fee_rate=rates["base_fee_rate_numerator"],max_bins=maximum_arrays*70,
+                fee_on_input=fee_on_input,limit_order_support=limit_order_support)
             effective={"status":"SOURCE_VOLATILITY_DYNAMIC_FEE_MODELED",
                 "amount_out":native["amount_out"],
                 "fee_input_base_units":native["fee_input_base_units"],
@@ -119,6 +127,7 @@ def quote_fee_envelope(fixture, *, pool, mint_in, amount_in, observed_unix,
             "fee_precision":FEE_PRECISION,"fee_on_input":fee_on_input,
             "liquidity_scope":"MARKET_MAKER_BINS_ONLY",
             "limit_order_liquidity_modeled":False,
+            "source_limit_order_support":limit_order_support,
             "effective_fee_verified":False,
             "full_route_quoted":False,
             "protocol_exact_verified":False,

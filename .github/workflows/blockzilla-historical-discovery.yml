@@ -27,6 +27,8 @@ on:
       - "arb/blockzilla_pair_trials.py"
       - "arb/blockzilla_pair_evidence.py"
       - "arb/blockzilla_multihop.py"
+      - "arb/blockzilla_size_plan.py"
+      - "arb/meteora_dlmm_source_bin_decoder.py"
       - "arb/pumpswap_source_fee_envelope.py"
       - "arb/pumpswap_signed_event_audit.py"
       - "arb/meteora_dlmm_signed_event_audit.py"
@@ -343,7 +345,7 @@ jobs:
   isolated-multihop-offline:
     needs: [source-authentication, evidence-gate]
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     env:
       SURFPOOL_EXPLICITLY_OFFLINE: "1"
       SURFPOOL_DATASOURCE_RPC_URL: ""
@@ -354,6 +356,8 @@ jobs:
       - run: |
           bash ci/install_surfpool.sh
           python3 -m pip install --disable-pip-version-check solders==0.26.0
+      - name: Build official DAMM SDK for pre-sign native sizing (no RPC credentials)
+        run: bash ci/build_meteora_damm_v2_reference.sh "$RUNNER_TEMP/damm-sdk-sizing"
       - uses: actions/download-artifact@v4
         with:
           name: blockzilla-multihop-source
@@ -382,6 +386,13 @@ jobs:
           path: |
             ${{ runner.temp }}/blockzilla-multihop/multihop-signed.json
             ${{ runner.temp }}/blockzilla-multihop/*-receipt.json
+          if-no-files-found: warn
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: blockzilla-damm-sdk-sizing-build
+          path: ${{ runner.temp }}/damm-sdk-sizing/
           if-no-files-found: warn
           retention-days: 7
   independent-multihop-evidence:
