@@ -16,7 +16,11 @@ MAX_POOLS=200
 MAX_CYCLES=2000
 
 def cycles(pools,anchors=None,max_hops=MAX_HOPS,max_cycles=MAX_CYCLES,truncate=False,min_hops=2,hint_only=False,required_first_pool=None,
-           max_edge_visits=None,search_stats=None):
+           max_edge_visits=None,search_stats=None,venue_priority=None):
+    if venue_priority is not None and (not isinstance(venue_priority,dict)
+            or set(venue_priority)!=set(TARGET_VENUES)
+            or any(type(v) is not int or not 0<=v<=100 for v in venue_priority.values())):
+        raise ValueError("invalid venue traversal priorities")
     if max_edge_visits is not None and (type(max_edge_visits) is not int or not 1<=max_edge_visits<=2_000_000):
         raise ValueError("invalid graph edge visit budget")
     if search_stats is not None and not isinstance(search_stats,dict):
@@ -48,7 +52,10 @@ def cycles(pools,anchors=None,max_hops=MAX_HOPS,max_cycles=MAX_CYCLES,truncate=F
         for src,dst in ((a,b),(b,a)):
             edges[src].append({"input":src,"output":dst,"venue":venue,"pool":address})
     for token in edges:
-        edges[token].sort(key=lambda e:(e["output"],e["venue"],e["pool"]))
+        if venue_priority is None:
+            edges[token].sort(key=lambda e:(e["output"],e["venue"],e["pool"]))
+        else:
+            edges[token].sort(key=lambda e:(venue_priority[e["venue"]],e["output"],e["venue"],e["pool"]))
     anchors=set(anchors) if anchors is not None else set(edges)
     if not anchors:raise ValueError("empty anchors")
     found=[];identities=set()
@@ -92,7 +99,8 @@ def cycles(pools,anchors=None,max_hops=MAX_HOPS,max_cycles=MAX_CYCLES,truncate=F
         pass
     if search_stats is not None:
         search_stats.update(edge_visits=edge_visits,stop_reason=stop_reason,
-                            complete=stop_reason is None,returned_cycles=len(found))
+                            complete=stop_reason is None,returned_cycles=len(found),
+                            venue_priority_traversal=venue_priority is not None)
     return found
 
 def scan(rpc,registry,extra_pairs=(),anchors=None,max_cycles=MAX_CYCLES):

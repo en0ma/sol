@@ -96,7 +96,7 @@ def select_six_hop_sources(rows,*,cap=2):
     """
     if type(cap) is not int or not 1<=cap<=4:
         raise ValueError("invalid source footprint selection cap")
-    if len(rows)>4 or len({r["id"] for r in rows})!=len(rows):
+    if len(rows)>8 or len({r["id"] for r in rows})!=len(rows):
         raise ValueError("invalid six-hop source inventory")
     def rank(item):
         index,row=item

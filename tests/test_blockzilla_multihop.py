@@ -70,6 +70,34 @@ class MultihopTests(unittest.TestCase):
         self.assertTrue(stats["pool_window_truncated"])
         self.assertEqual(seed_window(rows,rows[0],hops=4)[0],[rows[0]])
 
+    def test_venue_priority_search_avoids_lexicographic_budget_bias(self):
+        from arb.blockzilla_multihop import VENUE_LOCK_PRESSURE
+        a,b,c,d,e=[key() for _ in range(5)]
+        seed={"venue":"meteora_dlmm","address":key(),"mints":[a,b]}
+        rows=[seed,
+            {"venue":"pumpswap","address":key(),"mints":[b,c]},
+            {"venue":"raydium_cpmm","address":key(),"mints":[c,a]},
+            {"venue":"raydium_cpmm","address":key(),"mints":[b,d]},
+            {"venue":"orca","address":key(),"mints":[d,a]}]
+        stats={}
+        found=cycles(rows,anchors=[a],min_hops=3,max_hops=3,max_cycles=1,
+            truncate=True,hint_only=True,required_first_pool=(seed["venue"],seed["address"]),
+            venue_priority=VENUE_LOCK_PRESSURE,search_stats=stats)
+        self.assertEqual(found[0]["legs"][1]["venue"],"raydium_cpmm")
+        self.assertTrue(stats["venue_priority_traversal"])
+        self.assertFalse(found[0]["simulation_verified"])
+        with self.assertRaisesRegex(ValueError,"venue traversal priorities"):
+            cycles(rows,anchors=[a],hint_only=True,venue_priority={"orca":1})
+    def test_light_search_retains_novel_seed_and_strict_six_hops(self):
+        mints=[key() for _ in range(6)]
+        venues=["meteora_dlmm","raydium_cpmm","orca","raydium_cpmm","meteora_damm_v2","raydium_cpmm"]
+        rows=[{"venue":v,"address":key(),"mints":[mints[i],mints[(i+1)%6]]}
+              for i,v in enumerate(venues)]
+        picked,windows=candidate_routes(rows[1:],[{**rows[0],"source_verified_only":True}])
+        self.assertEqual(len(picked[6]),1)
+        self.assertIn("LIGHT_VENUE_PRIORITY",windows[0]["windows_by_hops"]["6"])
+        self.assertEqual(picked[6][0]["hops"],6)
+        self.assertTrue(windows[0]["windows_by_hops"]["6"]["LIGHT_VENUE_PRIORITY"]["venue_priority_traversal"])
     def test_graph_edge_budget_is_explicit(self):
         a,b,c,d=[key() for _ in range(4)]
         rows=[{"venue":"orca","address":key(),"mints":[u,v]}

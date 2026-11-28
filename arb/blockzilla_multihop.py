@@ -22,7 +22,8 @@ from arb.blockzilla_size_plan import CONTROL_AMOUNTS as AMOUNTS, evaluate as siz
 
 MAX_CAPTURE_PER_HOPS=4
 MAX_FOUR_FIVE_CAPTURED=2
-MAX_SIX_HOP_CAPTURE_ATTEMPTS=4
+MAX_SIX_HOP_CAPTURE_ATTEMPTS=8
+ORIGINAL_DIVERSITY_ATTEMPTS=4
 MAX_SIX_HOP_CAPTURED=2
 MAX_PUMP_CAPTURED=2
 MAX_PUMP_CAPTURE_ATTEMPTS=4
@@ -107,8 +108,15 @@ def candidate_routes(baseline,new_pools):
             # window. A result cap in the normal window must not starve
             # alternatives that do not depend on missing Whirlpool arrays.
             variants=[("ALL_VENUES",all_rows)]
-            if hops==6 and seed["venue"]!="orca":
-                variants.append(("NO_ORCA",[p for p in all_rows if p["venue"]!="orca"]))
+            if hops==6:
+                if seed["venue"]!="orca":
+                    variants.append(("NO_ORCA",[p for p in all_rows if p["venue"]!="orca"]))
+                # Independent bounded traversal prevents lexicographic
+                # cycle caps from exhausting the low-pressure candidates.
+                # Keep the seed even if its own venue is expensive.
+                light={"raydium_cpmm","orca","meteora_damm_v2"}|{seed["venue"]}
+                variants.append(("LIGHT_VENUE_PRIORITY",[p for p in all_rows if p["venue"] in light]))
+                variants.append(("ALL_VENUE_PRIORITY",all_rows))
             stats["windows_by_hops"][str(hops)]={}
             stats["cycle_counts_by_hops"][str(hops)]=0
             stats["cycle_limit_reached_by_hops"][str(hops)]=False
@@ -118,7 +126,8 @@ def candidate_routes(baseline,new_pools):
                 paths=cycles(window,anchors=anchors,max_hops=hops,min_hops=hops,
                              max_cycles=MAX_GRAPH_CYCLES,truncate=True,hint_only=True,
                              required_first_pool=(seed["venue"],seed["address"]),
-                             max_edge_visits=MAX_EDGE_VISITS,search_stats=search)
+                             max_edge_visits=MAX_EDGE_VISITS,search_stats=search,
+                             venue_priority=VENUE_LOCK_PRESSURE if label.endswith("PRIORITY") else None)
                 stats["windows_by_hops"][str(hops)][label]={**window_stats,**search}
                 stats["cycle_counts_by_hops"][str(hops)]+=len(paths)
                 stats["cycle_limit_reached_by_hops"][str(hops)] |= search["stop_reason"]=="CYCLE_LIMIT"
@@ -179,7 +188,10 @@ def diverse_candidates(rows,new,*,hops):
             if not chosen:
                 return (rank,)
             if hops==6:
-                return (no_orca_penalty,orca,overlap,rank)
+                if len(chosen)<ORIGINAL_DIVERSITY_ATTEMPTS:
+                    return (no_orca_penalty,orca,overlap,rank)
+                pressure=sum(VENUE_LOCK_PRESSURE[l["venue"]] for l in row["legs"])
+                return (pressure,overlap,orca,rank)
             # A second 4/5-hop fixture should explore other dependencies,
             # rather than merely repeating the original seed's bridge.
             return (overlap,rank)
@@ -297,6 +309,7 @@ def prepare(rpc, evidence_dir, directory, baseline, route):
                 "4":MAX_FOUR_FIVE_CAPTURED,"5":MAX_FOUR_FIVE_CAPTURED,"6":MAX_SIX_HOP_CAPTURED},**SAFE}
     from arb.blockzilla_source_footprint import source_footprint,select_six_hop_sources
     six_candidates=[]
+    venue_cache={}
     for hops, rows in choices.items():
         captured_for_hops=0
         cap=MAX_SIX_HOP_CAPTURED if hops==6 else MAX_PUMP_CAPTURED if hops==3 else MAX_FOUR_FIVE_CAPTURED
@@ -309,7 +322,7 @@ def prepare(rpc, evidence_dir, directory, baseline, route):
             try:
                 path=root/(item["id"]+"-fixture.json")
                 capture(rpc,{"status":"BLOCKZILLA_HINT_GRAPH_ONLY","routes":[row],**SAFE},
-                        0,path,allow_hint_graph=True)
+                        0,path,allow_hint_graph=True,venue_cache=venue_cache)
                 fixture=json.loads(path.read_text())
                 fixture_identity(fixture,item)
                 clock=source_clock(rpc);item["source_clock"]=clock
@@ -333,6 +346,9 @@ def prepare(rpc, evidence_dir, directory, baseline, route):
                 item["quote_sha256"]=digest(quote_path.read_bytes())
                 if hops!=6 and captured_for_hops>=cap:
                     break
+                if hops==6 and sum((c["source_account_footprint"].get("within_preferred_key_budget") is True)
+                        for c in six_candidates)>=cap:
+                    break
             except (ValueError,RuntimeError,KeyError,TypeError,OSError) as exc:
                 item.update(error_class=type(exc).__name__,diagnostic=str(exc)[:300])
                 if hops==6 and item["capture_status"]=="CAPTURED" and item not in six_candidates:
@@ -353,6 +369,9 @@ def prepare(rpc, evidence_dir, directory, baseline, route):
             item["capture_status"]="CAPTURED_NOT_SELECTED_FOOTPRINT"
             report["source_captured"]-=1
     report["source_footprint_deferred_count"]=len(six_candidates)-len(chosen)
+    report["source_cached_distinct_pool_directions"]=len(venue_cache)
+    report["six_hop_preferred_footprint_count"]=sum(
+        c["source_account_footprint"].get("within_preferred_key_budget") is True for c in six_candidates)
     write(root/"multihop-source.json",report)
     return report
 

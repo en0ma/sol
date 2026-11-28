@@ -337,3 +337,5 @@ Primary capture retains the first fixture per starting mint and may defer redund
 Ordinary noncanonical creator-free WSOL PumpSwap flat-fee scenarios may enter the preselected research model only with authenticated mode and fee selection. Preserve separate source and execution-time Orca samples. Rejected lock-limit messages require signed packet and ALT readback recheck, never successful execution or rollback evidence.
 
 For six-hop archive selection reuse existing builders to compile unsigned source-bound account unions with distinct public placeholders. Prefer a bounded research key budget without treating estimates as runtime proof; retain deferred authenticated candidates and recompute selection independently. Preserve source versus execution-clock native leg counts.
+
+Six-hop candidate search may use separate low-pressure venue-prioritized graph windows, preserving original traversal defaults and per-window bounds. Capture up to eight alternatives but keep at most two selected and stop early when two preferred source footprints are available. Reauthenticate contextual source accounts despite reuse of direction-specific discovery metadata.
