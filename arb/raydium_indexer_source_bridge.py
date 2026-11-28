@@ -23,9 +23,10 @@ def discover(rpc,entries,*,pages=3,page_size=100,maximum_verify=48,
     """Return authenticated source-pool additions, ordered by topology gain."""
     local_rpc_only(rpc)
     if (not isinstance(entries,list)
-            or type(pages)is not int or not 1<=pages<=10
+            or type(pages)is not int or not 1<=pages<=20
             or type(page_size)is not int or not 1<=page_size<=100
-            or type(maximum_verify)is not int or not 1<=maximum_verify<=96):
+            or (maximum_verify is not None and (type(maximum_verify)is not int
+                or not 1<=maximum_verify<=96))):
         raise ValueError("invalid bounded Raydium indexer discovery budget")
     known={(e["venue"],e["address"]) for e in entries}
     index=index_fn or api_candidate_addresses
@@ -92,8 +93,8 @@ def discover(rpc,entries,*,pages=3,page_size=100,maximum_verify=48,
     priorities=[]
     complementary_addresses=0
     for address,state,a,b in source_candidates:
-        edge={"venue":"raydium_cpmm","address":address,"mints":[a,b]}
-        gained=set(topology(entries+[edge])["three_hop_start_mints"])-before
+        common=old_neighbors.get(a,set())&old_neighbors.get(b,set())
+        gained=({a,b}|common)-before if common else set()
         # Count eligible triangle participants, not an unverified pool as
         # proof. A complementary edge needs a separate source verification.
         potential=set()
@@ -139,7 +140,10 @@ def discover(rpc,entries,*,pages=3,page_size=100,maximum_verify=48,
             "complementary_edge_candidates":complementary_addresses,
             "complementary_edge_priority_policy":
                 "DIRECT_TRIANGLE_GAIN_THEN_TWO_EDGE_POTENTIAL_THEN_NEW_PAIR",
-            "source_verification_attempts":min(len(priorities),maximum_verify),
+            "source_verification_attempts":len(priorities[:maximum_verify]),
+            "source_verification_pool_limit":maximum_verify,
+            "unattempted_decoded_pool_count":len(priorities)-len(priorities[:maximum_verify]),
+            "requested_index_pages":pages,
             "source_verification_failures":failures,
             "invalid_source_account_count":invalid_source,
             "verified_new_pool_count":len(selected),

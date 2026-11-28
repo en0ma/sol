@@ -31,7 +31,7 @@ def indexed_json(url):
                 raise
             time.sleep(min(8,2**attempt))
 
-def token_pairs(mint,known_mints):
+def token_pairs(mint,known_mints,*,limit=30):
     """Discover additional liquidity for existing connected tokens via DEX Screener."""
     from urllib.parse import quote
     url="https://api.dexscreener.com/token-pairs/v1/solana/"+quote(mint,safe="")
@@ -51,7 +51,7 @@ def token_pairs(mint,known_mints):
         result.append({"address":address,"liquidity_usd":liquidity,
                        "both_known":base in known_mints and quote_mint in known_mints})
     result.sort(key=lambda row:(row["both_known"],row["liquidity_usd"]),reverse=True)
-    return result[:30]
+    return result[:limit]
 
 def top_page(page,feed="volume"):
     from urllib.parse import urlencode
@@ -70,9 +70,21 @@ def top_page(page,feed="volume"):
                            "index_page":page})
     return result
 
-def campaign(rpc,entries,*,target=150,max_add=200,max_pages=10,pace=0.5):
-    if not (1<=target<=max_add<=200 and 1<=max_pages<=100 and 0<=pace<=5):
+def campaign(rpc,entries,*,target=150,max_add=200,max_pages=10,pace=0.5,
+             all_discovered=False,secondary_mint_limit=100,deadline=None):
+    if (type(all_discovered) is not bool or not 1<=max_pages<=100 or not 0<=pace<=5
+            or (not all_discovered and not 1<=target<=max_add<=200)
+            or (secondary_mint_limit is not None and (type(secondary_mint_limit) is not int
+                or secondary_mint_limit<0))
+            or (deadline is not None and not isinstance(deadline,(int,float)))):
         raise ValueError("invalid campaign bounds")
+    if all_discovered:
+        from arb.pumpswap_local_simulation import local_rpc_only
+        local_rpc_only(rpc)
+    def pool_limit_reached():
+        return not all_discovered and (len(new)>=target or len(new)>=max_add or len(old)>=400)
+    def expired():
+        return deadline is not None and time.monotonic()>=deadline
     old={(e["venue"],e["address"]):e for e in entries}
     seen_addresses={e["address"] for e in entries}
     known_mints={m for e in entries for m in e.get("mints",[])}
@@ -81,11 +93,14 @@ def campaign(rpc,entries,*,target=150,max_add=200,max_pages=10,pace=0.5):
     stop="PAGE_LIMIT"
     blocked_feeds=set()
     for index in range(min(max_pages,len(FEEDS)*PUBLIC_MAX_PAGE)):
+        if expired():
+            stop="TIME_BUDGET_REACHED"
+            break
         feed,_,_=FEEDS[index//PUBLIC_MAX_PAGE]
         page=index%PUBLIC_MAX_PAGE+1
         if feed in blocked_feeds:
             continue
-        if len(new)>=target or len(old)>=400:
+        if pool_limit_reached():
             stop="TARGET_REACHED" if len(new)>=target else "REGISTRY_CAP"
             break
         try:
@@ -99,6 +114,9 @@ def campaign(rpc,entries,*,target=150,max_add=200,max_pages=10,pace=0.5):
             continue
         attempted=0
         for candidate in candidates:
+            if expired():
+                stop="TIME_BUDGET_REACHED"
+                break
             address=candidate["address"]
             if address in seen_addresses or address in seen_index:
                 continue
@@ -128,7 +146,7 @@ def campaign(rpc,entries,*,target=150,max_add=200,max_pages=10,pace=0.5):
                     stop="SOURCE_RATE_LIMITED"
                     break
             if pace:time.sleep(pace)
-            if len(new)>=target or len(new)>=max_add or len(old)>=400:
+            if pool_limit_reached():
                 stop="TARGET_REACHED" if len(new)>=target else "REGISTRY_CAP"
                 break
         pages.append({"feed":feed,"page":page,"listed":len(candidates),"new_candidates_checked":attempted,
@@ -138,7 +156,7 @@ def campaign(rpc,entries,*,target=150,max_add=200,max_pages=10,pace=0.5):
 
     # Secondary discovery: additional pools for already-connected, active mints.
     # A mint's venue diversity is a useful proxy for potential arbitrage cycles.
-    if stop=="PAGE_LIMIT" and len(new)<target and len(old)<400:
+    if stop=="PAGE_LIMIT" and not pool_limit_reached() and not expired():
         hub_mints={"So11111111111111111111111111111111111111112",
                    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"}
         mint_venues={}
@@ -150,11 +168,15 @@ def campaign(rpc,entries,*,target=150,max_add=200,max_pages=10,pace=0.5):
         prioritized=sorted((mint for mint in known_mints if mint not in hub_mints),
             key=lambda m:(len(mint_venues.get(m,())),mint_degree[m],m),reverse=True)
         # Cap API usage; untrusted indexed rankings are never verification evidence.
-        for position,mint in enumerate(prioritized[:100]):
-            if len(new)>=target or len(old)>=400 or stop!="PAGE_LIMIT":
+        for position,mint in enumerate(prioritized[:secondary_mint_limit]):
+            if expired():
+                stop="TIME_BUDGET_REACHED"
+                break
+            if pool_limit_reached() or stop!="PAGE_LIMIT":
                 break
             try:
-                candidates=token_pairs(mint,known_mints)
+                candidates=(token_pairs(mint,known_mints,limit=None) if all_discovered
+                            else token_pairs(mint,known_mints))
             except Exception as exc:
                 errors.append({"feed":"dexscreener_token_pairs","mint":mint,
                                "stage":"INDEX","error":repr(exc)[:220]})
@@ -164,6 +186,9 @@ def campaign(rpc,entries,*,target=150,max_add=200,max_pages=10,pace=0.5):
                 continue
             attempted=0
             for candidate in candidates:
+                if expired():
+                    stop="TIME_BUDGET_REACHED"
+                    break
                 address=candidate["address"]
                 if address in seen_addresses or address in seen_index:
                     continue
@@ -192,7 +217,7 @@ def campaign(rpc,entries,*,target=150,max_add=200,max_pages=10,pace=0.5):
                         stop="SOURCE_RATE_LIMITED"
                         break
                 if pace:time.sleep(pace)
-                if len(new)>=target or len(old)>=400:
+                if pool_limit_reached():
                     stop="TARGET_REACHED" if len(new)>=target else "REGISTRY_CAP"
                     break
             pages.append({"feed":"dexscreener_token_pairs","mint":mint,"page":position+1,
@@ -200,11 +225,15 @@ def campaign(rpc,entries,*,target=150,max_add=200,max_pages=10,pace=0.5):
                           "total_authenticated_new":len(new)})
             if pace:time.sleep(pace)
 
-    if stop=="PAGE_LIMIT":stop="INDEX_FEEDS_EXHAUSTED"
+    if stop=="PAGE_LIMIT":
+        stop="CONFIGURED_INDEX_SEARCH_COMPLETED" if all_discovered else "INDEX_FEEDS_EXHAUSTED"
     all_pools=list(old.values())
     after_mints={m for p in all_pools for m in p.get("mints",[])}
-    return {"status":"COMPLETE" if len(new)>=target else "PARTIAL",
-            "stop_reason":stop,"target_new_pools":target,
+    return {"status":("COMPLETE" if stop=="CONFIGURED_INDEX_SEARCH_COMPLETED" and not errors
+                else "PARTIAL") if all_discovered else ("COMPLETE" if len(new)>=target else "PARTIAL"),
+            "stop_reason":stop,"target_new_pools":None if all_discovered else target,
+            "pool_count_limit":None if all_discovered else max_add,
+            "configured_feed_page_budget":max_pages,"secondary_mint_limit":secondary_mint_limit,
             "authenticated_new_pool_count":len(new),
             "existing_pool_count":len(entries),"candidate_registry_pool_count":len(all_pools),
             "new_token_mints":sorted(after_mints-known_mints),

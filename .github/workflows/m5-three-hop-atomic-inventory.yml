@@ -4,6 +4,10 @@ on:
     paths:
       - ".github/workflows/m5-three-hop-atomic-inventory.yml"
       - "arb/m5_three_hop_atomic_inventory.py"
+      - "arb/opportunity_graph.py"
+      - "arb/m5_registry_capacity.py"
+      - "arb/paginated_top_pool_discovery.py"
+      - "arb/raydium_indexer_source_bridge.py"
       - "arb/m5_source_indicative_route_chain.py"
       - "arb/m5_signed_start_mint_economics.py"
       - "arb/fixture_all_venue_signed_quotes.py"
@@ -25,6 +29,19 @@ on:
       - "arb/m5_four_to_six_source_capture.py"
       - "arb/next_ten_signed_atomic_offline.py"
   workflow_dispatch:
+    inputs:
+      raydium_index_pages:
+        description: "Raydium CPMM pages (1–20; all returned decoded pools verified)"
+        default: "10"
+        type: string
+      meteora_index_pages:
+        description: "Meteora pages per venue (1–20; all returned decoded pools verified)"
+        default: "8"
+        type: string
+      cross_venue_index_minutes:
+        description: "Additional public-index exploration time in minutes"
+        default: "20"
+        type: string
 permissions:
   contents: read
 concurrency:
@@ -49,8 +66,11 @@ jobs:
   source-preparation:
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
-    timeout-minutes: 55
+    timeout-minutes: 240
     env:
+      RAYDIUM_INDEX_PAGES: ${{ inputs.raydium_index_pages || '10' }}
+      METEORA_INDEX_PAGES: ${{ inputs.meteora_index_pages || '8' }}
+      CROSS_VENUE_INDEX_MINUTES: ${{ inputs.cross_venue_index_minutes || '20' }}
       SURFPOOL_DATASOURCE_RPC_URL: ${{ secrets.SOLANA_MAINNET_RPC_URL }}
       # Optional independent GPA-capable endpoint; candidate addresses must
       # still be reauthenticated against the locally source-backed fork.
@@ -83,7 +103,7 @@ jobs:
           else:
               raise SystemExit("source fork unavailable")
           PY
-      - name: Discover and capture 140 preflight-valid cycles from up to 200 candidates
+      - name: Discover all authenticated pools within index and runtime budgets, then capture 140 controls
         run: |
           python3 - <<'PY'
           import json,os
@@ -103,8 +123,6 @@ jobs:
           (root/"source-bridge-discovery.json").write_text(json.dumps(expansion,indent=2)+"\n")
           new=[{"venue":p["venue"],"address":p["address"],"mints":p["mints"]}
                for p in expansion["source_verified_new_pools"]]
-          if len(registry["pools"])+len(new)>768:
-              raise ValueError("source-discovered pool identities exceed bounded 768 registry limit")
           registry["pools"].extend(new)
           # A second, bounded source-authenticated discovery pass searches
           # missing bridge edges in other venues, not more permutations of
@@ -116,8 +134,8 @@ jobs:
           (root/"multi-venue-bridge-discovery.json").write_text(
               json.dumps(multi,indent=2)+"\n")
           other=multi["source_verified_new_pools"]
-          available=max(0,768-len(registry["pools"]))
-          registry["pools"].extend(other[:available])
+          registry["pools"].extend(other)
+          available=len(other)
           # Fill remaining source-pool budget using deterministic PDAs for
           # missing non-hub edges, without invoking rate-limited GPA search.
           nonhub=nonhub_orca_bridge_scout(
@@ -125,8 +143,8 @@ jobs:
           (root/"nonhub-orca-bridge-discovery.json").write_text(
               json.dumps(nonhub,indent=2)+"\n")
           extra=nonhub["source_verified_new_pools"]
-          room=max(0,768-len(registry["pools"]))
-          registry["pools"].extend(extra[:room])
+          registry["pools"].extend(extra)
+          room=len(extra)
           # Raydium CPMM supports a source-derived subset of deterministic
           # pool-state PDAs. Direct account reads bypass restricted GPA.
           from arb.raydium_cpmm_pda_bridge import discover as cpmm_pda_discover
@@ -139,20 +157,21 @@ jobs:
           (root/"raydium-cpmm-pda-bridge-discovery.json").write_text(
               json.dumps(cpmm_pdas,indent=2)+"\n")
           cpmm_new=cpmm_pdas["source_verified_new_pools"]
-          cpmm_room=max(0,768-len(registry["pools"]))
-          registry["pools"].extend(cpmm_new[:cpmm_room])
+          registry["pools"].extend(cpmm_new)
+          cpmm_room=len(cpmm_new)
           # Raydium pool state may also use an arbitrary signer address.
           # Treat Raydium's indexer as UNTRUSTED address hints only; every
           # candidate is decoded and vault-verified on the local source fork.
           from arb.raydium_indexer_source_bridge import discover as indexed_cpmm
           indexed=indexed_cpmm(
-              rpc,registry["pools"],pages=5,page_size=100,maximum_verify=80)
+              rpc,registry["pools"],pages=int(os.environ["RAYDIUM_INDEX_PAGES"]),
+              page_size=100,maximum_verify=None)
           (root/"raydium-indexed-source-bridge.json").write_text(
               json.dumps(indexed,indent=2)+"\n")
           indexed_new=indexed["source_verified_new_pools"]
-          from arb.m5_registry_capacity import admit,MAX_REGISTRY_POOLS
+          from arb.m5_registry_capacity import admit
           index_admission=admit(
-              registry["pools"],indexed_new,maximum=MAX_REGISTRY_POOLS)
+              registry["pools"],indexed_new,maximum=None)
           registry["pools"].extend(index_admission["admitted"])
           index_room=index_admission["admitted_count"]
           # Meteora's paginated Data APIs provide untrusted pool addresses;
@@ -162,14 +181,14 @@ jobs:
           # Proven control: four TVL pages per venue. Newest-pool hints
           # must never consume its 48 authenticated verification slots.
           meteora=indexed_meteora(
-              rpc,registry["pools"],pages=4,page_size=100,
-              maximum_verify_per_venue=48,
+              rpc,registry["pools"],pages=int(os.environ["METEORA_INDEX_PAGES"]),page_size=100,
+              maximum_verify_per_venue=None,
               sort_orders=("tvl:desc",))
           (root/"meteora-indexed-source-bridge.json").write_text(
               json.dumps(meteora,indent=2)+"\n")
           meteora_admission=admit(
               registry["pools"],meteora["source_verified_new_pools"],
-              maximum=MAX_REGISTRY_POOLS)
+              maximum=None)
           registry["pools"].extend(meteora_admission["admitted"])
           # Separate candidate experiment: check only NEW recent-pool
           # identities and record incremental topology. Do not admit these
@@ -196,14 +215,30 @@ jobs:
           assert recent_audit["admitted_to_primary_graph"] is False
           assert recent_audit["signed_simulation_verified"] is False
           assert recent_audit.get("source_capture_verified") is not True
+          # Additional all-venue public index feeds, including PumpSwap,
+          # Orca, AMM v4 and CLMM. Never treat public metadata as source proof.
+          import time
+          from arb.paginated_top_pool_discovery import campaign
+          minutes=int(os.environ["CROSS_VENUE_INDEX_MINUTES"])
+          if not 1<=minutes<=60:
+              raise ValueError("cross-venue index time budget must be 1..60 minutes")
+          broad=campaign(rpc,registry["pools"],all_discovered=True,max_pages=50,
+              secondary_mint_limit=None,deadline=time.monotonic()+minutes*60)
+          (root/"all-venue-public-source-discovery.json").write_text(json.dumps(broad,indent=2)+"\n")
+          broad_rows=[{**row,"source_verified_slot":row["source_slot"],"source_verified_only":True}
+                      for row in broad["new_verified_pools"]]
+          broad_admission=admit(registry["pools"],broad_rows,maximum=None)
+          registry["pools"].extend(broad_admission["admitted"])
+          (root/"expanded-pool-inventory.json").write_text(json.dumps(registry,indent=2)+"\n")
           graph=diversified_three_hop_graph(probe(rpc,registry,
                         batch=tuple((a,b) for a in ORDER for b in ORDER if a!=b),
-                        maximum_per_venue=48,
+                        maximum_per_venue=None,
                         require_dlmm_swap_eligible=True,
                         prefer_start_mint_coverage=True,historical_recovery=True),
-                        maximum=200,allow_start_rotations=True,recovery_ordering=True)
+                        maximum=max(200,3*topology(registry["pools"])["three_hop_start_mint_count"]),
+                        allow_start_rotations=True,recovery_ordering=True)
           graph["source_bridge_discovery"]={
-              "new_verified_pool_identities":len(new)+min(len(other),available)+min(len(extra),room)+min(len(cpmm_new),cpmm_room)+index_admission["admitted_count"]+meteora_admission["admitted_count"],
+              "new_verified_pool_identities":len(new)+min(len(other),available)+min(len(extra),room)+min(len(cpmm_new),cpmm_room)+index_admission["admitted_count"]+meteora_admission["admitted_count"]+broad_admission["admitted_count"],
               "meteora_indexed_source_verified_new_pools":meteora_admission["admitted_count"],
               "meteora_indexed_unadmitted_verified_pools":meteora_admission["unadmitted_count"],
               "meteora_indexer_venue_reports":meteora["venue_reports"],
@@ -223,7 +258,12 @@ jobs:
               "raydium_indexer_source_checked":indexed["source_accounts_checked"],
               "raydium_indexer_verified_new_pools":index_admission["admitted_count"],
               "raydium_indexer_unadmitted_verified_pools":index_admission["unadmitted_count"],
-              "registry_capacity":MAX_REGISTRY_POOLS,
+              "registry_capacity":None,
+              "all_venue_public_index_verified_new_pools":broad_admission["admitted_count"],
+              "all_venue_public_index_stop_reason":broad["stop_reason"],
+              "all_venue_public_index_pages_examined":len(broad["pages"]),
+              "all_venue_public_index_errors":len(broad["errors"]),
+              "pool_count_boundary_removed":True,
               "raydium_indexer_new_topology_starts":len(indexed["additional_topology_start_mints"]),
               "raydium_cpmm_pda_verified_new_pools":min(len(cpmm_new),cpmm_room),
               "raydium_cpmm_pda_pairs_searched":cpmm_pdas["pairs_searched"],

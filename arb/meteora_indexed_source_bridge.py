@@ -33,13 +33,13 @@ def indexed_addresses(venue,*,pages=4,page_size=100,
     Each sort can explore a different population of pools. A malformed
     page fails closed rather than silently asserting a complete search.
     """
-    if (venue not in HOSTS or type(pages)is not int or not 1<=pages<=5
+    if (venue not in HOSTS or type(pages)is not int or not 1<=pages<=20
             or type(page_size)is not int or not 1<=page_size<=200
             or not isinstance(sort_orders,(tuple,list))
             or not 1<=len(sort_orders)<=3
             or len(set(sort_orders))!=len(sort_orders)
             or any(order not in ALLOWED_SORT_ORDERS for order in sort_orders)
-            or pages*len(sort_orders)>8):
+            or pages*len(sort_orders)>60):
         raise ValueError("invalid bounded Meteora indexer search")
     out=[]
     seen=set()
@@ -78,15 +78,15 @@ def discover(rpc,entries,*,venues=("meteora_damm_v2","meteora_dlmm"),
     if (not isinstance(entries,list) or not isinstance(venues,(list,tuple))
             or not venues or len(set(venues))!=len(venues)
             or any(v not in HOSTS for v in venues)
-            or type(pages)is not int or not 1<=pages<=5
+            or type(pages)is not int or not 1<=pages<=20
             or type(page_size)is not int or not 1<=page_size<=200
-            or type(maximum_verify_per_venue)is not int
-            or not 1<=maximum_verify_per_venue<=64
+            or (maximum_verify_per_venue is not None and
+                (type(maximum_verify_per_venue)is not int or not 1<=maximum_verify_per_venue<=64))
             or not isinstance(sort_orders,(tuple,list))
             or not 1<=len(sort_orders)<=3
             or len(set(sort_orders))!=len(sort_orders)
             or any(order not in ALLOWED_SORT_ORDERS for order in sort_orders)
-            or pages*len(sort_orders)>8):
+            or pages*len(sort_orders)>60):
         raise ValueError("invalid bounded Meteora discovery")
     index=index_fn or indexed_addresses
     fetch=call_fn or call
@@ -154,9 +154,8 @@ def discover(rpc,entries,*,venues=("meteora_damm_v2","meteora_dlmm"),
         candidate_pairs={frozenset((a,b)) for _,_,a,b in decoded}
         priorities=[]
         for address,state,a,b in decoded:
-            edge={"venue":venue,"address":address,"mints":[a,b]}
-            immediate=len(set(topology(current_entries+[edge])[
-                "three_hop_start_mints"])-current_starts)
+            common=neighbors.get(a,set())&neighbors.get(b,set())
+            immediate=len(({a,b}|common)-current_starts) if common else 0
             potential=set()
             for c in neighbors.get(a,()):
                 if c!=b and frozenset((b,c)) in candidate_pairs:
@@ -194,8 +193,10 @@ def discover(rpc,entries,*,venues=("meteora_damm_v2","meteora_dlmm"),
             "source_accounts_checked":len(addresses),
             "decoded_pool_candidates":len(decoded),
             "invalid_source_accounts":invalid,
-            "source_verification_attempts":min(
-                maximum_verify_per_venue,len(priorities)),
+            "source_verification_attempts":len(priorities[:maximum_verify_per_venue]),
+            "source_verification_pool_limit":maximum_verify_per_venue,
+            "unattempted_decoded_pool_count":len(priorities)-len(priorities[:maximum_verify_per_venue]),
+            "requested_index_pages_per_sort":pages,
             "source_verification_failures":failed,
             "verified_pools":successes,
             "ranking_prior_verified_venue_pools":len(current_entries)-len(entries),
