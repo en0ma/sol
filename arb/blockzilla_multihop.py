@@ -682,6 +682,13 @@ def audit_signed_core(receipt,fixture,row,amount):
             or len(positive.message.instructions)!=n or len(negative.message.instructions)!=n):
         raise ValueError("negative message context differs")
     programs=[VENUES[v][0] for v in venues]
+    from arb.fixture_quote_execution_pipeline import extract_pool_states
+    from arb.venue_swap_adapter import audit_exact_input_payload
+    source_rows=extract_pool_states(fixture)
+    amounts=receipt["planned_inputs"]
+    if len(amounts)!=n or amounts[0]!=amount:
+        raise ValueError("signed exact input inventory mismatch")
+    payload_audits=[]
     for i,(a,b) in enumerate(zip(positive.message.instructions,negative.message.instructions)):
         metas=[str(keys[k]) for k in a.accounts]
         if (str(keys[a.program_id_index])!=programs[i] or a.program_id_index!=b.program_id_index
@@ -689,6 +696,9 @@ def audit_signed_core(receipt,fixture,row,amount):
                 or not set(accounts[i:i+2])<=set(metas)
                 or (i<n-1 and a.data!=b.data) or (i==n-1 and a.data==b.data)):
             raise ValueError("compiled route or negative instruction mismatch")
+        payload_audits.append(audit_exact_input_payload(venues[i],
+            source_rows[i]["decoded_pool_state"],mints[i],mints[i+1],
+            bytes(a.data),bytes(b.data),amounts[i],final_leg=i==n-1))
     from arb.raydium_clmm_ticks import verify_extended_direction
     for i,proof in enumerate(fixture["leg_evidence_by_index"]):
         aux=proof.get("auxiliary",{})
@@ -737,6 +747,7 @@ def audit_signed_core(receipt,fixture,row,amount):
     return {"status":"N_LEG_PACKET_AND_RECORDED_RESPONSE_RECHECKED",
             "receipt_metadata":metadata,"cpi":cpi,"balances":balances,
             "signed_message_fee_estimate_audit":fee_audit,
+            "exact_input_payload_audits":payload_audits,
             "resolved_account_key_count":len(keys),"positive_post_balances":post,
             "planned_inputs":amounts,"positive_signature":str(positive.signatures[0]),
             "negative_signature":str(negative.signatures[0]),**SAFE}

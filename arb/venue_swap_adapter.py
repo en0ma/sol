@@ -136,3 +136,63 @@ def build_leg(venue,pool,state,evidence,owner,src,dst,
         return build_v2(direction,addresses,amount,floor)
     raise ValueError("unsupported execution venue")
 
+
+
+def audit_exact_input_payload(venue,state,mint_in,mint_out,positive,negative,amount,*,final_leg):
+    """Independently decode supported exact-in ABI and rollback threshold.
+
+    The source state binds the two direction-sensitive instruction encodings.
+    The current N-leg simulator uses threshold 1 on positive instructions
+    and u64::MAX on the final rollback leg. No other payload change is allowed.
+    """
+    import hashlib
+    if (type(amount) is not int or not 0<amount<2**64 or type(final_leg) is not bool
+            or type(positive) is not bytes or type(negative) is not bytes
+            or mint_in==mint_out):
+        raise ValueError("invalid exact-input packet audit inputs")
+    def anchor(name):
+        return hashlib.sha256(("global:"+name).encode()).digest()[:8]
+    suffix=b""
+    if venue=="orca":
+        from arb.whirlpool_swap import MIN_SQRT,MAX_SQRT
+        a,b=state["token_mint_a"],state["token_mint_b"]
+        if (mint_in,mint_out) not in ((a,b),(b,a)):
+            raise ValueError("Orca signed payload mint mismatch")
+        down=mint_in==a
+        prefix=anchor("swap")
+        suffix=(MIN_SQRT if down else MAX_SQRT).to_bytes(16,"little")+bytes([1,down])
+    elif venue=="pumpswap":
+        a,b=state["base_mint"],state["quote_mint"]
+        if (mint_in,mint_out) not in ((a,b),(b,a)):
+            raise ValueError("PumpSwap signed payload mint mismatch")
+        prefix=anchor("sell_v2" if mint_in==a else "buy_exact_quote_in_v2")
+    elif venue=="raydium_cpmm":
+        prefix=anchor("swap_base_input")
+    elif venue=="raydium_clmm":
+        prefix=anchor("swap_v2")
+        suffix=bytes(16)+b"\x01"
+    elif venue=="meteora_damm_v2":
+        prefix=anchor("swap2")
+        suffix=b"\x00"
+    elif venue=="meteora_dlmm":
+        prefix=anchor("swap")
+    elif venue=="raydium_amm_v4":
+        prefix=b"\x09"
+    else:
+        raise ValueError("unsupported exact-input packet audit venue")
+    offset=len(prefix)
+    if (len(positive)!=offset+16+len(suffix) or positive[:offset]!=prefix
+            or positive[offset+16:]!=suffix):
+        raise ValueError("signed exact-input instruction ABI or direction mismatch")
+    actual=int.from_bytes(positive[offset:offset+8],"little")
+    minimum=int.from_bytes(positive[offset+8:offset+16],"little")
+    if actual!=amount or minimum!=1:
+        raise ValueError("signed exact-input amount or positive minimum mismatch")
+    expected_negative=(positive[:offset+8]+b"\xff"*8+positive[offset+16:]
+                       if final_leg else positive)
+    if negative!=expected_negative:
+        raise ValueError("rollback instruction changed more than final output threshold")
+    return {"venue":venue,"input_base_units":actual,"positive_minimum_output":minimum,
+        "negative_minimum_output":2**64-1 if final_leg else minimum,
+        "exact_input_abi_verified":True,"rollback_payload_verified":True,
+        "actionable":False,"broadcast":False,"live_execution_approved":False}

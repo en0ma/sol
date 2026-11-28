@@ -249,4 +249,37 @@ class MultihopTests(unittest.TestCase):
         reserve_receipt_signatures({"signed_transaction_signature":"C",
             "negative_signed_transaction_signature":"D"},seen)
         self.assertEqual(len(seen),4)
+
+class ExactInputPayloadAuditTests(unittest.TestCase):
+    def test_all_seven_venue_payloads_and_adversarial_changes(self):
+        import hashlib
+        from arb.venue_swap_adapter import audit_exact_input_payload
+        from arb.whirlpool_swap import encode_swap,MIN_SQRT
+        from arb.raydium_swap import encode
+        from arb.raydium_clmm_swap import encode as clmm_encode
+        def anchor(s):return hashlib.sha256(("global:"+s).encode()).digest()[:8]
+        amount=123
+        body=amount.to_bytes(8,"little")+(1).to_bytes(8,"little")
+        cases=[
+            ("orca",{"token_mint_a":"a","token_mint_b":"b"},encode_swap(amount,1,MIN_SQRT,True,True)),
+            ("raydium_cpmm",{},encode(amount,1)),
+            ("raydium_clmm",{},clmm_encode(amount,1)),
+            ("meteora_dlmm",{},anchor("swap")+body),
+            ("meteora_damm_v2",{},anchor("swap2")+body+b"\x00"),
+            ("raydium_amm_v4",{},b"\x09"+body),
+            ("pumpswap",{"base_mint":"a","quote_mint":"b"},anchor("sell_v2")+body)]
+        for venue,state,data in cases:
+            offset=1 if venue=="raydium_amm_v4" else 8
+            bad=data[:offset+8]+b"\xff"*8+data[offset+16:]
+            with self.subTest(venue=venue):
+                r=audit_exact_input_payload(venue,state,"a","b",data,bad,amount,final_leg=True)
+                self.assertTrue(r["rollback_payload_verified"])
+                self.assertFalse(r["broadcast"])
+                with self.assertRaises(ValueError):
+                    audit_exact_input_payload(venue,state,"a","b",data,bad,amount+1,final_leg=True)
+                with self.assertRaises(ValueError):
+                    audit_exact_input_payload(venue,state,"a","b",data,bad,amount,final_leg=False)
+                with self.assertRaises(ValueError):
+                    audit_exact_input_payload(venue,state,"a","b",data,bad[:-1]+bytes([bad[-1]^1]),amount,final_leg=True)
+
 if __name__=="__main__":unittest.main()
