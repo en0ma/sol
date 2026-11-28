@@ -595,6 +595,28 @@ def dlmm_bin_array_input_retries(error, venues, amount):
 
 
 
+def dlmm_insufficient_output_input_retries(error, venues, amount):
+    """Independent amount hypotheses for DLMM's observed 6039 prefix error.
+
+    Do not alter the nonzero minimum output, accounts, or rollback gate.
+    The error is not proof of quantization or executable liquidity.
+    """
+    message=str(error)
+    if (not isinstance(error,ValueError)
+            or type(amount) is not int or not 0<amount<2**64
+            or "signed prefix simulation failed" not in message
+            or "Error Code: InsufficientOutAmount." not in message
+            or "Error Number: 6039." not in message):
+        return []
+    context=failed_instruction_context(
+        {"venues":venues,"pools":[""]*len(venues)},message)
+    if (context.get("failed_venue")!="meteora_dlmm"
+            or context.get("program_error_code")!=6039):
+        return []
+    return [candidate for candidate in (amount*10,amount//10)
+            if 0<candidate<2**64 and candidate!=amount]
+
+
 def raydium_amm_v4_slippage_input_retries(error, venues, amount):
     """Bounded larger signed inputs for AMM v4's explicit error 30.
 
@@ -708,6 +730,8 @@ def offline_simulate(rpc,directory,*,amount=100000,shard_index=0,shard_count=1):
                         retry_amounts.extend(zero_output_input_retries(
                             error,row["venues"],amount))
                         retry_amounts.extend(dlmm_bin_array_input_retries(
+                            error,row["venues"],amount))
+                        retry_amounts.extend(dlmm_insufficient_output_input_retries(
                             error,row["venues"],amount))
                         retry_amounts.extend(raydium_amm_v4_slippage_input_retries(
                             error,row["venues"],amount))

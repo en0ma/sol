@@ -395,3 +395,49 @@ class BoundedOfflineOrcaInputTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class DlmmInsufficientOutputRetryTests(unittest.TestCase):
+    report=BoundedOfflineOrcaInputTests.report
+    signed_receipt=BoundedOfflineOrcaInputTests.signed_receipt
+
+    def test_dlmm_6039_requires_exact_venue_log_and_u64(self):
+        from arb.m5_three_hop_atomic_inventory import dlmm_insufficient_output_input_retries as retry
+        msg=("signed prefix simulation failed: "
+             "{'InstructionError': [1, {'Custom': 6039}]}; "
+             "program_log_tail=['Error Code: InsufficientOutAmount. Error Number: 6039.']")
+        venues=["orca","meteora_dlmm","raydium_cpmm"]
+        self.assertEqual(retry(ValueError(msg),venues,100000),[1000000,10000])
+        self.assertEqual(retry(ValueError(msg),venues,2**63),[(2**63)//10])
+        self.assertEqual(retry(ValueError(msg),venues,1),[10])
+        for bad in (msg.replace("InsufficientOutAmount","PoolDisabled"),
+                    msg.replace("6039","6037"),
+                    msg.replace("signed prefix simulation failed","untrusted report")):
+            self.assertEqual(retry(ValueError(bad),venues,100000),[])
+        self.assertEqual(retry(ValueError(msg),["meteora_dlmm","orca"],100000),[])
+        self.assertEqual(retry(RuntimeError(msg),venues,100000),[])
+        self.assertEqual(retry(ValueError(msg),venues,True),[])
+
+    def test_dlmm_6039_retry_preserves_acceptance_gate(self):
+        msg=("signed prefix simulation failed: "
+             "{'InstructionError': [1, {'Custom': 6039}]}; "
+             "program_log_tail=['Error Code: InsufficientOutAmount. Error Number: 6039.']")
+        for rollback in (True,False):
+            with self.subTest(rollback=rollback),tempfile.TemporaryDirectory() as directory:
+                root=self.report(directory)
+                path=root/"three-hop-inventory.json"
+                report=json.loads(path.read_text())
+                report["routes"][0]["venues"]=["orca","meteora_dlmm","raydium_cpmm"]
+                path.write_text(json.dumps(report))
+                receipt=dict(self.signed_receipt(),rollback_failure_case_verified=rollback)
+                with patch.dict(os.environ,{"SURFPOOL_EXPLICITLY_OFFLINE":"1",
+                                            "SURFPOOL_DATASOURCE_RPC_URL":""}),patch(
+                    "arb.pumpswap_local_simulation.local_rpc_only"),patch(
+                    "arb.dlmm_offline_clock.align_permissioned_dlmm_clock",
+                    return_value={}),patch(
+                    "arb.next_ten_signed_atomic_offline.run_four_to_six_venue",
+                    side_effect=[ValueError(msg),receipt]) as signer:
+                    output=offline_simulate("http://127.0.0.1:8899",root,amount=100000)
+                self.assertEqual([c.kwargs["amount_in"] for c in signer.call_args_list],
+                                 [100000,1000000])
+                self.assertEqual(output["simulations_verified"],int(rollback))
+                self.assertFalse(output["routes"][0]["broadcast"])
