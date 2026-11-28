@@ -798,9 +798,11 @@ def audit_primary_shard(directory):
             if plan["candidate_amounts"] and amount not in plan["candidate_amounts"]:
                 raise ValueError("accepted source-size input not in authenticated plan")
             audit["source_size_plan"]=recomputed
+        from arb.m5_signed_start_mint_economics import signed_net_economics
+        audit["signed_economics"]=signed_net_economics(receipt,start_mint=mints[0],
+            source_slot=source_row["source_slot"])
         if fixture.get("contextual_source_clock") is not None:
             from arb.m5_source_indicative_route_chain import contextual_economic_model
-            from arb.m5_signed_start_mint_economics import signed_net_economics
             selected=[a for a in row["signed_exact_input_attempts"]
                       if a["amount_base_units"]==amount and a["status"]=="RECEIPT_RETURNED"]
             model=contextual_economic_model(fixture,amount_in=amount)
